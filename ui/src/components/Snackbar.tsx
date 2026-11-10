@@ -1,7 +1,7 @@
 import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import type { GameState } from "../utils/api.types";
-import { humanizeActionRecord } from "../utils/promptUtils";
+import { humanizeActionRecordPt } from "../utils/promptUtils";
 
 // No types exported from notistack;
 type SnackbarKey = string | number;
@@ -11,7 +11,7 @@ export const snackbarActions =
     <>
       <IconButton
         size="small"
-        aria-label="close"
+        aria-label="fechar"
         color="inherit"
         onClick={() => closeSnackbar(key)}
       >
@@ -23,18 +23,17 @@ export const snackbarActions =
 export function dispatchSnackbar(
   enqueueSnackbar: (
     message: string,
-    options: { action: (key: string) => React.ReactNode; onClick: () => void },
+    options: { action: (key: string) => React.ReactNode; onClick: () => void }
   ) => SnackbarKey,
   closeSnackbar: (key?: string | number) => void,
-  gameState: GameState,
+  gameState: GameState
 ) {
-  enqueueSnackbar(
-    humanizeActionRecord(gameState, gameState.action_records.slice(-1)[0]),
-    {
-      action: snackbarActions(closeSnackbar),
-      onClick: () => {
-        closeSnackbar();
-      },
+  const latestRecord = gameState.action_records.slice(-1)[0];
+  if (!latestRecord) return;
+  enqueueSnackbar(humanizeActionRecordPt(gameState, latestRecord), {
+    action: snackbarActions(closeSnackbar),
+    onClick: () => {
+      closeSnackbar();
     },
-  );
+  });
 }

@@ -8,12 +8,111 @@ import type {
   PlayYearOfPlentyAction,
   MoveRobberAction,
   ResourceCard,
+   GameState,
 } from "./api.types";
-import type { GameState } from "./api.types";
+import { PLAYER_COLOR_META, RESOURCE_META } from "../config/assetRegistry";
+
+function resPt(resource?: ResourceCard | null): string {
+  if (!resource) return "";
+  return RESOURCE_META[resource]?.label || resource;
+}
+
+export function humanizeTradeActionPt(action: MaritimeTradeAction): string {
+  const out = action[2]
+    .slice(0, 4)
+    .filter((resource: unknown): resource is ResourceCard => resource !== null);
+  const giveRes = out[0] ? resPt(out[0]) : "";
+  const recvRes = action[2][4] ? resPt(action[2][4]) : "";
+  return `${out.length}× ${giveRes} → 1× ${recvRes}`;
+}
+
+export function humanizeActionRecordPt(
+  gameState: GameState,
+  actionRecord: GameActionRecord
+): string {
+  const botColors = gameState.bot_colors || [];
+  const action = actionRecord[0];
+  const color = action[0];
+  const colorLabel = PLAYER_COLOR_META[color]?.label || color;
+  const customName = gameState.seat_names?.[color];
+  const player =
+    customName || (botColors.includes(color) ? `IA (${colorLabel})` : colorLabel);
+
+  switch (action[1]) {
+    case "ROLL": {
+      const dice = actionRecord[1] as [number, number];
+      return `${player} rolou ${dice[0] + dice[1]} (${dice[0]}+${dice[1]})`;
+    }
+    case "DISCARD_RESOURCE":
+      return `${player} descartou ${resPt(actionRecord[1] as ResourceCard)}`;
+    case "BUY_DEVELOPMENT_CARD":
+      return `${player} comprou Carta de Desenvolvimento`;
+    case "BUILD_SETTLEMENT":
+    case "BUILD_CITY": {
+      const buildAction = action as BuildCityAction;
+      const isCity = buildAction[1] === "BUILD_CITY";
+      const label = isCity ? "Cidade" : "Aldeia";
+      const nodeId = buildAction[2];
+      const tiles = gameState.adjacent_tiles?.[nodeId] || [];
+      const tileString = tiles.map(getShortTileString).join("-");
+      return `${player} construiu ${label} em ${tileString}`;
+    }
+    case "BUILD_ROAD": {
+      const roadAction = action as BuildRoadAction;
+      const edge = roadAction[2];
+      const a = (gameState.adjacent_tiles?.[edge[0]] || []).flatMap((tile) =>
+        "id" in tile ? [tile.id] : []
+      );
+      const b = (gameState.adjacent_tiles?.[edge[1]] || []).flatMap((tile) =>
+        "id" in tile ? [tile.id] : []
+      );
+      const intersection = a.filter((t) => b.includes(t));
+      const tiles = intersection.map(
+        (tileId) => findTileById(gameState, tileId).tile
+      );
+      const edgeString = tiles.map(getShortTileString).join("-");
+      return `${player} construiu Estrada em ${edgeString}`;
+    }
+    case "PLAY_KNIGHT_CARD":
+      return `${player} usou carta Cavaleiro`;
+    case "PLAY_ROAD_BUILDING":
+      return `${player} usou Construção de Estradas`;
+    case "PLAY_MONOPOLY":
+      return `${player} monopolizou ${resPt(action[2] as ResourceCard)}`;
+    case "PLAY_YEAR_OF_PLENTY": {
+      const yopAction = action as PlayYearOfPlentyAction;
+      const firstResource = resPt(yopAction[2][0]);
+      const secondResource = yopAction[2][1] ? resPt(yopAction[2][1]) : "";
+      return secondResource
+        ? `${player} usou Ano da Fartura (${firstResource} e ${secondResource})`
+        : `${player} usou Ano da Fartura (${firstResource})`;
+    }
+    case "MOVE_ROBBER": {
+      const robAction = action as MoveRobberAction;
+      const tile = findTileByCoordinate(gameState, robAction[2][0]);
+      const tileInfo = tile.tile;
+      const tileStr =
+        tileInfo.type === "DESERT"
+          ? "o Deserto"
+          : `${tileInfo.number} (${resPt(tileInfo.resource)})`;
+      const robbedResource = actionRecord[1] as ResourceCard | null;
+      const stolenStr = robbedResource ? ` e roubou ${resPt(robbedResource)}` : "";
+      return `${player} moveu o Ladrão para ${tileStr}${stolenStr}`;
+    }
+    case "MARITIME_TRADE": {
+      const label = humanizeTradeActionPt(action as MaritimeTradeAction);
+      return `${player} trocou ${label}`;
+    }
+    case "END_TURN":
+      return `${player} passou a vez`;
+    default:
+      return `${player}: ${action[1]}`;
+  }
+}
 
 export function humanizeActionRecord(
   gameState: GameState,
-  actionRecord: GameActionRecord,
+  actionRecord: GameActionRecord
 ) {
   const botColors = gameState.bot_colors;
   const action = actionRecord[0];
@@ -48,7 +147,7 @@ export function humanizeActionRecord(
       );
       const intersection = a.filter((t) => b.includes(t));
       const tiles = intersection.map(
-        (tileId) => findTileById(gameState, tileId).tile,
+        (tileId) => findTileById(gameState, tileId).tile
       );
       const edgeString = tiles.map(getShortTileString).join("-");
       return `${player} BUILT ROAD ON ${edgeString}`;
@@ -90,6 +189,7 @@ export function humanizeActionRecord(
       throw new Error(`Unknown action type: ${action[1]}`);
   }
 }
+
 export function humanizeTradeAction(action: MaritimeTradeAction): string {
   const out = action[2]
     .slice(0, 4)
@@ -104,7 +204,7 @@ export function findTileByCoordinate(gameState: GameState, coordinate: any) {
     }
   }
   throw new Error(
-    `Tile not found for coordinate: ${JSON.stringify(coordinate)}`,
+    `Tile not found for coordinate: ${JSON.stringify(coordinate)}`
   );
 }
 

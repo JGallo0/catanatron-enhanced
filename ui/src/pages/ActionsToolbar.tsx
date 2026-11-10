@@ -344,7 +344,7 @@ function PlayButtons() {
         icon={<SimCardIcon />}
         items={useItems}
       >
-        Use
+        Usar Carta
       </OptionsButton>
 
       <OptionsButton
@@ -353,7 +353,7 @@ function PlayButtons() {
         icon={<BuildIcon />}
         items={buildItems}
       >
-        Buy
+        Construir
       </OptionsButton>
 
       <Button
@@ -364,7 +364,7 @@ function PlayButtons() {
         startIcon={<AccountBalanceIcon />}
         onClick={() => setTradeModalOpen(true)}
       >
-        Trade
+        Trocar
       </Button>
 
       <Button
@@ -388,14 +388,14 @@ function PlayButtons() {
         }
       >
         {isDiscard
-          ? "DISCARD"
+          ? "DESCARTAR"
           : isMoveRobber
-            ? "ROB"
+            ? "ROUBAR"
             : isPlayingYearOfPlenty || isPlayingMonopoly
-              ? "SELECT"
+              ? "ESCOLHER"
               : isRoll
-                ? "ROLL"
-                : "END"}
+                ? "ROLAR DADOS"
+                : "PASSAR VEZ"}
       </Button>
 
       <TradeModal

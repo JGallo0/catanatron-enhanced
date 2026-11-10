@@ -13,12 +13,13 @@ type ReplayBoxProps = {
   onSeekMove: (value: number) => void;
 };
 
-export default function ReplayBox({stateIndex,
+export default function ReplayBox({
+  stateIndex,
   latestStateIndex,
   onPrevMove,
   onNextMove,
-  onSeekMove
-}: ReplayBoxProps ) {
+  onSeekMove,
+}: ReplayBoxProps) {
   const [inputValue, setInputValue] = useState<string>(String(stateIndex));
 
   const commitInput = () => {
@@ -38,9 +39,9 @@ export default function ReplayBox({stateIndex,
 
   return (
     <div className="replay-box">
-      <h3>Replay</h3>
+      <h3>Replay da Partida</h3>
 
-      Move: {stateIndex} / {latestStateIndex}
+      Jogada: {stateIndex} / {latestStateIndex}
 
       <Slider
         className="move-slider"
@@ -52,7 +53,7 @@ export default function ReplayBox({stateIndex,
       />
 
       <NumericTextInput
-        label="Go to move"
+        label="Ir para a jogada"
         size="small"
         value={inputValue}
         onChange={setInputValue}
@@ -67,7 +68,7 @@ export default function ReplayBox({stateIndex,
           startIcon={<ArrowBackIos />}
           disabled={stateIndex === 0}
         >
-          Prev Move
+          Anterior
         </Button>
 
         <Button
@@ -77,10 +78,9 @@ export default function ReplayBox({stateIndex,
           startIcon={<ArrowForwardIos />}
           disabled={stateIndex === latestStateIndex}
         >
-          Next Move
+          Próxima
         </Button>
       </div>
-
     </div>
-  )
+  );
 }

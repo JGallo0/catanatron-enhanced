@@ -15,6 +15,7 @@ import {
   clearSavedAccount,
   createGame,
   createRoom,
+  DEFAULT_PLAYERS,
   getPlayers,
   getSavedAccount,
   listActiveRooms,
@@ -29,8 +30,19 @@ import { PLAYER_COLOR_META } from "../config/assetRegistry";
 
 import "./HomePage.scss";
 
-const MAP_TEMPLATES: MapTemplate[] = ["BASE", "MINI", "TOURNAMENT"];
+const MAP_TEMPLATES: Array<{ value: MapTemplate; label: string }> = [
+  { value: "BASE", label: "PADRÃO (BASE)" },
+  { value: "MINI", label: "MINI (RÁPIDO)" },
+  { value: "TOURNAMENT", label: "TORNEIO" },
+];
+
 const PLAYER_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"] as const;
+const COLOR_LABELS_PT: Record<(typeof PLAYER_COLORS)[number], string> = {
+  RED: "VERMELHO",
+  BLUE: "AZUL",
+  ORANGE: "LARANJA",
+  WHITE: "BRANCO",
+};
 
 export default function HomePage() {
   const [loading, setLoading] = useState(false);
@@ -44,7 +56,7 @@ export default function HomePage() {
     "CATANATRON",
     "CATANATRON",
   ]);
-  const [available, setAvailable] = useState<PlayerEntry[]>([]);
+  const [available, setAvailable] = useState<PlayerEntry[]>(DEFAULT_PLAYERS);
 
   // Account & Online Lobby state
   const [account, setAccount] = useState<PlayerAccount | null>(() =>
@@ -73,8 +85,10 @@ export default function HomePage() {
 
   useEffect(() => {
     getPlayers()
-      .then(setAvailable)
-      .catch(() => setAvailable([]));
+      .then((list) => {
+        if (list.length > 0) setAvailable(list);
+      })
+      .catch(() => setAvailable(DEFAULT_PLAYERS));
   }, []);
 
   useEffect(() => {
@@ -189,13 +203,18 @@ export default function HomePage() {
     }
   };
 
+  const selectedTemplateLabel =
+    MAP_TEMPLATES.find((t) => t.value === mapTemplate)?.label || mapTemplate;
+
   return (
     <div className="home-page">
       <div className="home-page__inner">
         <h1 className="logo">Catanatron</h1>
         {!loading ? (
           <div className="setup-card">
-            <p className="setup-note">Open hands. Random discard choice.</p>
+            <p className="setup-note">
+              Mãos privadas no multiplayer • Tabuleiro Interativo em Português
+            </p>
 
             {/* Player Account Bar (persistent login across any device on Vercel) */}
             <div className="account-bar">
@@ -204,7 +223,9 @@ export default function HomePage() {
                   <div className="account-bar__info">
                     <span className="account-bar__badge">👤 CONTA ONLINE</span>
                     <strong>{account.display_name}</strong>
-                    <small>@{account.username} • Suas salas e assentos ficam salvos em qualquer dispositivo</small>
+                    <small>
+                      @{account.username} • Suas salas e assentos ficam salvos em qualquer dispositivo
+                    </small>
                   </div>
                   <Button
                     size="small"
@@ -307,7 +328,9 @@ export default function HomePage() {
               {activeRooms.length > 0 && (
                 <div className="active-rooms-list">
                   <div className="active-rooms-list__title">
-                    <span>Salas Abertas & Suas Partidas Ativas ({activeRooms.length})</span>
+                    <span>
+                      Salas Abertas & Suas Partidas Ativas ({activeRooms.length})
+                    </span>
                   </div>
                   <div className="active-rooms-list__items">
                     {activeRooms.slice(0, 6).map((r) => {
@@ -378,11 +401,11 @@ export default function HomePage() {
 
             <div className="control-group">
               <div className="control-header">
-                <span>Map Template</span>
-                <strong>{mapTemplate}</strong>
+                <span>Modelo do Mapa</span>
+                <strong>{selectedTemplateLabel}</strong>
               </div>
               <div className="map-template-buttons">
-                {MAP_TEMPLATES.map((value) => (
+                {MAP_TEMPLATES.map(({ value, label }) => (
                   <Button
                     key={value}
                     variant="contained"
@@ -391,7 +414,7 @@ export default function HomePage() {
                       mapTemplate === value ? "selected" : ""
                     }`}
                   >
-                    {value}
+                    {label}
                   </Button>
                 ))}
               </div>
@@ -400,7 +423,7 @@ export default function HomePage() {
             <div className="control-row">
               <div className="control-group compact-control">
                 <div className="control-header">
-                  <span>Points to Win</span>
+                  <span>Pontos para Vencer</span>
                   <strong>{vpsToWin}</strong>
                 </div>
                 <Slider
@@ -416,7 +439,7 @@ export default function HomePage() {
 
               <div className="control-group compact-control">
                 <div className="control-header">
-                  <span>Card Discard Limit</span>
+                  <span>Limite de Cartas (Ladrão)</span>
                   <strong>{discardLimit}</strong>
                 </div>
                 <Slider
@@ -433,9 +456,9 @@ export default function HomePage() {
               <div className="control-group compact-control switch-control">
                 <div className="control-header">
                   <span className="inline-title">
-                    Friendly Robber
+                    Ladrão Amigável
                     <Tooltip
-                      title="Prevent robber placement on tiles touching opponents with 2 victory points."
+                      title="Impede colocar o Ladrão em terrenos de jogadores que tenham apenas 2 pontos de vitória."
                       arrow
                       enterTouchDelay={0}
                       leaveTouchDelay={3000}
@@ -443,13 +466,13 @@ export default function HomePage() {
                       <IconButton
                         size="small"
                         className="help-button"
-                        aria-label="Friendly Robber help"
+                        aria-label="Ajuda sobre Ladrão Amigável"
                       >
                         <HelpOutlineRoundedIcon fontSize="inherit" />
                       </IconButton>
                     </Tooltip>
                   </span>
-                  <strong>{friendlyRobber ? "On" : "Off"}</strong>
+                  <strong>{friendlyRobber ? "Ativo" : "Inativo"}</strong>
                 </div>
                 <Checkbox
                   className="inline-switch"
@@ -461,18 +484,18 @@ export default function HomePage() {
 
             <div className="control-group">
               <div className="control-header">
-                <span>Players</span>
+                <span>Jogadores na Mesa</span>
                 <strong>{players.length}/4</strong>
               </div>
               <div className="players-list">
                 {players.map((player, index) => (
                   <div className="player-row" key={`${player}-${index}`}>
                     <div className="player-meta">
-                      <span className="player-label">Player {index + 1}</span>
+                      <span className="player-label">Jogador {index + 1}</span>
                       <span
                         className={`player-color-chip ${PLAYER_COLORS[index].toLowerCase()}`}
                       >
-                        {PLAYER_COLORS[index]}
+                        {COLOR_LABELS_PT[PLAYER_COLORS[index]]}
                       </span>
                     </div>
                     <Select
@@ -498,7 +521,7 @@ export default function HomePage() {
                       disabled={players.length <= 2}
                       onClick={() => handleRemovePlayer(index)}
                     >
-                      Remove
+                      Remover
                     </Button>
                   </div>
                 ))}
@@ -510,7 +533,7 @@ export default function HomePage() {
                 disabled={players.length >= 4}
                 onClick={handleAddPlayer}
               >
-                Add Player
+                + Adicionar Jogador
               </Button>
             </div>
 
@@ -520,7 +543,7 @@ export default function HomePage() {
               className="start-btn"
               onClick={handleCreateGame}
             >
-              Start
+              Iniciar Partida Rápida
             </Button>
           </div>
         ) : (

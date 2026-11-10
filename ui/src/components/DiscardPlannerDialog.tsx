@@ -8,6 +8,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { ResourceCard } from "../utils/api.types";
+import { RESOURCE_META } from "../config/assetRegistry";
 import "./DiscardPlannerDialog.scss";
 
 type DiscardResourceCounts = Partial<Record<ResourceCard, number>>;
@@ -37,9 +38,9 @@ export default function DiscardPlannerDialog({
   discardResourceCounts,
   submitting = false,
 }: DiscardPlannerDialogProps) {
-  const [discardSelections, setDiscardSelections] = React.useState<ResourceCard[]>(
-    [],
-  );
+  const [discardSelections, setDiscardSelections] = React.useState<
+    ResourceCard[]
+  >([]);
 
   React.useEffect(() => {
     if (!open) {
@@ -86,11 +87,11 @@ export default function DiscardPlannerDialog({
       fullWidth
     >
       <DialogTitle>
-        Select Your Discards
+        Descartar Recursos (Ladrão)
         <Typography variant="body2" className="discard-note">
           {selectedCount === 0
-            ? `Choose ${remainingDiscardCount} card${remainingDiscardCount === 1 ? "" : "s"}.`
-            : `${selectedCount} of ${remainingDiscardCount} selected.`}
+            ? `Escolha ${remainingDiscardCount} carta${remainingDiscardCount === 1 ? "" : "s"} para descartar.`
+            : `${selectedCount} de ${remainingDiscardCount} selecionada${selectedCount === 1 ? "" : "s"}.`}
         </Typography>
       </DialogTitle>
       <DialogContent>
@@ -105,35 +106,35 @@ export default function DiscardPlannerDialog({
                   onClick={() => removeDiscardSelection(resource)}
                   disabled={submitting}
                 >
-                  {resource} x{count}
+                  {RESOURCE_META[resource].label} ×{count}
                 </Button>
               ))}
             </div>
           )}
         </div>
         <div className="resource-grid">
-          {RESOURCE_ORDER.filter((resource) => discardResourceCounts[resource] != null).map(
-            (resource) => (
-              <Button
-                key={resource}
-                variant="contained"
-                className="resource-button"
-                onClick={() => addDiscardSelection(resource)}
-                disabled={submitting || !canSelectResource(resource)}
-              >
-                <Typography variant="body2">
-                  <span className={`resource-name ${resource.toLowerCase()}`}>
-                    {resource}
-                  </span>
-                  <br />
-                  <span className="resource-meta">
-                    {selectedResourceCount(resource)}/
-                    {discardResourceCounts[resource]} selected
-                  </span>
-                </Typography>
-              </Button>
-            ),
-          )}
+          {RESOURCE_ORDER.filter(
+            (resource) => discardResourceCounts[resource] != null
+          ).map((resource) => (
+            <Button
+              key={resource}
+              variant="contained"
+              className="resource-button"
+              onClick={() => addDiscardSelection(resource)}
+              disabled={submitting || !canSelectResource(resource)}
+            >
+              <Typography variant="body2">
+                <span className={`resource-name ${resource.toLowerCase()}`}>
+                  {RESOURCE_META[resource].label}
+                </span>
+                <br />
+                <span className="resource-meta">
+                  {selectedResourceCount(resource)}/
+                  {discardResourceCounts[resource]} selecionada(s)
+                </span>
+              </Typography>
+            </Button>
+          ))}
         </div>
       </DialogContent>
       <DialogActions>
@@ -142,17 +143,21 @@ export default function DiscardPlannerDialog({
           className="clear-button"
           disabled={submitting || selectedCount === 0}
         >
-          Clear
+          Limpar
         </Button>
-        <Button onClick={onClose} className="cancel-button" disabled={submitting}>
-          Cancel
+        <Button
+          onClick={onClose}
+          className="cancel-button"
+          disabled={submitting}
+        >
+          Cancelar
         </Button>
         <Button
           variant="contained"
           onClick={() => onConfirm(discardSelections)}
           disabled={submitting || selectedCount !== remainingDiscardCount}
         >
-          Confirm
+          Confirmar
         </Button>
       </DialogActions>
     </Dialog>

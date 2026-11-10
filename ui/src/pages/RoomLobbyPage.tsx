@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button, MenuItem, Select } from "@mui/material";
 import { GridLoader } from "react-spinners";
 import {
+  DEFAULT_PLAYERS,
   getPlayers,
   getRoom,
   getSavedAccount,
@@ -61,7 +62,8 @@ export default function RoomLobbyPage() {
   const navigate = useNavigate();
 
   const [room, setRoom] = useState<RoomState | null>(null);
-  const [availablePlayers, setAvailablePlayers] = useState<PlayerEntry[]>([]);
+  const [availablePlayers, setAvailablePlayers] =
+    useState<PlayerEntry[]>(DEFAULT_PLAYERS);
   const [playerName, setPlayerName] = useState(
     () => localStorage.getItem("catan_player_name") || "Jogador"
   );

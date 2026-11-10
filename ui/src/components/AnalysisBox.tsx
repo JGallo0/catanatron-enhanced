@@ -1,34 +1,42 @@
 import { useContext, useState } from "react";
 import { CircularProgress, Button } from "@mui/material";
 import AssessmentIcon from "@mui/icons-material/Assessment";
-import { type MCTSProbabilities, type StateIndex, getMctsAnalysis } from "../utils/apiClient";
+import {
+  type MCTSProbabilities,
+  type StateIndex,
+  getMctsAnalysis,
+} from "../utils/apiClient";
 import { useParams } from "react-router-dom";
+import type { Color } from "../utils/api.types";
+import { PLAYER_COLOR_META } from "../config/assetRegistry";
 
 import "./AnalysisBox.scss";
 import { store } from "../store";
 
 type AnalysisBoxProps = {
-    stateIndex: StateIndex;
-}
+  stateIndex: StateIndex;
+};
 
-export default function AnalysisBox( { stateIndex }: AnalysisBoxProps ) {
+export default function AnalysisBox({ stateIndex }: AnalysisBoxProps) {
   const { gameId } = useParams();
   const { state } = useContext(store);
-  const [mctsResults, setMctsResults] = useState<MCTSProbabilities | undefined>(undefined);
+  const [mctsResults, setMctsResults] = useState<MCTSProbabilities | undefined>(
+    undefined
+  );
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleAnalyzeClick = async () => {
     if (!gameId || !state.gameState || state.gameState.winning_color) return;
 
     try {
       setLoading(true);
-      setError('');
+      setError("");
       const result = await getMctsAnalysis(gameId, stateIndex);
       if (result.success) {
         setMctsResults(result.probabilities);
       } else {
-        setError(result.error || "Analysis failed");
+        setError(result.error || "Falha na análise");
       }
     } catch (err) {
       console.error("MCTS Analysis failed:", err);
@@ -37,7 +45,7 @@ export default function AnalysisBox( { stateIndex }: AnalysisBoxProps ) {
       } else if (typeof err === "string") {
         setError(err);
       } else {
-        setError("An unknown error occurred");
+        setError("Ocorreu um erro inesperado");
       }
     } finally {
       setLoading(false);
@@ -47,29 +55,32 @@ export default function AnalysisBox( { stateIndex }: AnalysisBoxProps ) {
   return (
     <div className="analysis-box">
       <div className="analysis-header">
-        <h3>Win Probability Analysis</h3>
+        <h3>Chances de Vitória (IA MCTS)</h3>
         <Button
           variant="contained"
           color="primary"
           onClick={handleAnalyzeClick}
           disabled={loading || !!state.gameState?.winning_color}
-          startIcon={loading ? <CircularProgress size={20} /> : <AssessmentIcon />}
+          startIcon={
+            loading ? <CircularProgress size={20} /> : <AssessmentIcon />
+          }
         >
-          {loading ? "Analyzing..." : "Analyze"}
+          {loading ? "Calculando..." : "Analisar"}
         </Button>
       </div>
 
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+      {error && <div className="error-message">{error}</div>}
 
       {mctsResults && !loading && !error && (
         <div className="probability-bars">
           {Object.entries(mctsResults).map(([color, probability]) => (
-            <div key={color} className={`probability-row ${color.toLowerCase()}`}>
-              <span className="player-color">{color}</span>
+            <div
+              key={color}
+              className={`probability-row ${color.toLowerCase()}`}
+            >
+              <span className="player-color">
+                {PLAYER_COLOR_META[color as Color]?.label || color}
+              </span>
               <span className="probability-bar">
                 <div
                   className="bar-fill"

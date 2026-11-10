@@ -87,9 +87,127 @@ export async function loginOrRegisterAccount(options: {
   return response.data;
 }
 
+const PLAYER_PT_NAMES: Record<string, { name: string; description: string }> = {
+  HUMAN: {
+    name: "Humano (Você / Amigo)",
+    description: "Jogador controlado por pessoa na mesa ou via link.",
+  },
+  CATANATRON: {
+    name: "IA: Catanatron (AlphaBeta Forte)",
+    description: "Bot mais forte do Catanatron com busca Alpha-Beta.",
+  },
+  AB: {
+    name: "IA: AlphaBeta Configurável",
+    description: "Busca em árvore Alpha-Beta com profundidade ajustável.",
+  },
+  F: {
+    name: "IA: Função de Valor (Rápida)",
+    description: "Avalia a melhor jogada imediata por heurística.",
+  },
+  MCTS: {
+    name: "IA: Monte Carlo (MCTS)",
+    description: "Simula partidas completas para decidir a jogada.",
+  },
+  G: {
+    name: "IA: Gananciosa (Greedy)",
+    description: "Prioriza ganhos imediatos de produção.",
+  },
+  VP: {
+    name: "IA: Caçadora de Pontos (VP)",
+    description: "Foca diretamente em ações que geram pontos de vitória.",
+  },
+  W: {
+    name: "IA: Aleatória Ponderada",
+    description: "Escolhe jogadas aleatórias com peso maior para construções.",
+  },
+  WEIGHTED_RANDOM: {
+    name: "IA: Aleatória Ponderada",
+    description: "Escolhe jogadas aleatórias com peso maior para construções.",
+  },
+  R: {
+    name: "IA: Aleatória Simples (Fácil)",
+    description: "Escolhe qualquer ação válida aleatoriamente.",
+  },
+  RANDOM: {
+    name: "IA: Aleatória Simples (Fácil)",
+    description: "Escolhe qualquer ação válida aleatoriamente.",
+  },
+};
+
+export const DEFAULT_PLAYERS: PlayerEntry[] = [
+  {
+    key: "HUMAN",
+    name: PLAYER_PT_NAMES.HUMAN.name,
+    description: PLAYER_PT_NAMES.HUMAN.description,
+    is_bot: false,
+    source: "builtin",
+    params: [],
+  },
+  {
+    key: "CATANATRON",
+    name: PLAYER_PT_NAMES.CATANATRON.name,
+    description: PLAYER_PT_NAMES.CATANATRON.description,
+    is_bot: true,
+    source: "builtin",
+    params: [],
+  },
+  {
+    key: "F",
+    name: PLAYER_PT_NAMES.F.name,
+    description: PLAYER_PT_NAMES.F.description,
+    is_bot: true,
+    source: "builtin",
+    params: [],
+  },
+  {
+    key: "MCTS",
+    name: PLAYER_PT_NAMES.MCTS.name,
+    description: PLAYER_PT_NAMES.MCTS.description,
+    is_bot: true,
+    source: "builtin",
+    params: [],
+  },
+  {
+    key: "VP",
+    name: PLAYER_PT_NAMES.VP.name,
+    description: PLAYER_PT_NAMES.VP.description,
+    is_bot: true,
+    source: "builtin",
+    params: [],
+  },
+  {
+    key: "W",
+    name: PLAYER_PT_NAMES.W.name,
+    description: PLAYER_PT_NAMES.W.description,
+    is_bot: true,
+    source: "builtin",
+    params: [],
+  },
+  {
+    key: "RANDOM",
+    name: PLAYER_PT_NAMES.RANDOM.name,
+    description: PLAYER_PT_NAMES.RANDOM.description,
+    is_bot: true,
+    source: "builtin",
+    params: [],
+  },
+];
+
 export async function getPlayers(): Promise<PlayerEntry[]> {
-  const response = await axios.get<PlayerEntry[]>(API_URL + "/api/players");
-  return response.data;
+  try {
+    const response = await axios.get<PlayerEntry[]>(API_URL + "/api/players");
+    if (!Array.isArray(response.data) || response.data.length === 0) {
+      return DEFAULT_PLAYERS;
+    }
+    return response.data.map((entry) => {
+      const pt = PLAYER_PT_NAMES[entry.key];
+      return pt
+        ? { ...entry, name: pt.name, description: pt.description }
+        : entry;
+    });
+  } catch {
+    return DEFAULT_PLAYERS;
+  }
 }
 
 export async function createGame({

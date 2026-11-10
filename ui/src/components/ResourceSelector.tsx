@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import "./ResourceSelector.scss";
 import type { ResourceCard } from "../utils/api.types";
+import { RESOURCE_META } from "../config/assetRegistry";
 
 type SelectorOption = ResourceCard | ResourceCard[];
 
@@ -36,7 +37,7 @@ export default function ResourceSelector({
   mode,
 }: ResourceSelectorProps) {
   const isSingleResourceOption = (
-    option: SelectorOption,
+    option: SelectorOption
   ): option is ResourceCard => !Array.isArray(option);
 
   const sortedOptions = React.useMemo(() => {
@@ -45,10 +46,10 @@ export default function ResourceSelector({
     }
 
     const yearOfPlentyOptions = options.filter(
-      (option): option is ResourceCard[] => Array.isArray(option),
+      (option): option is ResourceCard[] => Array.isArray(option)
     );
     const hasDoubleOptions = yearOfPlentyOptions.some(
-      (option) => option.length === 2,
+      (option) => option.length === 2
     );
     const filteredOptions = hasDoubleOptions
       ? yearOfPlentyOptions.filter((option) => option.length === 2)
@@ -72,7 +73,7 @@ export default function ResourceSelector({
 
   const getResourceSpan = (resource: ResourceCard) => (
     <span className={`resource-name ${resource.toLowerCase()}`}>
-      {resource}
+      {RESOURCE_META[resource].label}
     </span>
   );
 
@@ -107,8 +108,8 @@ export default function ResourceSelector({
     >
       <DialogTitle>
         {mode === "monopoly"
-          ? "Select Resource to Monopolize"
-          : "Select Resources for Year of Plenty"}
+          ? "Escolha o Recurso para Monopolizar"
+          : "Escolha 2 Recursos (Ano da Fartura)"}
       </DialogTitle>
       <DialogContent>
         <div className="resource-grid">
@@ -128,7 +129,7 @@ export default function ResourceSelector({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} className="cancel-button">
-          Cancel
+          Cancelar
         </Button>
       </DialogActions>
     </Dialog>

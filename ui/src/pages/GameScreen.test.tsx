@@ -45,7 +45,9 @@ function deferred<T>() {
 
 function StateIndexProbe() {
   const { state } = useContext(store);
-  return <output data-testid="state-index">{state.gameState?.state_index}</output>;
+  return (
+    <output data-testid="state-index">{state.gameState?.state_index}</output>
+  );
 }
 
 function renderGameScreen({
@@ -89,12 +91,10 @@ test("loads a persisted API state into the real gameplay controls", async () => 
   renderGameScreen();
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "ROLL" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "ROLAR DADOS" })).toBeEnabled();
   expect(screen.getAllByTitle("Victory Points").length).toBeGreaterThan(0);
   expect(screen.getByTestId("state-index")).toHaveTextContent("12");
   expect(getState).toHaveBeenCalledWith("game-123", undefined);
-  // Spectator by default: every request carries the perspective, so it is set
-  // before the first fetch rather than passed at each call site.
   expect(setPerspective).toHaveBeenCalledWith(null);
   expect(postAction).not.toHaveBeenCalled();
 });
@@ -127,7 +127,7 @@ test("advances a persisted bot turn and publishes the returned state", async () 
   });
 
   expect(screen.getByTestId("state-index")).toHaveTextContent("13");
-  expect(screen.getByRole("button", { name: "ROLL" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "ROLAR DADOS" })).toBeEnabled();
   expect(dispatchSnackbar).toHaveBeenCalledOnce();
 });
 
@@ -144,5 +144,7 @@ test("loads a historical state without advancing bots in replay mode", async () 
   expect(screen.getByTestId("state-index")).toHaveTextContent("7");
   expect(getState).toHaveBeenCalledWith("game-123", "7");
   expect(postAction).not.toHaveBeenCalled();
-  expect(screen.queryByRole("button", { name: "ROLL" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "ROLAR DADOS" })
+  ).not.toBeInTheDocument();
 });

@@ -6,7 +6,7 @@ import Button from "@mui/material/Button";
 
 import Hidden from "./Hidden";
 import PlayerStateBox from "./PlayerStateBox";
-import { humanizeActionRecord } from "../utils/promptUtils";
+import { humanizeActionRecordPt } from "../utils/promptUtils";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import { getHumanColor, playerKey } from "../utils/stateUtils";
@@ -140,7 +140,7 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
                   {actionIcon(actionRecord)}
                 </span>
                 <span className="action__text">
-                  {humanizeActionRecord(gameState, actionRecord)}
+                  {humanizeActionRecordPt(gameState, actionRecord)}
                 </span>
               </div>
             );

@@ -29,7 +29,9 @@ vi.mock("../components/AnalysisBox", () => ({
 
 function StateIndexProbe() {
   const { state } = useContext(store);
-  return <output data-testid="state-index">{state.gameState?.state_index}</output>;
+  return (
+    <output data-testid="state-index">{state.gameState?.state_index}</output>
+  );
 }
 
 function renderReplayScreen() {
@@ -63,17 +65,17 @@ test("loads the latest replay boundary and navigates persisted states", async ()
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
   await waitFor(() => {
-    expect(screen.getByText("Move: 0 / 12")).toBeInTheDocument();
+    expect(screen.getByText("Jogada: 0 / 12")).toBeInTheDocument();
   });
   expect(getState).toHaveBeenCalledWith("game-123", "latest");
   expect(getState).toHaveBeenCalledWith("game-123", 0);
   expect(screen.getByTestId("state-index")).toHaveTextContent("0");
 
-  await user.click(screen.getByRole("button", { name: "Next Move" }));
+  await user.click(screen.getByRole("button", { name: "Próxima" }));
 
   await waitFor(() => {
     expect(getState).toHaveBeenCalledWith("game-123", 1);
     expect(screen.getByTestId("state-index")).toHaveTextContent("1");
-    expect(screen.getByText("Move: 1 / 12")).toBeInTheDocument();
+    expect(screen.getByText("Jogada: 1 / 12")).toBeInTheDocument();
   });
 });
