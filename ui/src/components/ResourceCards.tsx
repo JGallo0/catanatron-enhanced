@@ -1,12 +1,42 @@
-import { Paper } from "@mui/material";
-import { type PlayerState } from "../utils/api.types";
-import { type Card } from "../utils/api.types";
+import { type PlayerState, type Card, type ResourceCard } from "../utils/api.types";
+import {
+  DEV_CARD_META,
+  type DevCardType,
+  RESOURCE_META,
+} from "../config/assetRegistry";
+import {
+  DevCardIcon,
+  HybridIllustration,
+  ResourceIcon,
+} from "./icons/GameIcons";
 
-// TODO - do we need to split the SCSS for this component?
 import "./PlayerStateBox.scss";
 
-export default function ResourceCards({ playerState, playerKey }: { playerState: PlayerState; playerKey: string }) {
-  const amount = (card: Card) => playerState[`${playerKey}_${card}_IN_HAND`];
+const RESOURCES: ResourceCard[] = ["WOOD", "BRICK", "SHEEP", "WHEAT", "ORE"];
+
+const DEV_CARDS: {
+  id: DevCardType;
+  code: string;
+  titleLabel: string;
+}[] = [
+  { id: "VICTORY_POINT", code: "VP", titleLabel: "Victory Point" },
+  { id: "KNIGHT", code: "KN", titleLabel: "Knight" },
+  { id: "MONOPOLY", code: "MO", titleLabel: "Monopoly" },
+  { id: "YEAR_OF_PLENTY", code: "YP", titleLabel: "Year of Plenty" },
+  { id: "ROAD_BUILDING", code: "RB", titleLabel: "Road Building" },
+];
+
+export default function ResourceCards({
+  playerState,
+  playerKey,
+  compact = false,
+}: {
+  playerState: PlayerState;
+  playerKey: string;
+  compact?: boolean;
+}) {
+  const amount = (card: Card): number | undefined =>
+    playerState[`${playerKey}_${card}_IN_HAND`];
 
   // Seen from another seat, this hand arrives as two counts instead of cards.
   if (amount("WOOD") === undefined) {
@@ -16,93 +46,76 @@ export default function ResourceCards({ playerState, playerKey }: { playerState:
         developments={
           playerState[`${playerKey}_NUM_DEVELOPMENT_CARDS_IN_HAND`] ?? 0
         }
+        compact={compact}
       />
     );
   }
 
   return (
-    <div className="resource-cards" title="Resource Cards">
-      {amount("WOOD") !== 0 && (
-        <div className="wood-cards center-text card">
-          <Paper>{amount("WOOD")}</Paper>
-        </div>
-      )}
-      {amount("BRICK") !== 0 && (
-        <div className="brick-cards center-text card">
-          <Paper>{amount("BRICK")}</Paper>
-        </div>
-      )}
-      {amount("SHEEP") !== 0 && (
-        <div className="sheep-cards center-text card">
-          <Paper>{amount("SHEEP")}</Paper>
-        </div>
-      )}
-      {amount("WHEAT") !== 0 && (
-        <div className="wheat-cards center-text card">
-          <Paper>{amount("WHEAT")}</Paper>
-        </div>
-      )}
-      {amount("ORE") !== 0 && (
-        <div className="ore-cards center-text card">
-          <Paper>{amount("ORE")}</Paper>
-        </div>
-      )}
-      <div className="separator"></div>
-      {amount("VICTORY_POINT") !== 0 && (
-        <div
-          className="dev-cards center-text card"
-          title={amount("VICTORY_POINT") + " Victory Point Card(s)"}
-        >
-          <Paper>
-            <span>{amount("VICTORY_POINT")}</span>
-            <span>VP</span>
-          </Paper>
-        </div>
-      )}
-      {amount("KNIGHT") !== 0 && (
-        <div
-          className="dev-cards center-text card"
-          title={amount("KNIGHT") + " Knight Card(s)"}
-        >
-          <Paper>
-            <span>{amount("KNIGHT")}</span>
-            <span>KN</span>
-          </Paper>
-        </div>
-      )}
-      {amount("MONOPOLY") !== 0 && (
-        <div
-          className="dev-cards center-text card"
-          title={amount("MONOPOLY") + " Monopoly Card(s)"}
-        >
-          <Paper>
-            <span>{amount("MONOPOLY")}</span>
-            <span>MO</span>
-          </Paper>
-        </div>
-      )}
-      {amount("YEAR_OF_PLENTY") !== 0 && (
-        <div
-          className="dev-cards center-text card"
-          title={amount("YEAR_OF_PLENTY") + " Year of Plenty Card(s)"}
-        >
-          <Paper>
-            <span>{amount("YEAR_OF_PLENTY")}</span>
-            <span>YP</span>
-          </Paper>
-        </div>
-      )}
-      {amount("ROAD_BUILDING") !== 0 && (
-        <div
-          className="dev-cards center-text card"
-          title={amount("ROAD_BUILDING") + " Road Building Card(s)"}
-        >
-          <Paper>
-            <span>{amount("ROAD_BUILDING")}</span>
-            <span>RB</span>
-          </Paper>
-        </div>
-      )}
+    <div
+      className={`resource-cards ${compact ? "resource-cards--compact" : ""}`}
+      title="Resource Cards"
+    >
+      {RESOURCES.map((res) => {
+        const count = amount(res) ?? 0;
+        if (count === 0) return null;
+        const meta = RESOURCE_META[res];
+        const lower = res.toLowerCase();
+
+        return (
+          <div
+            key={res}
+            className={`${lower}-cards center-text card resource-card-item`}
+            title={`${count}x ${meta.label} (${res})`}
+            style={{
+              borderColor: meta.borderColor,
+              background: `linear-gradient(160deg, ${meta.secondaryColor} 0%, ${meta.primaryColor} 100%)`,
+            }}
+          >
+            <div className="resource-card-item__inner">
+              <HybridIllustration
+                src={meta.customCardIllustration}
+                alt={meta.label}
+                className="resource-card-item__custom-art"
+                fallback={
+                  <ResourceIcon resource={res} size={compact ? 16 : 22} />
+                }
+              />
+              <span className="resource-card-item__count">{count}</span>
+              {!compact && (
+                <span className="resource-card-item__label">
+                  {meta.shortLabel}
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="separator" />
+
+      {DEV_CARDS.map(({ id, code, titleLabel }) => {
+        const count = amount(id) ?? 0;
+        if (count === 0) return null;
+        const meta = DEV_CARD_META[id];
+
+        return (
+          <div
+            key={id}
+            className="dev-cards center-text card resource-card-item resource-card-item--dev"
+            title={`${count} ${titleLabel} Card(s)`}
+            style={{
+              borderColor: meta.accentColor,
+            }}
+          >
+            <div className="resource-card-item__inner">
+              <DevCardIcon card={id} size={compact ? 15 : 19} />
+              <span className="resource-card-item__count">{count}</span>
+              <span className="resource-card-item__label">{code}</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -110,29 +123,37 @@ export default function ResourceCards({ playerState, playerKey }: { playerState:
 function FaceDownCards({
   resources,
   developments,
+  compact = false,
 }: {
   resources: number;
   developments: number;
+  compact?: boolean;
 }) {
   return (
-    <div className="resource-cards" title="Resource Cards">
+    <div
+      className={`resource-cards ${compact ? "resource-cards--compact" : ""}`}
+      title="Resource Cards"
+    >
       {resources !== 0 && (
         <div
-          className="hidden-cards center-text card"
+          className="hidden-cards center-text card resource-card-item resource-card-item--facedown"
           title={resources + " Resource Card(s), face down"}
         >
-          <Paper>{resources}</Paper>
+          <div className="resource-card-item__inner">
+            <span className="resource-card-item__count">{resources}</span>
+            <span className="resource-card-item__label">REC</span>
+          </div>
         </div>
       )}
       {developments !== 0 && (
         <div
-          className="dev-cards center-text card"
+          className="dev-cards center-text card resource-card-item resource-card-item--dev-facedown"
           title={developments + " Development Card(s), face down"}
         >
-          <Paper>
-            <span>{developments}</span>
-            <span>DEV</span>
-          </Paper>
+          <div className="resource-card-item__inner">
+            <span className="resource-card-item__count">{developments}</span>
+            <span className="resource-card-item__label">DEV</span>
+          </div>
         </div>
       )}
     </div>

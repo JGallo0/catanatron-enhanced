@@ -4,15 +4,18 @@ body,
   margin: 0;
   height: 100%;
   overflow: hidden;
+  background-color: #060d18;
+  color: #f8fafc;
 }
 
 body {
-  font-family: "Roboto", sans-serif;
+  font-family: "Plus Jakarta Sans", "Outfit", -apple-system, BlinkMacSystemFont,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+  font-family: "JetBrains Mono", source-code-pro, Menlo, Monaco, Consolas,
     monospace;
 }

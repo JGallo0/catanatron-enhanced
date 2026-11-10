@@ -1,87 +1,238 @@
 @use "../variables.scss";
 
 .resource-cards {
-  height: 40px;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+  min-height: 44px;
 
-  margin-bottom: variables.$sm-gutter;
+  &--compact {
+    min-height: 34px;
+    gap: 4px;
+  }
 
-  .card {
-    border-radius: 4px;
-    div {
-      background: #151313;
-      color: white;
-
-      width: 21px;
-      height: 36px;
-
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.8rem;
-      font-weight: bold;
-      position: relative;
-    }
-  }
-  .wood-cards {
-    background: variables.$wood;
-  }
-  .brick-cards {
-    background: variables.$brick;
-  }
-  .wheat-cards {
-    background: variables.$wheat;
-  }
-  .sheep-cards {
-    background: variables.$darker-sheep;
-  }
-  .ore-cards {
-    background: variables.$ore;
-  }
-  .dev-cards {
-    background: purple;
-    div {
-      font-size: 0.7rem;
-    }
-  }
-  // A hand seen from another seat: countable, not readable.
-  .hidden-cards {
-    background: #6b6b6b;
+  .separator {
+    width: 1px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.12);
+    margin: 0 2px;
   }
 }
 
-.center-text {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.resource-card-item {
+  position: relative;
+  min-width: 44px;
+  height: 56px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  user-select: none;
 
-  width: 25px;
-  height: 40px;
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.6);
+  }
+
+  .resource-cards--compact & {
+    min-width: 34px;
+    height: 40px;
+    border-radius: 6px;
+  }
+
+  &__inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 4px;
+    position: relative;
+    z-index: 2;
+  }
+
+  &__custom-art {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 4px;
+  }
+
+  &__count {
+    font-family: "Outfit", "Inter", sans-serif;
+    font-weight: 800;
+    font-size: 0.92rem;
+    line-height: 1.05;
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  }
+
+  &__label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    opacity: 0.9;
+    color: rgba(255, 255, 255, 0.92);
+    line-height: 1;
+  }
+
+  &--dev {
+    background: linear-gradient(160deg, #4c1d95 0%, #1e1b4b 100%);
+  }
+
+  &--facedown {
+    background: linear-gradient(160deg, #334155 0%, #0f172a 100%);
+    border-color: #64748b;
+  }
+
+  &--dev-facedown {
+    background: linear-gradient(160deg, #3b0764 0%, #1e1b4b 100%);
+    border-color: #a855f7;
+  }
 }
 
 .player-state-box {
-  padding: variables.$sm-gutter;
+  padding: 10px 12px;
+  margin: 6px 8px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid #64748b;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 
-  max-width: variables.$sm-breakpoint;
-  margin: 0 auto;
-  width: 100%;
+  &--active {
+    background: rgba(30, 41, 59, 0.92) !important;
+    border-color: rgba(250, 204, 21, 0.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  &__swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &__name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #f8fafc;
+    letter-spacing: 0.01em;
+  }
+
+  &__role-badge {
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.09);
+    color: #cbd5e1;
+    letter-spacing: 0.05em;
+  }
+
+  &__turn-pill {
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(250, 204, 21, 0.18);
+    color: #fde047;
+    border: 1px solid rgba(250, 204, 21, 0.4);
+    text-transform: uppercase;
+  }
+
+  .victory-points {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.22), rgba(161, 98, 7, 0.32));
+    border: 1px solid rgba(250, 204, 21, 0.45);
+    color: #fef08a;
+
+    &__num {
+      font-family: "Cinzel", "Outfit", serif;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+
+    small {
+      font-size: 0.65rem;
+      font-weight: 700;
+      opacity: 0.85;
+    }
+  }
 
   .scores {
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    gap: 6px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .num-knights,
-  .num-roads,
-  .victory-points {
-    flex-direction: column;
-    width: 50px;
-    height: 40px;
+  .num-roads {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.76rem;
+    color: #cbd5e1;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.55);
+
+    small {
+      font-size: 0.66rem;
+      color: #94a3b8;
+    }
+  }
+
+  .score-pill--award {
+    background: rgba(234, 179, 8, 0.2);
+    border: 1px solid rgba(250, 204, 21, 0.5);
+    color: #fef08a;
+
+    small {
+      color: #fde047;
+      font-weight: 700;
+    }
+  }
+
+  .piece-stock-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin-left: auto;
   }
 
   .bold {
-    font-weight: bold;
+    font-weight: 700;
   }
 }

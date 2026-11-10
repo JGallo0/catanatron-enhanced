@@ -4,14 +4,16 @@ import React, {
   useEffect,
   useContext,
   useCallback,
+  useMemo,
 } from "react";
 import memoize from "fast-memoize";
-import { Button } from "@mui/material";
+import { Button, Dialog, DialogTitle, DialogContent } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import BuildIcon from "@mui/icons-material/Build";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import MenuItem from "@mui/material/MenuItem";
 import ClickAwayListener from "@mui/material/ClickAwayListener";
 import Grow from "@mui/material/Grow";
@@ -26,12 +28,19 @@ import Prompt from "../components/Prompt";
 import ResourceCards from "../components/ResourceCards";
 import ResourceSelector from "../components/ResourceSelector";
 import DiscardPlannerDialog from "../components/DiscardPlannerDialog";
+import TradeModal from "../components/TradeModal";
+import { DiceFaceSvg, ResourceIcon } from "../components/icons/GameIcons";
+import { BUILDING_COSTS, RESOURCE_META } from "../config/assetRegistry";
 import { store } from "../store";
 import ACTIONS from "../actions";
-import type { GameAction, ResourceCard } from "../utils/api.types"; // Add GameState to the import, adjust path if needed
+import type {
+  GameAction,
+  GameState,
+  MaritimeTradeAction,
+  ResourceCard,
+} from "../utils/api.types";
 import { getHumanColor, playerKey } from "../utils/stateUtils";
 import { postAction } from "../utils/apiClient";
-import { humanizeTradeAction } from "../utils/promptUtils";
 import { useDiscardBatchSubmission } from "../hooks/useDiscardBatchSubmission";
 
 import "./ActionsToolbar.scss";
@@ -46,6 +55,17 @@ const RESOURCE_ORDER: ResourceCard[] = [
   "ORE",
 ];
 
+function getLatestRollPair(gameState: GameState): [number, number] | null {
+  const records = gameState.action_records || [];
+  for (let i = records.length - 1; i >= 0; i--) {
+    const [action, result] = records[i];
+    if (action[1] === "ROLL" && Array.isArray(result) && result.length === 2) {
+      return [Number(result[0]), Number(result[1])];
+    }
+  }
+  return null;
+}
+
 function PlayButtons() {
   const { gameId } = useParams();
   if (!gameId) {
@@ -56,15 +76,24 @@ function PlayButtons() {
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const [resourceSelectorOpen, setResourceSelectorOpen] = useState(false);
   const [discardPlannerOpen, setDiscardPlannerOpen] = useState(false);
+  const [tradeModalOpen, setTradeModalOpen] = useState(false);
+  const [costsModalOpen, setCostsModalOpen] = useState(false);
   const { isSubmitting, submitDiscardBatch } = useDiscardBatchSubmission();
+
+  const executeGameAction = useCallback(
+    async (action?: GameAction) => {
+      const nextState = await postAction(gameId, action);
+      dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+      dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+    },
+    [gameId, dispatch, enqueueSnackbar, closeSnackbar]
+  );
 
   const carryOutAction = useCallback(
     memoize((action?: GameAction) => async () => {
-      const gameState = await postAction(gameId, action);
-      dispatch({ type: ACTIONS.SET_GAME_STATE, data: gameState });
-      dispatchSnackbar(enqueueSnackbar, closeSnackbar, gameState);
+      await executeGameAction(action);
     }),
-    [enqueueSnackbar, closeSnackbar],
+    [executeGameAction]
   );
 
   const {
@@ -87,16 +116,18 @@ function PlayButtons() {
   const playableDevCardTypes = new Set(
     gameState.current_playable_actions
       .filter((action) => action[1].startsWith("PLAY"))
-      .map((action) => action[1]),
+      .map((action) => action[1])
   );
   const humanColor = getHumanColor(gameState);
   const discardActionType =
     gameState.current_playable_actions.find(
-      (action) => action[1] === "DISCARD_RESOURCE",
+      (action) => action[1] === "DISCARD_RESOURCE"
     )?.[1] ?? "DISCARD_RESOURCE";
+
   const setIsPlayingMonopoly = useCallback(() => {
     dispatch({ type: ACTIONS.SET_IS_PLAYING_MONOPOLY });
   }, [dispatch]);
+
   const getDiscardResourceCounts = useCallback(() => {
     return RESOURCE_ORDER.reduce(
       (counts, resource) => {
@@ -106,14 +137,16 @@ function PlayButtons() {
         }
         return counts;
       },
-      {} as Partial<Record<ResourceCard, number>>,
+      {} as Partial<Record<ResourceCard, number>>
     );
   }, [gameState.player_state, key]);
+
   const getValidYearOfPlentyOptions = useCallback(() => {
     return gameState.current_playable_actions
       .filter((action) => action[1] === "PLAY_YEAR_OF_PLENTY")
       .map((action) => action[2]);
   }, [gameState.current_playable_actions]);
+
   const handleResourceSelection = useCallback(
     async (selectedResources: ResourceCard | ResourceCard[]) => {
       setResourceSelectorOpen(false);
@@ -148,14 +181,17 @@ function PlayButtons() {
       closeSnackbar,
       isPlayingMonopoly,
       isPlayingYearOfPlenty,
-    ],
+    ]
   );
+
   const handleOpenResourceSelector = useCallback(() => {
     setResourceSelectorOpen(true);
   }, []);
+
   const handleOpenDiscardPlanner = useCallback(() => {
     setDiscardPlannerOpen(true);
   }, []);
+
   const handleDiscardSelection = useCallback(
     async (resources: ResourceCard[]) => {
       setDiscardPlannerOpen(false);
@@ -176,42 +212,46 @@ function PlayButtons() {
       dispatch,
       enqueueSnackbar,
       closeSnackbar,
-    ],
+    ]
   );
+
   const setIsPlayingYearOfPlenty = useCallback(() => {
     dispatch({ type: ACTIONS.SET_IS_PLAYING_YEAR_OF_PLENTY });
   }, [dispatch]);
+
   const playRoadBuilding = useCallback(async () => {
     const action: GameAction = [humanColor, "PLAY_ROAD_BUILDING", null];
-    const gameState = await postAction(gameId, action);
+    const nextState = await postAction(gameId, action);
     dispatch({ type: ACTIONS.PLAY_ROAD_BUILDING });
-    dispatch({ type: ACTIONS.SET_GAME_STATE, data: gameState });
-    dispatchSnackbar(enqueueSnackbar, closeSnackbar, gameState);
+    dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
   }, [gameId, dispatch, enqueueSnackbar, closeSnackbar, humanColor]);
+
   const playKnightCard = useCallback(async () => {
     const action: GameAction = [humanColor, "PLAY_KNIGHT_CARD", null];
-    const gameState = await postAction(gameId, action);
-    dispatch({ type: ACTIONS.SET_GAME_STATE, data: gameState });
-    dispatchSnackbar(enqueueSnackbar, closeSnackbar, gameState);
+    const nextState = await postAction(gameId, action);
+    dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
   }, [gameId, dispatch, enqueueSnackbar, closeSnackbar, humanColor]);
+
   const useItems = [
     {
-      label: "Monopoly",
+      label: "👑 Monopólio (Monopoly)",
       disabled: !playableDevCardTypes.has("PLAY_MONOPOLY"),
       onClick: setIsPlayingMonopoly,
     },
     {
-      label: "Year of Plenty",
+      label: "🌾 Ano da Fartura (Year of Plenty)",
       disabled: !playableDevCardTypes.has("PLAY_YEAR_OF_PLENTY"),
       onClick: setIsPlayingYearOfPlenty,
     },
     {
-      label: "Road Building",
+      label: "🛤️ Construção de Estradas (2 grátis)",
       disabled: !playableDevCardTypes.has("PLAY_ROAD_BUILDING"),
       onClick: playRoadBuilding,
     },
     {
-      label: "Knight",
+      label: "⚔️ Cavaleiro (Mover Ladrão)",
       disabled: !playableDevCardTypes.has("PLAY_KNIGHT_CARD"),
       onClick: playKnightCard,
     },
@@ -223,71 +263,81 @@ function PlayButtons() {
       : gameState.current_playable_actions
           .filter(
             (action) =>
-              action[1].startsWith("BUY") || action[1].startsWith("BUILD"),
+              action[1].startsWith("BUY") || action[1].startsWith("BUILD")
           )
-          .map((a) => a[1]),
+          .map((a) => a[1])
   );
+
   const buyDevCard = useCallback(async () => {
     const action: GameAction = [humanColor, "BUY_DEVELOPMENT_CARD", null];
-    const gameState = await postAction(gameId, action);
-    dispatch({ type: ACTIONS.SET_GAME_STATE, data: gameState });
-    dispatchSnackbar(enqueueSnackbar, closeSnackbar, gameState);
+    const nextState = await postAction(gameId, action);
+    dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
   }, [gameId, dispatch, enqueueSnackbar, closeSnackbar, humanColor]);
+
   const setIsBuildingSettlement = useCallback(() => {
     dispatch({ type: ACTIONS.SET_IS_BUILDING_SETTLEMENT });
   }, [dispatch]);
+
   const setIsBuildingCity = useCallback(() => {
     dispatch({ type: ACTIONS.SET_IS_BUILDING_CITY });
   }, [dispatch]);
+
   const toggleBuildingRoad = useCallback(() => {
     dispatch({ type: ACTIONS.TOGGLE_BUILDING_ROAD });
   }, [dispatch]);
+
   const buildItems = [
     {
-      label: "Development Card",
-      disabled: !buildActionTypes.has("BUY_DEVELOPMENT_CARD"),
-      onClick: buyDevCard,
+      label: "🛤️ Estrada (1 Madeira + 1 Argila)",
+      disabled: !buildActionTypes.has("BUILD_ROAD"),
+      onClick: toggleBuildingRoad,
     },
     {
-      label: "City",
-      disabled: !buildActionTypes.has("BUILD_CITY"),
-      onClick: setIsBuildingCity,
-    },
-    {
-      label: "Settlement",
+      label: "🏠 Aldeia (1 Mad + 1 Arg + 1 Lã + 1 Tri)",
       disabled: !buildActionTypes.has("BUILD_SETTLEMENT"),
       onClick: setIsBuildingSettlement,
     },
     {
-      label: "Road",
-      disabled: !buildActionTypes.has("BUILD_ROAD"),
-      onClick: toggleBuildingRoad,
+      label: "🏰 Cidade (2 Trigos + 3 Minérios)",
+      disabled: !buildActionTypes.has("BUILD_CITY"),
+      onClick: setIsBuildingCity,
+    },
+    {
+      label: "🃏 Carta de Desenv. (1 Lã + 1 Tri + 1 Min)",
+      disabled: !buildActionTypes.has("BUY_DEVELOPMENT_CARD"),
+      onClick: buyDevCard,
     },
   ];
 
-  const tradeActions = gameState.current_playable_actions.filter(
-    (action) => action[1] === "MARITIME_TRADE",
+  const tradeActions = useMemo(
+    () =>
+      gameState.current_playable_actions.filter(
+        (action): action is MaritimeTradeAction =>
+          action[1] === "MARITIME_TRADE"
+      ),
+    [gameState.current_playable_actions]
   );
-  const tradeItems = React.useMemo(() => {
-    const items = tradeActions.map((action) => {
-      const label = humanizeTradeAction(action);
-      return {
-        label: label,
-        disabled: false,
-        onClick: carryOutAction(action),
-      };
-    });
-
-    return items.sort((a, b) => a.label.localeCompare(b.label));
-  }, [tradeActions, carryOutAction]);
 
   const setIsMovingRobber = useCallback(() => {
     dispatch({ type: ACTIONS.SET_IS_MOVING_ROBBER });
   }, [dispatch]);
+
   const rollAction = carryOutAction([humanColor, "ROLL", null]);
   const endTurnAction = carryOutAction([humanColor, "END_TURN", null]);
+
   return (
     <>
+      <Button
+        variant="outlined"
+        className="hud-btn hud-btn--ghost"
+        onClick={() => setCostsModalOpen(true)}
+        title="Tabela de Custos de Construção"
+      >
+        <MenuBookIcon fontSize="small" />
+        <span>Custos</span>
+      </Button>
+
       <OptionsButton
         disabled={playableDevCardTypes.size === 0 || isPlayingDevCard}
         menuListId="use-menu-list"
@@ -296,6 +346,7 @@ function PlayButtons() {
       >
         Use
       </OptionsButton>
+
       <OptionsButton
         disabled={buildActionTypes.size === 0 || isPlayingDevCard}
         menuListId="build-menu-list"
@@ -304,22 +355,25 @@ function PlayButtons() {
       >
         Buy
       </OptionsButton>
-      <OptionsButton
-        disabled={tradeItems.length === 0 || isPlayingDevCard}
-        menuListId="trade-menu-list"
-        icon={<AccountBalanceIcon />}
-        items={tradeItems}
+
+      <Button
+        disabled={tradeActions.length === 0 || isPlayingDevCard}
+        variant="contained"
+        color="secondary"
+        className="hud-btn"
+        startIcon={<AccountBalanceIcon />}
+        onClick={() => setTradeModalOpen(true)}
       >
         Trade
-      </OptionsButton>
+      </Button>
+
       <Button
         disabled={
-          gameState.is_initial_build_phase ||
-          isRoadBuilding ||
-          isSubmitting
+          gameState.is_initial_build_phase || isRoadBuilding || isSubmitting
         }
         variant="contained"
         color="primary"
+        className="hud-btn hud-btn--cta"
         startIcon={<NavigateNextIcon />}
         onClick={
           isDiscard
@@ -343,6 +397,55 @@ function PlayButtons() {
                 ? "ROLL"
                 : "END"}
       </Button>
+
+      <TradeModal
+        open={tradeModalOpen}
+        onClose={() => setTradeModalOpen(false)}
+        tradeActions={tradeActions}
+        playerState={gameState.player_state}
+        playerKey={key}
+        onExecuteTrade={executeGameAction}
+      />
+
+      <Dialog
+        open={costsModalOpen}
+        onClose={() => setCostsModalOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ className: "catan-modal-paper" }}
+      >
+        <DialogTitle className="catan-modal-title">
+          📋 Tabela de Custos de Construção
+        </DialogTitle>
+        <DialogContent className="catan-modal-content">
+          <div className="costs-reference-list">
+            {Object.entries(BUILDING_COSTS).map(([itemKey, info]) => (
+              <div key={itemKey} className="costs-reference-row">
+                <div className="costs-reference-row__title">
+                  <strong>{info.label}</strong>
+                  <small>{info.vps}</small>
+                </div>
+                <div className="costs-reference-row__recipe">
+                  {Object.entries(info.recipe).map(([res, qty]) => {
+                    const r = res as ResourceCard;
+                    return (
+                      <span
+                        key={r}
+                        className="costs-recipe-chip"
+                        title={`${qty}x ${RESOURCE_META[r].label}`}
+                      >
+                        <ResourceIcon resource={r} size={16} />
+                        <strong>×{qty}</strong>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <ResourceSelector
         open={resourceSelectorOpen}
         onClose={() => {
@@ -354,6 +457,7 @@ function PlayButtons() {
         onSelect={handleResourceSelection}
         mode={isPlayingMonopoly ? "monopoly" : "yearOfPlenty"}
       />
+
       <DiscardPlannerDialog
         open={discardPlannerOpen}
         onClose={() => setDiscardPlannerOpen(false)}
@@ -395,20 +499,44 @@ export default function ActionsToolbar({
 
   const botsTurn = gameState.bot_colors.includes(gameState.current_color);
   const humanColor = getHumanColor(gameState);
+  const latestDice = useMemo(() => getLatestRollPair(gameState), [gameState]);
+  const diceSum = latestDice ? latestDice[0] + latestDice[1] : null;
+
   return (
-    <>
+    <div className="hud-bottom-dock">
       <div className="state-summary">
         <Hidden breakpoint={{ size: "md", direction: "up" }}>
           <Button className="open-drawer-btn" onClick={openLeftDrawer}>
             <ChevronLeftIcon />
           </Button>
         </Hidden>
+
         {humanColor && (
           <ResourceCards
             playerState={gameState.player_state}
             playerKey={playerKey(gameState, humanColor)}
           />
         )}
+
+        {latestDice && (
+          <div
+            className="dice-widget-pill"
+            title={`Última rolagem: ${latestDice[0]} + ${latestDice[1]} = ${diceSum}`}
+          >
+            <DiceFaceSvg
+              value={latestDice[0]}
+              size={28}
+              isHot={diceSum === 6 || diceSum === 8}
+            />
+            <DiceFaceSvg
+              value={latestDice[1]}
+              size={28}
+              isHot={diceSum === 6 || diceSum === 8}
+            />
+            <span className="dice-widget-pill__sum">= {diceSum}</span>
+          </div>
+        )}
+
         <Hidden breakpoint={{ size: "lg", direction: "up" }}>
           <Button
             className="open-drawer-btn"
@@ -419,6 +547,7 @@ export default function ActionsToolbar({
           </Button>
         </Hidden>
       </div>
+
       <div className="actions-toolbar">
         {!(botsTurn || gameState.winning_color) && !replayMode && (
           <PlayButtons />
@@ -426,20 +555,8 @@ export default function ActionsToolbar({
         {(botsTurn || gameState.winning_color) && (
           <Prompt gameState={gameState} isBotThinking={isBotThinking} />
         )}
-        {/* <Button
-          disabled={disabled}
-          className="confirm-btn"
-          variant="contained"
-          color="primary"
-          onClick={onTick}
-        >
-          Ok
-        </Button> */}
-
-        {/* <Button onClick={zoomIn}>Zoom In</Button>
-      <Button onClick={zoomOut}>Zoom Out</Button> */}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -489,7 +606,6 @@ function OptionsButton({
       setOpen(false);
     }
   }
-  // return focus to the button when we transitioned from !open -> open
   const prevOpen = useRef(open);
   useEffect(() => {
     if (prevOpen.current === true && open === false) {
@@ -509,6 +625,7 @@ function OptionsButton({
         aria-haspopup="true"
         variant="contained"
         color="secondary"
+        className="hud-btn"
         startIcon={icon}
         onClick={handleToggle}
       >
@@ -530,7 +647,7 @@ function OptionsButton({
                 placement === "bottom" ? "center top" : "center bottom",
             }}
           >
-            <Paper>
+            <Paper className="catan-menu-paper">
               <ClickAwayListener onClickAway={handleClose()}>
                 <MenuList
                   autoFocusItem={open}
@@ -542,7 +659,7 @@ function OptionsButton({
                       key={item.label}
                       onClick={
                         handleClose(
-                          item.onClick,
+                          item.onClick
                         ) as unknown as React.MouseEventHandler
                       }
                       disabled={item.disabled}
