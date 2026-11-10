@@ -23,6 +23,13 @@ export type PlayerEntry = {
   params: PlayerParam[];
 };
 
+export type PlayerAccount = {
+  username: string;
+  display_name: string;
+  auth_token: string;
+  is_new?: boolean;
+};
+
 export type MapTemplate = "BASE" | "MINI" | "TOURNAMENT";
 export type StateIndex = number | `${number}` | "latest";
 
@@ -33,6 +40,52 @@ type CreateGameOptions = {
   discardLimit: number;
   friendlyRobber: boolean;
 };
+
+const ACCOUNT_STORAGE_KEY = "catan_player_account";
+
+export function getSavedAccount(): PlayerAccount | null {
+  try {
+    const raw = localStorage.getItem(ACCOUNT_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PlayerAccount;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAccount(account: PlayerAccount) {
+  try {
+    localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(account));
+    localStorage.setItem("catan_player_name", account.display_name);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function clearSavedAccount() {
+  try {
+    localStorage.removeItem(ACCOUNT_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export async function loginOrRegisterAccount(options: {
+  username: string;
+  pin: string;
+  displayName?: string;
+}): Promise<PlayerAccount> {
+  const response = await axios.post<PlayerAccount>(
+    `${API_URL}/api/auth/login`,
+    {
+      username: options.username,
+      pin: options.pin,
+      display_name: options.displayName,
+    }
+  );
+  saveAccount(response.data);
+  return response.data;
+}
 
 export async function getPlayers(): Promise<PlayerEntry[]> {
   const response = await axios.get<PlayerEntry[]>(API_URL + "/api/players");
@@ -56,7 +109,20 @@ export async function createGame({
   return response.data.game_id;
 }
 
-// ===== Private Rooms & Shareable Invite Links =====
+// ===== Private & Online Rooms + Shareable Invite Links =====
+export async function listActiveRooms(
+  token?: string | null
+): Promise<RoomState[]> {
+  const resolvedToken = token ?? getSavedAccount()?.auth_token ?? undefined;
+  const response = await axios.get<{ rooms: RoomState[] }>(
+    `${API_URL}/api/rooms`,
+    {
+      params: resolvedToken ? { token: resolvedToken } : {},
+    }
+  );
+  return response.data.rooms || [];
+}
+
 export async function createRoom(options: {
   hostName: string;
   players: PlayerKey[];
@@ -64,7 +130,10 @@ export async function createRoom(options: {
   vpsToWin: number;
   discardLimit: number;
   friendlyRobber: boolean;
+  token?: string | null;
 }): Promise<{ room_code: string; seat_token: string; room: RoomState }> {
+  const resolvedToken =
+    options.token ?? getSavedAccount()?.auth_token ?? undefined;
   const response = await axios.post(`${API_URL}/api/rooms`, {
     host_name: options.hostName,
     players: options.players,
@@ -72,6 +141,7 @@ export async function createRoom(options: {
     vps_to_win: options.vpsToWin,
     discard_limit: options.discardLimit,
     friendly_robber: options.friendlyRobber,
+    token: resolvedToken,
   });
   return response.data;
 }

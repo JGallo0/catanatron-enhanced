@@ -1,9 +1,11 @@
 """Persisting games as a document plus what happened to it, plus multiplayer rooms."""
 
+import hashlib
 import json
 import os
 import random
 import string
+import time
 import uuid
 from contextlib import contextmanager
 
@@ -66,6 +68,17 @@ class StoredRoom(Base):
     config_json = Column(String, nullable=False)
     seats_json = Column(String, nullable=False)
     game_id = Column(String(64), nullable=True)
+
+
+class StoredUser(Base):
+    """A lightweight player account so friends can log in from any device and resume rooms/games."""
+
+    __tablename__ = "users"
+
+    username = Column(String(32), primary_key=True)
+    display_name = Column(String(48), nullable=False)
+    pin_hash = Column(String(128), nullable=False)
+    auth_token = Column(String(64), nullable=False)
 
 
 db = SQLAlchemy(metadata=metadata)
@@ -208,6 +221,47 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
     }
 
 
+def _hash_pin(username: str, pin: str) -> str:
+    payload = f"catanatron:{username.lower().strip()}:{pin.strip()}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def login_or_register_user(
+    username: str, pin: str, display_name: str | None = None
+) -> tuple[StoredUser, bool]:
+    """Authenticate an existing account or create a new one on first login."""
+    session = db.session
+    clean_user = "".join(
+        ch for ch in username.lower().strip() if ch.isalnum() or ch in ("_", "-")
+    )[:24]
+    if len(clean_user) < 2:
+        abort(400, description="O usuário deve ter pelo menos 2 caracteres alfanuméricos")
+    if len(pin.strip()) < 3:
+        abort(400, description="A senha/PIN deve ter pelo menos 3 caracteres")
+
+    expected_hash = _hash_pin(clean_user, pin)
+    user = session.get(StoredUser, clean_user)
+    if user is None:
+        user = StoredUser(
+            username=clean_user,
+            display_name=(display_name or username).strip()[:32] or clean_user,
+            pin_hash=expected_hash,
+            auth_token=uuid.uuid4().hex,
+        )
+        session.add(user)
+        session.commit()
+        return user, True
+
+    if user.pin_hash != expected_hash:
+        abort(401, description="Senha/PIN incorreto para esta conta")
+
+    if display_name and display_name.strip():
+        user.display_name = display_name.strip()[:32]
+        session.commit()
+
+    return user, False
+
+
 def create_room(
     host_name: str = "Anfitrião",
     players: list[str] | None = None,
@@ -215,10 +269,11 @@ def create_room(
     vps_to_win: int = 10,
     discard_limit: int = 7,
     friendly_robber: bool = True,
+    host_token: str | None = None,
 ) -> tuple[StoredRoom, str]:
     session = db.session
     room_code = _generate_room_code(session)
-    host_token = uuid.uuid4().hex
+    resolved_host_token = (host_token or "").strip() or uuid.uuid4().hex
 
     initial_keys = players if players and 2 <= len(players) <= 4 else ["HUMAN", "HUMAN", "CATANATRON", "CATANATRON"]
     seats = []
@@ -231,7 +286,7 @@ def create_room(
                     "color": color,
                     "player_key": "HUMAN",
                     "player_name": host_name.strip() or "Anfitrião",
-                    "seat_token": host_token,
+                    "seat_token": resolved_host_token,
                 }
             )
             host_seated = True
@@ -259,11 +314,12 @@ def create_room(
         "vps_to_win": vps_to_win,
         "discard_limit": discard_limit,
         "friendly_robber": friendly_robber,
+        "created_at": int(time.time()),
     }
 
     room = StoredRoom(
         room_code=room_code,
-        host_token=host_token,
+        host_token=resolved_host_token,
         status="WAITING",
         config_json=json.dumps(config),
         seats_json=json.dumps(seats),
@@ -271,7 +327,23 @@ def create_room(
     )
     session.add(room)
     session.commit()
-    return room, host_token
+    return room, resolved_host_token
+
+
+def list_active_rooms(caller_token: str | None = None, limit: int = 20) -> list[dict]:
+    session = db.session
+    rooms = session.query(StoredRoom).limit(60).all()
+    serialized = [serialize_room(r, caller_token) for r in rooms]
+    # Sort so rooms where caller is seated come first, then WAITING rooms, then newest created_at
+    serialized.sort(
+        key=lambda item: (
+            1 if item.get("my_color") else 0,
+            1 if item.get("status") == "WAITING" else 0,
+            int(item.get("config", {}).get("created_at", 0)),
+        ),
+        reverse=True,
+    )
+    return serialized[:limit]
 
 
 def get_room_by_game_id(game_id: str) -> StoredRoom | None:

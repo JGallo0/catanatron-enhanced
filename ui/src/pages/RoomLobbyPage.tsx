@@ -5,6 +5,7 @@ import { GridLoader } from "react-spinners";
 import {
   getPlayers,
   getRoom,
+  getSavedAccount,
   joinRoom,
   updateRoom,
   startRoomGame,
@@ -19,7 +20,11 @@ const SEAT_COLORS: Color[] = ["RED", "BLUE", "ORANGE", "WHITE"];
 
 function getStoredToken(roomCode: string): string | null {
   try {
-    return localStorage.getItem(`catan_room_token_${roomCode.toUpperCase()}`);
+    return (
+      localStorage.getItem(`catan_room_token_${roomCode.toUpperCase()}`) ||
+      getSavedAccount()?.auth_token ||
+      null
+    );
   } catch {
     return null;
   }

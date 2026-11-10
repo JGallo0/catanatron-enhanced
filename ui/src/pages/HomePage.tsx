@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -12,13 +12,20 @@ import {
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import { GridLoader } from "react-spinners";
 import {
+  clearSavedAccount,
   createGame,
   createRoom,
   getPlayers,
+  getSavedAccount,
+  listActiveRooms,
+  loginOrRegisterAccount,
   type MapTemplate,
+  type PlayerAccount,
   type PlayerEntry,
   type PlayerKey,
 } from "../utils/apiClient";
+import type { RoomState } from "../utils/api.types";
+import { PLAYER_COLOR_META } from "../config/assetRegistry";
 
 import "./HomePage.scss";
 
@@ -38,17 +45,75 @@ export default function HomePage() {
     "CATANATRON",
   ]);
   const [available, setAvailable] = useState<PlayerEntry[]>([]);
+
+  // Account & Online Lobby state
+  const [account, setAccount] = useState<PlayerAccount | null>(() =>
+    getSavedAccount()
+  );
+  const [usernameInput, setUsernameInput] = useState("");
+  const [pinInput, setPinInput] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [activeRooms, setActiveRooms] = useState<RoomState[]>([]);
+
   const [hostName, setHostName] = useState(
-    () => localStorage.getItem("catan_player_name") || "Anfitrião"
+    () =>
+      getSavedAccount()?.display_name ||
+      localStorage.getItem("catan_player_name") ||
+      "Anfitrião"
   );
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const navigate = useNavigate();
+
+  const refreshRooms = useCallback(() => {
+    listActiveRooms(account?.auth_token)
+      .then(setActiveRooms)
+      .catch(() => {});
+  }, [account?.auth_token]);
 
   useEffect(() => {
     getPlayers()
       .then(setAvailable)
       .catch(() => setAvailable([]));
   }, []);
+
+  useEffect(() => {
+    refreshRooms();
+    const timer = setInterval(refreshRooms, 5000);
+    return () => clearInterval(timer);
+  }, [refreshRooms]);
+
+  const handleLoginOrRegister = async () => {
+    if (!usernameInput.trim() || !pinInput.trim()) return;
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const logged = await loginOrRegisterAccount({
+        username: usernameInput.trim(),
+        pin: pinInput.trim(),
+        displayName: hostName.trim() || usernameInput.trim(),
+      });
+      setAccount(logged);
+      setHostName(logged.display_name);
+      setPinInput("");
+      listActiveRooms(logged.auth_token)
+        .then(setActiveRooms)
+        .catch(() => {});
+    } catch (err: any) {
+      setAuthError(
+        err?.response?.data?.description ||
+          "Não foi possível autenticar. Verifique usuário e PIN."
+      );
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleLogout = () => {
+    clearSavedAccount();
+    setAccount(null);
+    refreshRooms();
+  };
 
   const handlePlayerChange = (index: number, value: PlayerKey) => {
     setPlayers((current) =>
@@ -88,9 +153,9 @@ export default function HomePage() {
   const handleCreatePrivateRoom = async () => {
     setLoading(true);
     try {
-      const cleanName = hostName.trim() || "Anfitrião";
+      const cleanName =
+        account?.display_name || hostName.trim() || "Anfitrião";
       localStorage.setItem("catan_player_name", cleanName);
-      // Ensure at least 2 human seats if user only had 1 human selected when creating a room for friends
       const humanSeats = players.filter((p) => p === "HUMAN").length;
       const roomPlayers =
         humanSeats >= 2
@@ -104,6 +169,7 @@ export default function HomePage() {
         vpsToWin,
         discardLimit,
         friendlyRobber,
+        token: account?.auth_token,
       });
       localStorage.setItem(
         `catan_room_token_${res.room_code.toUpperCase()}`,
@@ -131,12 +197,75 @@ export default function HomePage() {
           <div className="setup-card">
             <p className="setup-note">Open hands. Random discard choice.</p>
 
-            {/* Multiplayer Quick Bar: Create Invite Link or Join by Code */}
+            {/* Player Account Bar (persistent login across any device on Vercel) */}
+            <div className="account-bar">
+              {account ? (
+                <div className="account-bar__logged">
+                  <div className="account-bar__info">
+                    <span className="account-bar__badge">👤 CONTA ONLINE</span>
+                    <strong>{account.display_name}</strong>
+                    <small>@{account.username} • Suas salas e assentos ficam salvos em qualquer dispositivo</small>
+                  </div>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    className="account-logout-btn"
+                    onClick={handleLogout}
+                  >
+                    Sair
+                  </Button>
+                </div>
+              ) : (
+                <div className="account-bar__login">
+                  <div className="account-bar__header">
+                    <span>👤 Entrar ou Criar Conta Rápida</span>
+                    <small>
+                      Entre com usuário + PIN de 4 dígitos para jogar de qualquer PC/celular e retomar suas partidas quando quiser
+                    </small>
+                  </div>
+                  <div className="account-bar__inputs">
+                    <input
+                      type="text"
+                      className="multiplayer-input"
+                      value={usernameInput}
+                      onChange={(e) => setUsernameInput(e.target.value)}
+                      placeholder="Usuário (ex: joao)"
+                      maxLength={24}
+                    />
+                    <input
+                      type="password"
+                      className="multiplayer-input multiplayer-input--pin"
+                      value={pinInput}
+                      onChange={(e) => setPinInput(e.target.value)}
+                      placeholder="PIN / Senha"
+                      maxLength={16}
+                    />
+                    <Button
+                      variant="contained"
+                      className="account-login-btn"
+                      disabled={
+                        authBusy ||
+                        usernameInput.trim().length < 2 ||
+                        pinInput.trim().length < 3
+                      }
+                      onClick={handleLoginOrRegister}
+                    >
+                      {authBusy ? "Entrando..." : "Entrar / Criar"}
+                    </Button>
+                  </div>
+                  {authError && (
+                    <div className="account-bar__error">{authError}</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Multiplayer Quick Bar: Create Invite Link, Join by Code, or Browse Active Rooms */}
             <div className="multiplayer-banner-box">
               <div className="multiplayer-banner-box__header">
                 <span>🌐 Jogar com Amigos Online + Bots</span>
                 <small>
-                  Crie uma sala privada, gere um link de convite e preencha as vagas restantes com IAs fortes
+                  Crie uma sala privada, envie o link ou entre direto nas salas abertas abaixo
                 </small>
               </div>
               <div className="multiplayer-banner-box__controls">
@@ -145,7 +274,7 @@ export default function HomePage() {
                   className="multiplayer-input"
                   value={hostName}
                   onChange={(e) => setHostName(e.target.value)}
-                  placeholder="Seu nome na sala..."
+                  placeholder="Seu apelido na mesa..."
                   maxLength={24}
                 />
                 <Button
@@ -153,7 +282,7 @@ export default function HomePage() {
                   className="create-room-link-btn"
                   onClick={handleCreatePrivateRoom}
                 >
-                  🔗 Criar Sala Privada (Gerar Link)
+                  🔗 Criar Sala Online (Gerar Link)
                 </Button>
               </div>
               <div className="multiplayer-banner-box__join-row">
@@ -174,6 +303,77 @@ export default function HomePage() {
                   Entrar com Código
                 </Button>
               </div>
+
+              {activeRooms.length > 0 && (
+                <div className="active-rooms-list">
+                  <div className="active-rooms-list__title">
+                    <span>Salas Abertas & Suas Partidas Ativas ({activeRooms.length})</span>
+                  </div>
+                  <div className="active-rooms-list__items">
+                    {activeRooms.slice(0, 6).map((r) => {
+                      const humanCount = r.seats.filter(
+                        (s) => !s.is_bot && s.claimed
+                      ).length;
+                      const botCount = r.seats.filter((s) => s.is_bot).length;
+                      const openHumans = r.seats.filter(
+                        (s) => !s.is_bot && !s.claimed
+                      ).length;
+                      const myColorLabel = r.my_color
+                        ? PLAYER_COLOR_META[r.my_color]?.label
+                        : null;
+
+                      return (
+                        <div
+                          key={r.room_code}
+                          className={`active-room-item ${r.my_color ? "active-room-item--mine" : ""}`}
+                        >
+                          <div className="active-room-item__meta">
+                            <div className="active-room-item__top">
+                              <strong>#{r.room_code}</strong>
+                              <span
+                                className={`room-status-pill ${
+                                  r.status === "WAITING" ? "waiting" : "playing"
+                                }`}
+                              >
+                                {r.status === "WAITING"
+                                  ? `Aberta (${openHumans} vaga${openHumans === 1 ? "" : "s"})`
+                                  : "Em Andamento"}
+                              </span>
+                              {myColorLabel && (
+                                <span className="room-my-seat-pill">
+                                  ★ Seu Assento: {myColorLabel}
+                                </span>
+                              )}
+                            </div>
+                            <small>
+                              👥 {humanCount} humano(s) • 🤖 {botCount} bot(s) • Mapa {r.config.map_template} ({r.config.vps_to_win} PV)
+                            </small>
+                          </div>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            className="active-room-join-btn"
+                            onClick={() => {
+                              if (r.status === "IN_PROGRESS" && r.game_id) {
+                                const q = r.my_color ? `?seat=${r.my_color}` : "";
+                                navigate(`/games/${r.game_id}${q}`);
+                              } else {
+                                navigate(`/rooms/${r.room_code}`);
+                              }
+                            }}
+                          >
+                            {r.status === "IN_PROGRESS"
+                              ? r.my_color
+                                ? "▶ Retomar"
+                                : "👁 Assistir"
+                              : "Entrar"}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="control-group">

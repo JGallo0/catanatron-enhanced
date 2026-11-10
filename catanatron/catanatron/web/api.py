@@ -12,6 +12,8 @@ from catanatron.web.models import (
     db,
     get_game_state,
     get_room_by_game_id,
+    list_active_rooms,
+    login_or_register_user,
     serialize_room,
     upsert_game_state,
 )
@@ -95,11 +97,40 @@ def post_game_endpoint():
     return jsonify({"game_id": game.id})
 
 
-# ===== Private Rooms & Invite Links =====
+# ===== Player Accounts & Online Rooms =====
+@bp.route("/auth/login", methods=("POST",))
+def post_auth_login_endpoint():
+    body = request.get_json(silent=True) or {}
+    username = str(body.get("username") or "").strip()
+    pin = str(body.get("pin") or "").strip()
+    display_name = body.get("display_name")
+
+    user, is_new = login_or_register_user(
+        username=username,
+        pin=pin,
+        display_name=str(display_name).strip() if display_name else None,
+    )
+    return jsonify(
+        {
+            "username": user.username,
+            "display_name": user.display_name,
+            "auth_token": user.auth_token,
+            "is_new": is_new,
+        }
+    )
+
+
+@bp.route("/rooms", methods=("GET",))
+def list_rooms_endpoint():
+    token = request.args.get("token")
+    return jsonify({"rooms": list_active_rooms(caller_token=token)})
+
+
 @bp.route("/rooms", methods=("POST",))
 def post_room_endpoint():
     body = request.get_json(silent=True) or {}
     host_name = str(body.get("host_name") or "Anfitrião").strip()[:32]
+    host_token = body.get("token")
     players = body.get("players")
     map_template = body.get("map_template", "BASE")
     if map_template not in VALID_MAP_TEMPLATES:
@@ -109,19 +140,20 @@ def post_room_endpoint():
     discard_limit = int(body.get("discard_limit", 7))
     friendly_robber = bool(body.get("friendly_robber", True))
 
-    room, host_token = create_room(
+    room, resolved_token = create_room(
         host_name=host_name,
         players=players,
         map_template=map_template,
         vps_to_win=vps_to_win,
         discard_limit=discard_limit,
         friendly_robber=friendly_robber,
+        host_token=host_token,
     )
     return jsonify(
         {
             "room_code": room.room_code,
-            "seat_token": host_token,
-            "room": serialize_room(room, host_token),
+            "seat_token": resolved_token,
+            "room": serialize_room(room, resolved_token),
         }
     )
 
