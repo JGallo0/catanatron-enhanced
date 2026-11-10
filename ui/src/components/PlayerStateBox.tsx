@@ -11,12 +11,14 @@ export default function PlayerStateBox({
   color,
   isCurrentTurn = false,
   isBot = false,
+  customName,
 }: {
   playerState: PlayerState;
   playerKey: string;
   color: Color;
   isCurrentTurn?: boolean;
   isBot?: boolean;
+  customName?: string;
 }) {
   const actualVps =
     playerState[`${playerKey}_ACTUAL_VICTORY_POINTS`] ??
@@ -29,6 +31,7 @@ export default function PlayerStateBox({
   const citiesLeft = playerState[`${playerKey}_CITIES_AVAILABLE`];
   const roadsLeft = playerState[`${playerKey}_ROADS_AVAILABLE`];
   const colorMeta = PLAYER_COLOR_META[color];
+  const displayName = customName || colorMeta.label;
 
   return (
     <div
@@ -48,9 +51,9 @@ export default function PlayerStateBox({
               boxShadow: `0 0 8px ${colorMeta.glow}`,
             }}
           />
-          <span className="player-state-box__name">{colorMeta.label}</span>
+          <span className="player-state-box__name">{displayName}</span>
           <span className="player-state-box__role-badge">
-            {isBot ? "BOT" : "VOCÊ"}
+            {isBot ? "BOT" : "HUMANO"}
           </span>
           {isCurrentTurn && (
             <span className="player-state-box__turn-pill">vez atual</span>

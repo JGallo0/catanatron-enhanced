@@ -6,6 +6,7 @@ import Fade from "@mui/material/Fade";
 
 import GameScreen from "./pages/GameScreen";
 import HomePage from "./pages/HomePage";
+import RoomLobbyPage from "./pages/RoomLobbyPage";
 import { StateProvider } from "./store";
 
 import "./App.scss";
@@ -35,6 +36,7 @@ function App() {
         >
           <Router>
             <Routes>
+              <Route path="/rooms/:roomCode" element={<RoomLobbyPage />} />
               <Route
                 path="/games/:gameId/states/:stateIndex"
                 element={<GameScreen replayMode={true} />}

@@ -1,17 +1,15 @@
 import axios from "axios";
 
 import { API_URL } from "../configuration";
-import type { Color, GameAction, GameState } from "./api.types";
+import type { Color, GameAction, GameState, RoomState } from "./api.types";
 
 /** A registry key, e.g. "CATANATRON" or "AB". The server decides what exists. */
 export type PlayerKey = string;
 
-/** One settable parameter, as published by GET /api/players. */
 export type PlayerParam = {
   name: string;
   type: "int" | "float" | "str" | "bool";
   default: number | string | boolean | null;
-  /** Only present when the param declares a fixed set of values. */
   choices?: Array<string | number>;
   help: string;
 };
@@ -36,7 +34,6 @@ type CreateGameOptions = {
   friendlyRobber: boolean;
 };
 
-/** The players this server can seat. Replaces a hardcoded list in the UI. */
 export async function getPlayers(): Promise<PlayerEntry[]> {
   const response = await axios.get<PlayerEntry[]>(API_URL + "/api/players");
   return response.data;
@@ -59,13 +56,89 @@ export async function createGame({
   return response.data.game_id;
 }
 
-/**
- * Whose eyes the server renders state through. A seat sees the other hands as
- * counts rather than cards; null watches as a spectator, every hand face up.
- *
- * It lives here rather than as an argument because every request carries it,
- * and a call site that forgot would silently show the whole table again.
- */
+// ===== Private Rooms & Shareable Invite Links =====
+export async function createRoom(options: {
+  hostName: string;
+  players: PlayerKey[];
+  mapTemplate: MapTemplate;
+  vpsToWin: number;
+  discardLimit: number;
+  friendlyRobber: boolean;
+}): Promise<{ room_code: string; seat_token: string; room: RoomState }> {
+  const response = await axios.post(`${API_URL}/api/rooms`, {
+    host_name: options.hostName,
+    players: options.players,
+    map_template: options.mapTemplate,
+    vps_to_win: options.vpsToWin,
+    discard_limit: options.discardLimit,
+    friendly_robber: options.friendlyRobber,
+  });
+  return response.data;
+}
+
+export async function getRoom(
+  roomCode: string,
+  token?: string | null
+): Promise<RoomState> {
+  const response = await axios.get<RoomState>(
+    `${API_URL}/api/rooms/${roomCode}`,
+    {
+      params: token ? { token } : {},
+    }
+  );
+  return response.data;
+}
+
+export async function joinRoom(
+  roomCode: string,
+  options: {
+    playerName: string;
+    preferredColor?: Color;
+    token?: string | null;
+  }
+): Promise<{ seat_token: string; seat_color: Color; room: RoomState }> {
+  const response = await axios.post(`${API_URL}/api/rooms/${roomCode}/join`, {
+    player_name: options.playerName,
+    preferred_color: options.preferredColor,
+    token: options.token,
+  });
+  return response.data;
+}
+
+export async function updateRoom(
+  roomCode: string,
+  payload: {
+    token?: string | null;
+    config?: Partial<{
+      map_template: MapTemplate;
+      vps_to_win: number;
+      discard_limit: number;
+      friendly_robber: boolean;
+    }>;
+    seats?: Array<{
+      color: Color;
+      player_key: string;
+      player_name?: string;
+    }>;
+  }
+): Promise<RoomState> {
+  const response = await axios.patch<RoomState>(
+    `${API_URL}/api/rooms/${roomCode}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function startRoomGame(
+  roomCode: string,
+  token?: string | null
+): Promise<{ game_id: string; room: RoomState }> {
+  const response = await axios.post(`${API_URL}/api/rooms/${roomCode}/start`, {
+    token,
+  });
+  return response.data;
+}
+
 let perspective: Color | null = null;
 
 export function setPerspective(color: Color | null) {
@@ -116,31 +189,11 @@ export async function getMctsAnalysis(
   gameId: string,
   stateIndex: StateIndex = "latest"
 ) {
-  try {
-    console.log("Getting MCTS analysis for:", {
-      gameId,
-      stateIndex,
-      url: `${API_URL}/api/games/${gameId}/states/${stateIndex}/mcts-analysis`,
-    });
-
-    if (!gameId) {
-      throw new Error("No gameId provided to getMctsAnalysis");
-    }
-
-    const response = await axios.get<MCTSSuccessBody | MCTSErrorBody>(
-      `${API_URL}/api/games/${gameId}/states/${stateIndex}/mcts-analysis`
-    );
-
-    console.log("MCTS analysis response:", response.data);
-    return response.data;
-  } catch (error: any) {
-    // AxiosResponse<MCTSErrorBody>
-    console.error("MCTS analysis error:", {
-      message: error.message,
-      status: error.response?.status,
-      data: error.response?.data,
-      stack: error.stack,
-    });
-    throw error;
+  if (!gameId) {
+    throw new Error("No gameId provided to getMctsAnalysis");
   }
+  const response = await axios.get<MCTSSuccessBody | MCTSErrorBody>(
+    `${API_URL}/api/games/${gameId}/states/${stateIndex}/mcts-analysis`
+  );
+  return response.data;
 }

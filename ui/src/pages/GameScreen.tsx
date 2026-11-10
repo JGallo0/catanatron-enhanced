@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import { GridLoader } from "react-spinners";
 import { useSnackbar } from "notistack";
@@ -23,18 +23,25 @@ import { dispatchSnackbar } from "../components/Snackbar";
 import { getHumanColor } from "../utils/stateUtils";
 import AnalysisBox from "../components/AnalysisBox";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
-import type { GameState } from "../utils/api.types";
+import type { Color, GameState } from "../utils/api.types";
+import { getSavedGameSeat } from "./RoomLobbyPage";
 
 const ROBOT_THINKING_TIME = 300;
+const VALID_COLORS = new Set<Color>(["RED", "BLUE", "ORANGE", "WHITE"]);
 
 function describePromptBanner(
   gameState: GameState,
   isBotThinking: boolean
 ): string {
   if (gameState.winning_color) {
-    return `🏆 Vitória de ${PLAYER_COLOR_META[gameState.winning_color].label}!`;
+    const winName =
+      gameState.seat_names?.[gameState.winning_color] ||
+      PLAYER_COLOR_META[gameState.winning_color].label;
+    return `🏆 Vitória de ${winName}!`;
   }
-  const activeLabel = PLAYER_COLOR_META[gameState.current_color].label;
+  const activeLabel =
+    gameState.seat_names?.[gameState.current_color] ||
+    PLAYER_COLOR_META[gameState.current_color].label;
   if (isBotThinking) {
     return `🤖 IA (${activeLabel}) está calculando a melhor jogada...`;
   }
@@ -56,9 +63,27 @@ function describePromptBanner(
 
 function GameScreen({ replayMode }: { replayMode: boolean }) {
   const { gameId, stateIndex } = useParams();
+  const [searchParams] = useSearchParams();
   const { state, dispatch } = useContext(store);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const [isBotThinking, setIsBotThinking] = useState(false);
+
+  // Automatically apply seat perspective if ?seat=COLOR is in URL or saved from Room Lobby
+  useEffect(() => {
+    if (!gameId || replayMode) return;
+    const urlSeat = searchParams.get("seat")?.toUpperCase() as Color | undefined;
+    const savedSeat = getSavedGameSeat(gameId);
+    const chosenSeat =
+      urlSeat && VALID_COLORS.has(urlSeat)
+        ? urlSeat
+        : savedSeat && VALID_COLORS.has(savedSeat)
+          ? savedSeat
+          : null;
+
+    if (chosenSeat && state.perspective !== chosenSeat) {
+      dispatch({ type: ACTIONS.SET_PERSPECTIVE, data: chosenSeat });
+    }
+  }, [gameId, replayMode, searchParams, state.perspective, dispatch]);
 
   // Load game state
   useEffect(() => {
@@ -72,6 +97,37 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       dispatch({ type: ACTIONS.SET_GAME_STATE, data: gameState });
     })();
   }, [gameId, stateIndex, state.perspective, dispatch]);
+
+  // Real-time multiplayer polling when waiting for another human friend's turn
+  useEffect(() => {
+    if (!gameId || replayMode || !state.gameState || state.gameState.winning_color) {
+      return;
+    }
+    const isBotTurn = state.gameState.bot_colors.includes(
+      state.gameState.current_color
+    );
+    const isAnotherHumanTurn =
+      !isBotTurn &&
+      state.perspective !== null &&
+      state.gameState.current_color !== state.perspective;
+
+    if (!isAnotherHumanTurn) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const latest = await getState(gameId, "latest");
+        if (latest.state_index !== state.gameState?.state_index) {
+          dispatch({ type: ACTIONS.SET_GAME_STATE, data: latest });
+        }
+      } catch {
+        // ignore transient network errors
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [gameId, replayMode, state.gameState, state.perspective, dispatch]);
 
   // Advance bot turns automatically
   useEffect(() => {
@@ -90,7 +146,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         setTimeout(() => {
           setIsBotThinking(false);
           dispatch({ type: ACTIONS.SET_GAME_STATE, data: gameState });
-          if (getHumanColor(gameState)) {
+          if (getHumanColor(gameState, state.perspective)) {
             dispatchSnackbar(enqueueSnackbar, closeSnackbar, gameState);
           }
         }, ROBOT_THINKING_TIME - requestTime);
@@ -100,6 +156,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     gameId,
     replayMode,
     state.gameState,
+    state.perspective,
     dispatch,
     enqueueSnackbar,
     closeSnackbar,
@@ -130,6 +187,15 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             ← Lobby
           </Link>
           <h1 className="logo">Catanatron</h1>
+          {state.gameState.room_code && (
+            <Link
+              to={`/rooms/${state.gameState.room_code}`}
+              className="game-top-hud__room-badge"
+              title="Ver Sala e Link de Convite"
+            >
+              🔗 Sala #{state.gameState.room_code}
+            </Link>
+          )}
         </div>
 
         <div

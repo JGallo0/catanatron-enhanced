@@ -118,7 +118,7 @@ function PlayButtons() {
       .filter((action) => action[1].startsWith("PLAY"))
       .map((action) => action[1])
   );
-  const humanColor = getHumanColor(gameState);
+  const humanColor = getHumanColor(gameState, state.perspective);
   const discardActionType =
     gameState.current_playable_actions.find(
       (action) => action[1] === "DISCARD_RESOURCE"
@@ -498,7 +498,11 @@ export default function ActionsToolbar({
   }, [dispatch]);
 
   const botsTurn = gameState.bot_colors.includes(gameState.current_color);
-  const humanColor = getHumanColor(gameState);
+  const isOtherHumansTurn =
+    !botsTurn &&
+    state.perspective !== null &&
+    gameState.current_color !== state.perspective;
+  const humanColor = getHumanColor(gameState, state.perspective);
   const latestDice = useMemo(() => getLatestRollPair(gameState), [gameState]);
   const diceSum = latestDice ? latestDice[0] + latestDice[1] : null;
 
@@ -549,10 +553,9 @@ export default function ActionsToolbar({
       </div>
 
       <div className="actions-toolbar">
-        {!(botsTurn || gameState.winning_color) && !replayMode && (
-          <PlayButtons />
-        )}
-        {(botsTurn || gameState.winning_color) && (
+        {!(botsTurn || isOtherHumansTurn || gameState.winning_color) &&
+          !replayMode && <PlayButtons />}
+        {(botsTurn || isOtherHumansTurn || gameState.winning_color) && (
           <Prompt gameState={gameState} isBotThinking={isBotThinking} />
         )}
       </div>

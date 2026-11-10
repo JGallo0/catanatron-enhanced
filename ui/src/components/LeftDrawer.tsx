@@ -90,6 +90,7 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
           color={color}
           isCurrentTurn={isCurrentTurn}
           isBot={isBot}
+          customName={gameState.seat_names?.[color]}
         />
       </React.Fragment>
     );

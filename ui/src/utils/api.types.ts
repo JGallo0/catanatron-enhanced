@@ -9,12 +9,10 @@ export type Color = "RED" | "BLUE" | "ORANGE" | "WHITE";
 export type TileCoordinate = [number, number, number];
 
 export type GameActionRecord =
-  // These are the special cases
   | [RollGameAction, [number, number]]
   | [DiscardGameAction, ResourceCard]
   | [MoveRobberAction, ResourceCard | null]
   | [BuyDevelopmentCardAction, DevelopmentCard]
-  // These are deterministic and carry no extra info
   | [BuildSettlementAction, null]
   | [BuildCityAction, null]
   | [BuildRoadAction, null]
@@ -116,12 +114,30 @@ export type GameEdge = {
   tile_coordinate: TileCoordinate;
 };
 
-/**
- * The single payload GET /api/games/.../states/... returns: the game's state
- * document, plus the few things a browser needs that are not state — the
- * legal actions, which seats are bots, and the board geometry.
- * Built by catanatron.serialization.web_view.
- */
+export type RoomSeat = {
+  color: Color;
+  player_key: string;
+  player_name: string;
+  is_bot: boolean;
+  claimed: boolean;
+  is_me: boolean;
+};
+
+export type RoomState = {
+  room_code: string;
+  status: "WAITING" | "IN_PROGRESS";
+  game_id: string | null;
+  is_host: boolean;
+  my_color: Color | null;
+  config: {
+    map_template: "BASE" | "MINI" | "TOURNAMENT";
+    vps_to_win: number;
+    discard_limit: number;
+    friendly_robber: boolean;
+  };
+  seats: RoomSeat[];
+};
+
 export type GameState = {
   tiles: PlacedTile[];
   adjacent_tiles: Record<string, Tile[]>;
@@ -142,6 +158,8 @@ export type GameState = {
   edgeActions?: GameAction[];
   nodeActions?: GameAction[];
   state_index: number;
+  seat_names?: Partial<Record<Color, string>>;
+  room_code?: string;
 
   // Also present, from the state document itself.
   schema_version: number;
@@ -157,6 +175,7 @@ export type GameState = {
   resource_freqdeck: number[];
   development_listdeck: Record<string, number>;
 };
+
 const DIRECTIONS = [
   "NORTH",
   "NORTHEAST",

@@ -27,7 +27,7 @@ import { PLAYER_COLOR_META } from "../config/assetRegistry";
 function buildNodeActions(state: CatanState) {
   if (!state.gameState) throw new Error("GameState is not ready!");
 
-  if (!isPlayersTurn(state.gameState)) {
+  if (!isPlayersTurn(state.gameState, state.perspective)) {
     return {};
   }
 
@@ -58,7 +58,7 @@ function buildNodeActions(state: CatanState) {
 
 function buildEdgeActions(state: CatanState) {
   if (!state.gameState) throw new Error("GameState is not ready!");
-  if (!isPlayersTurn(state.gameState)) {
+  if (!isPlayersTurn(state.gameState, state.perspective)) {
     return {};
   }
 

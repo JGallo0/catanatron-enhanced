@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Alert,
   Button,
   Checkbox,
   IconButton,
@@ -14,6 +13,7 @@ import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import { GridLoader } from "react-spinners";
 import {
   createGame,
+  createRoom,
   getPlayers,
   type MapTemplate,
   type PlayerEntry,
@@ -28,33 +28,29 @@ const PLAYER_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"] as const;
 export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [mapTemplate, setMapTemplate] = useState<MapTemplate>("BASE");
-  const [vpsToWin, setVpsToWin] = useState(15);
-  const [discardLimit, setDiscardLimit] = useState(9);
+  const [vpsToWin, setVpsToWin] = useState(10);
+  const [discardLimit, setDiscardLimit] = useState(7);
   const [friendlyRobber, setFriendlyRobber] = useState(true);
-  const [players, setPlayers] = useState<PlayerKey[]>(["HUMAN", "CATANATRON"]);
+  const [players, setPlayers] = useState<PlayerKey[]>([
+    "HUMAN",
+    "CATANATRON",
+    "CATANATRON",
+    "CATANATRON",
+  ]);
   const [available, setAvailable] = useState<PlayerEntry[]>([]);
+  const [hostName, setHostName] = useState(
+    () => localStorage.getItem("catan_player_name") || "Anfitrião"
+  );
+  const [joinCodeInput, setJoinCodeInput] = useState("");
   const navigate = useNavigate();
 
-  // The server decides which players exist; the UI no longer hardcodes them.
   useEffect(() => {
     getPlayers()
       .then(setAvailable)
       .catch(() => setAvailable([]));
   }, []);
 
-  const humanKeys = useMemo(
-    () => new Set(available.filter((entry) => !entry.is_bot).map((e) => e.key)),
-    [available]
-  );
-  const isHuman = (key: PlayerKey) => humanKeys.has(key);
-  const humanCount = players.filter(isHuman).length;
-  const hasTooManyHumans = humanCount > 1;
-
   const handlePlayerChange = (index: number, value: PlayerKey) => {
-    if (isHuman(value) && !isHuman(players[index]) && humanCount >= 1) {
-      return;
-    }
-
     setPlayers((current) =>
       current.map((player, playerIndex) =>
         playerIndex === index ? value : player
@@ -64,7 +60,7 @@ export default function HomePage() {
 
   const handleAddPlayer = () => {
     setPlayers((current) =>
-      current.length >= 4 ? current : [...current, "WEIGHTED_RANDOM"]
+      current.length >= 4 ? current : [...current, "CATANATRON"]
     );
   };
 
@@ -77,10 +73,6 @@ export default function HomePage() {
   };
 
   const handleCreateGame = async () => {
-    if (hasTooManyHumans) {
-      return;
-    }
-
     setLoading(true);
     const gameId = await createGame({
       players,
@@ -93,6 +85,44 @@ export default function HomePage() {
     navigate("/games/" + gameId);
   };
 
+  const handleCreatePrivateRoom = async () => {
+    setLoading(true);
+    try {
+      const cleanName = hostName.trim() || "Anfitrião";
+      localStorage.setItem("catan_player_name", cleanName);
+      // Ensure at least 2 human seats if user only had 1 human selected when creating a room for friends
+      const humanSeats = players.filter((p) => p === "HUMAN").length;
+      const roomPlayers =
+        humanSeats >= 2
+          ? players
+          : ["HUMAN", "HUMAN", ...players.slice(2)];
+
+      const res = await createRoom({
+        hostName: cleanName,
+        players: roomPlayers,
+        mapTemplate,
+        vpsToWin,
+        discardLimit,
+        friendlyRobber,
+      });
+      localStorage.setItem(
+        `catan_room_token_${res.room_code.toUpperCase()}`,
+        res.seat_token
+      );
+      setLoading(false);
+      navigate(`/rooms/${res.room_code}`);
+    } catch {
+      setLoading(false);
+    }
+  };
+
+  const handleJoinRoomByCode = () => {
+    const code = joinCodeInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length >= 4) {
+      navigate(`/rooms/${code}`);
+    }
+  };
+
   return (
     <div className="home-page">
       <div className="home-page__inner">
@@ -100,6 +130,51 @@ export default function HomePage() {
         {!loading ? (
           <div className="setup-card">
             <p className="setup-note">Open hands. Random discard choice.</p>
+
+            {/* Multiplayer Quick Bar: Create Invite Link or Join by Code */}
+            <div className="multiplayer-banner-box">
+              <div className="multiplayer-banner-box__header">
+                <span>🌐 Jogar com Amigos Online + Bots</span>
+                <small>
+                  Crie uma sala privada, gere um link de convite e preencha as vagas restantes com IAs fortes
+                </small>
+              </div>
+              <div className="multiplayer-banner-box__controls">
+                <input
+                  type="text"
+                  className="multiplayer-input"
+                  value={hostName}
+                  onChange={(e) => setHostName(e.target.value)}
+                  placeholder="Seu nome na sala..."
+                  maxLength={24}
+                />
+                <Button
+                  variant="contained"
+                  className="create-room-link-btn"
+                  onClick={handleCreatePrivateRoom}
+                >
+                  🔗 Criar Sala Privada (Gerar Link)
+                </Button>
+              </div>
+              <div className="multiplayer-banner-box__join-row">
+                <input
+                  type="text"
+                  className="multiplayer-input multiplayer-input--code"
+                  value={joinCodeInput}
+                  onChange={(e) => setJoinCodeInput(e.target.value)}
+                  placeholder="Código da sala (ex: K7M4P9)"
+                  maxLength={10}
+                />
+                <Button
+                  variant="outlined"
+                  className="join-room-code-btn"
+                  disabled={joinCodeInput.trim().length < 4}
+                  onClick={handleJoinRoomByCode}
+                >
+                  Entrar com Código
+                </Button>
+              </div>
+            </div>
 
             <div className="control-group">
               <div className="control-header">
@@ -179,9 +254,7 @@ export default function HomePage() {
                 <Checkbox
                   className="inline-switch"
                   checked={friendlyRobber}
-                  onChange={(event) =>
-                    setFriendlyRobber(event.target.checked)
-                  }
+                  onChange={(event) => setFriendlyRobber(event.target.checked)}
                 />
               </div>
             </div>
@@ -191,11 +264,6 @@ export default function HomePage() {
                 <span>Players</span>
                 <strong>{players.length}/4</strong>
               </div>
-              {hasTooManyHumans && (
-                <Alert severity="error" className="players-alert">
-                  Only one Human player is allowed.
-                </Alert>
-              )}
               <div className="players-list">
                 {players.map((player, index) => (
                   <div className="player-row" key={`${player}-${index}`}>
@@ -219,16 +287,8 @@ export default function HomePage() {
                       }
                     >
                       {available.map((option) => (
-                        <MenuItem
-                          key={option.key}
-                          value={option.key}
-                          disabled={
-                            isHuman(option.key) &&
-                            humanCount >= 1 &&
-                            !isHuman(player)
-                          }
-                        >
-                          {option.name}
+                        <MenuItem key={option.key} value={option.key}>
+                          {option.is_bot ? `🤖 ${option.name}` : `👤 ${option.name}`}
                         </MenuItem>
                       ))}
                     </Select>
@@ -258,18 +318,13 @@ export default function HomePage() {
               variant="contained"
               color="primary"
               className="start-btn"
-              disabled={hasTooManyHumans}
               onClick={handleCreateGame}
             >
               Start
             </Button>
           </div>
         ) : (
-          <GridLoader
-            className="loader"
-            color="#ffffff"
-            size={60}
-          />
+          <GridLoader className="loader" color="#FACC15" size={60} />
         )}
         <div className="page-end-spacer" aria-hidden="true" />
       </div>

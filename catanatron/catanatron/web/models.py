@@ -1,31 +1,16 @@
-"""Persisting games as a document plus what happened to it.
-
-A game used to be stored by writing its whole document once per tick, so a
-400-tick game cost megabytes and the history was re-serialized in every row.
-Two things make that unnecessary:
-
-- Every random outcome the engine produces is recorded in the action itself
-  (the dice, the stolen resource, the drawn card), so re-applying the log
-  rebuilds the game exactly -- see :mod:`tests.test_replay`.
-- Replay never consults the players, so it does not matter what decided an
-  action, or whether that thing could ever be made to decide it again.
-
-So a game is one row holding the document it starts from and the document it
-is at now, plus one small row per action. Earlier states are materialized by
-replaying the log onto the first document; the current one is read straight
-off the second, because that is what nearly every request asks for.
-
-**No migration**: this reads neither the old ``game_states`` table nor
-anything written before this change.
-"""
+"""Persisting games as a document plus what happened to it, plus multiplayer rooms."""
 
 import json
 import os
+import random
+import string
+import uuid
 from contextlib import contextmanager
 
 from catanatron.game import Game
+from catanatron.models.map import build_map
 from catanatron.models.player import Color
-from catanatron.registry import REGISTRY
+from catanatron.registry import REGISTRY, SpecError
 from catanatron.serialization import (
     SCHEMA_VERSION,
     action_record_from_json,
@@ -40,43 +25,28 @@ from sqlalchemy.orm import Session
 from flask_sqlalchemy import SQLAlchemy
 from flask import abort
 
-# Using approach from: https://stackoverflow.com/questions/41004540/using-sqlalchemy-models-in-and-out-of-flask/41014157
 metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
+SEAT_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"]
+
 
 class StoredGame(Base):
-    """A game: where it started, who is playing, and where its rng is now.
-
-    ``base_state`` is a full document, but only one per game -- whatever state
-    the game was first saved at, which is normally its first tick. Everything
-    after it lives in :class:`StoredAction`.
-    """
+    """A game: where it started, who is playing, and where its rng is now."""
 
     __tablename__ = "games"
 
     uuid = Column(String(64), primary_key=True)
     schema_version = Column(Integer, nullable=False)
     player_specs = Column(String, nullable=False)
-    #: How many actions the base document already contains.
     base_index = Column(Integer, nullable=False)
     base_state = Column(String, nullable=False)
-    #: How many actions the log holds. The game's current state_index.
     head_index = Column(Integer, nullable=False)
-    #: The current state, overwritten on every write. Two reasons to keep it
-    #: rather than replay for it: it carries the live random stream, which a
-    #: log cannot rebuild (replay consumes no randomness, it re-applies
-    #: recorded outcomes), and reading the latest state is what nearly every
-    #: request wants, so it should not cost a replay of the whole game.
     head_state = Column(String, nullable=False)
 
 
 class StoredAction(Base):
-    """One entry of a game's log: ``[action, result]`` as JSON.
-
-    The composite key is also the index every read needs, and it is what stops
-    two concurrent writers from both appending the same position.
-    """
+    """One entry of a game's log: ``[action, result]`` as JSON."""
 
     __tablename__ = "game_actions"
 
@@ -85,15 +55,24 @@ class StoredAction(Base):
     payload = Column(String, nullable=False)
 
 
+class StoredRoom(Base):
+    """A multiplayer lobby/room with shareable invite code and configurable human/bot seats."""
+
+    __tablename__ = "rooms"
+
+    room_code = Column(String(16), primary_key=True)
+    host_token = Column(String(64), nullable=False)
+    status = Column(String(24), nullable=False, default="WAITING")
+    config_json = Column(String, nullable=False)
+    seats_json = Column(String, nullable=False)
+    game_id = Column(String(64), nullable=True)
+
+
 db = SQLAlchemy(metadata=metadata)
 
 
 @contextmanager
 def database_session():
-    """Can use like:
-    with database_session() as session:
-        games = session.query(StoredGame).all()
-    """
     database_url = os.environ.get(
         "DATABASE_URL",
         "postgresql://catanatron:victorypoint@127.0.0.1:5432/catanatron_db",
@@ -145,19 +124,12 @@ def upsert_game_state(game: Game, session_param=None):
 
 
 def get_game_state(game_id, state_index=None) -> Game | None:
-    """Materialize a game at ``state_index``, or at its latest state.
-
-    Only the latest state carries the live random stream, because only it can
-    be played on. An earlier state is replayed exactly, but it inherits the
-    stream the game had at its base, so treat it as read-only.
-    """
+    """Materialize a game at ``state_index``, or at its latest state."""
     session = db.session
     stored = session.get(StoredGame, game_id)
     if stored is None:
         abort(404)
     if stored.schema_version != SCHEMA_VERSION:
-        # There is no migration: a game written by an older document shape
-        # cannot be rebuilt by this one.
         abort(410, description=f"game was stored by schema v{stored.schema_version}")
 
     target = stored.head_index if state_index is None else state_index
@@ -186,10 +158,122 @@ def get_game_state(game_id, state_index=None) -> Game | None:
     )
     session.commit()
     if len(log) != target - stored.base_index:
-        # Replaying a hole would silently produce a state the game never had.
         abort(500, description=f"game {game_id} is missing actions before {target}")
 
     for entry in log:
         record = action_record_from_json(json.loads(entry.payload))
         game.execute(record.action, validate_action=False, action_record=record)
     return game
+
+
+# ===== Multiplayer Room Helpers =====
+def _generate_room_code(session) -> str:
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    for _ in range(20):
+        code = "".join(random.choices(alphabet, k=6))
+        if session.get(StoredRoom, code) is None:
+            return code
+    return uuid.uuid4().hex[:6].upper()
+
+
+def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
+    config = json.loads(room.config_json)
+    seats = json.loads(room.seats_json)
+    my_color = None
+    is_host = bool(caller_token and caller_token == room.host_token)
+
+    public_seats = []
+    for seat in seats:
+        if caller_token and seat.get("seat_token") == caller_token:
+            my_color = seat["color"]
+        public_seats.append(
+            {
+                "color": seat["color"],
+                "player_key": seat["player_key"],
+                "player_name": seat["player_name"],
+                "is_bot": seat["player_key"] != "HUMAN",
+                "claimed": bool(seat.get("seat_token")) or seat["player_key"] != "HUMAN",
+                "is_me": bool(caller_token and seat.get("seat_token") == caller_token),
+            }
+        )
+
+    return {
+        "room_code": room.room_code,
+        "status": room.status,
+        "game_id": room.game_id,
+        "is_host": is_host,
+        "my_color": my_color,
+        "config": config,
+        "seats": public_seats,
+    }
+
+
+def create_room(
+    host_name: str = "Anfitrião",
+    players: list[str] | None = None,
+    map_template: str = "BASE",
+    vps_to_win: int = 10,
+    discard_limit: int = 7,
+    friendly_robber: bool = True,
+) -> tuple[StoredRoom, str]:
+    session = db.session
+    room_code = _generate_room_code(session)
+    host_token = uuid.uuid4().hex
+
+    initial_keys = players if players and 2 <= len(players) <= 4 else ["HUMAN", "HUMAN", "CATANATRON", "CATANATRON"]
+    seats = []
+    host_seated = False
+    for idx, p_key in enumerate(initial_keys):
+        color = SEAT_COLORS[idx]
+        if p_key == "HUMAN" and not host_seated:
+            seats.append(
+                {
+                    "color": color,
+                    "player_key": "HUMAN",
+                    "player_name": host_name.strip() or "Anfitrião",
+                    "seat_token": host_token,
+                }
+            )
+            host_seated = True
+        elif p_key == "HUMAN":
+            seats.append(
+                {
+                    "color": color,
+                    "player_key": "HUMAN",
+                    "player_name": "Aguardando Amigo...",
+                    "seat_token": None,
+                }
+            )
+        else:
+            seats.append(
+                {
+                    "color": color,
+                    "player_key": p_key,
+                    "player_name": f"Bot ({p_key})",
+                    "seat_token": None,
+                }
+            )
+
+    config = {
+        "map_template": map_template,
+        "vps_to_win": vps_to_win,
+        "discard_limit": discard_limit,
+        "friendly_robber": friendly_robber,
+    }
+
+    room = StoredRoom(
+        room_code=room_code,
+        host_token=host_token,
+        status="WAITING",
+        config_json=json.dumps(config),
+        seats_json=json.dumps(seats),
+        game_id=None,
+    )
+    session.add(room)
+    session.commit()
+    return room, host_token
+
+
+def get_room_by_game_id(game_id: str) -> StoredRoom | None:
+    session = db.session
+    return session.query(StoredRoom).filter_by(game_id=game_id).first()
