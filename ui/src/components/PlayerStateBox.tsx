@@ -4,7 +4,11 @@ import "./PlayerStateBox.scss";
 import { type Color, type PlayerState } from "../utils/api.types";
 import ResourceCards from "./ResourceCards";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
-import { CitySvgPiece, SettlementSvgPiece } from "./icons/GameIcons";
+import {
+  CitySvgPiece,
+  HybridIllustration,
+  SettlementSvgPiece,
+} from "./icons/GameIcons";
 
 export default function PlayerStateBox({
   playerState,
@@ -153,7 +157,14 @@ export default function PlayerStateBox({
               : "Knights Played"
           }
         >
-          <span>⚔️ {knightsPlayed}</span>
+          <span className="score-pill__medallion">
+            <HybridIllustration
+              src="/assets/illustrations/ui/largest_army.webp"
+              alt="Maior Exército"
+              fallback={<span aria-hidden="true">⚔️</span>}
+            />
+          </span>
+          <span>{knightsPlayed}</span>
           <small>{hasArmy ? "Maior Exército ★" : "Cavaleiros"}</small>
         </div>
 
@@ -166,7 +177,14 @@ export default function PlayerStateBox({
             hasRoad ? "Longest Road — Maior Estrada (+2 PV)" : "Longest Road"
           }
         >
-          <span>📏 {longestRoad}</span>
+          <span className="score-pill__medallion">
+            <HybridIllustration
+              src="/assets/illustrations/ui/longest_road.webp"
+              alt="Maior Estrada"
+              fallback={<span aria-hidden="true">📏</span>}
+            />
+          </span>
+          <span>{longestRoad}</span>
           <small>{hasRoad ? "Maior Estrada ★" : "Seq. Estrada"}</small>
         </div>
       </div>

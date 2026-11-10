@@ -315,10 +315,26 @@
     }
   }
 
+  .score-pill__medallion {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+  }
+
   .score-pill--award {
     background: rgba(234, 179, 8, 0.2);
     border: 1px solid rgba(250, 204, 21, 0.5);
     color: #fef08a;
+
+    .score-pill__medallion {
+      width: 25px;
+      height: 25px;
+      filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.85));
+    }
 
     small {
       color: #fde047;

@@ -1,4 +1,5 @@
 import cn from "classnames";
+import { Tooltip } from "@mui/material";
 import {
   type PlayerState,
   type Card,
@@ -113,24 +114,15 @@ export default function ResourceCards({
               background: `linear-gradient(160deg, ${meta.secondaryColor} 0%, ${meta.primaryColor} 100%)`,
             }}
           >
-            {showEmptySlots && (
-              <CardArtIllustration
-                resource={res}
-                className="resource-card-item__bg-art"
-              />
-            )}
+            <CardArtIllustration
+              resource={res}
+              className="resource-card-item__bg-art"
+            />
             <div className="resource-card-item__inner">
               <div className="resource-card-item__badge">
-                <HybridIllustration
-                  src={meta.customCardIllustration}
-                  alt={meta.label}
-                  className="resource-card-item__custom-art"
-                  fallback={
-                    <ResourceIcon
-                      resource={res}
-                      size={compact ? 15 : showEmptySlots ? 22 : 20}
-                    />
-                  }
+                <ResourceIcon
+                  resource={res}
+                  size={compact ? 15 : showEmptySlots ? 20 : 18}
                 />
               </div>
               <span className="resource-card-item__count">
@@ -154,40 +146,67 @@ export default function ResourceCards({
         const meta = DEV_CARD_META[id];
 
         return (
-          <div
+          <Tooltip
             key={id}
-            className={cn(
-              "dev-cards center-text card resource-card-item resource-card-item--dev",
-              {
-                "resource-card-item--deck": showEmptySlots,
-              }
-            )}
-            title={`${count} ${titleLabel} Card(s)`}
-            style={{
-              borderColor: meta.accentColor,
+            placement="top"
+            arrow
+            title={
+              <div
+                style={{
+                  width: 210,
+                  height: 280,
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  boxShadow: "0 12px 28px rgba(0,0,0,0.85)",
+                }}
+              >
+                <CardArtIllustration cardType={id} />
+              </div>
+            }
+            slotProps={{
+              tooltip: {
+                sx: {
+                  p: 0,
+                  bgcolor: "transparent",
+                  maxWidth: "none",
+                },
+              },
             }}
           >
-            {showEmptySlots && (
+            <div
+              className={cn(
+                "dev-cards center-text card resource-card-item resource-card-item--dev",
+                {
+                  "resource-card-item--deck": showEmptySlots,
+                }
+              )}
+              style={{
+                borderColor: meta.accentColor,
+              }}
+            >
               <CardArtIllustration
                 cardType={id}
                 className="resource-card-item__bg-art"
               />
-            )}
-            <div className="resource-card-item__inner">
-              <div className="resource-card-item__badge">
-                <DevCardIcon
-                  card={id}
-                  size={compact ? 15 : showEmptySlots ? 20 : 18}
-                />
+              <div
+                className="resource-card-item__inner"
+                title={`${count} ${titleLabel} Card(s)`}
+              >
+                <div className="resource-card-item__badge">
+                  <DevCardIcon
+                    card={id}
+                    size={compact ? 15 : showEmptySlots ? 20 : 18}
+                  />
+                </div>
+                <span className="resource-card-item__count">
+                  {showEmptySlots ? `×${count}` : count}
+                </span>
+                <span className="resource-card-item__label">
+                  {showEmptySlots ? ptLabel : code}
+                </span>
               </div>
-              <span className="resource-card-item__count">
-                {showEmptySlots ? `×${count}` : count}
-              </span>
-              <span className="resource-card-item__label">
-                {showEmptySlots ? ptLabel : code}
-              </span>
             </div>
-          </div>
+          </Tooltip>
         );
       })}
     </div>
@@ -213,6 +232,13 @@ function FaceDownCards({
           className="hidden-cards center-text card resource-card-item resource-card-item--facedown"
           title={resources + " Resource Card(s), face down"}
         >
+          <div className="resource-card-item__bg-art">
+            <HybridIllustration
+              src="/assets/illustrations/dev/card_back.webp"
+              alt="Verso da Carta"
+              fallback={null}
+            />
+          </div>
           <div className="resource-card-item__inner">
             <span className="resource-card-item__count">{resources}</span>
             <span className="resource-card-item__label">REC</span>
@@ -224,6 +250,13 @@ function FaceDownCards({
           className="dev-cards center-text card resource-card-item resource-card-item--dev-facedown"
           title={developments + " Development Card(s), face down"}
         >
+          <div className="resource-card-item__bg-art">
+            <HybridIllustration
+              src="/assets/illustrations/dev/card_back.webp"
+              alt="Verso da Carta"
+              fallback={null}
+            />
+          </div>
           <div className="resource-card-item__inner">
             <span className="resource-card-item__count">{developments}</span>
             <span className="resource-card-item__label">DEV</span>

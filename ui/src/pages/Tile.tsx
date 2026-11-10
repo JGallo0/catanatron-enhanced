@@ -182,7 +182,7 @@ export default function Tile({
   hasRobber = false,
 }: TileProps) {
   const [customImgLoaded, setCustomImgLoaded] = useState(false);
-  const [customImgError, setCustomImgError] = useState(false);
+  const [extIndex, setExtIndex] = useState(0);
 
   const w = SQRT3 * size;
   const h = 2 * size;
@@ -199,6 +199,20 @@ export default function Tile({
       : tile.type === "DESERT"
         ? DESERT_META.customTileIllustration
         : undefined;
+
+  const baseWithoutExt = customIllustrationUrl
+    ? customIllustrationUrl.replace(/\.(webp|png|jpg|jpeg)$/i, "")
+    : "";
+  const candidateUrls = customIllustrationUrl
+    ? [
+        customIllustrationUrl,
+        `${baseWithoutExt}.webp`,
+        `${baseWithoutExt}.png`,
+        `${baseWithoutExt}.jpg`,
+      ].filter((v, idx, arr) => arr.indexOf(v) === idx)
+    : [];
+  const activeCustomUrl =
+    extIndex < candidateUrls.length ? candidateUrls[extIndex] : undefined;
 
   return (
     <div
@@ -227,15 +241,18 @@ export default function Tile({
           </div>
 
           {/* Optional Nano Banana Pro high-res illustration overlay */}
-          {customIllustrationUrl && !customImgError && (
+          {activeCustomUrl && (
             <img
-              src={customIllustrationUrl}
+              src={activeCustomUrl}
               alt=""
               className={cn("tile__custom-illustration", {
                 "tile__custom-illustration--loaded": customImgLoaded,
               })}
               onLoad={() => setCustomImgLoaded(true)}
-              onError={() => setCustomImgError(true)}
+              onError={() => {
+                setCustomImgLoaded(false);
+                setExtIndex((prev) => prev + 1);
+              }}
               draggable={false}
             />
           )}
