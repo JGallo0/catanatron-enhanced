@@ -15,11 +15,10 @@ import Robber from "./Robber";
 import "./Board.scss";
 
 /**
- * Computes optimal hex size based on viewport dimensions.
- * Uses the formulas: W = SQRT3 * size and H = 2 * size.
+ * Computes optimal hex size based on available canvas dimensions.
  */
 function computeDefaultSize(divWidth: number, divHeight: number): number {
-  const numLevels = 6; // 3 rings + outer water ring
+  const numLevels = 6.2; // 3 land rings + outer port ring + margin
   const maxSizeThatRespectsHeight = (4 * divHeight) / (3 * numLevels + 1) / 2;
   const correspondingWidth = SQRT3 * maxSizeThatRespectsHeight;
   if (numLevels * correspondingWidth < divWidth) {
@@ -35,7 +34,6 @@ function getLastRolledSum(gameState: GameState): number | null {
     if (action[1] === "ROLL" && Array.isArray(result) && result.length === 2) {
       return Number(result[0]) + Number(result[1]);
     }
-    // Stop if we crossed back into a previous turn's END_TURN
     if (action[1] === "END_TURN") {
       break;
     }
@@ -80,13 +78,13 @@ export default function Board({
   isMovingRobber,
   robberCoordinates,
 }: BoardProps) {
-  // Full-bleed Steam Catan style table with comfortable HUD margins
-  const hudVerticalPadding = isMobile ? 165 : 145;
-  const hudHorizontalPadding = isMobile ? 16 : 320;
-  const containerHeight = Math.max(320, height - hudVerticalPadding);
-  const containerWidth = Math.max(320, width - hudHorizontalPadding);
-  const center: [number, number] = [width / 2, (height - 64) / 2];
-  const size = computeDefaultSize(containerWidth, containerHeight);
+  // Exact available viewport after accounting for LeftDrawer (300px on desktop) and top/bottom HUD bars
+  const leftSidebarWidth = isMobile ? 0 : 300;
+  const canvasWidth = Math.max(320, width - leftSidebarWidth);
+  const canvasHeight = Math.max(320, height - (isMobile ? 185 : 175));
+
+  const center: [number, number] = [canvasWidth / 2, canvasHeight / 2];
+  const size = computeDefaultSize(canvasWidth - 24, canvasHeight - 24);
 
   const lastRolledSum = useMemo(() => getLastRolledSum(gameState), [gameState]);
   const robberCoordKey = `${gameState.robber_coordinate}`;
@@ -142,34 +140,42 @@ export default function Board({
   );
 
   const edges = Object.values(gameState.edges).map(
-    ({ color, direction, tile_coordinate, id }) => (
-      <Edge
-        id={`${id[0]},${id[1]}`}
-        key={`${id}`}
-        center={center}
-        size={size}
-        coordinate={tile_coordinate}
-        direction={direction}
-        color={color}
-        flashing={!!edgeActions && toEdgeId(id) in edgeActions}
-        onClick={buildOnEdgeClick(
-          id,
-          edgeActions ? edgeActions[toEdgeId(id)] : undefined
-        )}
-      />
-    )
+    ({ color, direction, tile_coordinate, id }) => {
+      const action =
+        edgeActions?.[toEdgeId(id)] ??
+        edgeActions?.[`${id[1]},${id[0]}` as EdgeId];
+      return (
+        <Edge
+          id={`${id[0]},${id[1]}`}
+          key={`${id}`}
+          center={center}
+          size={size}
+          coordinate={tile_coordinate}
+          direction={direction}
+          color={color}
+          flashing={!!action}
+          onClick={buildOnEdgeClick(id, action)}
+        />
+      );
+    }
   );
 
   return (
-    <div className={classnames("board", { show })}>
-      {/* Ambient Ocean Glow behind island */}
+    <div
+      className={classnames("board", { show })}
+      style={{
+        width: canvasWidth,
+        height: canvasHeight,
+      }}
+    >
+      {/* Ambient Caribbean Ocean Reef Glow behind Catan island */}
       <div
         className="board__island-glow"
         style={{
           left: center[0],
           top: center[1],
-          width: size * 9.5,
-          height: size * 9.5,
+          width: size * 8.4,
+          height: size * 8.4,
         }}
       />
       {tiles}

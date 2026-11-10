@@ -8,11 +8,11 @@ import {
   type ResourceCard,
   type Tile as TileData,
 } from "../utils/api.types";
+import { DESERT_META, RESOURCE_META } from "../config/assetRegistry";
 import {
-  DESERT_META,
-  RESOURCE_META,
-} from "../config/assetRegistry";
-import { ResourceIcon } from "../components/icons/GameIcons";
+  ResourceIcon,
+  TerrainHexIllustration,
+} from "../components/icons/GameIcons";
 
 type NumberTokenProps = {
   number: number;
@@ -56,7 +56,7 @@ export function NumberToken({
   size = 72,
 }: NumberTokenProps) {
   const isHot = number === 6 || number === 8;
-  const tokenDiameter = Math.max(32, Math.min(54, Math.round(size * 0.66)));
+  const tokenDiameter = Math.max(30, Math.min(50, Math.round(size * 0.6)));
 
   return (
     <div
@@ -117,7 +117,7 @@ const Port = ({
   const ratio = resource ? "2:1" : "3:1";
   const offset = calculatePortOffset(direction, size);
   const meta = resource ? RESOURCE_META[resource] : null;
-  const badgeSize = Math.max(38, Math.min(58, Math.round(size * 0.72)));
+  const badgeSize = Math.max(36, Math.min(54, Math.round(size * 0.68)));
 
   return (
     <div
@@ -137,7 +137,6 @@ const Port = ({
           : "Porto Marítimo Geral 3:1 (Qualquer Recurso)"
       }
     >
-      {/* Pier direction indicator */}
       <div
         className="port__pier-indicator"
         style={{
@@ -146,10 +145,13 @@ const Port = ({
       />
       <div className="port__icon">
         {resource ? (
-          <ResourceIcon resource={resource} size={Math.round(badgeSize * 0.42)} />
+          <ResourceIcon
+            resource={resource}
+            size={Math.round(badgeSize * 0.42)}
+          />
         ) : (
           <span className="port__anchor" aria-hidden="true">
-            ⚓
+            ⛵
           </span>
         )}
       </div>
@@ -191,13 +193,6 @@ export default function Tile({
   const resourceMeta =
     tile.type === "RESOURCE_TILE" ? RESOURCE_META[tile.resource] : null;
 
-  const legacySvgUrl =
-    tile.type === "RESOURCE_TILE"
-      ? resourceMeta?.legacyTileSvg
-      : tile.type === "DESERT"
-        ? DESERT_META.legacyTileSvg
-        : undefined;
-
   const customIllustrationUrl =
     tile.type === "RESOURCE_TILE"
       ? resourceMeta?.customTileIllustration
@@ -224,13 +219,12 @@ export default function Tile({
     >
       {isLand && (
         <div className="tile__hex-surface">
-          {/* Base SVG terrain artwork */}
-          <div
-            className="tile__artwork"
-            style={{
-              backgroundImage: legacySvgUrl ? `url("${legacySvgUrl}")` : undefined,
-            }}
-          />
+          {/* Rich Catan Universe style vector landscape */}
+          <div className="tile__artwork">
+            <TerrainHexIllustration
+              terrain={tile.type === "RESOURCE_TILE" ? tile.resource : "DESERT"}
+            />
+          </div>
 
           {/* Optional Nano Banana Pro high-res illustration overlay */}
           {customIllustrationUrl && !customImgError && (
@@ -246,7 +240,7 @@ export default function Tile({
             />
           )}
 
-          {/* SVG Bevel & Coastal Frame Overlay */}
+          {/* Sandy Beach Shoreline & Inner Frame Overlay */}
           <svg
             className="tile__frame-svg"
             viewBox="0 0 100 115.47"
@@ -255,7 +249,7 @@ export default function Tile({
           >
             <polygon
               className="tile__bevel-outer"
-              points="50,1.5 98.5,29.5 98.5,85.97 50,113.97 1.5,85.97 1.5,29.5"
+              points="50,1.2 98.8,29.2 98.8,86.2 50,114.2 1.2,86.2 1.2,29.2"
             />
             <polygon
               className="tile__bevel-inner"
@@ -271,7 +265,7 @@ export default function Tile({
             >
               <ResourceIcon
                 resource={tile.resource}
-                size={Math.max(14, Math.round(size * 0.22))}
+                size={Math.max(13, Math.round(size * 0.2))}
               />
             </div>
           )}
@@ -297,7 +291,10 @@ export default function Tile({
       )}
 
       {flashing && (
-        <div className="tile__robber-target-ring" title="Mover Ladrão para cá" />
+        <div
+          className="tile__robber-target-ring"
+          title="Mover Ladrão para cá"
+        />
       )}
     </div>
   );

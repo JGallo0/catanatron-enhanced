@@ -47,8 +47,10 @@
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(14, 116, 144, 0.32) 0%,
-    rgba(15, 23, 42, 0) 70%
+    rgba(253, 230, 138, 0.22) 0%,
+    rgba(14, 165, 233, 0.28) 42%,
+    rgba(2, 132, 199, 0.12) 65%,
+    rgba(15, 23, 42, 0) 80%
   );
   pointer-events: none;
   z-index: 0;
@@ -62,13 +64,13 @@
   border-radius: 50%;
   background: radial-gradient(
     circle at 35% 30%,
-    rgba(51, 65, 85, 0.92),
-    rgba(15, 23, 42, 0.96)
+    rgba(51, 65, 85, 0.94),
+    rgba(15, 23, 42, 0.98)
   );
-  border: 2px solid #f43f5e;
+  border: 2.5px solid #f43f5e;
   box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.75),
-    0 0 12px rgba(244, 63, 94, 0.45);
+    0 6px 16px rgba(0, 0, 0, 0.8),
+    0 0 12px rgba(244, 63, 94, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,30 +85,30 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 11px;
+  height: 14px;
   z-index: 6;
 
   &--buildable {
     cursor: pointer;
-    z-index: 10;
+    z-index: 11;
   }
 }
 
 .road {
   position: absolute;
   width: 82%;
-  height: 9px;
-  border-radius: 4px;
-  border: 1.5px solid #0f172a;
-  transition: transform 0.2s ease;
+  height: 11px;
+  border-radius: 5px;
+  border: 2px solid #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 @media screen and (min-width: variables.$sm-breakpoint) {
   .edge {
-    height: 14px;
+    height: 16px;
   }
   .road {
-    height: 11px;
+    height: 12px;
   }
 }
 
@@ -135,7 +137,7 @@
 
   &__svg {
     overflow: visible;
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.65));
+    filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.78));
   }
 }
 
@@ -150,7 +152,7 @@
   }
 }
 
-// ===== Buildable Action Pulse Indicator
+// ===== Buildable Action Pulse Indicator (Catan Universe Target Ring)
 .pulse {
   cursor: pointer;
   position: absolute;
@@ -165,40 +167,47 @@
     display: block;
     background: radial-gradient(
       circle,
-      rgba(250, 204, 21, 0.95) 0%,
-      rgba(234, 179, 8, 0.45) 65%,
-      transparent 100%
+      rgba(254, 240, 138, 0.92) 0%,
+      rgba(234, 179, 8, 0.68) 55%,
+      rgba(15, 23, 42, 0.25) 100%
     );
-    border: 2px solid #fef08a;
+    border: 2.5px solid #ffffff;
     border-radius: 999px;
-    box-shadow: 0 0 14px rgba(250, 204, 21, 0.9);
-    animation: pulse-dot 1.15s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+    box-shadow:
+      0 0 0 2px rgba(15, 23, 42, 0.75),
+      0 0 12px rgba(250, 204, 21, 0.95);
+    animation: pulse-dot 1.2s ease-in-out infinite;
+    transition: transform 0.15s ease, background 0.15s ease;
   }
 
   &:hover:after {
-    background: #facc15;
-    transform: scale(1.22);
+    background: #fef08a;
+    border-color: #ef4444;
+    transform: scale(1.28);
+    box-shadow:
+      0 0 0 2px #0f172a,
+      0 0 18px rgba(250, 204, 21, 1);
   }
 }
 
 @keyframes pulse-dot {
   0% {
-    transform: scale(0.78);
+    transform: scale(0.76);
   }
   50% {
-    transform: scale(1.06);
+    transform: scale(1.02);
   }
   100% {
-    transform: scale(0.78);
+    transform: scale(0.76);
   }
 }
 
 .edge .pulse {
-  width: 82%;
-  height: 110%;
+  width: 76%;
+  height: 92%;
 }
 
 .node .pulse {
-  width: 72%;
-  height: 72%;
+  width: 52%;
+  height: 52%;
 }

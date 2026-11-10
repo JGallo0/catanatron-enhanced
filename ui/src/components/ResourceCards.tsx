@@ -1,10 +1,16 @@
-import { type PlayerState, type Card, type ResourceCard } from "../utils/api.types";
+import cn from "classnames";
+import {
+  type PlayerState,
+  type Card,
+  type ResourceCard,
+} from "../utils/api.types";
 import {
   DEV_CARD_META,
   type DevCardType,
   RESOURCE_META,
 } from "../config/assetRegistry";
 import {
+  CardArtIllustration,
   DevCardIcon,
   HybridIllustration,
   ResourceIcon,
@@ -18,22 +24,45 @@ const DEV_CARDS: {
   id: DevCardType;
   code: string;
   titleLabel: string;
+  ptLabel: string;
 }[] = [
-  { id: "VICTORY_POINT", code: "VP", titleLabel: "Victory Point" },
-  { id: "KNIGHT", code: "KN", titleLabel: "Knight" },
-  { id: "MONOPOLY", code: "MO", titleLabel: "Monopoly" },
-  { id: "YEAR_OF_PLENTY", code: "YP", titleLabel: "Year of Plenty" },
-  { id: "ROAD_BUILDING", code: "RB", titleLabel: "Road Building" },
+  {
+    id: "VICTORY_POINT",
+    code: "PV",
+    titleLabel: "Victory Point",
+    ptLabel: "Ponto Vitória",
+  },
+  { id: "KNIGHT", code: "CAV", titleLabel: "Knight", ptLabel: "Cavaleiro" },
+  {
+    id: "MONOPOLY",
+    code: "MON",
+    titleLabel: "Monopoly",
+    ptLabel: "Monopólio",
+  },
+  {
+    id: "YEAR_OF_PLENTY",
+    code: "FAR",
+    titleLabel: "Year of Plenty",
+    ptLabel: "Fartura",
+  },
+  {
+    id: "ROAD_BUILDING",
+    code: "EST",
+    titleLabel: "Road Building",
+    ptLabel: "2 Estradas",
+  },
 ];
 
 export default function ResourceCards({
   playerState,
   playerKey,
   compact = false,
+  showEmptySlots = false,
 }: {
   playerState: PlayerState;
   playerKey: string;
   compact?: boolean;
+  showEmptySlots?: boolean;
 }) {
   const amount = (card: Card): number | undefined =>
     playerState[`${playerKey}_${card}_IN_HAND`];
@@ -53,38 +82,63 @@ export default function ResourceCards({
 
   return (
     <div
-      className={`resource-cards ${compact ? "resource-cards--compact" : ""}`}
+      className={cn("resource-cards", {
+        "resource-cards--compact": compact,
+        "resource-cards--deck": showEmptySlots,
+      })}
       title="Resource Cards"
     >
       {RESOURCES.map((res) => {
         const count = amount(res) ?? 0;
-        if (count === 0) return null;
+        if (count === 0 && !showEmptySlots) return null;
         const meta = RESOURCE_META[res];
         const lower = res.toLowerCase();
 
         return (
           <div
             key={res}
-            className={`${lower}-cards center-text card resource-card-item`}
+            className={cn(
+              `${lower}-cards center-text card resource-card-item`,
+              {
+                "resource-card-item--deck": showEmptySlots,
+                "resource-card-item--empty": showEmptySlots && count === 0,
+              }
+            )}
             title={`${count}x ${meta.label} (${res})`}
             style={{
-              borderColor: meta.borderColor,
+              borderColor:
+                showEmptySlots && count === 0
+                  ? "rgba(148, 163, 184, 0.25)"
+                  : meta.borderColor,
               background: `linear-gradient(160deg, ${meta.secondaryColor} 0%, ${meta.primaryColor} 100%)`,
             }}
           >
-            <div className="resource-card-item__inner">
-              <HybridIllustration
-                src={meta.customCardIllustration}
-                alt={meta.label}
-                className="resource-card-item__custom-art"
-                fallback={
-                  <ResourceIcon resource={res} size={compact ? 16 : 22} />
-                }
+            {showEmptySlots && (
+              <CardArtIllustration
+                resource={res}
+                className="resource-card-item__bg-art"
               />
-              <span className="resource-card-item__count">{count}</span>
+            )}
+            <div className="resource-card-item__inner">
+              <div className="resource-card-item__badge">
+                <HybridIllustration
+                  src={meta.customCardIllustration}
+                  alt={meta.label}
+                  className="resource-card-item__custom-art"
+                  fallback={
+                    <ResourceIcon
+                      resource={res}
+                      size={compact ? 15 : showEmptySlots ? 22 : 20}
+                    />
+                  }
+                />
+              </div>
+              <span className="resource-card-item__count">
+                {showEmptySlots ? `×${count}` : count}
+              </span>
               {!compact && (
                 <span className="resource-card-item__label">
-                  {meta.shortLabel}
+                  {showEmptySlots ? meta.label : meta.shortLabel}
                 </span>
               )}
             </div>
@@ -94,7 +148,7 @@ export default function ResourceCards({
 
       <div className="separator" />
 
-      {DEV_CARDS.map(({ id, code, titleLabel }) => {
+      {DEV_CARDS.map(({ id, code, titleLabel, ptLabel }) => {
         const count = amount(id) ?? 0;
         if (count === 0) return null;
         const meta = DEV_CARD_META[id];
@@ -102,16 +156,30 @@ export default function ResourceCards({
         return (
           <div
             key={id}
-            className="dev-cards center-text card resource-card-item resource-card-item--dev"
+            className={cn(
+              "dev-cards center-text card resource-card-item resource-card-item--dev",
+              {
+                "resource-card-item--deck": showEmptySlots,
+              }
+            )}
             title={`${count} ${titleLabel} Card(s)`}
             style={{
               borderColor: meta.accentColor,
             }}
           >
             <div className="resource-card-item__inner">
-              <DevCardIcon card={id} size={compact ? 15 : 19} />
-              <span className="resource-card-item__count">{count}</span>
-              <span className="resource-card-item__label">{code}</span>
+              <div className="resource-card-item__badge">
+                <DevCardIcon
+                  card={id}
+                  size={compact ? 15 : showEmptySlots ? 20 : 18}
+                />
+              </div>
+              <span className="resource-card-item__count">
+                {showEmptySlots ? `×${count}` : count}
+              </span>
+              <span className="resource-card-item__label">
+                {showEmptySlots ? ptLabel : code}
+              </span>
             </div>
           </div>
         );

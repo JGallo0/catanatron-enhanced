@@ -4,6 +4,7 @@ import "./PlayerStateBox.scss";
 import { type Color, type PlayerState } from "../utils/api.types";
 import ResourceCards from "./ResourceCards";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { CitySvgPiece, SettlementSvgPiece } from "./icons/GameIcons";
 
 export default function PlayerStateBox({
   playerState,
@@ -27,9 +28,14 @@ export default function PlayerStateBox({
   const hasRoad = Boolean(playerState[`${playerKey}_HAS_ROAD`]);
   const knightsPlayed = playerState[`${playerKey}_PLAYED_KNIGHT`] ?? 0;
   const longestRoad = playerState[`${playerKey}_LONGEST_ROAD_LENGTH`] ?? 0;
-  const settlementsLeft = playerState[`${playerKey}_SETTLEMENTS_AVAILABLE`];
-  const citiesLeft = playerState[`${playerKey}_CITIES_AVAILABLE`];
-  const roadsLeft = playerState[`${playerKey}_ROADS_AVAILABLE`];
+  const settlementsLeft = playerState[`${playerKey}_SETTLEMENTS_AVAILABLE`] ?? 5;
+  const citiesLeft = playerState[`${playerKey}_CITIES_AVAILABLE`] ?? 4;
+  const roadsLeft = playerState[`${playerKey}_ROADS_AVAILABLE`] ?? 15;
+
+  const builtSettlements = Math.max(0, 5 - settlementsLeft);
+  const builtCities = Math.max(0, 4 - citiesLeft);
+  const builtRoads = Math.max(0, 15 - roadsLeft);
+
   const colorMeta = PLAYER_COLOR_META[color];
   const displayName = customName || colorMeta.label;
 
@@ -77,6 +83,64 @@ export default function PlayerStateBox({
         compact={true}
       />
 
+      <div
+        className="player-pieces-strip"
+        title={`Peças de ${displayName}: ${builtSettlements} Aldeias no mapa (${settlementsLeft} restantes), ${builtCities} Cidades no mapa (${citiesLeft} restantes), ${builtRoads} Estradas no mapa (${roadsLeft} restantes)`}
+      >
+        <div
+          className="player-piece-badge"
+          title={`Aldeias construídas: ${builtSettlements} (Restam ${settlementsLeft} no estoque)`}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="-22 -24 44 42"
+            aria-hidden="true"
+          >
+            <SettlementSvgPiece color={color} scale={1.0} />
+          </svg>
+          <div className="player-piece-badge__text">
+            <strong>{builtSettlements}/5</strong>
+            <small>Aldeias</small>
+          </div>
+        </div>
+
+        <div
+          className="player-piece-badge"
+          title={`Cidades construídas: ${builtCities} (Restam ${citiesLeft} no estoque)`}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="-22 -24 44 42"
+            aria-hidden="true"
+          >
+            <CitySvgPiece color={color} scale={1.0} />
+          </svg>
+          <div className="player-piece-badge__text">
+            <strong>{builtCities}/4</strong>
+            <small>Cidades</small>
+          </div>
+        </div>
+
+        <div
+          className="player-piece-badge"
+          title={`Estradas construídas: ${builtRoads} (Restam ${roadsLeft} no estoque)`}
+        >
+          <span
+            className="player-piece-badge__road-icon"
+            style={{
+              background: `linear-gradient(90deg, ${colorMeta.secondary}, ${colorMeta.primary})`,
+              borderColor: colorMeta.stroke,
+            }}
+          />
+          <div className="player-piece-badge__text">
+            <strong>{builtRoads}/15</strong>
+            <small>Estradas</small>
+          </div>
+        </div>
+      </div>
+
       <div className="scores">
         <div
           className={cn("num-knights center-text", {
@@ -90,7 +154,7 @@ export default function PlayerStateBox({
           }
         >
           <span>⚔️ {knightsPlayed}</span>
-          <small>{hasArmy ? "Exército ★" : "Cavaleiros"}</small>
+          <small>{hasArmy ? "Maior Exército ★" : "Cavaleiros"}</small>
         </div>
 
         <div
@@ -102,19 +166,9 @@ export default function PlayerStateBox({
             hasRoad ? "Longest Road — Maior Estrada (+2 PV)" : "Longest Road"
           }
         >
-          <span>🛤️ {longestRoad}</span>
-          <small>{hasRoad ? "Estrada ★" : "Estradas"}</small>
+          <span>📏 {longestRoad}</span>
+          <small>{hasRoad ? "Maior Estrada ★" : "Seq. Estrada"}</small>
         </div>
-
-        {settlementsLeft !== undefined && (
-          <div
-            className="piece-stock-pill"
-            title={`Estoque restante: ${settlementsLeft} Aldeias, ${citiesLeft ?? 0} Cidades, ${roadsLeft ?? 0} Estradas`}
-          >
-            <span>🏠{5 - settlementsLeft}/5</span>
-            <span>🏰{4 - (citiesLeft ?? 4)}/4</span>
-          </div>
-        )}
       </div>
     </div>
   );

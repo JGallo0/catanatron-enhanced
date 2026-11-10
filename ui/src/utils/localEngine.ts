@@ -1160,10 +1160,10 @@ export function localGetState(
     saveGamesMap(freshMap);
   }
   if (stateIndex === "latest") {
-    return game.state;
+    return JSON.parse(JSON.stringify(game.state));
   }
   const idx = Number(stateIndex);
-  return game.history[idx] || game.state;
+  return JSON.parse(JSON.stringify(game.history[idx] || game.state));
 }
 
 export function localPostAction(
@@ -1180,7 +1180,7 @@ export function localPostAction(
     applyActionToGame(game, chosen);
     saveGamesMap(map);
   }
-  return game.state;
+  return JSON.parse(JSON.stringify(game.state));
 }
 
 export function localGetMctsAnalysis(gameId: string): {

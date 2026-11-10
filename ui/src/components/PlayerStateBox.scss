@@ -5,11 +5,16 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
+  min-height: 36px;
 
   &--compact {
-    min-height: 34px;
+    min-height: 28px;
     gap: 4px;
+  }
+
+  &--deck {
+    gap: 8px;
+    min-height: 78px;
   }
 
   .separator {
@@ -30,18 +35,48 @@
     0 4px 10px rgba(0, 0, 0, 0.45),
     inset 0 1px 1px rgba(255, 255, 255, 0.25);
   overflow: hidden;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
   user-select: none;
 
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.6);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.65);
   }
 
   .resource-cards--compact & {
     min-width: 34px;
-    height: 40px;
+    height: 38px;
     border-radius: 6px;
+  }
+
+  &--deck {
+    min-width: 64px;
+    height: 82px;
+    border-radius: 10px;
+    border-width: 2px;
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.6),
+      inset 0 1px 2px rgba(255, 255, 255, 0.35);
+  }
+
+  &--empty {
+    opacity: 0.42;
+    filter: saturate(0.35);
+
+    &:hover {
+      opacity: 0.72;
+      filter: saturate(0.75);
+    }
+  }
+
+  &__bg-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.85;
   }
 
   &__inner {
@@ -50,15 +85,31 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 3px 4px;
+    justify-content: space-between;
+    padding: 4px 4px;
     position: relative;
     z-index: 2;
+    background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.15) 0%,
+      rgba(15, 23, 42, 0.55) 65%,
+      rgba(15, 23, 42, 0.88) 100%
+    );
+  }
+
+  &__badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 2px;
+    background: rgba(15, 23, 42, 0.48);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
   }
 
   &__custom-art {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     object-fit: cover;
     border-radius: 4px;
   }
@@ -66,23 +117,24 @@
   &__count {
     font-family: "Outfit", "Inter", sans-serif;
     font-weight: 800;
-    font-size: 0.92rem;
+    font-size: 0.96rem;
     line-height: 1.05;
     color: #ffffff;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
   }
 
   &__label {
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    opacity: 0.9;
-    color: rgba(255, 255, 255, 0.92);
-    line-height: 1;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    color: #f8fafc;
+    line-height: 1.05;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+    white-space: nowrap;
   }
 
   &--dev {
-    background: linear-gradient(160deg, #4c1d95 0%, #1e1b4b 100%);
+    background: linear-gradient(160deg, #581c87 0%, #1e1b4b 100%);
   }
 
   &--facedown {
@@ -100,17 +152,17 @@
   padding: 10px 12px;
   margin: 6px 8px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.72) !important;
+  background: rgba(15, 23, 42, 0.78) !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-left: 4px solid #64748b;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 
   &--active {
-    background: rgba(30, 41, 59, 0.92) !important;
-    border-color: rgba(250, 204, 21, 0.4);
+    background: rgba(30, 41, 59, 0.94) !important;
+    border-color: rgba(250, 204, 21, 0.45);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
   }
 
@@ -124,7 +176,7 @@
   &__identity {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
     min-width: 0;
   }
 
@@ -143,7 +195,7 @@
   }
 
   &__role-badge {
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 700;
     padding: 2px 5px;
     border-radius: 4px;
@@ -153,7 +205,7 @@
   }
 
   &__turn-pill {
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 700;
     padding: 2px 6px;
     border-radius: 999px;
@@ -169,7 +221,11 @@
     gap: 3px;
     padding: 3px 9px;
     border-radius: 999px;
-    background: linear-gradient(135deg, rgba(234, 179, 8, 0.22), rgba(161, 98, 7, 0.32));
+    background: linear-gradient(
+      135deg,
+      rgba(234, 179, 8, 0.22),
+      rgba(161, 98, 7, 0.32)
+    );
     border: 1px solid rgba(250, 204, 21, 0.45);
     color: #fef08a;
 
@@ -186,28 +242,75 @@
     }
   }
 
+  .player-pieces-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    padding: 5px 6px;
+    border-radius: 8px;
+    background: rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  .player-piece-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+
+    &__road-icon {
+      width: 18px;
+      height: 7px;
+      border-radius: 3px;
+      border: 1.5px solid #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.65);
+      flex-shrink: 0;
+      transform: rotate(-18deg);
+    }
+
+    &__text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.05;
+
+      strong {
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: #f8fafc;
+      }
+
+      small {
+        font-size: 0.58rem;
+        color: #94a3b8;
+        font-weight: 600;
+      }
+    }
+  }
+
   .scores {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    padding-top: 4px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 3px;
   }
 
   .num-knights,
   .num-roads {
+    flex: 1;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
-    font-size: 0.76rem;
+    font-size: 0.74rem;
     color: #cbd5e1;
-    padding: 2px 7px;
+    padding: 3px 6px;
     border-radius: 6px;
     background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.1);
 
     small {
-      font-size: 0.66rem;
+      font-size: 0.64rem;
       color: #94a3b8;
     }
   }
@@ -221,15 +324,6 @@
       color: #fde047;
       font-weight: 700;
     }
-  }
-
-  .piece-stock-pill {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.7rem;
-    color: #94a3b8;
-    margin-left: auto;
   }
 
   .bold {

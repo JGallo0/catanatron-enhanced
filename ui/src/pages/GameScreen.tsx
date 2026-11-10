@@ -221,6 +221,19 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           >
             🃏 Baralho Dev: <strong>{devCardsRemaining}</strong>
           </span>
+          <button
+            type="button"
+            className="game-top-hud__mcts-btn"
+            onClick={() =>
+              dispatch({
+                type: ACTIONS.SET_RIGHT_DRAWER_OPENED,
+                data: !state.isRightDrawerOpen,
+              })
+            }
+            title="Abrir Análise de Probabilidade de Vitória (IA MCTS)"
+          >
+            📊 Chances (IA)
+          </button>
         </div>
       </header>
 

@@ -14,10 +14,11 @@ function Road({ color }: { color: Color }) {
   return (
     <div
       className={cn("road", color)}
+      title={`Estrada — ${palette.label}`}
       style={{
         background: `linear-gradient(180deg, ${palette.secondary} 0%, ${palette.primary} 55%, ${palette.dark} 100%)`,
-        borderColor: palette.dark,
-        boxShadow: `0 2px 6px rgba(0,0,0,0.6), 0 0 8px ${palette.glow}`,
+        borderColor: "#090d16",
+        boxShadow: `0 3px 7px rgba(0,0,0,0.75), 0 0 10px ${palette.glow}`,
       }}
     />
   );
@@ -65,7 +66,12 @@ export default function Edge({
         width: size * 0.84,
         transform: transform,
       }}
-      onClick={onClick}
+      onClick={(e) => {
+        if (flashing) {
+          e.stopPropagation();
+        }
+        onClick(e);
+      }}
     >
       {color && <Road color={color} />}
       {flashing && <div className="pulse" title="Construir Estrada aqui" />}

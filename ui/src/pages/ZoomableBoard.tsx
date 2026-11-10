@@ -1,10 +1,16 @@
 import { useCallback, useContext, useEffect, useState } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import memoize from "fast-memoize";
-import { useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent } from "@mui/material";
+import {
+  useMediaQuery,
+  useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+} from "@mui/material";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
+import { useSnackbar } from "notistack";
 
 import useWindowSize from "../utils/useWindowSize";
 
@@ -23,6 +29,7 @@ import type {
   TileCoordinate,
 } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { dispatchSnackbar } from "../components/Snackbar";
 
 function buildNodeActions(state: CatanState) {
   if (!state.gameState) throw new Error("GameState is not ready!");
@@ -87,6 +94,7 @@ type ZoomableBoardProps = {
 export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
   const { gameId } = useParams();
   const { state, dispatch } = useContext(store);
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const { width, height } = useWindowSize();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -100,28 +108,35 @@ export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
   if (!gameId) throw new Error("expecting gameId in URL");
 
   const buildOnNodeClick = useCallback(
-    memoize((_id, action) => async () => {
+    (_id: number, action?: GameAction) => async () => {
       if (action) {
         const nextState = await postAction(gameId, action);
         dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+        dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
       }
-    }),
-    [gameId, dispatch]
+    },
+    [gameId, dispatch, enqueueSnackbar, closeSnackbar]
   );
 
   const buildOnEdgeClick = useCallback(
-    memoize((_id, action) => async () => {
+    (_id: [number, number], action?: GameAction) => async () => {
       if (action) {
         const nextState = await postAction(gameId, action);
         dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+        dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
       }
-    }),
-    [gameId, dispatch]
+    },
+    [gameId, dispatch, enqueueSnackbar, closeSnackbar]
   );
 
   const handleTileClick = useCallback(
     (coordinate: TileCoordinate) => {
-      if (!state.isMovingRobber) return;
+      if (
+        !state.isMovingRobber &&
+        gameState.current_prompt !== "MOVE_ROBBER"
+      ) {
+        return;
+      }
 
       const matchingActions = gameState.current_playable_actions.filter(
         (action): action is MoveRobberAction =>
@@ -134,24 +149,39 @@ export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
       if (matchingActions.length === 1) {
         postAction(gameId, matchingActions[0]).then((nextState) => {
           dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+          dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
         });
       } else if (matchingActions.length > 1) {
         setPendingRobberActions(matchingActions);
       }
     },
-    [state.isMovingRobber, gameState.current_playable_actions, gameId, dispatch]
+    [
+      state.isMovingRobber,
+      gameState.current_prompt,
+      gameState.current_playable_actions,
+      gameId,
+      dispatch,
+      enqueueSnackbar,
+      closeSnackbar,
+    ]
   );
 
   const handleChooseRobberVictim = async (action: MoveRobberAction) => {
     setPendingRobberActions([]);
     const nextState = await postAction(gameId, action);
     dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
   };
 
   const nodeActions = replayMode ? {} : buildNodeActions(state);
   const edgeActions = replayMode ? {} : buildEdgeActions(state);
+  const isRobberPhase =
+    state.isMovingRobber ||
+    (isPlayersTurn(gameState, state.perspective) &&
+      gameState.current_prompt === "MOVE_ROBBER");
+
   const robberCoordinates = new Set(
-    state.isMovingRobber
+    isRobberPhase
       ? gameState.current_playable_actions
           .filter((action) => action[1] === "MOVE_ROBBER")
           .map((action) => `${action[2][0]}`)
@@ -161,7 +191,7 @@ export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShow(true);
-    }, 120);
+    }, 80);
     return () => clearTimeout(timer);
   }, []);
 
@@ -173,8 +203,17 @@ export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
         initialScale={1}
         minScale={0.55}
         maxScale={2.4}
-        centerOnInit={false}
+        centerOnInit={true}
+        limitToBounds={false}
         wheel={{ step: 0.08 }}
+        panning={{
+          excluded: [
+            "node--buildable",
+            "edge--buildable",
+            "pulse",
+            "camera-btn",
+          ],
+        }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <div className="board-container">
@@ -220,7 +259,7 @@ export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
                 show={show}
                 gameState={gameState}
                 isMobile={isMobile}
-                isMovingRobber={state.isMovingRobber}
+                isMovingRobber={isRobberPhase}
                 robberCoordinates={robberCoordinates}
               />
             </TransformComponent>
@@ -251,7 +290,8 @@ export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
                 ? gameState.player_state[`${pKey}_NUM_RESOURCES_IN_HAND`] ??
                   (["WOOD", "BRICK", "SHEEP", "WHEAT", "ORE"] as const).reduce(
                     (acc, r) =>
-                      acc + (gameState.player_state[`${pKey}_${r}_IN_HAND`] ?? 0),
+                      acc +
+                      (gameState.player_state[`${pKey}_${r}_IN_HAND`] ?? 0),
                     0
                   )
                 : 0;

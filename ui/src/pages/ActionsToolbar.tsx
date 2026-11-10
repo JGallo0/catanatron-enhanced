@@ -6,7 +6,6 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import memoize from "fast-memoize";
 import { Button, Dialog, DialogTitle, DialogContent } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -90,9 +89,9 @@ function PlayButtons() {
   );
 
   const carryOutAction = useCallback(
-    memoize((action?: GameAction) => async () => {
+    (action?: GameAction) => async () => {
       await executeGameAction(action);
-    }),
+    },
     [executeGameAction]
   );
 
@@ -519,6 +518,7 @@ export default function ActionsToolbar({
           <ResourceCards
             playerState={gameState.player_state}
             playerKey={playerKey(gameState, humanColor)}
+            showEmptySlots={true}
           />
         )}
 
