@@ -427,45 +427,66 @@ export const CardArtIllustration: React.FC<{
     resolvedType === "WHEAT" ||
     resolvedType === "ORE"
   ) {
+    const customSrc = `/assets/illustrations/cards/${resolvedType.toLowerCase()}.webp`;
     return (
       <div className={className} aria-hidden="true">
-        <TerrainHexIllustration terrain={resolvedType} />
+        <HybridIllustration
+          src={customSrc}
+          alt={resolvedType}
+          className="card-art-custom-img"
+          fallback={<TerrainHexIllustration terrain={resolvedType} />}
+        />
       </div>
     );
   }
 
+  const devCustomSrc = `/assets/illustrations/dev/${resolvedType.toLowerCase()}.webp`;
   return (
     <div className={className} aria-hidden="true">
-      <svg
-        viewBox="0 0 120 160"
-        width="100%"
-        height="100%"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden="true"
-      >
-        <defs>
-          <linearGradient id={`devGrad-${resolvedType}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#312e81" />
-            <stop offset="55%" stopColor="#1e1b4b" />
-            <stop offset="100%" stopColor="#0f172a" />
-          </linearGradient>
-        </defs>
-        <rect width="120" height="160" fill={`url(#devGrad-${resolvedType})`} />
-        <circle
-          cx="60"
-          cy="68"
-          r="34"
-          fill="rgba(250, 204, 21, 0.14)"
-          stroke="rgba(250, 204, 21, 0.45)"
-          strokeWidth="1.5"
-        />
-      </svg>
+      <HybridIllustration
+        src={devCustomSrc}
+        alt={resolvedType}
+        className="card-art-custom-img"
+        fallback={
+          <svg
+            viewBox="0 0 120 160"
+            width="100%"
+            height="100%"
+            preserveAspectRatio="xMidYMid slice"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient
+                id={`devGrad-${resolvedType}`}
+                x1="0"
+                y1="0"
+                x2="1"
+                y2="1"
+              >
+                <stop offset="0%" stopColor="#312e81" />
+                <stop offset="55%" stopColor="#1e1b4b" />
+                <stop offset="100%" stopColor="#0f172a" />
+              </linearGradient>
+            </defs>
+            <rect width="120" height="160" fill={`url(#devGrad-${resolvedType})`} />
+            <circle
+              cx="60"
+              cy="68"
+              r="34"
+              fill="rgba(250, 204, 21, 0.14)"
+              stroke="rgba(250, 204, 21, 0.45)"
+              strokeWidth="1.5"
+            />
+          </svg>
+        }
+      />
     </div>
   );
 };
 
 /**
- * Renders a custom Nano Banana Pro illustration if available on disk,
+ * Renders a custom Nano Banana Pro illustration if available on disk
+ * (automatically trying .webp, .png, and .jpg extensions),
  * or smoothly falls back to the built-in vector component.
  */
 export const HybridIllustration: React.FC<{
@@ -474,12 +495,26 @@ export const HybridIllustration: React.FC<{
   className?: string;
   fallback: React.ReactNode;
 }> = ({ src, alt, className, fallback }) => {
+  const [extIndex, setExtIndex] = useState(0);
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgError, setImgError] = useState(false);
 
-  if (!src || imgError) {
+  if (!src) {
     return <>{fallback}</>;
   }
+
+  const baseWithoutExt = src.replace(/\.(webp|png|jpg|jpeg)$/i, "");
+  const candidateUrls = [
+    src,
+    `${baseWithoutExt}.png`,
+    `${baseWithoutExt}.webp`,
+    `${baseWithoutExt}.jpg`,
+  ].filter((v, idx, arr) => arr.indexOf(v) === idx);
+
+  if (extIndex >= candidateUrls.length) {
+    return <>{fallback}</>;
+  }
+
+  const currentUrl = candidateUrls[extIndex];
 
   return (
     <span
@@ -489,14 +524,19 @@ export const HybridIllustration: React.FC<{
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
+        width: "100%",
+        height: "100%",
       }}
     >
       {!imgLoaded && fallback}
       <img
-        src={src}
+        src={currentUrl}
         alt={alt}
         onLoad={() => setImgLoaded(true)}
-        onError={() => setImgError(true)}
+        onError={() => {
+          setImgLoaded(false);
+          setExtIndex((prev) => prev + 1);
+        }}
         style={{
           display: imgLoaded ? "block" : "none",
           width: "100%",

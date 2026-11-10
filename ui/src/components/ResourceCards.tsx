@@ -167,6 +167,12 @@ export default function ResourceCards({
               borderColor: meta.accentColor,
             }}
           >
+            {showEmptySlots && (
+              <CardArtIllustration
+                cardType={id}
+                className="resource-card-item__bg-art"
+              />
+            )}
             <div className="resource-card-item__inner">
               <div className="resource-card-item__badge">
                 <DevCardIcon

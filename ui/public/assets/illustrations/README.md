@@ -1,29 +1,34 @@
-# Pasta de Ilustrações — Nano Banana Pro
+# 🎨 Pasta de Ilustrações Customizadas (Nano Banana Pro)
 
-Coloque suas ilustrações geradas no **Nano Banana Pro** nas subpastas abaixo (formato `.webp` recomendado):
+Basta salvar suas imagens geradas no **Nano Banana Pro** dentro das subpastas abaixo (em formato `.webp`, `.png` ou `.jpg`).
+O componente [`HybridIllustration`](../../../src/components/icons/GameIcons.tsx) detecta automaticamente qualquer arquivo `.webp`, `.png` ou `.jpg` com o nome correspondente e substitui a arte vetorial padrão!
 
-```text
-ui/public/assets/illustrations/
-├── tiles/
-│   ├── wood.webp          # Floresta (1024x1024, 1:1)
-│   ├── brick.webp         # Colinas / Argila (1024x1024, 1:1)
-│   ├── sheep.webp         # Pastagem / Lã (1024x1024, 1:1)
-│   ├── wheat.webp         # Campos / Trigo (1024x1024, 1:1)
-│   ├── ore.webp           # Montanha / Minério (1024x1024, 1:1)
-│   └── desert.webp        # Deserto (1024x1024, 1:1)
-├── cards/
-│   ├── wood.webp          # Carta de Madeira (768x1024, 3:4)
-│   ├── brick.webp         # Carta de Argila (768x1024, 3:4)
-│   ├── sheep.webp         # Carta de Lã (768x1024, 3:4)
-│   ├── wheat.webp         # Carta de Trigo (768x1024, 3:4)
-│   └── ore.webp           # Carta de Minério (768x1024, 3:4)
-└── dev/
-    ├── knight.webp        # Cavaleiro (768x1024, 3:4)
-    ├── monopoly.webp      # Monopólio (768x1024, 3:4)
-    ├── year_of_plenty.webp # Ano da Fartura (768x1024, 3:4)
-    ├── road_building.webp # Construção de Estradas (768x1024, 3:4)
-    └── victory_point.webp # Ponto de Vitória (768x1024, 3:4)
-```
+## 1. `tiles/` — Hexágonos do Tabuleiro (`1:1`, ex: `1024x1024`)
+- `wood.webp` (ou `wood.png`) — Floresta (Madeira)
+- `brick.webp` (ou `brick.png`) — Colinas (Argila)
+- `sheep.webp` (ou `sheep.png`) — Pastagem (Lã)
+- `wheat.webp` (ou `wheat.png`) — Campos (Trigo)
+- `ore.webp` (ou `ore.png`) — Montanha (Minério)
+- `desert.webp` (ou `desert.png`) — Deserto (Oásis)
+- `water.webp` (ou `water.png`) — Oceano / Mar *(opcional)*
 
-Consulte os prompts prontos em [`docs/NANO_BANANA_PROMPTS.md`](../../../../docs/NANO_BANANA_PROMPTS.md).
-O motor do **Catanatron Enhanced** detecta automaticamente esses arquivos e os aplica com recorte hexagonal, chanfro dourado e iluminação sem precisar alterar código!
+## 2. `cards/` — Cartas de Matéria-Prima (`3:4`, ex: `768x1024`)
+- `wood.webp` (ou `wood.png`) — Carta de Madeira
+- `brick.webp` (ou `brick.png`) — Carta de Argila
+- `sheep.webp` (ou `sheep.png`) — Carta de Lã
+- `wheat.webp` (ou `wheat.png`) — Carta de Trigo
+- `ore.webp` (ou `ore.png`) — Carta de Minério
+
+## 3. `dev/` — Cartas de Desenvolvimento (`3:4`, ex: `768x1024`)
+- `knight.webp` (ou `knight.png`) — Cavaleiro
+- `victory_point.webp` (ou `victory_point.png`) — Ponto de Vitória
+- `road_building.webp` (ou `road_building.png`) — Construção de Estradas
+- `year_of_plenty.webp` (ou `year_of_plenty.png`) — Ano da Fartura
+- `monopoly.webp` (ou `monopoly.png`) — Monopólio
+- `card_back.webp` (ou `card_back.png`) — Verso da Carta *(opcional)*
+
+## 4. `ui/` — Peças Especiais e Banner (`1:1` / `16:9`)
+- `robber.webp` (ou `robber.png`) — Peão do Ladrão (`512x512` fundo transparente)
+- `largest_army.webp` (ou `largest_army.png`) — Medalha Maior Exército (`512x512`)
+- `longest_road.webp` (ou `longest_road.png`) — Medalha Maior Estrada (`512x512`)
+- `lobby_hero.webp` (ou `lobby_hero.png`) — Banner de Fundo da Tela Inicial (`1920x1080`)
