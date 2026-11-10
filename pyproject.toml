@@ -16,7 +16,17 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-dependencies = ["networkx", "click", "rich"]
+dependencies = [
+    "networkx",
+    "click",
+    "rich",
+    "flask",
+    "flask_cors",
+    "flask_sqlalchemy",
+    "sqlalchemy",
+    "psycopg2-binary",
+    "gunicorn",
+]
 
 [project.optional-dependencies]
 gym = ["gymnasium<=0.29.1", "numpy", "pandas", "fastparquet", "pygame"]

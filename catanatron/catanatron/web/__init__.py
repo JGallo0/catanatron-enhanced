@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 from flask import Flask
 from flask_cors import CORS
@@ -9,12 +10,11 @@ def create_app(test_config=None):
     app = Flask(__name__)
     CORS(app)
 
-    # ===== Load base configuration (supports DATABASE_URL and Vercel POSTGRES_URL)
-    default_sqlite = (
-        "sqlite:////tmp/catanatron.db"
-        if os.environ.get("VERCEL")
-        else "sqlite:///:memory:"
-    )
+    # ===== Load base configuration (supports DATABASE_URL, POSTGRES_URL, and file SQLite in /tmp)
+    tmp_dir = "/tmp" if os.path.isdir("/tmp") else tempfile.gettempdir()
+    sqlite_path = os.path.join(tmp_dir, "catanatron.db").replace("\\", "/")
+    default_sqlite = f"sqlite:///{sqlite_path}"
+
     database_url = (
         os.environ.get("DATABASE_URL")
         or os.environ.get("POSTGRES_URL")
@@ -41,8 +41,8 @@ def create_app(test_config=None):
     # ===== Initialize Database
     from catanatron.web.models import db
 
+    db.init_app(app)
     with app.app_context():
-        db.init_app(app)
         db.create_all()
 
     # ===== Initialize Routes

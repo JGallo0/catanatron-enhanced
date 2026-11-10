@@ -98,14 +98,19 @@ export default function HomePage() {
   }, [refreshRooms]);
 
   const handleLoginOrRegister = async () => {
-    if (!usernameInput.trim() || !pinInput.trim()) return;
+    const cleanUsername = usernameInput.trim() || hostName.trim();
+    if (!cleanUsername) {
+      setAuthError("Digite um nome de usuário acima para entrar ou criar sua conta.");
+      return;
+    }
+    const cleanPin = pinInput.trim() || "1234";
     setAuthBusy(true);
     setAuthError("");
     try {
       const logged = await loginOrRegisterAccount({
-        username: usernameInput.trim(),
-        pin: pinInput.trim(),
-        displayName: hostName.trim() || usernameInput.trim(),
+        username: cleanUsername,
+        pin: cleanPin,
+        displayName: hostName.trim() || cleanUsername,
       });
       setAccount(logged);
       setHostName(logged.display_name);
@@ -153,15 +158,19 @@ export default function HomePage() {
 
   const handleCreateGame = async () => {
     setLoading(true);
-    const gameId = await createGame({
-      players,
-      mapTemplate,
-      vpsToWin,
-      discardLimit,
-      friendlyRobber,
-    });
-    setLoading(false);
-    navigate("/games/" + gameId);
+    try {
+      const gameId = await createGame({
+        players,
+        mapTemplate,
+        vpsToWin,
+        discardLimit,
+        friendlyRobber,
+      });
+      setLoading(false);
+      navigate("/games/" + gameId);
+    } catch {
+      setLoading(false);
+    }
   };
 
   const handleCreatePrivateRoom = async () => {
@@ -250,6 +259,9 @@ export default function HomePage() {
                       className="multiplayer-input"
                       value={usernameInput}
                       onChange={(e) => setUsernameInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleLoginOrRegister();
+                      }}
                       placeholder="Usuário (ex: joao)"
                       maxLength={24}
                     />
@@ -258,17 +270,16 @@ export default function HomePage() {
                       className="multiplayer-input multiplayer-input--pin"
                       value={pinInput}
                       onChange={(e) => setPinInput(e.target.value)}
-                      placeholder="PIN / Senha"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleLoginOrRegister();
+                      }}
+                      placeholder="PIN / Senha (opcional)"
                       maxLength={16}
                     />
                     <Button
                       variant="contained"
                       className="account-login-btn"
-                      disabled={
-                        authBusy ||
-                        usernameInput.trim().length < 2 ||
-                        pinInput.trim().length < 3
-                      }
+                      disabled={authBusy}
                       onClick={handleLoginOrRegister}
                     >
                       {authBusy ? "Entrando..." : "Entrar / Criar"}
