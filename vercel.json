@@ -3,6 +3,21 @@
   "buildCommand": "cd ui && npm install && npm run build",
   "outputDirectory": "ui/dist",
   "framework": null,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ],
   "functions": {
     "api/index.py": {
       "includeFiles": "catanatron/**"

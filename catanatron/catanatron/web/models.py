@@ -66,6 +66,96 @@ AVATAR_UNLOCK_REQUIREMENTS: dict[str, dict[str, int]] = {
     "hat": {"crown_gold": 7},
 }
 
+OFFICIAL_BOT_NAMES: tuple[str, ...] = (
+    "Creitu",
+    "Felire",
+    "Guiri",
+    "Jaó",
+    "Angeleri",
+)
+
+BOT_AVATAR_BY_NAME: dict[str, dict[str, str]] = {
+    "Creitu": {
+        "skin": "warm",
+        "eyes": "sharp",
+        "hair": "short",
+        "hairColor": "navy",
+        "beard": "goatee",
+        "hat": "captain",
+        "outfit": "captain",
+        "outfitColor": "royal",
+        "background": "ocean",
+        "frame": "bronze",
+    },
+    "Felire": {
+        "skin": "fair",
+        "eyes": "cheerful",
+        "hair": "wavy",
+        "hairColor": "red",
+        "beard": "none",
+        "hat": "explorer",
+        "outfit": "settler",
+        "outfitColor": "emerald",
+        "background": "forest",
+        "frame": "bronze",
+    },
+    "Guiri": {
+        "skin": "tan",
+        "eyes": "wise",
+        "hair": "curly",
+        "hairColor": "brown",
+        "beard": "mustache",
+        "hat": "bandana",
+        "outfit": "merchant",
+        "outfitColor": "amber",
+        "background": "sunset",
+        "frame": "bronze",
+    },
+    "Jaó": {
+        "skin": "brown",
+        "eyes": "sharp",
+        "hair": "short",
+        "hairColor": "silver",
+        "beard": "full",
+        "hat": "helm",
+        "outfit": "armor",
+        "outfitColor": "slate",
+        "background": "mountain",
+        "frame": "silver",
+    },
+    "Angeleri": {
+        "skin": "porcelain",
+        "eyes": "calm",
+        "hair": "braids",
+        "hairColor": "blonde",
+        "beard": "none",
+        "hat": "none",
+        "outfit": "merchant",
+        "outfitColor": "crimson",
+        "background": "gold",
+        "frame": "silver",
+    },
+}
+
+
+def pick_bot_names(
+    count: int, exclude: set[str] | list[str] | tuple[str, ...] | None = None
+) -> list[str]:
+    """Return unique official AI bot names without color labels."""
+    used = {name for name in (exclude or ()) if isinstance(name, str)}
+    available = [name for name in OFFICIAL_BOT_NAMES if name not in used]
+    random.shuffle(available)
+    chosen: list[str] = []
+    while len(chosen) < count:
+        if not available:
+            fallback = list(OFFICIAL_BOT_NAMES)
+            random.shuffle(fallback)
+            available.extend(fallback)
+        pick = available.pop(0)
+        chosen.append(pick)
+        used.add(pick)
+    return chosen
+
 
 def sanitize_avatar_config(raw: dict | None) -> dict[str, str]:
     if not isinstance(raw, dict):
@@ -76,6 +166,19 @@ def sanitize_avatar_config(raw: dict | None) -> dict[str, str]:
         if isinstance(val, str) and val in allowed:
             sanitized[field] = val
     return sanitized
+
+
+def filter_unlocked_avatar_config(
+    raw: dict | None, wins: int = 0
+) -> dict[str, str]:
+    """Sanitize avatar config and silently drop items above current win count."""
+    clean = sanitize_avatar_config(raw)
+    unlocked: dict[str, str] = {}
+    for field, val in clean.items():
+        required = AVATAR_UNLOCK_REQUIREMENTS.get(field, {}).get(val, 0)
+        if wins >= required:
+            unlocked[field] = val
+    return unlocked
 
 
 def _load_avatars_by_username(usernames: list[str]) -> dict[str, dict[str, str]]:
@@ -337,6 +440,12 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
     avatars = _load_avatars_by_username(user_names)
 
     public_seats = []
+    used_bot_names = {
+        s.get("player_name")
+        for s in seats
+        if s.get("player_key") != "HUMAN"
+        and s.get("player_name") in OFFICIAL_BOT_NAMES
+    }
     for seat in seats:
         if caller_token and seat.get("seat_token") == caller_token:
             my_color = seat["color"]
@@ -347,19 +456,36 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
             if is_bot
             else (seat.get("seat_kind") or ("USER" if uname else "GUEST"))
         )
+        if is_bot:
+            raw_name = seat.get("player_name")
+            if raw_name in OFFICIAL_BOT_NAMES:
+                resolved_name = raw_name
+            else:
+                resolved_name = pick_bot_names(1, exclude=used_bot_names)[0]
+                used_bot_names.add(resolved_name)
+            seat_avatar = sanitize_avatar_config(seat.get("avatar_config")) or dict(
+                BOT_AVATAR_BY_NAME.get(resolved_name) or {}
+            )
+        elif seat_kind == "USER" and uname:
+            resolved_name = seat["player_name"]
+            seat_avatar = avatars.get(uname, {})
+        else:
+            resolved_name = seat["player_name"]
+            seat_avatar = filter_unlocked_avatar_config(
+                seat.get("avatar_config"), wins=0
+            )
+
         public_seats.append(
             {
                 "color": seat["color"],
                 "player_key": seat["player_key"],
-                "player_name": seat["player_name"],
+                "player_name": resolved_name,
                 "is_bot": is_bot,
                 "claimed": bool(seat.get("seat_token")) or is_bot,
                 "is_me": bool(caller_token and seat.get("seat_token") == caller_token),
                 "seat_kind": seat_kind,
                 "username": uname,
-                "avatar_config": (
-                    avatars.get(uname, {}) if (seat_kind == "USER" and uname) else {}
-                ),
+                "avatar_config": seat_avatar,
             }
         )
 
@@ -518,7 +644,10 @@ def serialize_user(user: StoredUser, stats: dict | None = None) -> dict:
 
 
 def register_user(
-    username: str, password: str, display_name: str | None = None
+    username: str,
+    password: str,
+    display_name: str | None = None,
+    avatar_config: dict | None = None,
 ) -> tuple[StoredUser, StoredSession]:
     session = db.session
     clean_user = _normalize_username(username)
@@ -532,13 +661,14 @@ def register_user(
         abort(409, description="Este nome de usuário já está cadastrado. Use a aba Entrar.")
 
     clean_display = (display_name or username).strip()[:32] or clean_user
+    initial_avatar = filter_unlocked_avatar_config(avatar_config, wins=0)
     user = StoredUser(
         username=clean_user,
         display_name=clean_display,
         password_hash=hash_password(raw_password),
         pin_hash="",
         auth_token=secrets.token_hex(16),
-        avatar_json="{}",
+        avatar_json=json.dumps(initial_avatar),
         created_at=int(time.time()),
     )
     session.add(user)
@@ -614,7 +744,9 @@ def _unique_username_candidate(base_hint: str, session) -> str:
     return candidate
 
 
-def login_with_google_claims(claims: dict) -> tuple[StoredUser, StoredSession, bool]:
+def login_with_google_claims(
+    claims: dict, avatar_config: dict | None = None
+) -> tuple[StoredUser, StoredSession, bool]:
     session = db.session
     google_sub = str(claims.get("sub") or "").strip()[:64]
     email = str(claims.get("email") or "").strip().lower()[:255] or None
@@ -635,6 +767,7 @@ def login_with_google_claims(claims: dict) -> tuple[StoredUser, StoredSession, b
 
     hint = email.split("@")[0] if email else display
     username = _unique_username_candidate(hint, session)
+    initial_avatar = filter_unlocked_avatar_config(avatar_config, wins=0)
     user = StoredUser(
         username=username,
         display_name=display or username,
@@ -643,7 +776,7 @@ def login_with_google_claims(claims: dict) -> tuple[StoredUser, StoredSession, b
         pin_hash="",
         google_sub=google_sub,
         email=email,
-        avatar_json="{}",
+        avatar_json=json.dumps(initial_avatar),
         auth_token=secrets.token_hex(16),
         created_at=int(time.time()),
     )
@@ -665,6 +798,7 @@ def build_seat_metadata_for_game(
     player_keys: list,
     auth_user: StoredUser | None = None,
     host_name: str | None = None,
+    host_avatar_config: dict | None = None,
 ) -> dict[str, dict]:
     """Seat metadata keyed by color.
 
@@ -674,44 +808,65 @@ def build_seat_metadata_for_game(
     keyed by color stays correct regardless of the shuffle.
     """
     by_color: dict[str, dict] = {}
+    parsed_keys = [
+        str(spec["key"]).upper()
+        if isinstance(spec, dict)
+        else str(spec).split(":")[0].upper()
+        for spec in player_keys
+    ]
+    num_bots = sum(1 for k in parsed_keys if k != "HUMAN")
+    bot_names_iter = iter(pick_bot_names(num_bots))
+
     human_assigned = False
-    for idx, spec in enumerate(player_keys):
+    extra_guest_index = 1
+    for idx, key in enumerate(parsed_keys):
         color = SEAT_COLORS[idx]
-        key = (
-            str(spec["key"]).upper()
-            if isinstance(spec, dict)
-            else str(spec).split(":")[0].upper()
-        )
         if key == "HUMAN":
             if not human_assigned and auth_user is not None:
+                try:
+                    user_avatar = sanitize_avatar_config(
+                        json.loads(auth_user.avatar_json or "{}")
+                    )
+                except Exception:
+                    user_avatar = {}
                 by_color[color] = {
                     "color": color,
                     "seat_kind": "USER",
                     "username": auth_user.username,
                     "player_key": "HUMAN",
                     "display_name": auth_user.display_name,
+                    "avatar_config": user_avatar,
                 }
             else:
-                guest_label = (
-                    (host_name or "").strip()[:32]
-                    if not human_assigned and (host_name or "").strip()
-                    else COLOR_LABELS_PT[color]
-                )
+                if not human_assigned:
+                    guest_label = (
+                        (host_name or "").strip()[:32] or "Explorador da Ilha"
+                    )
+                    guest_avatar = filter_unlocked_avatar_config(
+                        host_avatar_config, wins=0
+                    )
+                else:
+                    extra_guest_index += 1
+                    guest_label = f"Convidado {extra_guest_index}"
+                    guest_avatar = {}
                 by_color[color] = {
                     "color": color,
                     "seat_kind": "GUEST",
                     "username": None,
                     "player_key": "HUMAN",
                     "display_name": guest_label,
+                    "avatar_config": guest_avatar,
                 }
             human_assigned = True
         else:
+            bot_name = next(bot_names_iter)
             by_color[color] = {
                 "color": color,
                 "seat_kind": "BOT",
                 "username": None,
                 "player_key": key,
-                "display_name": f"IA ({key})",
+                "display_name": bot_name,
+                "avatar_config": dict(BOT_AVATAR_BY_NAME.get(bot_name) or {}),
             }
     return by_color
 
@@ -762,6 +917,12 @@ def record_completed_match(game: Game, session_param=None) -> StoredMatch | None
     win_color_str = winner.value
     participants_rows: list[StoredMatchParticipant] = []
     seen_usernames: set[str] = set()
+    used_bot_names: set[str] = {
+        meta.get("display_name")
+        for meta in seat_meta.values()
+        if meta.get("seat_kind") == "BOT"
+        and meta.get("display_name") in OFFICIAL_BOT_NAMES
+    }
     winner_name = COLOR_LABELS_PT.get(win_color_str, win_color_str)
     winner_username: str | None = None
     winner_is_bot = False
@@ -786,9 +947,15 @@ def record_completed_match(game: Game, session_param=None) -> StoredMatch | None
         if not player.is_bot:
             human_count += 1
 
-        dname = meta.get("display_name") or (
-            f"IA ({key})" if player.is_bot else COLOR_LABELS_PT.get(c, c)
-        )
+        if player.is_bot:
+            candidate_name = meta.get("display_name")
+            if candidate_name in OFFICIAL_BOT_NAMES:
+                dname = candidate_name
+            else:
+                dname = pick_bot_names(1, exclude=used_bot_names)[0]
+                used_bot_names.add(dname)
+        else:
+            dname = meta.get("display_name") or "Explorador da Ilha"
         vps = int(get_actual_victory_points(game.state, player.color))
         is_win = c == win_color_str
         if is_win:
@@ -995,12 +1162,18 @@ def create_room(
     friendly_robber: bool = True,
     host_token: str | None = None,
     host_username: str | None = None,
+    host_avatar_config: dict | None = None,
 ) -> tuple[StoredRoom, str]:
     session = db.session
     room_code = _generate_room_code(session)
     resolved_host_token = (host_token or "").strip() or uuid.uuid4().hex
 
     initial_keys = players if players and 2 <= len(players) <= 4 else ["HUMAN", "HUMAN", "CATANATRON", "CATANATRON"]
+    num_bots = sum(1 for k in initial_keys if k != "HUMAN")
+    bot_names_iter = iter(pick_bot_names(num_bots))
+    safe_guest_avatar = (
+        {} if host_username else filter_unlocked_avatar_config(host_avatar_config, wins=0)
+    )
     seats = []
     host_seated = False
     for idx, p_key in enumerate(initial_keys):
@@ -1014,6 +1187,7 @@ def create_room(
                     "seat_token": resolved_host_token,
                     "seat_kind": "USER" if host_username else "GUEST",
                     "username": host_username,
+                    "avatar_config": safe_guest_avatar,
                 }
             )
             host_seated = True
@@ -1026,17 +1200,20 @@ def create_room(
                     "seat_token": None,
                     "seat_kind": "GUEST",
                     "username": None,
+                    "avatar_config": {},
                 }
             )
         else:
+            bot_name = next(bot_names_iter)
             seats.append(
                 {
                     "color": color,
                     "player_key": p_key,
-                    "player_name": f"Bot ({p_key})",
+                    "player_name": bot_name,
                     "seat_token": None,
                     "seat_kind": "BOT",
                     "username": None,
+                    "avatar_config": dict(BOT_AVATAR_BY_NAME.get(bot_name) or {}),
                 }
             )
 

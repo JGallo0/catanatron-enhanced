@@ -454,7 +454,7 @@ def apply_offer_trade(state: State, action: Action):
 
     # go in seating order; order won't matter because of "acceptees hook"
     state.current_player_index = next(
-        i for i, c in enumerate(state.colors) if c != action.color
+        i for i in range(len(state.colors)) if i != state.current_turn_index
     )  # cant ask yourself
     state.current_prompt = ActionPrompt.DECIDE_TRADE
     return ActionRecord(action=action, result=None)
@@ -468,11 +468,11 @@ def apply_accept_trade(state: State, action: Action):
     state.acceptees = tuple(new_acceptess)
 
     try:
-        # keep going around table w/o asking yourself or players that have answered
+        # keep going around table w/o asking proposer or players that have answered
         state.current_player_index = next(
             i
-            for i, c in enumerate(state.colors)
-            if c != action.color and i > state.current_player_index
+            for i in range(len(state.colors))
+            if i != state.current_turn_index and i > state.current_player_index
         )
         # .is_resolving_trade, .current_trade, .current_prompt, .acceptees stay the same
     except StopIteration:
@@ -486,11 +486,11 @@ def apply_accept_trade(state: State, action: Action):
 
 def apply_reject_trade(state: State, action: Action):
     try:
-        # keep going around table w/o asking yourself or players that have answered
+        # keep going around table w/o asking proposer or players that have answered
         state.current_player_index = next(
             i
-            for i, c in enumerate(state.colors)
-            if c != action.color and i > state.current_player_index
+            for i in range(len(state.colors))
+            if i != state.current_turn_index and i > state.current_player_index
         )
         # .is_resolving_trade, .current_trade, .current_prompt, .acceptees stay the same
     except StopIteration:

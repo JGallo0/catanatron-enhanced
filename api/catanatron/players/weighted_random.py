@@ -1,5 +1,6 @@
 from catanatron.models.player import Player
 from catanatron.models.actions import ActionType
+from catanatron.players.trade_evaluator import evaluate_trade_decision
 
 
 WEIGHTS_BY_ACTION_TYPE = {
@@ -18,6 +19,10 @@ class WeightedRandomPlayer(Player):
     LABEL = "Weighted Random"
 
     def decide(self, game, playable_actions):
+        trade_action = evaluate_trade_decision(self.color, game, playable_actions)
+        if trade_action is not None:
+            return trade_action
+
         bloated_actions = []
         for action in playable_actions:
             weight = WEIGHTS_BY_ACTION_TYPE.get(action.action_type, 1)

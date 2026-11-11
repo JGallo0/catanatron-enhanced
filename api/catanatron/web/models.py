@@ -1,9 +1,11 @@
 """Persisting games as a document plus what happened to it, plus multiplayer rooms."""
 
 import hashlib
+import hmac
 import json
 import os
 import random
+import secrets
 import string
 import time
 import uuid
@@ -20,8 +22,21 @@ from catanatron.serialization import (
     state_from_json,
     state_to_json,
 )
-from catanatron.state_functions import get_state_index
-from sqlalchemy import Column, ForeignKey, Integer, MetaData, String, create_engine
+from catanatron.state_functions import get_actual_victory_points, get_state_index
+from sqlalchemy import (
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    MetaData,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+    inspect,
+    text,
+)
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 from flask_sqlalchemy import SQLAlchemy
@@ -31,6 +46,154 @@ metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
 SEAT_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"]
+SESSION_TTL_SECONDS = 90 * 24 * 60 * 60
+
+AVATAR_VALID_VALUES: dict[str, tuple[str, ...]] = {
+    "skin": ("porcelain", "fair", "warm", "tan", "brown", "deep"),
+    "eyes": ("calm", "cheerful", "sharp", "wise"),
+    "hair": ("none", "short", "wavy", "bun", "braids", "curly", "long"),
+    "hairColor": ("brown", "black", "blonde", "red", "silver", "navy"),
+    "beard": ("none", "goatee", "full", "mustache"),
+    "hat": ("none", "captain", "explorer", "bandana", "helm", "crown_gold"),
+    "outfit": ("settler", "captain", "armor", "merchant"),
+    "outfitColor": ("crimson", "royal", "emerald", "amber", "slate"),
+    "background": ("ocean", "sunset", "forest", "mountain", "gold", "crimson"),
+    "frame": ("wood", "bronze", "silver", "gold", "imperial"),
+}
+
+AVATAR_UNLOCK_REQUIREMENTS: dict[str, dict[str, int]] = {
+    "frame": {"bronze": 1, "silver": 3, "gold": 5, "imperial": 10},
+    "hat": {"crown_gold": 7},
+}
+
+OFFICIAL_BOT_NAMES: tuple[str, ...] = (
+    "Creitu",
+    "Felire",
+    "Guiri",
+    "Jaó",
+    "Angeleri",
+)
+
+BOT_AVATAR_BY_NAME: dict[str, dict[str, str]] = {
+    "Creitu": {
+        "skin": "warm",
+        "eyes": "sharp",
+        "hair": "short",
+        "hairColor": "navy",
+        "beard": "goatee",
+        "hat": "captain",
+        "outfit": "captain",
+        "outfitColor": "royal",
+        "background": "ocean",
+        "frame": "bronze",
+    },
+    "Felire": {
+        "skin": "fair",
+        "eyes": "cheerful",
+        "hair": "wavy",
+        "hairColor": "red",
+        "beard": "none",
+        "hat": "explorer",
+        "outfit": "settler",
+        "outfitColor": "emerald",
+        "background": "forest",
+        "frame": "bronze",
+    },
+    "Guiri": {
+        "skin": "tan",
+        "eyes": "wise",
+        "hair": "curly",
+        "hairColor": "brown",
+        "beard": "mustache",
+        "hat": "bandana",
+        "outfit": "merchant",
+        "outfitColor": "amber",
+        "background": "sunset",
+        "frame": "bronze",
+    },
+    "Jaó": {
+        "skin": "brown",
+        "eyes": "sharp",
+        "hair": "short",
+        "hairColor": "silver",
+        "beard": "full",
+        "hat": "helm",
+        "outfit": "armor",
+        "outfitColor": "slate",
+        "background": "mountain",
+        "frame": "silver",
+    },
+    "Angeleri": {
+        "skin": "porcelain",
+        "eyes": "calm",
+        "hair": "braids",
+        "hairColor": "blonde",
+        "beard": "none",
+        "hat": "none",
+        "outfit": "merchant",
+        "outfitColor": "crimson",
+        "background": "gold",
+        "frame": "silver",
+    },
+}
+
+
+def pick_bot_names(
+    count: int, exclude: set[str] | list[str] | tuple[str, ...] | None = None
+) -> list[str]:
+    """Return unique official AI bot names without color labels."""
+    used = {name for name in (exclude or ()) if isinstance(name, str)}
+    available = [name for name in OFFICIAL_BOT_NAMES if name not in used]
+    random.shuffle(available)
+    chosen: list[str] = []
+    while len(chosen) < count:
+        if not available:
+            fallback = list(OFFICIAL_BOT_NAMES)
+            random.shuffle(fallback)
+            available.extend(fallback)
+        pick = available.pop(0)
+        chosen.append(pick)
+        used.add(pick)
+    return chosen
+
+
+def sanitize_avatar_config(raw: dict | None) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    sanitized: dict[str, str] = {}
+    for field, allowed in AVATAR_VALID_VALUES.items():
+        val = raw.get(field)
+        if isinstance(val, str) and val in allowed:
+            sanitized[field] = val
+    return sanitized
+
+
+def filter_unlocked_avatar_config(
+    raw: dict | None, wins: int = 0
+) -> dict[str, str]:
+    """Sanitize avatar config and silently drop items above current win count."""
+    clean = sanitize_avatar_config(raw)
+    unlocked: dict[str, str] = {}
+    for field, val in clean.items():
+        required = AVATAR_UNLOCK_REQUIREMENTS.get(field, {}).get(val, 0)
+        if wins >= required:
+            unlocked[field] = val
+    return unlocked
+
+
+def _load_avatars_by_username(usernames: list[str]) -> dict[str, dict[str, str]]:
+    clean = sorted({u for u in usernames if isinstance(u, str) and u})
+    if not clean:
+        return {}
+    users = db.session.query(StoredUser).filter(StoredUser.username.in_(clean)).all()
+    by_user: dict[str, dict[str, str]] = {}
+    for u in users:
+        try:
+            parsed = json.loads(u.avatar_json or "{}")
+        except Exception:
+            parsed = {}
+        by_user[u.username] = sanitize_avatar_config(parsed)
+    return by_user
 
 
 class StoredGame(Base):
@@ -45,6 +208,7 @@ class StoredGame(Base):
     base_state = Column(String, nullable=False)
     head_index = Column(Integer, nullable=False)
     head_state = Column(String, nullable=False)
+    seat_metadata_json = Column(Text, nullable=True)
 
 
 class StoredAction(Base):
@@ -71,14 +235,80 @@ class StoredRoom(Base):
 
 
 class StoredUser(Base):
-    """A lightweight player account so friends can log in from any device and resume rooms/games."""
+    """Persistent registered human account."""
 
     __tablename__ = "users"
 
     username = Column(String(32), primary_key=True)
     display_name = Column(String(48), nullable=False)
-    pin_hash = Column(String(128), nullable=False)
-    auth_token = Column(String(64), nullable=False)
+    pin_hash = Column(String(128), nullable=True)
+    auth_token = Column(String(64), nullable=True)
+    password_hash = Column(String(256), nullable=True)
+    google_sub = Column(String(64), unique=True, index=True, nullable=True)
+    email = Column(String(255), index=True, nullable=True)
+    avatar_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
+
+
+class StoredSession(Base):
+    """Per-device session token allowing simultaneous logins and isolated logout."""
+
+    __tablename__ = "user_sessions"
+
+    token = Column(String(64), primary_key=True)
+    username = Column(
+        String(32), ForeignKey("users.username"), index=True, nullable=False
+    )
+    created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
+    last_seen_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
+    expires_at = Column(
+        Integer,
+        nullable=False,
+        default=lambda: int(time.time()) + SESSION_TTL_SECONDS,
+    )
+
+
+class StoredMatch(Base):
+    """Completed game outcome persisted once per finished game."""
+
+    __tablename__ = "matches"
+
+    game_id = Column(String(64), primary_key=True)
+    room_code = Column(String(16), index=True, nullable=True)
+    mode = Column(String(16), nullable=False, default="SOLO")
+    map_template = Column(String(24), nullable=False, default="BASE")
+    vps_to_win = Column(Integer, nullable=False, default=10)
+    num_turns = Column(Integer, nullable=False, default=0)
+    winning_color = Column(String(16), nullable=False)
+    winner_name = Column(String(64), nullable=False)
+    winner_username = Column(String(32), index=True, nullable=True)
+    winner_is_bot = Column(Boolean, nullable=False, default=False)
+    finished_at = Column(
+        Integer, index=True, nullable=False, default=lambda: int(time.time())
+    )
+
+
+class StoredMatchParticipant(Base):
+    """Per-seat participation record linking finished games back to registered users."""
+
+    __tablename__ = "match_participants"
+    __table_args__ = (
+        UniqueConstraint("game_id", "color", name="uq_match_participant_game_color"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(
+        String(64), ForeignKey("matches.game_id"), index=True, nullable=False
+    )
+    color = Column(String(16), nullable=False)
+    seat_kind = Column(String(16), nullable=False)  # "USER" | "GUEST" | "BOT"
+    username = Column(
+        String(32), ForeignKey("users.username"), index=True, nullable=True
+    )
+    player_key = Column(String(32), nullable=False)
+    display_name = Column(String(64), nullable=False)
+    victory_points = Column(Integer, nullable=False, default=0)
+    is_winner = Column(Boolean, nullable=False, default=False)
 
 
 db = SQLAlchemy(metadata=metadata)
@@ -99,7 +329,9 @@ def database_session():
         session.close()
 
 
-def upsert_game_state(game: Game, session_param=None):
+def upsert_game_state(
+    game: Game, session_param=None, seat_metadata_by_color: dict | None = None
+):
     """Save a game: create its row the first time, then append what is new."""
     session = session_param or db.session
     head = get_state_index(game.state)
@@ -117,6 +349,11 @@ def upsert_game_state(game: Game, session_param=None):
             base_state=document,
             head_index=head,
             head_state=document,
+            seat_metadata_json=(
+                json.dumps(seat_metadata_by_color)
+                if seat_metadata_by_color is not None
+                else None
+            ),
         )
         session.add(stored)
 
@@ -195,18 +432,60 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
     my_color = None
     is_host = bool(caller_token and caller_token == room.host_token)
 
+    user_names = [
+        s.get("username")
+        for s in seats
+        if s.get("player_key") == "HUMAN" and s.get("username")
+    ]
+    avatars = _load_avatars_by_username(user_names)
+
     public_seats = []
+    used_bot_names = {
+        s.get("player_name")
+        for s in seats
+        if s.get("player_key") != "HUMAN"
+        and s.get("player_name") in OFFICIAL_BOT_NAMES
+    }
     for seat in seats:
         if caller_token and seat.get("seat_token") == caller_token:
             my_color = seat["color"]
+        is_bot = seat["player_key"] != "HUMAN"
+        uname = seat.get("username") if not is_bot else None
+        seat_kind = (
+            "BOT"
+            if is_bot
+            else (seat.get("seat_kind") or ("USER" if uname else "GUEST"))
+        )
+        if is_bot:
+            raw_name = seat.get("player_name")
+            if raw_name in OFFICIAL_BOT_NAMES:
+                resolved_name = raw_name
+            else:
+                resolved_name = pick_bot_names(1, exclude=used_bot_names)[0]
+                used_bot_names.add(resolved_name)
+            seat_avatar = sanitize_avatar_config(seat.get("avatar_config")) or dict(
+                BOT_AVATAR_BY_NAME.get(resolved_name) or {}
+            )
+        elif seat_kind == "USER" and uname:
+            resolved_name = seat["player_name"]
+            seat_avatar = avatars.get(uname, {})
+        else:
+            resolved_name = seat["player_name"]
+            seat_avatar = filter_unlocked_avatar_config(
+                seat.get("avatar_config"), wins=0
+            )
+
         public_seats.append(
             {
                 "color": seat["color"],
                 "player_key": seat["player_key"],
-                "player_name": seat["player_name"],
-                "is_bot": seat["player_key"] != "HUMAN",
-                "claimed": bool(seat.get("seat_token")) or seat["player_key"] != "HUMAN",
+                "player_name": resolved_name,
+                "is_bot": is_bot,
+                "claimed": bool(seat.get("seat_token")) or is_bot,
                 "is_me": bool(caller_token and seat.get("seat_token") == caller_token),
+                "seat_kind": seat_kind,
+                "username": uname,
+                "avatar_config": seat_avatar,
             }
         )
 
@@ -221,45 +500,657 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
     }
 
 
-def _hash_pin(username: str, pin: str) -> str:
+def ensure_schema_columns(engine) -> None:
+    """Idempotently add new columns when upgrading an existing SQLite/Postgres DB."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    alter_statements: list[str] = []
+
+    if "users" in tables:
+        user_cols = {col["name"] for col in inspector.get_columns("users")}
+        if "password_hash" not in user_cols:
+            alter_statements.append(
+                "ALTER TABLE users ADD COLUMN password_hash VARCHAR(256)"
+            )
+        if "google_sub" not in user_cols:
+            alter_statements.append("ALTER TABLE users ADD COLUMN google_sub VARCHAR(64)")
+        if "email" not in user_cols:
+            alter_statements.append("ALTER TABLE users ADD COLUMN email VARCHAR(255)")
+        if "avatar_json" not in user_cols:
+            alter_statements.append(
+                "ALTER TABLE users ADD COLUMN avatar_json TEXT DEFAULT '{}'"
+            )
+        if "created_at" not in user_cols:
+            alter_statements.append(
+                "ALTER TABLE users ADD COLUMN created_at INTEGER DEFAULT 0"
+            )
+
+    if "games" in tables:
+        game_cols = {col["name"] for col in inspector.get_columns("games")}
+        if "seat_metadata_json" not in game_cols:
+            alter_statements.append("ALTER TABLE games ADD COLUMN seat_metadata_json TEXT")
+
+    if alter_statements:
+        with engine.begin() as conn:
+            for stmt in alter_statements:
+                conn.execute(text(stmt))
+            if "users" in tables:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_sub ON users (google_sub)"
+                    )
+                )
+
+
+def _normalize_username(username: str) -> str:
+    return "".join(
+        ch
+        for ch in (username or "").lower().strip()
+        if ch.isalnum() or ch in ("_", "-")
+    )[:24]
+
+
+def _hash_legacy_pin(username: str, pin: str) -> str:
     payload = f"catanatron:{username.lower().strip()}:{pin.strip()}".encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
-def login_or_register_user(
-    username: str, pin: str, display_name: str | None = None
-) -> tuple[StoredUser, bool]:
-    """Authenticate an existing account or create a new one on first login."""
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000
+    ).hex()
+    return f"pbkdf2_sha256${salt}${digest}"
+
+
+def verify_password(user: StoredUser, password: str) -> bool:
+    if user.password_hash and user.password_hash.startswith("pbkdf2_sha256$"):
+        try:
+            _, salt, expected_digest = user.password_hash.split("$", 2)
+        except ValueError:
+            return False
+        actual = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000
+        ).hex()
+        return hmac.compare_digest(actual, expected_digest)
+    if user.pin_hash:
+        expected_legacy = _hash_legacy_pin(user.username, password.strip())
+        return hmac.compare_digest(user.pin_hash, expected_legacy)
+    return False
+
+
+def create_user_session(username: str, session_param=None) -> StoredSession:
+    session = session_param or db.session
+    now = int(time.time())
+    sess = StoredSession(
+        token=f"sess_{secrets.token_hex(24)}",
+        username=username,
+        created_at=now,
+        last_seen_at=now,
+        expires_at=now + SESSION_TTL_SECONDS,
+    )
+    session.add(sess)
+    session.commit()
+    return sess
+
+
+def resolve_user_from_token(token: str | None, session_param=None) -> StoredUser | None:
+    clean_token = (token or "").strip()
+    if not clean_token:
+        return None
+    session = session_param or db.session
+    now = int(time.time())
+    sess = session.get(StoredSession, clean_token)
+    if sess is not None:
+        if sess.expires_at < now:
+            session.delete(sess)
+            session.commit()
+            return None
+        sess.last_seen_at = now
+        session.commit()
+        return session.get(StoredUser, sess.username)
+    # Retrocompatibilidade com token legado único salvo em StoredUser.auth_token
+    return session.query(StoredUser).filter_by(auth_token=clean_token).first()
+
+
+def revoke_session_token(token: str | None, session_param=None) -> bool:
+    clean_token = (token or "").strip()
+    if not clean_token:
+        return False
+    session = session_param or db.session
+    sess = session.get(StoredSession, clean_token)
+    if sess is None:
+        return False
+    session.delete(sess)
+    session.commit()
+    return True
+
+
+def serialize_user(user: StoredUser, stats: dict | None = None) -> dict:
+    try:
+        avatar_cfg = json.loads(user.avatar_json or "{}")
+    except Exception:
+        avatar_cfg = {}
+    payload = {
+        "username": user.username,
+        "display_name": user.display_name,
+        "has_google": bool(user.google_sub),
+        "avatar_config": sanitize_avatar_config(avatar_cfg),
+    }
+    if stats is not None:
+        payload["stats"] = stats
+        payload["leaderboard_rank"] = get_user_rank(user.username)
+    return payload
+
+
+def register_user(
+    username: str,
+    password: str,
+    display_name: str | None = None,
+    avatar_config: dict | None = None,
+) -> tuple[StoredUser, StoredSession]:
     session = db.session
-    clean_user = "".join(
-        ch for ch in username.lower().strip() if ch.isalnum() or ch in ("_", "-")
-    )[:24]
+    clean_user = _normalize_username(username)
     if len(clean_user) < 2:
         abort(400, description="O usuário deve ter pelo menos 2 caracteres alfanuméricos")
-    if len(pin.strip()) < 3:
-        abort(400, description="A senha/PIN deve ter pelo menos 3 caracteres")
+    raw_password = password or ""
+    if not 4 <= len(raw_password) <= 128:
+        abort(400, description="A senha deve ter entre 4 e 128 caracteres")
 
-    expected_hash = _hash_pin(clean_user, pin)
+    if session.get(StoredUser, clean_user) is not None:
+        abort(409, description="Este nome de usuário já está cadastrado. Use a aba Entrar.")
+
+    clean_display = (display_name or username).strip()[:32] or clean_user
+    initial_avatar = filter_unlocked_avatar_config(avatar_config, wins=0)
+    user = StoredUser(
+        username=clean_user,
+        display_name=clean_display,
+        password_hash=hash_password(raw_password),
+        pin_hash="",
+        auth_token=secrets.token_hex(16),
+        avatar_json=json.dumps(initial_avatar),
+        created_at=int(time.time()),
+    )
+    session.add(user)
+    session.commit()
+    sess = create_user_session(clean_user, session)
+    return user, sess
+
+
+def authenticate_user(username: str, password: str) -> tuple[StoredUser, StoredSession]:
+    session = db.session
+    clean_user = _normalize_username(username)
+    raw_password = password or ""
+    if len(clean_user) < 2 or len(raw_password) < 3:
+        abort(401, description="Usuário ou senha incorretos")
+
     user = session.get(StoredUser, clean_user)
-    if user is None:
-        user = StoredUser(
-            username=clean_user,
-            display_name=(display_name or username).strip()[:32] or clean_user,
-            pin_hash=expected_hash,
-            auth_token=uuid.uuid4().hex,
+    if user is None or not verify_password(user, raw_password):
+        abort(401, description="Usuário ou senha incorretos")
+
+    # Upgrade transparente de hash legado SHA-256 para PBKDF2 com salt aleatório
+    if not user.password_hash:
+        user.password_hash = hash_password(raw_password)
+        session.commit()
+
+    sess = create_user_session(clean_user, session)
+    return user, sess
+
+
+def update_user_profile(
+    user: StoredUser, display_name: str | None = None, avatar_config: dict | None = None
+) -> StoredUser:
+    session = db.session
+    if avatar_config is not None:
+        if not isinstance(avatar_config, dict):
+            abort(400, description="Configuração de avatar inválida.")
+        try:
+            existing_cfg = sanitize_avatar_config(json.loads(user.avatar_json or "{}"))
+        except Exception:
+            existing_cfg = {}
+        incoming_cfg = sanitize_avatar_config(avatar_config)
+        merged_cfg = {**existing_cfg, **incoming_cfg}
+
+        wins = get_user_stats(user.username)["wins"]
+        for field, rules in AVATAR_UNLOCK_REQUIREMENTS.items():
+            chosen = merged_cfg.get(field)
+            if chosen in rules and wins < rules[chosen]:
+                required = rules[chosen]
+                abort(
+                    403,
+                    description=(
+                        f"Este item requer {required} vitória(s) no Ranking para ser "
+                        f"desbloqueado (você tem {wins})."
+                    ),
+                )
+        user.avatar_json = json.dumps(merged_cfg)
+
+    if display_name is not None and str(display_name).strip():
+        user.display_name = str(display_name).strip()[:32]
+    session.commit()
+    return user
+
+
+def _unique_username_candidate(base_hint: str, session) -> str:
+    base = _normalize_username(base_hint)
+    if len(base) < 2:
+        base = "jogador"
+    candidate = base[:24]
+    suffix = 1
+    while session.get(StoredUser, candidate) is not None:
+        tail = str(suffix)
+        candidate = f"{base[: max(2, 24 - len(tail))]}{tail}"
+        suffix += 1
+    return candidate
+
+
+def login_with_google_claims(
+    claims: dict, avatar_config: dict | None = None
+) -> tuple[StoredUser, StoredSession, bool]:
+    session = db.session
+    google_sub = str(claims.get("sub") or "").strip()[:64]
+    email = str(claims.get("email") or "").strip().lower()[:255] or None
+    display = str(
+        claims.get("name") or (email.split("@")[0] if email else "Jogador")
+    ).strip()[:32]
+
+    if not google_sub:
+        abort(401, description="Token Google inválido (sub ausente)")
+
+    user = session.query(StoredUser).filter_by(google_sub=google_sub).first()
+    if user is not None:
+        if email and not user.email:
+            user.email = email
+            session.commit()
+        sess = create_user_session(user.username, session)
+        return user, sess, False
+
+    hint = email.split("@")[0] if email else display
+    username = _unique_username_candidate(hint, session)
+    initial_avatar = filter_unlocked_avatar_config(avatar_config, wins=0)
+    user = StoredUser(
+        username=username,
+        display_name=display or username,
+        password_hash=None,
+        # "" (não None): bancos migrados de versões antigas têm pin_hash NOT NULL
+        pin_hash="",
+        google_sub=google_sub,
+        email=email,
+        avatar_json=json.dumps(initial_avatar),
+        auth_token=secrets.token_hex(16),
+        created_at=int(time.time()),
+    )
+    session.add(user)
+    session.commit()
+    sess = create_user_session(username, session)
+    return user, sess, True
+
+
+COLOR_LABELS_PT = {
+    "RED": "Vermelho",
+    "BLUE": "Azul",
+    "ORANGE": "Laranja",
+    "WHITE": "Branco",
+}
+
+
+def build_seat_metadata_for_game(
+    player_keys: list,
+    auth_user: StoredUser | None = None,
+    host_name: str | None = None,
+    host_avatar_config: dict | None = None,
+) -> dict[str, dict]:
+    """Seat metadata keyed by color.
+
+    ``REGISTRY.build_all`` pairs the i-th spec with the i-th ``Color``, so the
+    i-th spec sits on ``SEAT_COLORS[i]``. ``State.__init__`` only shuffles the
+    turn order (``state.players``); each player keeps its color, so metadata
+    keyed by color stays correct regardless of the shuffle.
+    """
+    by_color: dict[str, dict] = {}
+    parsed_keys = [
+        str(spec["key"]).upper()
+        if isinstance(spec, dict)
+        else str(spec).split(":")[0].upper()
+        for spec in player_keys
+    ]
+    num_bots = sum(1 for k in parsed_keys if k != "HUMAN")
+    bot_names_iter = iter(pick_bot_names(num_bots))
+
+    human_assigned = False
+    extra_guest_index = 1
+    for idx, key in enumerate(parsed_keys):
+        color = SEAT_COLORS[idx]
+        if key == "HUMAN":
+            if not human_assigned and auth_user is not None:
+                try:
+                    user_avatar = sanitize_avatar_config(
+                        json.loads(auth_user.avatar_json or "{}")
+                    )
+                except Exception:
+                    user_avatar = {}
+                by_color[color] = {
+                    "color": color,
+                    "seat_kind": "USER",
+                    "username": auth_user.username,
+                    "player_key": "HUMAN",
+                    "display_name": auth_user.display_name,
+                    "avatar_config": user_avatar,
+                }
+            else:
+                if not human_assigned:
+                    guest_label = (
+                        (host_name or "").strip()[:32] or "Explorador da Ilha"
+                    )
+                    guest_avatar = filter_unlocked_avatar_config(
+                        host_avatar_config, wins=0
+                    )
+                else:
+                    extra_guest_index += 1
+                    guest_label = f"Convidado {extra_guest_index}"
+                    guest_avatar = {}
+                by_color[color] = {
+                    "color": color,
+                    "seat_kind": "GUEST",
+                    "username": None,
+                    "player_key": "HUMAN",
+                    "display_name": guest_label,
+                    "avatar_config": guest_avatar,
+                }
+            human_assigned = True
+        else:
+            bot_name = next(bot_names_iter)
+            by_color[color] = {
+                "color": color,
+                "seat_kind": "BOT",
+                "username": None,
+                "player_key": key,
+                "display_name": bot_name,
+                "avatar_config": dict(BOT_AVATAR_BY_NAME.get(bot_name) or {}),
+            }
+    return by_color
+
+
+def _detect_map_template(game: Game) -> str:
+    land_count = len(game.state.board.map.land_tiles)
+    if land_count <= 7:
+        return "MINI"
+    return "BASE"
+
+
+def record_completed_match(game: Game, session_param=None) -> StoredMatch | None:
+    session = session_param or db.session
+    winner = game.winning_color()
+    if winner is None:
+        return None
+
+    existing = session.get(StoredMatch, game.id)
+    if existing is not None:
+        return existing
+
+    stored_game = session.get(StoredGame, game.id)
+    room = get_room_by_game_id(game.id)
+
+    seat_meta: dict[str, dict] = {}
+    if stored_game and stored_game.seat_metadata_json:
+        try:
+            seat_meta = json.loads(stored_game.seat_metadata_json)
+        except Exception:
+            seat_meta = {}
+    elif room is not None:
+        try:
+            for seat in json.loads(room.seats_json):
+                c = seat["color"]
+                is_bot = seat.get("player_key", "HUMAN") != "HUMAN"
+                uname = seat.get("username") if not is_bot else None
+                seat_meta[c] = {
+                    "color": c,
+                    "seat_kind": "BOT" if is_bot else ("USER" if uname else "GUEST"),
+                    "username": uname,
+                    "player_key": seat.get("player_key", "HUMAN"),
+                    "display_name": seat.get("player_name")
+                    or COLOR_LABELS_PT.get(c, c),
+                }
+        except Exception:
+            seat_meta = {}
+
+    win_color_str = winner.value
+    participants_rows: list[StoredMatchParticipant] = []
+    seen_usernames: set[str] = set()
+    used_bot_names: set[str] = {
+        meta.get("display_name")
+        for meta in seat_meta.values()
+        if meta.get("seat_kind") == "BOT"
+        and meta.get("display_name") in OFFICIAL_BOT_NAMES
+    }
+    winner_name = COLOR_LABELS_PT.get(win_color_str, win_color_str)
+    winner_username: str | None = None
+    winner_is_bot = False
+    human_count = 0
+
+    for player in game.state.players:
+        c = player.color.value
+        meta = seat_meta.get(c, {})
+        key = (
+            meta.get("player_key")
+            or getattr(player, "registry_key", None)
+            or ("HUMAN" if not player.is_bot else "BOT")
         )
-        session.add(user)
+        seat_kind = meta.get("seat_kind") or ("BOT" if player.is_bot else "GUEST")
+        uname = meta.get("username") if seat_kind == "USER" else None
+        if uname and uname in seen_usernames:
+            # Garante no máximo uma atribuição por usuário na mesma partida
+            uname = None
+            seat_kind = "GUEST"
+        if uname:
+            seen_usernames.add(uname)
+        if not player.is_bot:
+            human_count += 1
+
+        if player.is_bot:
+            candidate_name = meta.get("display_name")
+            if candidate_name in OFFICIAL_BOT_NAMES:
+                dname = candidate_name
+            else:
+                dname = pick_bot_names(1, exclude=used_bot_names)[0]
+                used_bot_names.add(dname)
+        else:
+            dname = meta.get("display_name") or "Explorador da Ilha"
+        vps = int(get_actual_victory_points(game.state, player.color))
+        is_win = c == win_color_str
+        if is_win:
+            winner_name = dname
+            winner_username = uname
+            winner_is_bot = bool(player.is_bot)
+
+        participants_rows.append(
+            StoredMatchParticipant(
+                game_id=game.id,
+                color=c,
+                seat_kind=seat_kind,
+                username=uname,
+                player_key=str(key)[:32],
+                display_name=str(dname)[:64],
+                victory_points=vps,
+                is_winner=is_win,
+            )
+        )
+
+    mode = "MULTIPLAYER" if (room is not None or human_count >= 2) else "SOLO"
+    map_template = _detect_map_template(game)
+    if room is not None:
+        try:
+            map_template = json.loads(room.config_json).get("map_template", map_template)
+        except Exception:
+            pass
+
+    match_row = StoredMatch(
+        game_id=game.id,
+        room_code=room.room_code if room is not None else None,
+        mode=mode,
+        map_template=str(map_template)[:24],
+        vps_to_win=int(game.vps_to_win),
+        num_turns=int(game.state.num_turns),
+        winning_color=win_color_str,
+        winner_name=str(winner_name)[:64],
+        winner_username=winner_username,
+        winner_is_bot=winner_is_bot,
+        finished_at=int(time.time()),
+    )
+
+    try:
+        session.add(match_row)
+        session.flush()
+        for row in participants_rows:
+            session.add(row)
         session.commit()
-        return user, True
+        return match_row
+    except IntegrityError:
+        session.rollback()
+        return session.get(StoredMatch, game.id)
 
-    if user.pin_hash != expected_hash:
-        abort(401, description="Senha/PIN incorreto para esta conta")
 
-    if display_name and display_name.strip():
-        user.display_name = display_name.strip()[:32]
-        session.commit()
+def get_user_stats(username: str) -> dict:
+    rows = (
+        db.session.query(StoredMatchParticipant)
+        .filter_by(username=username, seat_kind="USER")
+        .all()
+    )
+    games_played = len(rows)
+    wins = sum(1 for r in rows if r.is_winner)
+    losses = max(0, games_played - wins)
+    win_rate = round((wins / games_played) * 100.0, 1) if games_played > 0 else 0.0
+    return {
+        "wins": wins,
+        "losses": losses,
+        "games_played": games_played,
+        "win_rate": win_rate,
+    }
 
-    return user, False
+
+def _build_leaderboard_rows() -> list[dict]:
+    users = db.session.query(StoredUser).all()
+    participants = (
+        db.session.query(StoredMatchParticipant).filter_by(seat_kind="USER").all()
+    )
+    counts: dict[str, list[int]] = {}
+    for p in participants:
+        if not p.username:
+            continue
+        bucket = counts.setdefault(p.username, [0, 0])  # [wins, games]
+        bucket[1] += 1
+        if p.is_winner:
+            bucket[0] += 1
+
+    board = []
+    for u in users:
+        wins, games_played = counts.get(u.username, [0, 0])
+        losses = max(0, games_played - wins)
+        win_rate = (
+            round((wins / games_played) * 100.0, 1) if games_played > 0 else 0.0
+        )
+        try:
+            avatar_cfg = sanitize_avatar_config(json.loads(u.avatar_json or "{}"))
+        except Exception:
+            avatar_cfg = {}
+        board.append(
+            {
+                "username": u.username,
+                "display_name": u.display_name,
+                "avatar_config": avatar_cfg,
+                "wins": wins,
+                "losses": losses,
+                "games_played": games_played,
+                "win_rate": win_rate,
+            }
+        )
+
+    board.sort(
+        key=lambda item: (
+            -item["wins"],
+            -item["win_rate"],
+            -item["games_played"],
+            item["username"],
+        )
+    )
+    for idx, entry in enumerate(board, start=1):
+        entry["rank"] = idx
+    return board
+
+
+def get_leaderboard(limit: int = 100) -> list[dict]:
+    return _build_leaderboard_rows()[:limit]
+
+
+def get_user_rank(username: str) -> int | None:
+    clean = _normalize_username(username)
+    if not clean:
+        return None
+    for row in _build_leaderboard_rows():
+        if row["username"] == clean:
+            return int(row["rank"])
+    return None
+
+
+def get_match_history(username: str | None = None, limit: int = 30) -> list[dict]:
+    query = db.session.query(StoredMatch)
+    if username:
+        clean_user = _normalize_username(username)
+        game_ids = [
+            r.game_id
+            for r in db.session.query(StoredMatchParticipant.game_id)
+            .filter_by(username=clean_user, seat_kind="USER")
+            .all()
+        ]
+        if not game_ids:
+            return []
+        query = query.filter(StoredMatch.game_id.in_(game_ids))
+
+    matches = query.order_by(StoredMatch.finished_at.desc()).limit(limit).all()
+    if not matches:
+        return []
+
+    m_ids = [m.game_id for m in matches]
+    all_parts = (
+        db.session.query(StoredMatchParticipant)
+        .filter(StoredMatchParticipant.game_id.in_(m_ids))
+        .all()
+    )
+    parts_by_game: dict[str, list[dict]] = {}
+    for p in all_parts:
+        parts_by_game.setdefault(p.game_id, []).append(
+            {
+                "color": p.color,
+                "seat_kind": p.seat_kind,
+                "username": p.username,
+                "player_key": p.player_key,
+                "display_name": p.display_name,
+                "victory_points": p.victory_points,
+                "is_winner": p.is_winner,
+            }
+        )
+
+    result = []
+    for m in matches:
+        parts = parts_by_game.get(m.game_id, [])
+        parts.sort(key=lambda item: (-int(item["is_winner"]), -item["victory_points"]))
+        result.append(
+            {
+                "game_id": m.game_id,
+                "room_code": m.room_code,
+                "mode": m.mode,
+                "map_template": m.map_template,
+                "vps_to_win": m.vps_to_win,
+                "num_turns": m.num_turns,
+                "winning_color": m.winning_color,
+                "winner_name": m.winner_name,
+                "winner_username": m.winner_username,
+                "winner_is_bot": m.winner_is_bot,
+                "finished_at": m.finished_at,
+                "participants": parts,
+            }
+        )
+    return result
 
 
 def create_room(
@@ -270,12 +1161,19 @@ def create_room(
     discard_limit: int = 7,
     friendly_robber: bool = True,
     host_token: str | None = None,
+    host_username: str | None = None,
+    host_avatar_config: dict | None = None,
 ) -> tuple[StoredRoom, str]:
     session = db.session
     room_code = _generate_room_code(session)
     resolved_host_token = (host_token or "").strip() or uuid.uuid4().hex
 
     initial_keys = players if players and 2 <= len(players) <= 4 else ["HUMAN", "HUMAN", "CATANATRON", "CATANATRON"]
+    num_bots = sum(1 for k in initial_keys if k != "HUMAN")
+    bot_names_iter = iter(pick_bot_names(num_bots))
+    safe_guest_avatar = (
+        {} if host_username else filter_unlocked_avatar_config(host_avatar_config, wins=0)
+    )
     seats = []
     host_seated = False
     for idx, p_key in enumerate(initial_keys):
@@ -287,6 +1185,9 @@ def create_room(
                     "player_key": "HUMAN",
                     "player_name": host_name.strip() or "Anfitrião",
                     "seat_token": resolved_host_token,
+                    "seat_kind": "USER" if host_username else "GUEST",
+                    "username": host_username,
+                    "avatar_config": safe_guest_avatar,
                 }
             )
             host_seated = True
@@ -297,15 +1198,22 @@ def create_room(
                     "player_key": "HUMAN",
                     "player_name": "Aguardando Amigo...",
                     "seat_token": None,
+                    "seat_kind": "GUEST",
+                    "username": None,
+                    "avatar_config": {},
                 }
             )
         else:
+            bot_name = next(bot_names_iter)
             seats.append(
                 {
                     "color": color,
                     "player_key": p_key,
-                    "player_name": f"Bot ({p_key})",
+                    "player_name": bot_name,
                     "seat_token": None,
+                    "seat_kind": "BOT",
+                    "username": None,
+                    "avatar_config": dict(BOT_AVATAR_BY_NAME.get(bot_name) or {}),
                 }
             )
 

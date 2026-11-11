@@ -2,11 +2,13 @@ import os
 import sys
 from urllib.parse import parse_qsl, urlencode
 
-# Ensure the local catanatron package directory is importable in Vercel Python runtime
+# Ensure the local catanatron package directory is highest-priority in Vercel Python runtime
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API_DIR = os.path.dirname(os.path.abspath(__file__))
-for candidate in (os.path.join(ROOT_DIR, "catanatron"), API_DIR, ROOT_DIR):
-    if os.path.isdir(candidate) and candidate not in sys.path:
+for candidate in (ROOT_DIR, API_DIR, os.path.join(ROOT_DIR, "catanatron")):
+    if os.path.isdir(candidate):
+        if candidate in sys.path:
+            sys.path.remove(candidate)
         sys.path.insert(0, candidate)
 
 from catanatron.web import create_app

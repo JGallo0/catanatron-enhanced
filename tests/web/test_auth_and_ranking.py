@@ -8,6 +8,8 @@ import pytest
 
 from catanatron.web import create_app
 from catanatron.web.models import (
+    BOT_AVATAR_BY_NAME,
+    OFFICIAL_BOT_NAMES,
     StoredSession,
     StoredUser,
     authenticate_user,
@@ -453,8 +455,12 @@ def test_game_state_and_room_serialize_user_seat_avatars(app, client):
     assert state_view["seat_avatars"]["BLUE"]["seat_kind"] == "USER"
     assert state_view["seat_avatars"]["BLUE"]["username"] == "diana"
     assert state_view["seat_avatars"]["BLUE"]["avatar_config"]["hat"] == "explorer"
+    assert state_view["seat_names"]["RED"] in OFFICIAL_BOT_NAMES
     assert state_view["seat_avatars"]["RED"]["seat_kind"] == "BOT"
-    assert state_view["seat_avatars"]["RED"]["avatar_config"] == {}
+    assert (
+        state_view["seat_avatars"]["RED"]["avatar_config"]
+        == BOT_AVATAR_BY_NAME[state_view["seat_names"]["RED"]]
+    )
 
     # 2. Sala Multiplayer: serialize_room e start expõem avatar_config
     room_res = client.post(

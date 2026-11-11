@@ -16,6 +16,7 @@ from catanatron.features import (
     reachability_features,
     resource_hand_features,
 )
+from catanatron.players.trade_evaluator import evaluate_trade_decision
 
 TRANSLATE_VARIETY = 4  # i.e. each new resource is like 4 production points
 
@@ -166,6 +167,10 @@ class ValueFunctionPlayer(Player):
     def decide(self, game, playable_actions):
         if len(playable_actions) == 1:
             return playable_actions[0]
+
+        trade_action = evaluate_trade_decision(self.color, game, playable_actions)
+        if trade_action is not None:
+            return trade_action
 
         epsilon = self.params.epsilon
         if epsilon is not None and game.state.random.random() < epsilon:

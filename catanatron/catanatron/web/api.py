@@ -12,7 +12,9 @@ from flask import Response, Blueprint, jsonify, abort, request
 from werkzeug.exceptions import HTTPException
 
 from catanatron.web.models import (
+    BOT_AVATAR_BY_NAME,
     COLOR_LABELS_PT,
+    OFFICIAL_BOT_NAMES,
     SEAT_COLORS,
     StoredGame,
     StoredRoom,
@@ -21,6 +23,7 @@ from catanatron.web.models import (
     build_seat_metadata_for_game,
     create_room,
     db,
+    filter_unlocked_avatar_config,
     get_game_state,
     get_leaderboard,
     get_match_history,
@@ -28,10 +31,12 @@ from catanatron.web.models import (
     get_user_stats,
     list_active_rooms,
     login_with_google_claims,
+    pick_bot_names,
     record_completed_match,
     register_user,
     resolve_user_from_token,
     revoke_session_token,
+    sanitize_avatar_config,
     serialize_room,
     serialize_user,
     update_user_profile,
@@ -90,6 +95,7 @@ def _enrich_view_with_seats(game: Game, view: dict) -> dict:
                         "player_key": seat.get("player_key", "HUMAN"),
                         "display_name": seat.get("player_name")
                         or COLOR_LABELS_PT.get(c, c),
+                        "avatar_config": seat.get("avatar_config") or {},
                     }
 
         if seat_meta:
@@ -101,16 +107,41 @@ def _enrich_view_with_seats(game: Game, view: dict) -> dict:
             avatars = _load_avatars_by_username(usernames)
             seat_names: dict[str, str] = {}
             seat_avatars: dict[str, dict] = {}
+            used_bot_names = {
+                meta.get("display_name")
+                for meta in seat_meta.values()
+                if meta.get("seat_kind") == "BOT"
+                and meta.get("display_name") in OFFICIAL_BOT_NAMES
+            }
             for color, meta in seat_meta.items():
                 seat_kind = meta.get("seat_kind") or "GUEST"
                 uname = meta.get("username") if seat_kind == "USER" else None
-                seat_names[color] = meta.get("display_name") or COLOR_LABELS_PT.get(
-                    color, color
-                )
+                if seat_kind == "BOT":
+                    raw_bot_name = meta.get("display_name")
+                    if raw_bot_name in OFFICIAL_BOT_NAMES:
+                        bot_name = raw_bot_name
+                    else:
+                        bot_name = pick_bot_names(1, exclude=used_bot_names)[0]
+                        used_bot_names.add(bot_name)
+                    seat_names[color] = bot_name
+                    seat_avatar = sanitize_avatar_config(meta.get("avatar_config")) or dict(
+                        BOT_AVATAR_BY_NAME.get(bot_name) or {}
+                    )
+                elif seat_kind == "USER" and uname:
+                    seat_names[color] = meta.get("display_name") or COLOR_LABELS_PT.get(
+                        color, color
+                    )
+                    seat_avatar = avatars.get(uname, {})
+                else:
+                    seat_names[color] = meta.get("display_name") or "Explorador da Ilha"
+                    seat_avatar = filter_unlocked_avatar_config(
+                        meta.get("avatar_config"), wins=0
+                    )
+
                 seat_avatars[color] = {
                     "seat_kind": seat_kind,
                     "username": uname,
-                    "avatar_config": avatars.get(uname, {}) if uname else {},
+                    "avatar_config": seat_avatar,
                 }
             view["seat_names"] = seat_names
             view["seat_avatars"] = seat_avatars
@@ -168,10 +199,12 @@ def post_game_endpoint():
     )
     auth_user = resolve_user_from_token(_extract_auth_token())
     host_name = request.json.get("host_name")
+    host_avatar = request.json.get("avatar_config")
     seat_meta = build_seat_metadata_for_game(
         player_keys,
         auth_user=auth_user,
         host_name=str(host_name).strip() if host_name else None,
+        host_avatar_config=host_avatar if isinstance(host_avatar, dict) else None,
     )
     upsert_game_state(game, seat_metadata_by_color=seat_meta)
     return jsonify({"game_id": game.id})
@@ -220,9 +253,21 @@ def _verify_google_id_token(credential: str, expected_client_id: str) -> dict:
     return claims
 
 
+def _get_google_client_id() -> str | None:
+    for env_key in (
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_ID",
+        "VITE_GOOGLE_CLIENT_ID",
+    ):
+        value = (os.environ.get(env_key) or "").strip()
+        if value:
+            return value
+    return None
+
+
 @bp.route("/auth/config", methods=("GET",))
 def get_auth_config_endpoint():
-    client_id = (os.environ.get("GOOGLE_CLIENT_ID") or "").strip() or None
+    client_id = _get_google_client_id()
     return jsonify({"google_enabled": bool(client_id), "google_client_id": client_id})
 
 
@@ -232,11 +277,13 @@ def post_auth_register_endpoint():
     username = str(body.get("username") or "").strip()
     password = str(body.get("password") or body.get("pin") or "")
     display_name = body.get("display_name")
+    avatar_config = body.get("avatar_config")
 
     user, sess = register_user(
         username=username,
         password=password,
         display_name=str(display_name).strip() if display_name else None,
+        avatar_config=avatar_config if isinstance(avatar_config, dict) else None,
     )
     payload = serialize_user(user, get_user_stats(user.username))
     payload.update({"auth_token": sess.token, "is_new": True})
@@ -257,17 +304,21 @@ def post_auth_login_endpoint():
 
 @bp.route("/auth/google", methods=("POST",))
 def post_auth_google_endpoint():
-    client_id = (os.environ.get("GOOGLE_CLIENT_ID") or "").strip()
+    client_id = _get_google_client_id()
     if not client_id:
         abort(503, description="Login com Google não configurado no servidor")
     body = request.get_json(silent=True) or {}
     credential = str(body.get("credential") or "").strip()
+    avatar_config = body.get("avatar_config")
     try:
         claims = _verify_google_id_token(credential, client_id)
     except ValueError as err:
         abort(401, description=str(err))
 
-    user, sess, is_new = login_with_google_claims(claims)
+    user, sess, is_new = login_with_google_claims(
+        claims,
+        avatar_config=avatar_config if isinstance(avatar_config, dict) else None,
+    )
     payload = serialize_user(user, get_user_stats(user.username))
     payload.update({"auth_token": sess.token, "is_new": is_new})
     return jsonify(payload)
@@ -328,6 +379,7 @@ def post_room_endpoint():
             if host_name and host_name != "Anfitrião"
             else auth_user.display_name
         )
+    host_avatar = body.get("avatar_config")
     room, resolved_token = create_room(
         host_name=host_name,
         players=players,
@@ -337,6 +389,7 @@ def post_room_endpoint():
         friendly_robber=friendly_robber,
         host_token=host_token or _extract_auth_token(),
         host_username=auth_user.username if auth_user else None,
+        host_avatar_config=host_avatar if isinstance(host_avatar, dict) else None,
     )
     return jsonify(
         {
@@ -369,6 +422,11 @@ def join_room_endpoint(room_code: str):
     auth_user = resolve_user_from_token(_extract_auth_token())
     seat_kind = "USER" if auth_user else "GUEST"
     seat_username = auth_user.username if auth_user else None
+    guest_avatar = (
+        {}
+        if auth_user
+        else filter_unlocked_avatar_config(body.get("avatar_config"), wins=0)
+    )
 
     seats = json.loads(room.seats_json)
 
@@ -390,10 +448,12 @@ def join_room_endpoint(room_code: str):
                 current_seat["player_name"] = "Aguardando Amigo..."
                 current_seat["username"] = None
                 current_seat["seat_kind"] = "GUEST"
+                current_seat["avatar_config"] = {}
             target["seat_token"] = token
             target["player_name"] = player_name
             target["seat_kind"] = seat_kind
             target["username"] = seat_username
+            target["avatar_config"] = guest_avatar
             room.seats_json = json.dumps(seats)
             db.session.commit()
             return jsonify(
@@ -408,6 +468,7 @@ def join_room_endpoint(room_code: str):
         current_seat["player_name"] = player_name
         current_seat["seat_kind"] = seat_kind
         current_seat["username"] = seat_username
+        current_seat["avatar_config"] = guest_avatar
         room.seats_json = json.dumps(seats)
         db.session.commit()
         return jsonify(
@@ -430,6 +491,7 @@ def join_room_endpoint(room_code: str):
     open_seat["player_name"] = player_name
     open_seat["seat_kind"] = seat_kind
     open_seat["username"] = seat_username
+    open_seat["avatar_config"] = guest_avatar
     room.seats_json = json.dumps(seats)
     db.session.commit()
 
@@ -473,6 +535,7 @@ def patch_room_endpoint(room_code: str):
             abort(400, description="A sala deve ter entre 2 e 4 assentos")
         updated_seats = []
         old_by_color = {s["color"]: s for s in seats}
+        used_bot_names: set[str] = set()
         for idx, item in enumerate(raw_seats):
             color = SEAT_COLORS[idx]
             prev = old_by_color.get(color, {})
@@ -495,6 +558,9 @@ def patch_room_endpoint(room_code: str):
                             prev.get("seat_kind", "GUEST") if seat_token else "GUEST"
                         ),
                         "username": prev.get("username") if seat_token else None,
+                        "avatar_config": (
+                            prev.get("avatar_config", {}) if seat_token else {}
+                        ),
                     }
                 )
             else:
@@ -503,7 +569,18 @@ def patch_room_endpoint(room_code: str):
                     REGISTRY.lookup(p_key.split(":")[0])
                 except SpecError as err:
                     abort(400, description=str(err))
-                bot_label = item.get("player_name") or f"Bot ({p_key})"
+                candidate = (
+                    item.get("player_name")
+                    or (prev.get("player_name") if prev.get("player_key") != "HUMAN" else None)
+                )
+                if (
+                    candidate in OFFICIAL_BOT_NAMES
+                    and candidate not in used_bot_names
+                ):
+                    bot_label = candidate
+                else:
+                    bot_label = pick_bot_names(1, exclude=used_bot_names)[0]
+                used_bot_names.add(bot_label)
                 updated_seats.append(
                     {
                         "color": color,
@@ -512,6 +589,7 @@ def patch_room_endpoint(room_code: str):
                         "seat_token": None,
                         "seat_kind": "BOT",
                         "username": None,
+                        "avatar_config": dict(BOT_AVATAR_BY_NAME.get(bot_label) or {}),
                     }
                 )
         seats = updated_seats
@@ -562,6 +640,7 @@ def start_room_endpoint(room_code: str):
             "username": seat.get("username") if seat["player_key"] == "HUMAN" else None,
             "player_key": seat["player_key"],
             "display_name": seat.get("player_name") or seat["color"],
+            "avatar_config": seat.get("avatar_config") or {},
         }
         for seat in seats
     }
