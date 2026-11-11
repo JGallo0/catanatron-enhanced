@@ -11,7 +11,11 @@ from catanatron.models.actions import generate_playable_actions
 from catanatron.models.enums import Action, ActionPrompt, ActionRecord, ActionType
 from catanatron.state import State
 from catanatron.apply_action import apply_action
-from catanatron.state_functions import player_key, player_has_rolled
+from catanatron.state_functions import (
+    player_key,
+    player_has_rolled,
+    player_resource_freqdeck_contains,
+)
 from catanatron.models.map import CatanMap, NumberPlacement
 from catanatron.models.player import Color, Player
 from catanatron.observer import GameObserver
@@ -25,10 +29,17 @@ def is_valid_action(playable_actions, state: State, action: Action) -> bool:
     if its in playable_actions or if its a OFFER_TRADE in the right time."""
     if action.action_type == ActionType.OFFER_TRADE:
         return (
-            state.current_color() == action.color
+            not state.is_initial_build_phase
+            and not state.is_road_building
+            and not state.is_resolving_trade
+            and len(state.colors) >= 2
+            and state.current_color() == action.color
             and state.current_prompt == ActionPrompt.PLAY_TURN
             and player_has_rolled(state, action.color)
             and is_valid_trade(action.value)
+            and player_resource_freqdeck_contains(
+                state, action.color, action.value[:5]
+            )
         )
 
     return action in playable_actions
@@ -38,6 +49,16 @@ def is_valid_trade(action_value):
     """Checks the value of a OFFER_TRADE does not
     give away resources or trade matching resources.
     """
+    if not isinstance(action_value, (tuple, list)) or len(action_value) != 10:
+        return False
+    for amount in action_value:
+        if (
+            not isinstance(amount, int)
+            or isinstance(amount, bool)
+            or amount < 0
+        ):
+            return False
+
     offering = action_value[:5]
     asking = action_value[5:]
     if sum(offering) == 0 or sum(asking) == 0:

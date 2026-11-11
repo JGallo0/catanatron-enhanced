@@ -6,6 +6,7 @@ from collections import defaultdict
 from catanatron.game import Game
 from catanatron.models.player import Player
 from catanatron.players.playouts import run_playout
+from catanatron.players.trade_evaluator import evaluate_trade_decision
 from catanatron.players.tree_search_utils import execute_spectrum, list_prunned_actions
 
 SIMULATIONS = 10
@@ -27,6 +28,10 @@ class MCTSPlayer(Player):
         )
         if len(actions) == 1:
             return actions[0]
+
+        trade_action = evaluate_trade_decision(self.color, game, playable_actions)
+        if trade_action is not None:
+            return trade_action
 
         start = time.time()
         root = StateNode(self.color, game.copy(), None, self.params.prunning)

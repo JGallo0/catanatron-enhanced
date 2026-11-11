@@ -3,6 +3,7 @@ from catanatron.state_functions import (
 )
 from catanatron.models.player import Player
 from catanatron.game import Game
+from catanatron.players.trade_evaluator import evaluate_trade_decision
 
 
 class VictoryPointPlayer(Player):
@@ -17,6 +18,10 @@ class VictoryPointPlayer(Player):
     def decide(self, game: Game, playable_actions):
         if len(playable_actions) == 1:
             return playable_actions[0]
+
+        trade_action = evaluate_trade_decision(self.color, game, playable_actions)
+        if trade_action is not None:
+            return trade_action
 
         best_value = float("-inf")
         best_actions = []

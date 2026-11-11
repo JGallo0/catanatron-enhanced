@@ -6,6 +6,7 @@ from collections import Counter
 
 from catanatron.game import Game
 from catanatron.models.player import Player
+from catanatron.players.trade_evaluator import evaluate_trade_decision
 
 DEFAULT_NUM_PLAYOUTS = 25
 USE_MULTIPROCESSING = True
@@ -31,6 +32,10 @@ class GreedyPlayoutsPlayer(Player):
     def decide(self, game: Game, playable_actions):
         if len(playable_actions) == 1:
             return playable_actions[0]
+
+        trade_action = evaluate_trade_decision(self.color, game, playable_actions)
+        if trade_action is not None:
+            return trade_action
 
         start = time.time()
         # num_playouts = PLAYOUTS_BUDGET // len(playable_actions)

@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional
 
 from catanatron.game import Game
 from catanatron.models.player import Player
+from catanatron.players.trade_evaluator import evaluate_trade_decision
 from catanatron.players.tree_search_utils import expand_spectrum, list_prunned_actions
 from catanatron.players.value import (
     DEFAULT_WEIGHTS,
@@ -56,6 +57,10 @@ class AlphaBetaPlayer(Player):
         actions = self.get_actions(game)
         if len(actions) == 1:
             return actions[0]
+
+        trade_action = evaluate_trade_decision(self.color, game, playable_actions)
+        if trade_action is not None:
+            return trade_action
 
         epsilon = self.params.epsilon
         if epsilon is not None and game.state.random.random() < epsilon:
