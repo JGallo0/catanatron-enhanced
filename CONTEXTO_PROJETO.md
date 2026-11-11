@@ -58,14 +58,14 @@ cd catanatron-enhanced
 # 2. Instalar dependências do frontend e rodar servidor de desenvolvimento
 cd ui
 npm install
-npm run dev
+npm start
 
 # 3. Rodar testes e build de produção
 npx vitest run
 npm run build
 ```
 
-> **Nota:** Graças ao [`localEngine.ts`](ui/src/utils/localEngine.ts), você pode rodar apenas `cd ui && npm run dev` no PC de casa sem nem precisar subir o Docker/Flask em Python para testar o visual, o tabuleiro, as cartas e partidas completas contra Bots!
+> **Nota:** Graças ao [`localEngine.ts`](ui/src/utils/localEngine.ts), você pode rodar apenas `cd ui && npm start` no PC de casa sem nem precisar subir o Docker/Flask em Python para testar o visual, o tabuleiro, as cartas e partidas completas contra Bots!
 
 ---
 
@@ -170,6 +170,14 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
     - Modal interativo **🏆 Ranking Global & Histórico** acessível da tela inicial, com abas dedicadas para o Ranking e para o Histórico de Partidas (com filtro *"Só Minhas Partidas"*).
   - **Espelho Offline Total (`localEngine.ts`):**
     - Cadastro, login, histórico e ranking continuam funcionando diretamente no navegador via `localStorage` mesmo sem backend ou sem internet.
+- **Bloco 2 Concluído: Criador Modular de Avatar, Perfil e Molduras por Mérito:**
+  - **Avatar SVG Modular em Camadas (`ui/src/config/avatarCatalog.ts` & `ui/src/components/PlayerAvatar.tsx`):**
+    - 10 dimensões customizáveis (pele, olhos/expressão, estilo/cor de cabelo, barba, chapéu/coroa, traje/cor, cenário de fundo e moldura), com fallback determinístico a partir do `username` (`resolveAvatarConfig`), 6 arquétipos prontos (*Modelos Prontos*) e sorteio aleatório (`🎲 Aleatório`).
+  - **Recompensas por Vitórias no Ranking Global (Trava Dupla `403` Servidor + Offline):**
+    - Molduras (`wood` 0, `bronze` 1, `silver` 3, `gold` 5, `imperial` 10 vitórias) e `crown_gold` (7 vitórias) validadas tanto em `catanatron/catanatron/web/models.py` (`update_user_profile` com HTTP `403`) + `catanatron/catanatron/web/api.py` (`PATCH /api/auth/profile`) quanto em `localEngine.ts` (`localUpdateProfile`).
+  - **Studio de Perfil & Propagação Universal:**
+    - Modal [`AvatarStudioModal.tsx`](ui/src/components/AvatarStudioModal.tsx) acessível pela Home e pela Sala Multiplayer com edição de apelido e pré-visualização ao vivo.
+    - Propagação em lote zero-N+1 via `_load_avatars_by_username`, `serialize_room` e `_enrich_view_with_seats`, exibindo o avatar SVG em `HomePage`, `RoomLobbyPage`, `LeaderboardModal` e `PlayerTopBar` (para usuários `USER`, preservando os retratos clássicos `.webp` para Bots e convidados).
 
 ---
 
@@ -187,12 +195,9 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 
 ---
 
-## 7. Próximos Passos (Bloco 2 e Bloco 3)
+## 7. Próximos Passos (Bloco 3)
 
-1. **Bloco 2 — Customização de Avatar e Perfil (estilo Catan Universe):**
-   - Seletor e criador de avatar personalizado (combinações de estilo, trajes e cores).
-   - Armazenamento em `users.avatar_json` e sincronização no perfil `/api/auth/profile`.
-   - Exibição do avatar na barra superior de jogadores e nas mesas multiplayer.
+1. ~~**Bloco 2 — Customização de Avatar e Perfil**~~ *(Concluído)*
 2. **Bloco 3 — Redesign da Tela Inicial e Lobby Aberto:**
    - Remoção do card sólido central que encobre a arte de fundo (`lobby_hero.webp`).
    - Apresentação do avatar do jogador no lobby com seus dados e ranking.
