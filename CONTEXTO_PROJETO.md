@@ -28,15 +28,15 @@ Este documento consolida **todo o histórico, arquitetura, decisões de design e
   - [`Tile.tsx`](ui/src/pages/Tile.tsx) & [`Tile.scss`](ui/src/pages/Tile.scss): Renderização dos hexágonos com costa de areia dourada, fichas numéricas com pontos de probabilidade (`•` a `•••••`) e portos marítimos (`3:1` e `2:1`).
   - [`Node.tsx`](ui/src/pages/Node.tsx) & [`Edge.tsx`](ui/src/pages/Edge.tsx): Vértices (Aldeias/Cidades) e Arestas (Estradas) com indicadores pulsantes de construção.
 - **HUD, Jogadores, Cartas e Modais (`ui/src/components/` & `ui/src/pages/`):**
-  - **[`PlayerTopBar.tsx`](ui/src/components/PlayerTopBar.tsx) & [`PlayerTopBar.scss`](ui/src/components/PlayerTopBar.scss):** Barra superior de jogadores inspirada fielmente no **Catan Universe (Steam)**. Exibe cards horizontais para cada jogador:
-    - **Lado Esquerdo:** Retrato/avatar estilizado e nome sobre fundo na cor do jogador, com badge animado de turno `↻` embutido sem sobreposição de texto.
+  - **[`PlayerTopBar.tsx`](ui/src/components/PlayerTopBar.tsx) & [`PlayerTopBar.scss`](ui/src/components/PlayerTopBar.scss):** Barra superior de jogadores com visual escuro polido, avatares SVG 100% originais ([`PlayerAvatar.tsx`](ui/src/components/PlayerAvatar.tsx)) para usuários logados, convidados personalizados e bots, além de faixa compacta responsiva em dispositivos móveis (`<= 768px`) com **diálogo tátil de inspeção (*tap-to-inspect*)** ao tocar em qualquer jogador:
+    - **Lado Esquerdo (Desktop):** Retrato SVG modular com moldura e nome sobre fundo na cor do jogador, com badge animado de turno `↻` embutido sem sobreposição de texto.
     - **Lado Direito (Grid 2×3 em ardósia escura):** Estatísticas com ícones vetoriais nítidos para Cavaleiros `🗡️`, Sequência de Estrada `〰️`, Cartas de Recurso `🂠` (com alerta pulsante se > 7 cartas), Cartas de Desenvolvimento `🎴` e Pontos de Vitória `🏆` em fonte grande colorida.
     - **Destaque Ativo:** Borda de `2.5px` e brilho luminoso na cor do jogador ativo.
-  - **[`LeftDrawer.tsx`](ui/src/components/LeftDrawer.tsx):** Gaveta lateral recolhível (acionada pelo botão `📜 Histórico` no topo) contendo o histórico detalhado de jogadas em `pt-BR`, meta de PV, turno atual e alternador de perspectiva (`Espectador` / `Visão do Assento`).
+  - **[`LeftDrawer.tsx`](ui/src/components/LeftDrawer.tsx):** Gaveta lateral recolhível (acionada pelo botão `📜 Histórico` no topo) contendo o histórico detalhado de jogadas em `pt-BR` (incluindo negociações entre jogadores), meta de PV, turno atual e alternador de perspectiva (`Espectador` / `Visão do Assento`).
   - [`ResourceCards.tsx`](ui/src/components/ResourceCards.tsx): Renderiza tanto a versão compacta quanto o **baralho completo ilustrado (`showEmptySlots={true}`)** na doca inferior do jogador, mostrando sempre os 5 tipos de recurso (`Madeira`, `Argila`, `Lã`, `Trigo`, `Minério`) e as Cartas de Desenvolvimento.
-  - [`ActionsToolbar.tsx`](ui/src/pages/ActionsToolbar.tsx) & [`ActionsToolbar.scss`](ui/src/pages/ActionsToolbar.scss): Doca inferior com dados 2D6, mão de cartas ilustradas e botões de ação (`Custos`, `Usar Carta`, `Construir`, `Trocar`, `Rolar Dados` / `Passar Vez`).
-  - [`TradeModal.tsx`](ui/src/components/TradeModal.tsx): Bancada visual de Troca Marítima e Portos (`4:1`, `3:1`, `2:1`).
-  - [`RobberVictimModal.tsx`](ui/src/components/RobberVictimModal.tsx): Modal para escolher de qual jogador roubar ao mover o Ladrão.
+  - [`ActionsToolbar.tsx`](ui/src/pages/ActionsToolbar.tsx) & [`ActionsToolbar.scss`](ui/src/pages/ActionsToolbar.scss): Doca inferior em 3 zonas com layout adaptativo mobile (`44px+` em alvos táteis), dados 2D6, mão de cartas ilustradas e botões de ação (`Custos`, `Usar Carta`, `Construir`, `Trocar`, `Rolar Dados` / `Passar Vez` / `Responder` / `Confirmar`).
+  - [`TradeModal.tsx`](ui/src/components/TradeModal.tsx) & [`TradeOfferDecisionDialog.tsx`](ui/src/components/TradeOfferDecisionDialog.tsx): Bancada unificada com abas **🤝 Entre Jogadores** (negociação doméstica em 3 etapas `OFFER_TRADE` → `DECIDE_TRADE` → `DECIDE_ACCEPTEES`) e **⚓ Porto & Banco** (`4:1`, `3:1`, `2:1`).
+  - [`ZoomableBoard.tsx`](ui/src/pages/ZoomableBoard.tsx): Inclui seleção de vítima ao mover o Ladrão e suporte *pinch/pan* tátil com `touch-action: none`.
   - [`RightDrawer.tsx`](ui/src/components/RightDrawer.tsx): Gaveta recolhível de análise de IA MCTS (aberta pelo botão `📊 Chances (IA)` no topo).
 - **Lobby, Contas e Motor Local Fallback:**
   - [`HomePage.tsx`](ui/src/pages/HomePage.tsx) & [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx): Tela inicial em palco panorâmico **A2** (`lobby_hero.webp` descoberto ao centro, cabeçalho de 3 colunas com avatar/`#rank` e doca inferior com 5 modos), apoiada pela suíte modular de diálogos em `ui/src/components/home/` ([`AuthModal.tsx`](ui/src/components/home/AuthModal.tsx), [`MatchSetupModal.tsx`](ui/src/components/home/MatchSetupModal.tsx), [`OpenLobbyModal.tsx`](ui/src/components/home/OpenLobbyModal.tsx)), além da sala de espera multiplayer (`/rooms/:roomCode`) com link compartilhável, adição de Bots (`RANDOM`, `WEIGHTED_RANDOM`, `VICTORY_POINT`, `AB_2`, `AB_4`) e partida rápida.
@@ -124,15 +124,11 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
 21. **`longest_road.webp` (ou `longest_road.png`) — Medalha Maior Estrada (`512×512`)**
 22. **`lobby_hero.webp` (ou `lobby_hero.png`) — Banner de Fundo da Tela Inicial (`1920×1080`)**
 
-### E. Avatares de Jogadores (`ui/public/assets/illustrations/avatars/`) — `1:1` (`256×256 px`)
-23. **`red.webp` — Paul (Vermelho):**
-    `Bust portrait of Paul, rugged Norse Viking settler with reddish-brown beard and hair, fur collar tunic, facing camera, solid red background, Catan Universe Steam style`
-24. **`orange.webp` — Max (Laranja):**
-    `Bust portrait of Max, medieval knight with dark trimmed beard wearing polished steel plate armor and helmet, warm amber golden background, Catan Universe Steam style`
-25. **`white.webp` — Mia (Branco):**
-    `Bust portrait of Mia, cute fluffy alpaca settler, emerald forest green background, Catan Universe Steam style`
-26. **`blue.webp` — Sarah (Azul):**
-    `Bust portrait of Sarah, adventurous female sea captain wearing navy tricorn hat and colonial coat, solid royal blue background, Catan Universe Steam style`
+### E. Sistema de Avatares SVG 100% Originais (`ui/src/config/avatarCatalog.ts` & `ui/src/components/PlayerAvatar.tsx`)
+Os retratos legados `.webp` herdados do Catan Universe foram completamente aposentados e removidos da interface em favor do compositor vetorial próprio em camadas (`<PlayerAvatar />`), garantindo:
+- **Prioridade do Avatar Interativo:** Jogadores logados (`USER`) e visitantes com perfil salvo no navegador (`catan_guest_profile_v1`, `customized: true`) exibem automaticamente suas escolhas customizadas em todo o app (Home, Lobby, Mesa e Modal de Negociação).
+- **Predefinições Originais ("Modelos Prontos"):** 6 arquétipos harmônicos com a identidade de *Rule the Isle* (`Capitania Dourada`, `Navegador Atlântico`, `Forja da Montanha`, `Guardia da Floresta`, `Mercador Real` e `Pioneiro Livre`).
+- **Avatares e Nomes Oficiais de Bots (`botCatalog.ts` & `models.py`):** Perfis SVG distintos pareados com o elenco oficial da mesa (**`Creitu`**, **`Felire`**, **`Guiri`**, **`Jaó`** e **`Angeleri`**), atribuídos sem repetição na mesa e sem rótulos de cor ou prefixos artificiais (`IA (...)` / `Bot ...`).
 
 ---
 
@@ -187,6 +183,20 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
     - `AuthModal.tsx`: login, criação de conta e Google Sign-In em diálogo dedicado (com transição automática para o Studio de Avatar quando acionado deslogado).
     - `MatchSetupModal.tsx`: configuração compartilhada para partidas Solo vs IA e criação de Salas Online com código/link compartilhável.
     - `OpenLobbyModal.tsx`: navegador do Lobby Aberto com entrada rápida por código (`#K7M4P9`), filtros (*Todas*, *Com Vagas*, *Minhas*) e exibição dos `<PlayerAvatar />` nos assentos humanos.
+- **Bloco 4 Concluído: Correção Home & Google OAuth, Avatares/Bots Oficiais, Negociação Entre Jogadores & Mobile-First:**
+  - **Fix do Retângulo Preto na Home (`GameScreen.scss` / `ReplayScreen.scss`):** Regras globais de `main` e fundo escuro foram escopadas para `main.catan-game-screen` e `main.catan-replay-screen`, eliminando qualquer tarja opaca sobre `.home-page--stage` e garantindo exibição contínua do palco panorâmico `lobby_hero.webp`.
+  - **Login com Google Hardened (`.env`, COOP & Visibilidade Permanente):**
+    - Backend (`catanatron/web/__init__.py` e `api/catanatron/web/__init__.py`) carrega `.env` automaticamente na inicialização e aplica cabeçalhos `Cross-Origin-Opener-Policy: same-origin-allow-popups` compatíveis com popups OAuth / One Tap.
+    - Frontend (`AuthModal.tsx` e `GoogleSignInButton.tsx`) aceita `VITE_GOOGLE_CLIENT_ID` como fallback local e exibe sempre a seção *"Entrar com Google"* no topo do modal (com aviso instrutivo quando `GOOGLE_CLIENT_ID` ainda não estiver configurado), encaminhando também o `avatar_config` personalizado do visitante ao autenticar via Google.
+  - **Bots Oficiais & Avatares Originais Sem Legado Catan Universe:**
+    - Assentos de IA recebem nomes únicos por partida estritamente dentre **`Creitu`**, **`Felire`**, **`Guiri`**, **`Jaó`** e **`Angeleri`** em `catanatron/web/models.py`, `localEngine.ts`, `botCatalog.ts`, prompts e histórico (`LeftDrawer.tsx`, `promptUtils.ts`), sem nomes de cores ou prefixos `IA (...)`/`Bot (...)`.
+    - Remoção integral dos `.webp` legados; `<PlayerAvatar />` é renderizado em todos os assentos com prioridade absoluta para a criação interativa do jogador (`USER` ou visitante em `catan_guest_profile_v1`).
+  - **Negociação Player-to-Player (Entre Jogadores):**
+    - Fluxo completo de 3 etapas (`OFFER_TRADE` → `DECIDE_TRADE` [`ACCEPT_TRADE`/`REJECT_TRADE`] → `DECIDE_ACCEPTEES` [`CONFIRM_TRADE`/`CANCEL_TRADE`]) habilitado em validação determinística (`DETERMINISTIC_ACTIONS` + `is_valid_trade`), heurística de avaliação de troca para bots (`trade_evaluator.py`, usada pelos 6 avaliadores de IA) e paridade offline completa em `localEngine.ts`.
+    - Interface completa em [`TradeModal.tsx`](ui/src/components/TradeModal.tsx) (aba *🤝 Entre Jogadores* + *⚓ Porto & Banco*), [`TradeOfferDecisionDialog.tsx`](ui/src/components/TradeOfferDecisionDialog.tsx) (minimização via *Ver Tabuleiro* + restauração pelo orbe CTA) e logs/banners em `pt-BR`.
+  - **Otimização Mobile-First (`<= 768px`, `<= 480px` e paisagem `max-height: 520px`):**
+    - [`PlayerTopBar.tsx`](ui/src/components/PlayerTopBar.tsx) com faixa compacta horizontal zero-scroll em celulares e modal *tap-to-inspect* com estatísticas completas e peças no tabuleiro.
+    - [`Board.tsx`](ui/src/pages/Board.tsx), [`Board.scss`](ui/src/pages/Board.scss), [`GameScreen.scss`](ui/src/pages/GameScreen.scss) e [`ActionsToolbar.scss`](ui/src/pages/ActionsToolbar.scss) com cálculo de altura responsivo, `touch-action: none` para pinch/pan tátil, HUD compacta e alvos `44px+` em todos os controles e modais sem overflow horizontal.
 
 ---
 
@@ -197,7 +207,7 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 | Variável | Onde obter | Descrição |
 |---|---|---|
 | `DATABASE_URL` | **Supabase Dashboard** -> Project Settings -> Database -> Connection Pooling (Session ou Transaction mode, porta `6543` / IPv4) | URL de conexão PostgreSQL (ex: `postgresql://postgres.[ref]:[senha]@aws-0-[regiao].pooler.supabase.com:6543/postgres`). Evita problemas de IPv6 na Vercel Serverless. As tabelas e colunas são criadas/migradas automaticamente pelo `models.py` na inicialização. |
-| `GOOGLE_CLIENT_ID` | **Google Cloud Console** -> APIs & Services -> Credentials -> OAuth 2.0 Client IDs (Web application) | ID do cliente Google para login com 1 clique (ex: `123456...apps.googleusercontent.com`). Adicionar `http://localhost:5173` e a URL da Vercel (`https://*.vercel.app`) em *Authorized JavaScript origins*. |
+| `GOOGLE_CLIENT_ID` | **Google Cloud Console** -> APIs & Services -> Credentials -> OAuth 2.0 Client IDs (Web application) | ID do cliente Google para login com 1 clique (ex: `123456...apps.googleusercontent.com`). Adicionar `http://localhost:3000`, `http://localhost:5173` e a URL da Vercel (`https://*.vercel.app`) em *Authorized JavaScript origins*. Opcionalmente defina também `VITE_GOOGLE_CLIENT_ID` no ambiente do Vite. |
 | `SECRET_KEY` | Qualquer string aleatória | Chave de segurança usada internamente pelo Flask para assinar sessões. |
 
 > **Nota sobre o plano gratuito do Supabase:** Nossa arquitetura de login utiliza Google OAuth via ID Token + PBKDF2 direto no banco SQL. Isso significa que **nenhum e-mail transacional é disparado pelo Supabase**, garantindo que o sistema funcione 100% dentro dos limites do plano gratuito sem bloqueios de cota de SMTP!
@@ -208,4 +218,6 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 
 1. ~~**Bloco 2 — Customização de Avatar e Perfil**~~ *(Concluído)*
 2. ~~**Bloco 3 — Redesign da Tela Inicial e Lobby Aberto**~~ *(Concluído)*
-3. **Substituir os 4 Avatares Padrão:** Gerar retratos 100% originais via Nano Banana Pro em `ui/public/assets/illustrations/avatars/{red,orange,white,blue}.webp`.
+3. ~~**Bloco 4 — Fix Home/Google OAuth, Bots & Avatares Oficiais, Troca Entre Jogadores e Mobile-First**~~ *(Concluído)*
+4. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.
+5. **Publicação e Monitoramento em Produção:** Conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase e validar partidas multiplayer entre desktop e celular em produção.
