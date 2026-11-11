@@ -84,6 +84,26 @@
     }
   }
 
+  &__stats {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: #cbd5e1;
+
+    strong {
+      color: #facc15;
+      font-size: 0.78rem;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   &__badge {
     width: fit-content;
     font-size: 0.62rem;
@@ -95,7 +115,15 @@
   &__login {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
+  }
+
+  &__top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 
   &__header {
@@ -113,16 +141,88 @@
     }
   }
 
+  &__tabs {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+  }
+
   &__inputs {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
   }
 
+  &__google {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  &__divider {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin: 2px 0;
+    color: #64748b;
+    font-size: 0.75rem;
+    text-transform: lowercase;
+
+    &::before,
+    &::after {
+      content: "";
+      flex: 1;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    span {
+      padding: 0 8px;
+    }
+  }
+
   &__error {
     font-size: 0.76rem;
     color: #fca5a5;
     font-weight: 600;
+  }
+}
+
+.account-tab-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: #f8fafc;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  &.active {
+    background: rgba(250, 204, 21, 0.15);
+    color: #facc15;
+    border-color: #facc15;
+    font-weight: 700;
+  }
+}
+
+.account-leaderboard-btn {
+  border-color: rgba(250, 204, 21, 0.4) !important;
+  color: #facc15 !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  border-radius: 8px !important;
+  font-size: 0.82rem !important;
+
+  &:hover {
+    background: rgba(250, 204, 21, 0.1) !important;
+    border-color: #facc15 !important;
   }
 }
 

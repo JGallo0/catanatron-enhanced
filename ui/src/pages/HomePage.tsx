@@ -12,14 +12,19 @@ import {
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import { GridLoader } from "react-spinners";
 import {
-  clearSavedAccount,
   createGame,
   createRoom,
   DEFAULT_PLAYERS,
+  fetchCurrentAccount,
+  getAuthConfig,
   getPlayers,
   getSavedAccount,
   listActiveRooms,
-  loginOrRegisterAccount,
+  loginAccount,
+  loginWithGoogle,
+  logoutAccount,
+  registerAccount,
+  type AuthConfig,
   type MapTemplate,
   type PlayerAccount,
   type PlayerEntry,
@@ -27,6 +32,8 @@ import {
 } from "../utils/apiClient";
 import type { RoomState } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import GoogleSignInButton from "../components/GoogleSignInButton";
+import LeaderboardModal from "../components/LeaderboardModal";
 
 import "./HomePage.scss";
 
@@ -62,10 +69,17 @@ export default function HomePage() {
   const [account, setAccount] = useState<PlayerAccount | null>(() =>
     getSavedAccount()
   );
+  const [authConfig, setAuthConfig] = useState<AuthConfig>({
+    google_enabled: false,
+    google_client_id: null,
+  });
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [usernameInput, setUsernameInput] = useState("");
-  const [pinInput, setPinInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [displayNameInput, setDisplayNameInput] = useState("");
   const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [activeRooms, setActiveRooms] = useState<RoomState[]>([]);
 
   const [hostName, setHostName] = useState(
@@ -89,6 +103,19 @@ export default function HomePage() {
         if (list.length > 0) setAvailable(list);
       })
       .catch(() => setAvailable(DEFAULT_PLAYERS));
+
+    getAuthConfig()
+      .then(setAuthConfig)
+      .catch(() => {});
+
+    fetchCurrentAccount()
+      .then((acc) => {
+        if (acc) {
+          setAccount(acc);
+          setHostName(acc.display_name);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -97,39 +124,89 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [refreshRooms]);
 
-  const handleLoginOrRegister = async () => {
-    const cleanUsername = usernameInput.trim() || hostName.trim();
+  const handleLogin = async () => {
+    const cleanUsername = usernameInput.trim();
     if (!cleanUsername) {
-      setAuthError("Digite um nome de usuário acima para entrar ou criar sua conta.");
+      setAuthError("Informe seu nome de usuário.");
       return;
     }
-    const cleanPin = pinInput.trim() || "1234";
+    if (!passwordInput) {
+      setAuthError("Informe sua senha.");
+      return;
+    }
     setAuthBusy(true);
     setAuthError("");
     try {
-      const logged = await loginOrRegisterAccount({
+      const logged = await loginAccount({
         username: cleanUsername,
-        pin: cleanPin,
-        displayName: hostName.trim() || cleanUsername,
+        password: passwordInput,
       });
       setAccount(logged);
       setHostName(logged.display_name);
-      setPinInput("");
-      listActiveRooms(logged.auth_token)
-        .then(setActiveRooms)
-        .catch(() => {});
+      setPasswordInput("");
+      refreshRooms();
     } catch (err: any) {
       setAuthError(
         err?.response?.data?.description ||
-          "Não foi possível autenticar. Verifique usuário e PIN."
+          "Usuário ou senha incorretos."
       );
     } finally {
       setAuthBusy(false);
     }
   };
 
-  const handleLogout = () => {
-    clearSavedAccount();
+  const handleRegister = async () => {
+    const cleanUsername = usernameInput.trim();
+    if (cleanUsername.length < 2) {
+      setAuthError("O nome de usuário deve ter pelo menos 2 caracteres.");
+      return;
+    }
+    if (passwordInput.length < 4) {
+      setAuthError("A senha deve ter pelo menos 4 caracteres.");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const logged = await registerAccount({
+        username: cleanUsername,
+        password: passwordInput,
+        displayName: displayNameInput.trim() || cleanUsername,
+      });
+      setAccount(logged);
+      setHostName(logged.display_name);
+      setPasswordInput("");
+      refreshRooms();
+    } catch (err: any) {
+      setAuthError(
+        err?.response?.data?.description ||
+          "Não foi possível cadastrar o usuário."
+      );
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleGoogleCredential = async (credential: string) => {
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const logged = await loginWithGoogle(credential);
+      setAccount(logged);
+      setHostName(logged.display_name);
+      refreshRooms();
+    } catch (err: any) {
+      setAuthError(
+        err?.response?.data?.description ||
+          "Falha na autenticação com o Google."
+      );
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logoutAccount();
     setAccount(null);
     refreshRooms();
   };
@@ -225,7 +302,7 @@ export default function HomePage() {
               Mãos privadas no multiplayer • Tabuleiro Interativo em Português
             </p>
 
-            {/* Player Account Bar (persistent login across any device on Vercel) */}
+            {/* Player Account Bar & Global Leaderboard */}
             <div className="account-bar">
               {account ? (
                 <div className="account-bar__logged">
@@ -235,24 +312,75 @@ export default function HomePage() {
                     <small>
                       @{account.username} • Suas salas e assentos ficam salvos em qualquer dispositivo
                     </small>
+                    {account.stats && (
+                      <div className="account-bar__stats">
+                        <span>Vitórias: <strong>{account.stats.wins}</strong></span>
+                        <span>Partidas: <strong>{account.stats.games_played}</strong></span>
+                        <span>Aproveitamento: <strong>{account.stats.win_rate}%</strong></span>
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    className="account-logout-btn"
-                    onClick={handleLogout}
-                  >
-                    Sair
-                  </Button>
+                  <div className="account-bar__actions">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      className="account-leaderboard-btn"
+                      onClick={() => setLeaderboardOpen(true)}
+                    >
+                      🏆 Ranking & Histórico
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      className="account-logout-btn"
+                      onClick={handleLogout}
+                    >
+                      Sair
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="account-bar__login">
-                  <div className="account-bar__header">
-                    <span>👤 Entrar ou Criar Conta Rápida</span>
-                    <small>
-                      Entre com usuário + PIN de 4 dígitos para jogar de qualquer PC/celular e retomar suas partidas quando quiser
-                    </small>
+                  <div className="account-bar__top-row">
+                    <div className="account-bar__header">
+                      <span>👤 Identificação de Jogador</span>
+                      <small>
+                        Acesse sua conta para salvar suas vitórias e pontuar no Ranking Global
+                      </small>
+                    </div>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      className="account-leaderboard-btn"
+                      onClick={() => setLeaderboardOpen(true)}
+                    >
+                      🏆 Ranking & Histórico
+                    </Button>
                   </div>
+
+                  <div className="account-bar__tabs">
+                    <button
+                      type="button"
+                      className={`account-tab-btn ${authMode === "login" ? "active" : ""}`}
+                      onClick={() => {
+                        setAuthMode("login");
+                        setAuthError("");
+                      }}
+                    >
+                      Entrar
+                    </button>
+                    <button
+                      type="button"
+                      className={`account-tab-btn ${authMode === "register" ? "active" : ""}`}
+                      onClick={() => {
+                        setAuthMode("register");
+                        setAuthError("");
+                      }}
+                    >
+                      Criar Conta
+                    </button>
+                  </div>
+
                   <div className="account-bar__inputs">
                     <input
                       type="text"
@@ -260,31 +388,58 @@ export default function HomePage() {
                       value={usernameInput}
                       onChange={(e) => setUsernameInput(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") handleLoginOrRegister();
+                        if (e.key === "Enter") {
+                          authMode === "login" ? handleLogin() : handleRegister();
+                        }
                       }}
                       placeholder="Usuário (ex: joao)"
                       maxLength={24}
                     />
+                    {authMode === "register" && (
+                      <input
+                        type="text"
+                        className="multiplayer-input"
+                        value={displayNameInput}
+                        onChange={(e) => setDisplayNameInput(e.target.value)}
+                        placeholder="Apelido na mesa (ex: João)"
+                        maxLength={24}
+                      />
+                    )}
                     <input
                       type="password"
                       className="multiplayer-input multiplayer-input--pin"
-                      value={pinInput}
-                      onChange={(e) => setPinInput(e.target.value)}
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") handleLoginOrRegister();
+                        if (e.key === "Enter") {
+                          authMode === "login" ? handleLogin() : handleRegister();
+                        }
                       }}
-                      placeholder="PIN / Senha (opcional)"
-                      maxLength={16}
+                      placeholder={authMode === "login" ? "Senha" : "Senha (mín 4 caracteres)"}
+                      maxLength={64}
                     />
                     <Button
                       variant="contained"
                       className="account-login-btn"
                       disabled={authBusy}
-                      onClick={handleLoginOrRegister}
+                      onClick={authMode === "login" ? handleLogin : handleRegister}
                     >
-                      {authBusy ? "Entrando..." : "Entrar / Criar"}
+                      {authBusy ? "Aguarde..." : authMode === "login" ? "Entrar" : "Criar Conta"}
                     </Button>
                   </div>
+
+                  {authConfig.google_enabled && authConfig.google_client_id && (
+                    <div className="account-bar__google">
+                      <div className="account-bar__divider">
+                        <span>ou</span>
+                      </div>
+                      <GoogleSignInButton
+                        clientId={authConfig.google_client_id}
+                        onCredential={handleGoogleCredential}
+                      />
+                    </div>
+                  )}
+
                   {authError && (
                     <div className="account-bar__error">{authError}</div>
                   )}
@@ -573,6 +728,12 @@ export default function HomePage() {
         </footer>
         <div className="page-end-spacer" aria-hidden="true" />
       </div>
+
+      <LeaderboardModal
+        open={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
+        currentUsername={account?.username}
+      />
     </div>
   );
 }
