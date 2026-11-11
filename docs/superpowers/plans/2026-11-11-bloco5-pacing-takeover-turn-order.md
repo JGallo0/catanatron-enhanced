@@ -12,7 +12,7 @@
 **Tech Stack:** Python 3.12 (Flask, SQLAlchemy, pytest), React 19, TypeScript, Vite 6, MUI v5/v6, SCSS, Vitest + Testing Library.
 
 ## Global Constraints
-- Work strictly on branch `layout-topbar` inside `C:\Users\JoãoGallo\OneDrive - Astra Solar\Documentos\CBAM\1`; never push or merge to `main`.
+- Work primarily on branch `layout-topbar` inside `C:\Users\JoãoGallo\OneDrive - Astra Solar\Documentos\CBAM\1` while implementing Tasks 1–6; in **Task 7** (explicitly requested by user), update GitHub cross-machine memory (`CONTEXTO_PROJETO.md`), push `layout-topbar`, and fast-forward `main` + `git push origin main` (after `git pull --ff-only origin main`) once all tests and `npm run build` pass so Vercel deploys automatically and the home PC has 100% synced state.
 - PowerShell command chaining uses `;` (never `&&`). Run backend tests via `.\.venv\Scripts\python.exe -m pytest -o addopts="" ...`.
 - Official bot names remain strictly `("Creitu", "Felire", "Guiri", "Jaó", "Angeleri")`; human seats taken over by bots are named `"<OriginalName> (Bot)"` and keep their original human/guest avatar.
 - **No** numeric turn-order badges (`1º`, `2º`, `3º`, `4º`) on `PlayerTopBar` cards — turn order is communicated strictly by card ordering (`colors`) and the opening turn announcement.
@@ -2746,3 +2746,34 @@ Set-Location "C:\Users\JoãoGallo\OneDrive - Astra Solar\Documentos\CBAM\1"
 git add CONTEXTO_PROJETO.md
 git commit -m "docs: update CONTEXTO_PROJETO.md with Bloco 5 delivery"
 ```
+
+---
+
+### Task 7: Final Verification, Cross-Machine GitHub Memory, `git push` & Vercel Main Sync
+
+**Files:**
+- Verify/Update: `CONTEXTO_PROJETO.md` (include Bloco 5 state, endpoints, branch sync note & next steps for home PC continuation)
+- Git remotes: `origin/layout-topbar` and `origin/main` (triggers automatic Vercel production deploy per `AGENTS.md`)
+
+- [ ] **Step 1: Confirm cross-machine memory (`CONTEXTO_PROJETO.md`) has accurate Bloco 5 handoff info for home PC**
+
+Ensure `CONTEXTO_PROJETO.md` clearly documents:
+- Bloco 5 completed features, API endpoints (`/heartbeat`, `/abandon`, `/reclaim`, `?bot_only=1`), local offline parity, and test totals.
+- Exact branch & quick-start continuation steps (`git pull origin main` or `git checkout layout-topbar; git pull`) for continuing work seamlessly at home.
+- If edited in this step, re-run verification checks before committing.
+
+- [ ] **Step 2: Sync with remote (`git pull`), push `layout-topbar`, fast-forward `main` and push `origin/main` for Vercel**
+
+Run in PowerShell:
+```powershell
+Set-Location "C:\Users\JoãoGallo\OneDrive - Astra Solar\Documentos\CBAM\1"
+git fetch origin
+git status
+git push origin layout-topbar
+git checkout main
+git pull --ff-only origin main
+git merge --ff-only layout-topbar
+git push origin main
+git checkout layout-topbar
+```
+Expected: Clean fast-forward merge, both `origin/layout-topbar` and `origin/main` updated on GitHub with clean working tree, triggering Vercel auto-deploy from `main`.
