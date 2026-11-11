@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import secrets
 import time
 import traceback
 import urllib.error
@@ -20,6 +21,7 @@ from catanatron.web.models import (
     StoredRoom,
     _load_avatars_by_username,
     authenticate_user,
+    authorize_seat_caller,
     build_seat_metadata_for_game,
     create_room,
     db,
@@ -29,9 +31,15 @@ from catanatron.web.models import (
     get_match_history,
     get_room_by_game_id,
     get_user_stats,
+    init_presence_metadata,
+    is_multiplayer_game,
     list_active_rooms,
+    load_game_seat_metadata,
     login_with_google_claims,
+    maybe_promote_disconnected_seats,
     pick_bot_names,
+    promote_seat_to_bot,
+    reclaim_seat_from_bot,
     record_completed_match,
     register_user,
     resolve_user_from_token,
@@ -39,6 +47,7 @@ from catanatron.web.models import (
     sanitize_avatar_config,
     serialize_room,
     serialize_user,
+    touch_seat_heartbeat,
     update_user_profile,
     upsert_game_state,
 )
@@ -75,48 +84,63 @@ def _enrich_view_with_seats(game: Game, view: dict) -> dict:
     try:
         seat_meta: dict[str, dict] = {}
         stored_game = db.session.get(StoredGame, game.id)
-        if stored_game and stored_game.seat_metadata_json:
-            parsed = json.loads(stored_game.seat_metadata_json)
-            if isinstance(parsed, dict):
-                seat_meta = parsed
+        if stored_game is not None:
+            seat_meta = load_game_seat_metadata(stored_game)
 
         room = get_room_by_game_id(game.id)
         if room is not None:
             view["room_code"] = room.room_code
-            if not seat_meta:
-                for seat in json.loads(room.seats_json):
-                    c = seat["color"]
-                    is_bot = seat.get("player_key", "HUMAN") != "HUMAN"
-                    uname = seat.get("username") if not is_bot else None
-                    seat_meta[c] = {
-                        "color": c,
-                        "seat_kind": "BOT" if is_bot else ("USER" if uname else "GUEST"),
-                        "username": uname,
-                        "player_key": seat.get("player_key", "HUMAN"),
-                        "display_name": seat.get("player_name")
-                        or COLOR_LABELS_PT.get(c, c),
-                        "avatar_config": seat.get("avatar_config") or {},
-                    }
 
         if seat_meta:
-            usernames = [
-                meta.get("username")
-                for meta in seat_meta.values()
-                if meta.get("seat_kind") == "USER" and meta.get("username")
-            ]
+            usernames = list(
+                {
+                    u
+                    for meta in seat_meta.values()
+                    for u in (meta.get("username"), meta.get("original_username"))
+                    if u
+                }
+            )
             avatars = _load_avatars_by_username(usernames)
             seat_names: dict[str, str] = {}
             seat_avatars: dict[str, dict] = {}
+            taken_over_colors: list[str] = []
+            seat_takeover: dict[str, dict] = {}
             used_bot_names = {
                 meta.get("display_name")
                 for meta in seat_meta.values()
                 if meta.get("seat_kind") == "BOT"
+                and not meta.get("taken_over_by_bot")
                 and meta.get("display_name") in OFFICIAL_BOT_NAMES
             }
             for color, meta in seat_meta.items():
                 seat_kind = meta.get("seat_kind") or "GUEST"
                 uname = meta.get("username") if seat_kind == "USER" else None
-                if seat_kind == "BOT":
+                is_taken_over = bool(meta.get("taken_over_by_bot"))
+                orig_player_key = str(
+                    meta.get("original_player_key") or meta.get("player_key") or "HUMAN"
+                )
+                if is_taken_over:
+                    taken_over_colors.append(color)
+                    orig_name = str(
+                        meta.get("original_display_name")
+                        or COLOR_LABELS_PT.get(color, color)
+                    )
+                    seat_names[color] = str(
+                        meta.get("display_name") or f"{orig_name} (Bot)"
+                    )
+                    orig_kind = str(meta.get("original_seat_kind") or "GUEST")
+                    orig_uname = meta.get("original_username")
+                    if orig_kind == "USER" and orig_uname and orig_uname in avatars:
+                        seat_avatar = avatars[orig_uname]
+                    else:
+                        seat_avatar = filter_unlocked_avatar_config(
+                            meta.get("original_avatar_config")
+                            or meta.get("avatar_config"),
+                            wins=0,
+                        )
+                    seat_kind = "BOT"
+                    uname = None
+                elif seat_kind == "BOT":
                     raw_bot_name = meta.get("display_name")
                     if raw_bot_name in OFFICIAL_BOT_NAMES:
                         bot_name = raw_bot_name
@@ -143,11 +167,38 @@ def _enrich_view_with_seats(game: Game, view: dict) -> dict:
                     "username": uname,
                     "avatar_config": seat_avatar,
                 }
+                if orig_player_key == "HUMAN":
+                    seat_takeover[color] = {
+                        "taken_over": is_taken_over,
+                        "reason": meta.get("takeover_reason"),
+                        "original_username": meta.get("original_username"),
+                        "original_display_name": meta.get("original_display_name"),
+                    }
+
             view["seat_names"] = seat_names
             view["seat_avatars"] = seat_avatars
+            view["taken_over_colors"] = taken_over_colors
+            view["seat_takeover"] = seat_takeover
     except Exception:
         pass
     return view
+
+
+def _parse_seed(raw_seed) -> int:
+    if raw_seed is None:
+        return secrets.randbits(63)
+    if isinstance(raw_seed, bool):
+        abort(400, description="'seed' must be an integer")
+    if isinstance(raw_seed, int):
+        return raw_seed
+    if isinstance(raw_seed, str):
+        stripped = raw_seed.strip()
+        if stripped and (
+            stripped.isdigit()
+            or (stripped[0] in ("+", "-") and stripped[1:].isdigit())
+        ):
+            return int(stripped)
+    abort(400, description="'seed' must be an integer")
 
 
 @bp.route("/players", methods=("GET",))
@@ -158,7 +209,11 @@ def get_players_endpoint():
 
 @bp.route("/games", methods=("POST",))
 def post_game_endpoint():
-    if not request.is_json or request.json is None or "players" not in request.json:
+    if (
+        not request.is_json
+        or not isinstance(request.json, dict)
+        or "players" not in request.json
+    ):
         abort(400, description="Missing or invalid JSON body: 'players' key required")
 
     player_keys = request.json["players"]
@@ -173,11 +228,19 @@ def post_game_endpoint():
         )
 
     discard_limit = request.json.get("discard_limit", 7)
-    if not isinstance(discard_limit, int) or not 5 <= discard_limit <= 20:
+    if (
+        isinstance(discard_limit, bool)
+        or not isinstance(discard_limit, int)
+        or not 5 <= discard_limit <= 20
+    ):
         abort(400, description="'discard_limit' must be an integer between 5 and 20")
 
     vps_to_win = request.json.get("vps_to_win", 10)
-    if not isinstance(vps_to_win, int) or not 3 <= vps_to_win <= 20:
+    if (
+        isinstance(vps_to_win, bool)
+        or not isinstance(vps_to_win, int)
+        or not 3 <= vps_to_win <= 20
+    ):
         abort(400, description="'vps_to_win' must be an integer between 3 and 20")
 
     friendly_robber = request.json.get("friendly_robber", False)
@@ -189,9 +252,11 @@ def post_game_endpoint():
     except SpecError as error:
         abort(400, description=str(error))
     catan_map = build_map(map_template)
+    seed = _parse_seed(request.json.get("seed"))
 
     game = Game(
         players=players,
+        seed=seed,
         discard_limit=discard_limit,
         friendly_robber=friendly_robber,
         vps_to_win=vps_to_win,
@@ -607,6 +672,8 @@ def start_room_endpoint(room_code: str):
         abort(404, description="Sala não encontrada")
 
     body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        body = {}
     token = body.get("token") or request.args.get("token")
 
     if room.game_id:
@@ -622,14 +689,16 @@ def start_room_endpoint(room_code: str):
         abort(400, description=str(error))
 
     catan_map = build_map(config.get("map_template", "BASE"))
+    seed = _parse_seed(body.get("seed"))
     game = Game(
         players=players,
+        seed=seed,
         discard_limit=int(config.get("discard_limit", 7)),
         friendly_robber=bool(config.get("friendly_robber", True)),
         vps_to_win=int(config.get("vps_to_win", 10)),
         catan_map=catan_map,
     )
-    seat_meta = {
+    raw_meta = {
         seat["color"]: {
             "color": seat["color"],
             "seat_kind": (
@@ -644,6 +713,12 @@ def start_room_endpoint(room_code: str):
         }
         for seat in seats
     }
+    seat_tokens = {
+        seat["color"]: seat.get("seat_token")
+        for seat in seats
+        if seat["player_key"] == "HUMAN"
+    }
+    seat_meta = init_presence_metadata(raw_meta, seat_tokens_by_color=seat_tokens)
     upsert_game_state(game, seat_metadata_by_color=seat_meta)
 
     room.game_id = game.id
@@ -653,9 +728,159 @@ def start_room_endpoint(room_code: str):
     return jsonify({"game_id": game.id, "room": serialize_room(room, token)})
 
 
+def _extract_seat_token() -> str | None:
+    hdr = request.headers.get("X-Seat-Token", "").strip()
+    if hdr:
+        return hdr
+    body = request.get_json(silent=True) or {}
+    if isinstance(body, dict):
+        tok = body.get("seat_token") or body.get("token")
+        if tok is not None:
+            clean = str(tok).strip()
+            if clean:
+                return clean
+    q_tok = request.args.get("seat_token")
+    if q_tok is not None:
+        clean = str(q_tok).strip()
+        if clean:
+            return clean
+    return None
+
+
+@bp.route("/games/<string:game_id>/heartbeat", methods=("POST",))
+def game_heartbeat_endpoint(game_id: str):
+    stored = db.session.get(StoredGame, game_id)
+    if stored is None:
+        abort(404, description="Partida não encontrada")
+
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        body = {}
+    preferred_color = body.get("color") or body.get("seat") or request.args.get("as")
+    auth_user = resolve_user_from_token(_extract_auth_token())
+    seat_token = _extract_seat_token()
+    seat_meta = load_game_seat_metadata(stored)
+
+    normalized_preferred = (
+        str(preferred_color).strip().upper()
+        if preferred_color is not None and str(preferred_color).strip()
+        else None
+    )
+    caller_color = authorize_seat_caller(
+        stored,
+        seat_meta,
+        preferred_color=normalized_preferred,
+        auth_user=auth_user,
+        seat_token=seat_token,
+    )
+    if caller_color is not None:
+        touch_seat_heartbeat(game_id, caller_color)
+
+    promoted = maybe_promote_disconnected_seats(game_id)
+    fresh_stored = db.session.get(StoredGame, game_id)
+    fresh_meta = load_game_seat_metadata(fresh_stored) if fresh_stored is not None else {}
+    bot_colors = [
+        c for c, m in fresh_meta.items() if m.get("seat_kind") == "BOT"
+    ]
+    taken_over_colors = [
+        c for c, m in fresh_meta.items() if m.get("taken_over_by_bot")
+    ]
+    target_color = caller_color or normalized_preferred
+    my_seat_taken_over = bool(
+        target_color and fresh_meta.get(target_color, {}).get("taken_over_by_bot")
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "bot_colors": bot_colors,
+            "taken_over_colors": taken_over_colors,
+            "my_seat_taken_over": my_seat_taken_over,
+            "promoted_colors": promoted,
+        }
+    )
+
+
+@bp.route("/games/<string:game_id>/abandon", methods=("POST",))
+def abandon_game_endpoint(game_id: str):
+    stored = db.session.get(StoredGame, game_id)
+    if stored is None:
+        abort(404, description="Partida não encontrada")
+
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        body = {}
+    preferred_color = body.get("color") or body.get("seat") or request.args.get("as")
+    auth_user = resolve_user_from_token(_extract_auth_token())
+    seat_token = _extract_seat_token()
+    seat_meta = load_game_seat_metadata(stored)
+
+    normalized_preferred = (
+        str(preferred_color).strip().upper()
+        if preferred_color is not None and str(preferred_color).strip()
+        else None
+    )
+    caller_color = authorize_seat_caller(
+        stored,
+        seat_meta,
+        preferred_color=normalized_preferred,
+        auth_user=auth_user,
+        seat_token=seat_token,
+    )
+    if caller_color is None:
+        abort(403, description="Sem permissão para abandonar este assento")
+    if not is_multiplayer_game(stored, seat_meta):
+        abort(400, description="Apenas partidas multiplayer permitem abandono para bot")
+
+    promote_seat_to_bot(game_id, caller_color, reason="ABANDONED")
+    game = get_game_state(game_id)
+    view = _enrich_view_with_seats(game, web_view(game, _perspective(game)))
+    return Response(response=json.dumps(view), status=200, mimetype="application/json")
+
+
+@bp.route("/games/<string:game_id>/reclaim", methods=("POST",))
+def reclaim_game_endpoint(game_id: str):
+    stored = db.session.get(StoredGame, game_id)
+    if stored is None:
+        abort(404, description="Partida não encontrada")
+
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        body = {}
+    preferred_color = body.get("color") or body.get("seat") or request.args.get("as")
+    auth_user = resolve_user_from_token(_extract_auth_token())
+    seat_token = _extract_seat_token()
+    seat_meta = load_game_seat_metadata(stored)
+
+    normalized_preferred = (
+        str(preferred_color).strip().upper()
+        if preferred_color is not None and str(preferred_color).strip()
+        else None
+    )
+    caller_color = authorize_seat_caller(
+        stored,
+        seat_meta,
+        preferred_color=normalized_preferred,
+        auth_user=auth_user,
+        seat_token=seat_token,
+    )
+    if caller_color is None:
+        abort(403, description="Sem permissão para retomar este assento")
+
+    if not reclaim_seat_from_bot(game_id, caller_color):
+        abort(400, description="Este assento não está sob controle de bot")
+
+    game = get_game_state(game_id)
+    perspective = _perspective(game) or caller_color
+    view = _enrich_view_with_seats(game, web_view(game, perspective))
+    view["reclaimed_color"] = caller_color
+    return Response(response=json.dumps(view), status=200, mimetype="application/json")
+
+
 @bp.route("/games/<string:game_id>/states/<string:state_index>", methods=("GET",))
 def get_game_endpoint(game_id, state_index):
     parsed_state_index = _parse_state_index(state_index)
+    if parsed_state_index is None:
+        maybe_promote_disconnected_seats(game_id)
     game = get_game_state(game_id, parsed_state_index)
     if game is None:
         abort(404, description="Resource not found")
@@ -670,6 +895,28 @@ def get_game_endpoint(game_id, state_index):
 
 @bp.route("/games/<string:game_id>/actions", methods=["POST"])
 def post_action_endpoint(game_id):
+    parsed_json = request.get_json(silent=True)
+    body_is_empty = (not request.data) or parsed_json is None or parsed_json == {}
+    bot_only = request.args.get("bot_only") == "1"
+
+    if not body_is_empty and isinstance(parsed_json, list) and len(parsed_json) >= 2:
+        stored = db.session.get(StoredGame, game_id)
+        if stored is not None:
+            seat_meta = load_game_seat_metadata(stored)
+            auth_user = resolve_user_from_token(_extract_auth_token())
+            seat_token = _extract_seat_token()
+            action_color = str(parsed_json[0]).strip().upper()
+            verified_color = authorize_seat_caller(
+                stored,
+                seat_meta,
+                preferred_color=action_color,
+                auth_user=auth_user,
+                seat_token=seat_token,
+            )
+            if verified_color:
+                touch_seat_heartbeat(game_id, verified_color)
+
+    maybe_promote_disconnected_seats(game_id)
     game = get_game_state(game_id)
     if game is None:
         abort(404, description="Resource not found")
@@ -682,9 +929,6 @@ def post_action_endpoint(game_id):
             status=200,
             mimetype="application/json",
         )
-
-    body_is_empty = (not request.data) or request.json is None or request.json == {}
-    bot_only = request.args.get("bot_only") == "1"
 
     if bot_only and body_is_empty and not game.state.current_player().is_bot:
         # Another client in a multiplayer room already advanced the bot turn
@@ -699,7 +943,7 @@ def post_action_endpoint(game_id):
         game.play_tick()
         upsert_game_state(game)
     else:
-        action = action_from_json(request.json)
+        action = action_from_json(parsed_json)
         game.execute(action)
         upsert_game_state(game)
 
