@@ -47,6 +47,8 @@ Base = declarative_base(metadata=metadata)
 
 SEAT_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"]
 SESSION_TTL_SECONDS = 90 * 24 * 60 * 60
+TAKEOVER_TIMEOUT_SECONDS = 45
+TAKEOVER_BOT_SPEC = "CATANATRON"
 
 AVATAR_VALID_VALUES: dict[str, tuple[str, ...]] = {
     "skin": ("porcelain", "fair", "warm", "tan", "brown", "deep"),
@@ -329,6 +331,389 @@ def database_session():
         session.close()
 
 
+def init_presence_metadata(
+    seat_meta: dict[str, dict],
+    seat_tokens_by_color: dict[str, str | None] | None = None,
+    now: int | None = None,
+) -> dict[str, dict]:
+    """Attach presence, ownership, and original identity fields per color seat."""
+    ts = int(now if now is not None else time.time())
+    tokens = seat_tokens_by_color or {}
+    enriched: dict[str, dict] = {}
+    for color, raw in seat_meta.items():
+        meta = dict(raw or {})
+        player_key = str(meta.get("player_key") or "HUMAN")
+        seat_kind = str(
+            meta.get("seat_kind")
+            or (
+                "BOT"
+                if player_key != "HUMAN"
+                else ("USER" if meta.get("username") else "GUEST")
+            )
+        )
+        uname = meta.get("username") if seat_kind == "USER" else None
+        dname = str(meta.get("display_name") or COLOR_LABELS_PT.get(color, color))
+        avatar = dict(meta.get("avatar_config") or {})
+        tok = meta.get("seat_token")
+        if not tok and color in tokens:
+            tok = tokens.get(color)
+
+        meta.setdefault("color", color)
+        meta["seat_kind"] = seat_kind
+        meta["username"] = uname
+        meta["player_key"] = player_key
+        meta["display_name"] = dname
+        meta["avatar_config"] = avatar
+        if tok:
+            meta["seat_token"] = str(tok)
+        elif "seat_token" in meta:
+            meta["seat_token"] = None
+
+        meta.setdefault("original_player_key", player_key)
+        meta.setdefault("original_seat_kind", seat_kind)
+        meta.setdefault("original_username", uname)
+        meta.setdefault("original_display_name", dname)
+        meta.setdefault("original_avatar_config", dict(avatar))
+        meta.setdefault("last_seen_at", ts)
+        meta.setdefault("taken_over_by_bot", False)
+        meta.setdefault("takeover_reason", None)
+        enriched[color] = meta
+    return enriched
+
+
+def load_game_seat_metadata(stored_game: StoredGame) -> dict[str, dict]:
+    """Load per-color metadata for a StoredGame, falling back to its StoredRoom if needed."""
+    parsed: dict[str, dict] = {}
+    if stored_game.seat_metadata_json:
+        try:
+            raw = json.loads(stored_game.seat_metadata_json)
+            if isinstance(raw, dict):
+                parsed = raw
+        except Exception:
+            parsed = {}
+
+    seat_tokens_by_color: dict[str, str | None] | None = None
+    if not parsed:
+        room = get_room_by_game_id(stored_game.uuid)
+        if room is not None:
+            try:
+                for seat in json.loads(room.seats_json):
+                    c = seat["color"]
+                    p_key = seat.get("player_key", "HUMAN")
+                    is_bot = p_key != "HUMAN"
+                    uname = seat.get("username") if not is_bot else None
+                    parsed[c] = {
+                        "color": c,
+                        "seat_kind": "BOT" if is_bot else ("USER" if uname else "GUEST"),
+                        "username": uname,
+                        "player_key": p_key,
+                        "display_name": seat.get("player_name")
+                        or COLOR_LABELS_PT.get(c, c),
+                        "avatar_config": seat.get("avatar_config") or {},
+                        "seat_token": seat.get("seat_token"),
+                    }
+            except Exception:
+                parsed = {}
+    elif any(
+        isinstance(m, dict)
+        and str(m.get("original_player_key") or m.get("player_key") or "") == "HUMAN"
+        and not m.get("seat_token")
+        for m in parsed.values()
+    ):
+        room = get_room_by_game_id(stored_game.uuid)
+        if room is not None:
+            try:
+                seat_tokens_by_color = {
+                    seat["color"]: seat.get("seat_token")
+                    for seat in json.loads(room.seats_json)
+                    if seat.get("player_key") == "HUMAN"
+                }
+            except Exception:
+                seat_tokens_by_color = None
+
+    if not parsed:
+        return {}
+    return init_presence_metadata(parsed, seat_tokens_by_color=seat_tokens_by_color)
+
+
+def is_multiplayer_game(stored_game: StoredGame, seat_meta: dict[str, dict]) -> bool:
+    if get_room_by_game_id(stored_game.uuid) is not None:
+        return True
+    orig_human_count = sum(
+        1
+        for meta in seat_meta.values()
+        if str(meta.get("original_player_key") or meta.get("player_key") or "")
+        == "HUMAN"
+    )
+    return orig_human_count >= 2
+
+
+def _seat_matches_caller(
+    meta: dict,
+    auth_user: StoredUser | None,
+    seat_token: str | None,
+    allow_open_local_guest: bool,
+) -> bool:
+    if str(meta.get("original_player_key") or meta.get("player_key") or "") != "HUMAN":
+        return False
+    orig_uname = meta.get("original_username") or meta.get("username")
+    if auth_user is not None and orig_uname and orig_uname == auth_user.username:
+        return True
+    stored_tok = meta.get("seat_token")
+    if (
+        seat_token
+        and stored_tok
+        and hmac.compare_digest(
+            str(stored_tok).encode("utf-8"), str(seat_token).encode("utf-8")
+        )
+    ):
+        return True
+    if allow_open_local_guest and not stored_tok and orig_uname is None:
+        return True
+    return False
+
+
+def authorize_seat_caller(
+    stored_game: StoredGame,
+    seat_meta: dict[str, dict],
+    preferred_color: str | None = None,
+    auth_user: StoredUser | None = None,
+    seat_token: str | None = None,
+) -> str | None:
+    """Resolve which seat color the caller is authorized to manage."""
+    has_room = get_room_by_game_id(stored_game.uuid) is not None
+    any_tokens = any(bool(m.get("seat_token")) for m in seat_meta.values())
+    allow_open_local_guest = (not has_room) and (not any_tokens)
+
+    if preferred_color:
+        col = str(preferred_color).strip().upper()
+        meta = seat_meta.get(col)
+        if meta and _seat_matches_caller(
+            meta, auth_user, seat_token, allow_open_local_guest
+        ):
+            return col
+        return None
+
+    for col, meta in seat_meta.items():
+        if _seat_matches_caller(
+            meta, auth_user, seat_token, allow_open_local_guest=False
+        ):
+            return col
+
+    if allow_open_local_guest:
+        for col, meta in seat_meta.items():
+            if _seat_matches_caller(
+                meta, auth_user, seat_token, allow_open_local_guest=True
+            ):
+                return col
+    return None
+
+
+def _stored_game_is_finished(stored_game: StoredGame) -> bool:
+    if db.session.get(StoredMatch, stored_game.uuid) is not None:
+        return True
+    try:
+        doc = json.loads(stored_game.head_state)
+        vps_to_win = int(doc.get("game", {}).get("vps_to_win", 10))
+        ps = doc.get("player_state", {})
+        colors = doc.get("colors", [])
+        max_vp = max(
+            (
+                int(ps.get(f"P{idx}_ACTUAL_VICTORY_POINTS", 0))
+                for idx in range(len(colors))
+            ),
+            default=0,
+        )
+        if max_vp < vps_to_win:
+            return False
+        game = get_game_state(stored_game.uuid)
+        return game is not None and game.winning_color() is not None
+    except Exception:
+        return False
+
+
+def _apply_takeover_to_seat(meta: dict, reason: str, now: int) -> None:
+    orig_name = str(
+        meta.get("original_display_name")
+        or meta.get("display_name")
+        or COLOR_LABELS_PT.get(meta.get("color", ""), "Jogador")
+    )
+    if orig_name.endswith(" (Bot)"):
+        orig_name = orig_name[:-6]
+    orig_avatar = dict(
+        meta.get("original_avatar_config") or meta.get("avatar_config") or {}
+    )
+    meta["original_player_key"] = (
+        meta.get("original_player_key") or meta.get("player_key") or "HUMAN"
+    )
+    meta["original_seat_kind"] = (
+        meta.get("original_seat_kind") or meta.get("seat_kind") or "GUEST"
+    )
+    if "original_username" not in meta:
+        meta["original_username"] = meta.get("username")
+    meta["original_display_name"] = orig_name
+    meta["original_avatar_config"] = orig_avatar
+    meta["taken_over_by_bot"] = True
+    meta["takeover_reason"] = reason
+    meta["player_key"] = TAKEOVER_BOT_SPEC
+    meta["seat_kind"] = "BOT"
+    meta["username"] = None
+    meta["display_name"] = f"{orig_name[:42]} (Bot)"
+    meta["avatar_config"] = orig_avatar
+    meta.setdefault("last_seen_at", now)
+
+
+def touch_seat_heartbeat(
+    game_id: str, color: str, now: int | None = None
+) -> bool:
+    stored = db.session.get(StoredGame, game_id)
+    if stored is None:
+        return False
+    seat_meta = load_game_seat_metadata(stored)
+    col = str(color).strip().upper()
+    meta = seat_meta.get(col)
+    if not meta:
+        return False
+    if meta.get("taken_over_by_bot"):
+        return False
+    if str(meta.get("original_player_key") or meta.get("player_key") or "") != "HUMAN":
+        return False
+    ts = int(now if now is not None else time.time())
+    meta["last_seen_at"] = ts
+    stored.seat_metadata_json = json.dumps(seat_meta)
+    db.session.commit()
+    return True
+
+
+def promote_seat_to_bot(
+    game_id: str,
+    color: str,
+    reason: str = "DISCONNECTED",
+    now: int | None = None,
+) -> bool:
+    stored = db.session.get(StoredGame, game_id)
+    if stored is None or _stored_game_is_finished(stored):
+        return False
+    seat_meta = load_game_seat_metadata(stored)
+    col = str(color).strip().upper()
+    meta = seat_meta.get(col)
+    if not meta:
+        return False
+    if str(meta.get("original_player_key") or meta.get("player_key") or "") != "HUMAN":
+        return False
+    if meta.get("taken_over_by_bot"):
+        return False
+
+    doc = json.loads(stored.head_state)
+    colors = doc.get("colors", [])
+    if col not in colors:
+        return False
+    idx = colors.index(col)
+    specs = json.loads(stored.player_specs)
+    specs[idx] = TAKEOVER_BOT_SPEC
+
+    ts = int(now if now is not None else time.time())
+    _apply_takeover_to_seat(meta, reason=reason, now=ts)
+
+    stored.player_specs = json.dumps(specs)
+    stored.seat_metadata_json = json.dumps(seat_meta)
+    db.session.commit()
+    return True
+
+
+def reclaim_seat_from_bot(
+    game_id: str, color: str, now: int | None = None
+) -> bool:
+    stored = db.session.get(StoredGame, game_id)
+    if stored is None or _stored_game_is_finished(stored):
+        return False
+    seat_meta = load_game_seat_metadata(stored)
+    col = str(color).strip().upper()
+    meta = seat_meta.get(col)
+    if not meta or not meta.get("taken_over_by_bot"):
+        return False
+
+    doc = json.loads(stored.head_state)
+    colors = doc.get("colors", [])
+    if col not in colors:
+        return False
+    idx = colors.index(col)
+    specs = json.loads(stored.player_specs)
+    orig_key = str(meta.get("original_player_key") or "HUMAN")
+    specs[idx] = orig_key
+
+    ts = int(now if now is not None else time.time())
+    meta["taken_over_by_bot"] = False
+    meta["takeover_reason"] = None
+    meta["player_key"] = orig_key
+    meta["seat_kind"] = str(meta.get("original_seat_kind") or "GUEST")
+    meta["username"] = (
+        meta.get("original_username") if meta["seat_kind"] == "USER" else None
+    )
+    meta["display_name"] = str(
+        meta.get("original_display_name") or COLOR_LABELS_PT.get(col, col)
+    )
+    meta["avatar_config"] = dict(meta.get("original_avatar_config") or {})
+    meta["last_seen_at"] = ts
+
+    stored.player_specs = json.dumps(specs)
+    stored.seat_metadata_json = json.dumps(seat_meta)
+    db.session.commit()
+    return True
+
+
+def maybe_promote_disconnected_seats(
+    game_id: str,
+    now: int | None = None,
+    timeout_seconds: int = TAKEOVER_TIMEOUT_SECONDS,
+) -> list[str]:
+    """Lazily promote timed-out multiplayer seats only when >= 1 live human remains online."""
+    stored = db.session.get(StoredGame, game_id)
+    if stored is None or _stored_game_is_finished(stored):
+        return []
+    seat_meta = load_game_seat_metadata(stored)
+    if not seat_meta or not is_multiplayer_game(stored, seat_meta):
+        return []
+
+    ts = int(now if now is not None else time.time())
+    active_humans = [
+        c
+        for c, m in seat_meta.items()
+        if str(m.get("original_player_key") or m.get("player_key") or "") == "HUMAN"
+        and not m.get("taken_over_by_bot")
+    ]
+    live_humans = [
+        c
+        for c in active_humans
+        if (ts - int(seat_meta[c].get("last_seen_at") or ts)) < timeout_seconds
+    ]
+    stale_humans = [
+        c
+        for c in active_humans
+        if (ts - int(seat_meta[c].get("last_seen_at") or ts)) >= timeout_seconds
+    ]
+    if not live_humans or not stale_humans:
+        return []
+
+    doc = json.loads(stored.head_state)
+    colors = doc.get("colors", [])
+    specs = json.loads(stored.player_specs)
+    promoted: list[str] = []
+    for col in stale_humans:
+        if col not in colors:
+            continue
+        idx = colors.index(col)
+        specs[idx] = TAKEOVER_BOT_SPEC
+        _apply_takeover_to_seat(seat_meta[col], reason="DISCONNECTED", now=ts)
+        promoted.append(col)
+
+    if promoted:
+        stored.player_specs = json.dumps(specs)
+        stored.seat_metadata_json = json.dumps(seat_meta)
+        db.session.commit()
+    return promoted
+
+
 def upsert_game_state(
     game: Game, session_param=None, seat_metadata_by_color: dict | None = None
 ):
@@ -350,7 +735,7 @@ def upsert_game_state(
             head_index=head,
             head_state=document,
             seat_metadata_json=(
-                json.dumps(seat_metadata_by_color)
+                json.dumps(init_presence_metadata(seat_metadata_by_color))
                 if seat_metadata_by_color is not None
                 else None
             ),
@@ -921,6 +1306,7 @@ def record_completed_match(game: Game, session_param=None) -> StoredMatch | None
         meta.get("display_name")
         for meta in seat_meta.values()
         if meta.get("seat_kind") == "BOT"
+        and not meta.get("taken_over_by_bot")
         and meta.get("display_name") in OFFICIAL_BOT_NAMES
     }
     winner_name = COLOR_LABELS_PT.get(win_color_str, win_color_str)
@@ -931,12 +1317,18 @@ def record_completed_match(game: Game, session_param=None) -> StoredMatch | None
     for player in game.state.players:
         c = player.color.value
         meta = seat_meta.get(c, {})
+        is_taken_over = bool(meta.get("taken_over_by_bot"))
+        is_bot_seat = bool(player.is_bot or is_taken_over)
         key = (
             meta.get("player_key")
             or getattr(player, "registry_key", None)
-            or ("HUMAN" if not player.is_bot else "BOT")
+            or ("HUMAN" if not is_bot_seat else "BOT")
         )
-        seat_kind = meta.get("seat_kind") or ("BOT" if player.is_bot else "GUEST")
+        seat_kind = (
+            "BOT"
+            if is_taken_over
+            else (meta.get("seat_kind") or ("BOT" if is_bot_seat else "GUEST"))
+        )
         uname = meta.get("username") if seat_kind == "USER" else None
         if uname and uname in seen_usernames:
             # Garante no máximo uma atribuição por usuário na mesma partida
@@ -944,16 +1336,24 @@ def record_completed_match(game: Game, session_param=None) -> StoredMatch | None
             seat_kind = "GUEST"
         if uname:
             seen_usernames.add(uname)
-        if not player.is_bot:
+        if not is_bot_seat:
             human_count += 1
 
-        if player.is_bot:
-            candidate_name = meta.get("display_name")
-            if candidate_name in OFFICIAL_BOT_NAMES:
-                dname = candidate_name
+        if is_bot_seat:
+            if is_taken_over:
+                orig_label = str(
+                    meta.get("original_display_name") or COLOR_LABELS_PT.get(c, c)
+                )
+                if orig_label.endswith(" (Bot)"):
+                    orig_label = orig_label[:-6]
+                dname = str(meta.get("display_name") or f"{orig_label[:42]} (Bot)")
             else:
-                dname = pick_bot_names(1, exclude=used_bot_names)[0]
-                used_bot_names.add(dname)
+                candidate_name = meta.get("display_name")
+                if candidate_name in OFFICIAL_BOT_NAMES:
+                    dname = candidate_name
+                else:
+                    dname = pick_bot_names(1, exclude=used_bot_names)[0]
+                    used_bot_names.add(dname)
         else:
             dname = meta.get("display_name") or "Explorador da Ilha"
         vps = int(get_actual_victory_points(game.state, player.color))
@@ -961,7 +1361,7 @@ def record_completed_match(game: Game, session_param=None) -> StoredMatch | None
         if is_win:
             winner_name = dname
             winner_username = uname
-            winner_is_bot = bool(player.is_bot)
+            winner_is_bot = bool(is_bot_seat)
 
         participants_rows.append(
             StoredMatchParticipant(
@@ -976,7 +1376,17 @@ def record_completed_match(game: Game, session_param=None) -> StoredMatch | None
             )
         )
 
-    mode = "MULTIPLAYER" if (room is not None or human_count >= 2) else "SOLO"
+    orig_human_count = sum(
+        1
+        for meta in seat_meta.values()
+        if str(meta.get("original_player_key") or meta.get("player_key") or "")
+        == "HUMAN"
+    )
+    mode = (
+        "MULTIPLAYER"
+        if (room is not None or max(human_count, orig_human_count) >= 2)
+        else "SOLO"
+    )
     map_template = _detect_map_template(game)
     if room is not None:
         try:
