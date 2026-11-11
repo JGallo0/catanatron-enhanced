@@ -28,8 +28,12 @@ Este documento consolida **todo o histórico, arquitetura, decisões de design e
   - [`Tile.tsx`](ui/src/pages/Tile.tsx) & [`Tile.scss`](ui/src/pages/Tile.scss): Renderização dos hexágonos com costa de areia dourada, fichas numéricas com pontos de probabilidade (`•` a `•••••`) e portos marítimos (`3:1` e `2:1`).
   - [`Node.tsx`](ui/src/pages/Node.tsx) & [`Edge.tsx`](ui/src/pages/Edge.tsx): Vértices (Aldeias/Cidades) e Arestas (Estradas) com indicadores pulsantes de construção.
 - **HUD, Jogadores, Cartas e Modais (`ui/src/components/` & `ui/src/pages/`):**
-  - [`PlayerStateBox.tsx`](ui/src/components/PlayerStateBox.tsx) & [`PlayerStateBox.scss`](ui/src/components/PlayerStateBox.scss): Card de cada jogador na barra esquerda exibindo nome, badge `HUMANO`/`BOT`, Pontos de Vitória (`PV`), cartas na mão, **inventário visual de peças construídas (`🏠 Aldeias X/5`, `🏰 Cidades X/4`, `🛤️ Estradas X/15`)** com miniaturas 3D coloridas, Cavaleiros e Maior Estrada.
-  - [`ResourceCards.tsx`](ui/src/components/ResourceCards.tsx): Renderiza tanto a versão compacta (nos cards laterais) quanto o **baralho completo ilustrado (`showEmptySlots={true}`)** na doca inferior do jogador, mostrando sempre os 5 tipos de recurso (`Madeira`, `Argila`, `Lã`, `Trigo`, `Minério`) e as Cartas de Desenvolvimento.
+  - **[`PlayerTopBar.tsx`](ui/src/components/PlayerTopBar.tsx) & [`PlayerTopBar.scss`](ui/src/components/PlayerTopBar.scss):** Barra superior de jogadores inspirada fielmente no **Catan Universe (Steam)**. Exibe cards horizontais para cada jogador:
+    - **Lado Esquerdo:** Retrato/avatar estilizado e nome sobre fundo na cor do jogador, com badge animado de turno `↻` embutido sem sobreposição de texto.
+    - **Lado Direito (Grid 2×3 em ardósia escura):** Estatísticas com ícones vetoriais nítidos para Cavaleiros `🗡️`, Sequência de Estrada `〰️`, Cartas de Recurso `🂠` (com alerta pulsante se > 7 cartas), Cartas de Desenvolvimento `🎴` e Pontos de Vitória `🏆` em fonte grande colorida.
+    - **Destaque Ativo:** Borda de `2.5px` e brilho luminoso na cor do jogador ativo.
+  - **[`LeftDrawer.tsx`](ui/src/components/LeftDrawer.tsx):** Gaveta lateral recolhível (acionada pelo botão `📜 Histórico` no topo) contendo o histórico detalhado de jogadas em `pt-BR`, meta de PV, turno atual e alternador de perspectiva (`Espectador` / `Visão do Assento`).
+  - [`ResourceCards.tsx`](ui/src/components/ResourceCards.tsx): Renderiza tanto a versão compacta quanto o **baralho completo ilustrado (`showEmptySlots={true}`)** na doca inferior do jogador, mostrando sempre os 5 tipos de recurso (`Madeira`, `Argila`, `Lã`, `Trigo`, `Minério`) e as Cartas de Desenvolvimento.
   - [`ActionsToolbar.tsx`](ui/src/pages/ActionsToolbar.tsx) & [`ActionsToolbar.scss`](ui/src/pages/ActionsToolbar.scss): Doca inferior com dados 2D6, mão de cartas ilustradas e botões de ação (`Custos`, `Usar Carta`, `Construir`, `Trocar`, `Rolar Dados` / `Passar Vez`).
   - [`TradeModal.tsx`](ui/src/components/TradeModal.tsx): Bancada visual de Troca Marítima e Portos (`4:1`, `3:1`, `2:1`).
   - [`RobberVictimModal.tsx`](ui/src/components/RobberVictimModal.tsx): Modal para escolher de qual jogador roubar ao mover o Ladrão.
@@ -120,9 +124,30 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
 21. **`longest_road.webp` (ou `longest_road.png`) — Medalha Maior Estrada (`512×512`)**
 22. **`lobby_hero.webp` (ou `lobby_hero.png`) — Banner de Fundo da Tela Inicial (`1920×1080`)**
 
+### E. Avatares de Jogadores (`ui/public/assets/illustrations/avatars/`) — `1:1` (`256×256 px`)
+23. **`red.webp` — Paul (Vermelho):**
+    `Bust portrait of Paul, rugged Norse Viking settler with reddish-brown beard and hair, fur collar tunic, facing camera, solid red background, Catan Universe Steam style`
+24. **`orange.webp` — Max (Laranja):**
+    `Bust portrait of Max, medieval knight with dark trimmed beard wearing polished steel plate armor and helmet, warm amber golden background, Catan Universe Steam style`
+25. **`white.webp` — Mia (Branco):**
+    `Bust portrait of Mia, cute fluffy alpaca settler, emerald forest green background, Catan Universe Steam style`
+26. **`blue.webp` — Sarah (Azul):**
+    `Bust portrait of Sarah, adventurous female sea captain wearing navy tricorn hat and colonial coat, solid royal blue background, Catan Universe Steam style`
+
 ---
 
-## 5. Próximos Passos Planejados (Para Continuar do PC de Casa)
-1. **Integrar as ilustrações geradas no Nano Banana Pro** em `ui/public/assets/illustrations/` e ajustar enquadramento/contraste se necessário.
-2. **Persistência Multiplayer Online Completa (Banco Externo na Vercel):** Conectar uma instância gratuita do **Neon Postgres** ou **Supabase** na variável `DATABASE_URL` do painel da Vercel para que salas compartilhadas entre diferentes computadores persistam no banco SQL em nuvem (além do `localEngine` e da memória do container Python).
-3. **Efeitos Sonoros e Animações Extras:** Sons opcionais de dados rolando, construção de aldeia/estrada e recebimento de cartas.
+## 5. Histórico Recente de Entregas e Próximos Passos
+
+### Concluído Recentemente:
+- **Barra Superior Catan Universe (`PlayerTopBar.tsx`):**
+  - Grid de estatísticas 2×3 limpo com ícones vetoriais nítidos (Cavaleiros `🗡️`, Maior Estrada `〰️`, Recursos `🂠`, Cartas de Dev `🎴`, Pontos de Vitória `🏆`).
+  - Avatares oficiais integrados em `ui/public/assets/illustrations/avatars/{red,orange,white,blue}.webp`.
+  - Remoção da coluna lateral fixa de 300px; tabuleiro centralizado e com aproveitamento total da tela.
+  - Histórico de jogadas convertido em gaveta recolhível (`LeftDrawer.tsx`) com acionamento pelo botão `📜 Histórico`.
+  - Mesa de jogo com textura de madeira nobre quente e iluminação radial suave em `GameScreen.scss`.
+- **Correção de bots travando no meio do jogo:** Histórico completo de estados desacoplado de gravações síncronas pesadas no `localStorage`, evitando erro de estouro de cota e congelamento de IA.
+
+### Próximos Passos:
+1. **Doca Inferior Catan Universe:** Alinhar a barra de ações e recursos da base da tela para formato idêntico ao console da Steam (recursos em linha central e botão dourado circular de rolar/passar).
+2. **Persistência Multiplayer Online Completa (Banco Externo na Vercel):** Conectar uma instância gratuita do **Neon Postgres** ou **Supabase** na variável `DATABASE_URL` do painel da Vercel para que salas compartilhadas entre diferentes computadores persistam no banco SQL em nuvem.
+3. **Efeitos Sonoros:** Adicionar áudio opcional para rolagem de dados 2D6, colocação de peças e término de turno.
