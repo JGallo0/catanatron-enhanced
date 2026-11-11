@@ -325,6 +325,24 @@
     color: #fde047;
     line-height: 1;
   }
+
+  &.is-rolling {
+    border-color: #facc15;
+    box-shadow: 0 0 14px rgba(250, 204, 21, 0.45);
+
+    .dice-widget-pill__faces svg {
+      animation: dice-pill-wobble 0.22s ease-in-out infinite alternate;
+    }
+  }
+}
+
+@keyframes dice-pill-wobble {
+  from {
+    transform: rotate(-12deg) scale(1.05);
+  }
+  to {
+    transform: rotate(12deg) scale(0.95);
+  }
 }
 
 .cu-cta-orb {

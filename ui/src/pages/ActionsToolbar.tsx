@@ -85,9 +85,11 @@ function getLatestRollPair(gameState: GameState): [number, number] | null {
 export default function ActionsToolbar({
   isBotThinking,
   replayMode,
+  isRollingDice = false,
 }: {
   isBotThinking: boolean;
   replayMode: boolean;
+  isRollingDice?: boolean;
 }) {
   const { gameId } = useParams();
   const { state, dispatch } = useContext(store);
@@ -98,7 +100,18 @@ export default function ActionsToolbar({
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [tradeDecisionMinimized, setTradeDecisionMinimized] = useState(false);
   const [costsModalOpen, setCostsModalOpen] = useState(false);
+  const [pillSpinFaces, setPillSpinFaces] = useState<[number, number]>([1, 6]);
   const { isSubmitting, submitDiscardBatch } = useDiscardBatchSubmission();
+
+  useEffect(() => {
+    if (!isRollingDice) return;
+    let step = 0;
+    const iv = setInterval(() => {
+      step += 1;
+      setPillSpinFaces([((step * 3) % 6) + 1, ((step * 5 + 2) % 6) + 1]);
+    }, 90);
+    return () => clearInterval(iv);
+  }, [isRollingDice]);
 
   const {
     gameState,
@@ -610,26 +623,38 @@ export default function ActionsToolbar({
 
         {/* RIGHT ZONE: 2D6 Dice + Circular Golden CTA Orb */}
         <div className="cu-console__cta-zone">
-          {latestDice && (
-            <div
-              className="dice-widget-pill"
-              title={`Última rolagem: ${latestDice[0]} + ${latestDice[1]} = ${diceSum}`}
-            >
-              <div className="dice-widget-pill__faces">
-                <DiceFaceSvg
-                  value={latestDice[0]}
-                  size={26}
-                  isHot={diceSum === 6 || diceSum === 8}
-                />
-                <DiceFaceSvg
-                  value={latestDice[1]}
-                  size={26}
-                  isHot={diceSum === 6 || diceSum === 8}
-                />
+          {(isRollingDice || latestDice) && (() => {
+            const shownPillDice = isRollingDice ? pillSpinFaces : latestDice!;
+            const isHotDice = !isRollingDice && (diceSum === 6 || diceSum === 8);
+            return (
+              <div
+                className={cn("dice-widget-pill", {
+                  "is-rolling": isRollingDice,
+                })}
+                title={
+                  isRollingDice
+                    ? "Rolando dados..."
+                    : `Última rolagem: ${latestDice![0]} + ${latestDice![1]} = ${diceSum}`
+                }
+              >
+                <div className="dice-widget-pill__faces">
+                  <DiceFaceSvg
+                    value={shownPillDice[0]}
+                    size={26}
+                    isHot={isHotDice}
+                  />
+                  <DiceFaceSvg
+                    value={shownPillDice[1]}
+                    size={26}
+                    isHot={isHotDice}
+                  />
+                </div>
+                <span className="dice-widget-pill__sum">
+                  {isRollingDice ? "..." : `Σ ${diceSum}`}
+                </span>
               </div>
-              <span className="dice-widget-pill__sum">Σ {diceSum}</span>
-            </div>
-          )}
+            );
+          })()}
 
           {isInteractiveTurn && (
             <button
