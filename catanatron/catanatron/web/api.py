@@ -1,6 +1,11 @@
 import json
 import logging
+import os
+import time
 import traceback
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 
 from flask import Response, Blueprint, jsonify, abort, request
@@ -8,13 +13,20 @@ from flask import Response, Blueprint, jsonify, abort, request
 from catanatron.web.models import (
     SEAT_COLORS,
     StoredRoom,
+    authenticate_user,
     create_room,
     db,
     get_game_state,
     get_room_by_game_id,
+    get_user_stats,
     list_active_rooms,
-    login_or_register_user,
+    login_with_google_claims,
+    register_user,
+    resolve_user_from_token,
+    revoke_session_token,
     serialize_room,
+    serialize_user,
+    update_user_profile,
     upsert_game_state,
 )
 from catanatron.serialization import action_from_json, web_view
@@ -98,26 +110,127 @@ def post_game_endpoint():
 
 
 # ===== Player Accounts & Online Rooms =====
+def _extract_auth_token() -> str | None:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        tok = auth_header[7:].strip()
+        if tok:
+            return tok
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        body = {}
+    tok = body.get("auth_token") or body.get("token") or request.args.get("token")
+    return str(tok).strip() if tok else None
+
+
+def _verify_google_id_token(credential: str, expected_client_id: str) -> dict:
+    if not credential or len(credential) < 20:
+        raise ValueError("Credencial Google ausente")
+    url = "https://oauth2.googleapis.com/tokeninfo?" + urllib.parse.urlencode(
+        {"id_token": credential}
+    )
+    req = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            claims = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise ValueError("Falha ao validar token Google") from exc
+
+    if claims.get("aud") != expected_client_id:
+        raise ValueError("Client ID inválido")
+    if claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        raise ValueError("Emissor Google inválido")
+    verified = (
+        str(claims.get("email_verified", "")).lower() == "true"
+        or claims.get("email_verified") is True
+    )
+    if not verified:
+        raise ValueError("Conta Google sem e-mail verificado")
+    exp = int(claims.get("exp") or 0)
+    if exp <= int(time.time()):
+        raise ValueError("Token Google expirado")
+    return claims
+
+
+@bp.route("/auth/config", methods=("GET",))
+def get_auth_config_endpoint():
+    client_id = (os.environ.get("GOOGLE_CLIENT_ID") or "").strip() or None
+    return jsonify({"google_enabled": bool(client_id), "google_client_id": client_id})
+
+
+@bp.route("/auth/register", methods=("POST",))
+def post_auth_register_endpoint():
+    body = request.get_json(silent=True) or {}
+    username = str(body.get("username") or "").strip()
+    password = str(body.get("password") or body.get("pin") or "")
+    display_name = body.get("display_name")
+
+    user, sess = register_user(
+        username=username,
+        password=password,
+        display_name=str(display_name).strip() if display_name else None,
+    )
+    payload = serialize_user(user)
+    payload.update({"auth_token": sess.token, "is_new": True})
+    return jsonify(payload)
+
+
 @bp.route("/auth/login", methods=("POST",))
 def post_auth_login_endpoint():
     body = request.get_json(silent=True) or {}
     username = str(body.get("username") or "").strip()
-    pin = str(body.get("pin") or "").strip()
-    display_name = body.get("display_name")
+    password = str(body.get("password") or body.get("pin") or "")
 
-    user, is_new = login_or_register_user(
-        username=username,
-        pin=pin,
-        display_name=str(display_name).strip() if display_name else None,
+    user, sess = authenticate_user(username=username, password=password)
+    payload = serialize_user(user, get_user_stats(user.username))
+    payload.update({"auth_token": sess.token, "is_new": False})
+    return jsonify(payload)
+
+
+@bp.route("/auth/google", methods=("POST",))
+def post_auth_google_endpoint():
+    client_id = (os.environ.get("GOOGLE_CLIENT_ID") or "").strip()
+    if not client_id:
+        abort(503, description="Login com Google não configurado no servidor")
+    body = request.get_json(silent=True) or {}
+    credential = str(body.get("credential") or "").strip()
+    try:
+        claims = _verify_google_id_token(credential, client_id)
+    except ValueError as err:
+        abort(401, description=str(err))
+
+    user, sess, is_new = login_with_google_claims(claims)
+    payload = serialize_user(user, get_user_stats(user.username))
+    payload.update({"auth_token": sess.token, "is_new": is_new})
+    return jsonify(payload)
+
+
+@bp.route("/auth/me", methods=("GET",))
+def get_auth_me_endpoint():
+    user = resolve_user_from_token(_extract_auth_token())
+    if user is None:
+        abort(401, description="Sessão inválida ou expirada")
+    return jsonify(serialize_user(user, get_user_stats(user.username)))
+
+
+@bp.route("/auth/logout", methods=("POST",))
+def post_auth_logout_endpoint():
+    revoke_session_token(_extract_auth_token())
+    return jsonify({"success": True})
+
+
+@bp.route("/auth/profile", methods=("PATCH",))
+def patch_auth_profile_endpoint():
+    user = resolve_user_from_token(_extract_auth_token())
+    if user is None:
+        abort(401, description="Autenticação necessária")
+    body = request.get_json(silent=True) or {}
+    update_user_profile(
+        user,
+        display_name=body.get("display_name"),
+        avatar_config=body.get("avatar_config"),
     )
-    return jsonify(
-        {
-            "username": user.username,
-            "display_name": user.display_name,
-            "auth_token": user.auth_token,
-            "is_new": is_new,
-        }
-    )
+    return jsonify(serialize_user(user, get_user_stats(user.username)))
 
 
 @bp.route("/rooms", methods=("GET",))

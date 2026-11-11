@@ -261,47 +261,6 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
     }
 
 
-def _hash_pin(username: str, pin: str) -> str:
-    payload = f"catanatron:{username.lower().strip()}:{pin.strip()}".encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
-
-
-def login_or_register_user(
-    username: str, pin: str, display_name: str | None = None
-) -> tuple[StoredUser, bool]:
-    """Authenticate an existing account or create a new one on first login."""
-    session = db.session
-    clean_user = "".join(
-        ch for ch in username.lower().strip() if ch.isalnum() or ch in ("_", "-")
-    )[:24]
-    if len(clean_user) < 2:
-        abort(400, description="O usuário deve ter pelo menos 2 caracteres alfanuméricos")
-    if len(pin.strip()) < 3:
-        abort(400, description="A senha/PIN deve ter pelo menos 3 caracteres")
-
-    expected_hash = _hash_pin(clean_user, pin)
-    user = session.get(StoredUser, clean_user)
-    if user is None:
-        user = StoredUser(
-            username=clean_user,
-            display_name=(display_name or username).strip()[:32] or clean_user,
-            pin_hash=expected_hash,
-            auth_token=uuid.uuid4().hex,
-        )
-        session.add(user)
-        session.commit()
-        return user, True
-
-    if user.pin_hash != expected_hash:
-        abort(401, description="Senha/PIN incorreto para esta conta")
-
-    if display_name and display_name.strip():
-        user.display_name = display_name.strip()[:32]
-        session.commit()
-
-    return user, False
-
-
 def ensure_schema_columns(engine) -> None:
     """Idempotently add new columns when upgrading an existing SQLite/Postgres DB."""
     inspector = inspect(engine)
@@ -504,6 +463,67 @@ def update_user_profile(
         user.avatar_json = json.dumps(avatar_config)
     session.commit()
     return user
+
+
+def _unique_username_candidate(base_hint: str, session) -> str:
+    base = _normalize_username(base_hint)
+    if len(base) < 2:
+        base = "jogador"
+    candidate = base[:24]
+    suffix = 1
+    while session.get(StoredUser, candidate) is not None:
+        tail = str(suffix)
+        candidate = f"{base[: max(2, 24 - len(tail))]}{tail}"
+        suffix += 1
+    return candidate
+
+
+def login_with_google_claims(claims: dict) -> tuple[StoredUser, StoredSession, bool]:
+    session = db.session
+    google_sub = str(claims.get("sub") or "").strip()[:64]
+    email = str(claims.get("email") or "").strip().lower()[:255] or None
+    display = str(
+        claims.get("name") or (email.split("@")[0] if email else "Jogador")
+    ).strip()[:32]
+
+    if not google_sub:
+        abort(401, description="Token Google inválido (sub ausente)")
+
+    user = session.query(StoredUser).filter_by(google_sub=google_sub).first()
+    if user is not None:
+        if email and not user.email:
+            user.email = email
+            session.commit()
+        sess = create_user_session(user.username, session)
+        return user, sess, False
+
+    hint = email.split("@")[0] if email else display
+    username = _unique_username_candidate(hint, session)
+    user = StoredUser(
+        username=username,
+        display_name=display or username,
+        password_hash=None,
+        # "" (não None): bancos migrados de versões antigas têm pin_hash NOT NULL
+        pin_hash="",
+        google_sub=google_sub,
+        email=email,
+        avatar_json="{}",
+        auth_token=secrets.token_hex(16),
+        created_at=int(time.time()),
+    )
+    session.add(user)
+    session.commit()
+    sess = create_user_session(username, session)
+    return user, sess, True
+
+
+def get_user_stats(username: str) -> dict:
+    return {
+        "wins": 0,
+        "losses": 0,
+        "games_played": 0,
+        "win_rate": 0.0,
+    }
 
 
 def create_room(
