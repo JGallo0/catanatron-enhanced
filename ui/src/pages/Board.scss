@@ -152,6 +152,34 @@
   }
 }
 
+.node--recent {
+  z-index: 15;
+  .building-piece {
+    filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.95));
+    animation: recent-piece-flash 0.55s ease-in-out 3;
+  }
+}
+
+.edge--recent {
+  z-index: 14;
+  .road {
+    box-shadow:
+      0 0 0 2px #fef08a,
+      0 0 16px rgba(250, 204, 21, 0.95) !important;
+    animation: recent-piece-flash 0.55s ease-in-out 3;
+  }
+}
+
+@keyframes recent-piece-flash {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.22);
+  }
+}
+
 // ===== Buildable Action Pulse Indicator (Catan Universe Target Ring)
 .pulse {
   cursor: pointer;

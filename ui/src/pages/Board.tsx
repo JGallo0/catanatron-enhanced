@@ -61,6 +61,8 @@ type BoardProps = {
   show: boolean;
   isMovingRobber: boolean;
   robberCoordinates?: Set<string>;
+  recentNodeId?: number | null;
+  recentEdgeId?: string | null;
 };
 
 export default function Board({
@@ -77,6 +79,8 @@ export default function Board({
   show,
   isMovingRobber,
   robberCoordinates,
+  recentNodeId = null,
+  recentEdgeId = null,
 }: BoardProps) {
   // Exact available viewport after accounting for HUD, PlayerTopBar and bottom console
   const leftSidebarWidth = 0;
@@ -137,6 +141,7 @@ export default function Board({
         building={building}
         color={color}
         flashing={!replayMode && !!nodeActions && id in nodeActions}
+        isRecent={recentNodeId === id}
         onClick={buildOnNodeClick(
           id,
           nodeActions ? nodeActions[id] : undefined
@@ -150,6 +155,10 @@ export default function Board({
       const action =
         edgeActions?.[toEdgeId(id)] ??
         edgeActions?.[`${id[1]},${id[0]}` as EdgeId];
+      const normalizedEdgeId = `${Math.min(id[0], id[1])},${Math.max(
+        id[0],
+        id[1]
+      )}`;
       return (
         <Edge
           id={`${id[0]},${id[1]}`}
@@ -160,6 +169,7 @@ export default function Board({
           direction={direction}
           color={color}
           flashing={!!action}
+          isRecent={recentEdgeId === normalizedEdgeId}
           onClick={buildOnEdgeClick(id, action)}
         />
       );

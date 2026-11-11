@@ -87,4 +87,85 @@ describe("PlayerTopBar", () => {
     expect(screen.getByText("1/4")).toBeInTheDocument();
     expect(screen.getByText("6/15")).toBeInTheDocument();
   });
+
+  test("renders taken-over seat with '<Nome> (Bot)', 'Bot assumiu' indicator, original custom avatar instead of Creitu, and 'Substituto IA' inspector tag", () => {
+    const state = makeGameState({
+      colors: ["RED", "BLUE"],
+      bot_colors: ["RED", "BLUE"],
+      taken_over_colors: ["BLUE"],
+      seat_names: { RED: "Felire", BLUE: "João (Bot)" },
+      seat_avatars: {
+        RED: { seat_kind: "BOT", username: null, avatar_config: {} },
+        BLUE: {
+          seat_kind: "BOT",
+          username: null,
+          avatar_config: {
+            hat: "captain",
+            background: "ocean",
+            frame: "gold",
+          },
+        },
+      },
+      seat_takeover: {
+        BLUE: {
+          taken_over: true,
+          reason: "ABANDONED",
+          original_username: "joao",
+          original_display_name: "João",
+        },
+      },
+    });
+
+    const { container } = render(
+      <StateProvider>
+        <PlayerTopBar gameState={state} recentDevColor="BLUE" />
+      </StateProvider>
+    );
+
+    expect(screen.getByText("João (Bot)")).toBeInTheDocument();
+    expect(screen.getByText(/Bot assumiu/i)).toBeInTheDocument();
+    expect(screen.queryByText("Creitu")).not.toBeInTheDocument();
+
+    const avatars = screen.getAllByTestId("player-avatar");
+    expect(avatars).toHaveLength(2);
+    expect(avatars[1]).toHaveAttribute("data-frame", "gold");
+    expect(
+      screen.getByRole("img", { name: "Avatar de joao" })
+    ).toBeInTheDocument();
+    expect(
+      container.querySelectorAll(".cu-stat--devcards.cu-stat--recent")
+    ).toHaveLength(1);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Inspecionar João \(Bot\)/i })
+    );
+    expect(screen.getByText(/Substituto IA/i)).toBeInTheDocument();
+  });
+
+  test("renders seats in colors order without numeric turn-order badges (1º, 2º, 3º, 4º)", () => {
+    const state = makeGameState({
+      colors: ["ORANGE", "RED", "WHITE", "BLUE"],
+      bot_colors: ["RED", "WHITE", "BLUE"],
+      seat_names: {
+        ORANGE: "Ana",
+        RED: "Creitu",
+        WHITE: "Felire",
+        BLUE: "Guiri",
+      },
+    });
+
+    const { container } = render(
+      <StateProvider>
+        <PlayerTopBar gameState={state} />
+      </StateProvider>
+    );
+
+    const bar = container.querySelector(".cu-player-top-bar") as HTMLElement;
+    expect(bar).toBeTruthy();
+    expect(bar.textContent).not.toMatch(/[1-4]º/);
+    const cardNames = Array.from(
+      bar.querySelectorAll(".cu-player-card__name")
+    ).map((el) => el.textContent);
+    expect(cardNames).toEqual(["Ana", "Creitu", "Felire", "Guiri"]);
+  });
 });

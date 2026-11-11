@@ -201,6 +201,55 @@ main.catan-game-screen {
     }
   }
 
+  &__speed-btn {
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    color: #e2e8f0;
+    font-size: 0.76rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background: rgba(30, 41, 59, 0.95);
+      border-color: rgba(250, 204, 21, 0.55);
+    }
+
+    &.is-fast {
+      background: rgba(180, 83, 9, 0.4);
+      border-color: rgba(250, 204, 21, 0.58);
+      color: #fde047;
+    }
+  }
+
+  &__abandon-btn {
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(127, 29, 29, 0.65);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    color: #fecaca;
+    font-size: 0.76rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+
+    &:hover {
+      background: rgba(185, 28, 28, 0.85);
+      border-color: rgba(252, 165, 165, 0.7);
+      color: #ffffff;
+    }
+  }
+
   &__sound-btn {
     width: 32px;
     height: 30px;
@@ -327,10 +376,14 @@ main.catan-game-screen {
 
     &__right {
       gap: 5px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     &__mcts-btn,
-    &__bank-chip {
+    &__bank-chip,
+    &__speed-btn,
+    &__abandon-btn {
       min-height: 36px;
       padding: 4px 8px;
       font-size: 0.72rem;
@@ -392,7 +445,9 @@ main.catan-game-screen {
 
     &__home-btn,
     &__mcts-btn,
-    &__bank-chip {
+    &__bank-chip,
+    &__speed-btn,
+    &__abandon-btn {
       min-height: 30px;
       padding: 2px 7px;
       font-size: 0.68rem;
@@ -415,5 +470,151 @@ main.catan-game-screen {
       width: 32px;
       height: 32px;
     }
+  }
+}
+
+.game-reclaim-banner {
+  position: relative;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 14px;
+  margin: 0 12px 4px;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    rgba(120, 53, 15, 0.88),
+    rgba(180, 83, 9, 0.88)
+  );
+  border: 1.5px solid rgba(250, 204, 21, 0.65);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  font-size: 0.82rem;
+  color: #fef3c7;
+
+  &__text {
+    font-weight: 600;
+  }
+
+  &__btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1.5px solid #fef08a;
+    background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
+    color: #0f172a;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(250, 204, 21, 0.35);
+    transition: transform 0.14s ease, filter 0.14s ease;
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+    }
+
+    &:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+  }
+}
+
+/* Unified Desktop + Mobile Action Spotlight Toast */
+.action-spotlight-toast {
+  position: fixed;
+  top: 158px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 38;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(92vw, 520px);
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid #facc15;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.62),
+    0 0 16px rgba(250, 204, 21, 0.22);
+  color: #f8fafc;
+  font-size: 0.84rem;
+  font-weight: 700;
+  animation: spotlight-toast-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+
+  &__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+
+  &__text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@keyframes spotlight-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .action-spotlight-toast {
+    top: 124px;
+    padding: 5px 12px;
+    font-size: 0.74rem;
+    max-width: 94vw;
+  }
+
+  .game-reclaim-banner {
+    padding: 5px 10px;
+    margin: 0 6px 3px;
+    font-size: 0.72rem;
+    gap: 6px;
+
+    &__btn {
+      padding: 4px 10px;
+      font-size: 0.72rem;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .game-top-hud__speed-btn {
+    padding: 3px 6px;
+    font-size: 0.66rem;
+    gap: 3px;
+  }
+
+  .action-spotlight-toast {
+    top: 118px;
+  }
+}
+
+@media (max-height: 520px) {
+  .action-spotlight-toast {
+    top: 88px;
+    padding: 4px 10px;
+    font-size: 0.72rem;
   }
 }

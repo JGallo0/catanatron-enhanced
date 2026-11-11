@@ -10,6 +10,7 @@ import {
   getSavedAccountAvatarSummary,
 } from "../config/avatarCatalog";
 import {
+  isTakenOverSeat,
   resolvePlayerDisplayName,
   resolveSeatAvatarProps,
 } from "../config/botCatalog";
@@ -170,6 +171,7 @@ type PlayerSeatStats = {
   color: Color;
   name: string;
   isBot: boolean;
+  isTakenOver: boolean;
   isActive: boolean;
   isWinner: boolean;
   vps: number;
@@ -197,6 +199,7 @@ function computeSeatStats(
   const ps = gameState.player_state;
   const meta = PLAYER_COLOR_META[color];
   const isBot = gameState.bot_colors.includes(color);
+  const isTakenOver = isTakenOverSeat(gameState, color);
   const isActive = gameState.current_color === color;
   const isWinner = gameState.winning_color === color;
   const name = resolvePlayerDisplayName(gameState, color, meta.label);
@@ -218,25 +221,32 @@ function computeSeatStats(
   const builtRoads = Math.max(0, 15 - roadsLeft);
 
   const seatAvatar = gameState.seat_avatars?.[color];
+  const originalUsername =
+    gameState.seat_takeover?.[color]?.original_username ??
+    seatAvatar?.username ??
+    null;
   const savedAcct = getSavedAccountAvatarSummary();
   const guestProfile = !savedAcct ? getGuestProfile() : null;
   const humanColors = gameState.colors.filter(
     (c) => !gameState.bot_colors.includes(c)
   );
   const isMySeat =
-    !isBot &&
+    (!isBot || isTakenOver) &&
     (perspective !== null
       ? perspective === color
       : savedAcct
-        ? seatAvatar?.seat_kind === "USER" &&
-          seatAvatar.username === savedAcct.username
-        : humanColors.length === 1);
+        ? (seatAvatar?.seat_kind === "USER" &&
+            seatAvatar.username === savedAcct.username) ||
+          originalUsername === savedAcct.username
+        : !isBot && humanColors.length === 1);
   const resolvedAvatar = resolveSeatAvatarProps({
     color,
     isBot,
+    isTakenOver,
     seatIndex,
     seatName: name,
     seatAvatar,
+    originalUsername,
     isMySeat,
     accountAvatar: savedAcct?.avatar_config,
     accountUsername: savedAcct?.username,
@@ -249,6 +259,7 @@ function computeSeatStats(
     color,
     name,
     isBot,
+    isTakenOver,
     isActive,
     isWinner,
     vps,
@@ -271,10 +282,12 @@ function computeSeatStats(
 function PlayerCard({
   seat,
   isInspected,
+  isRecentDev,
   onInspect,
 }: {
   seat: PlayerSeatStats;
   isInspected: boolean;
+  isRecentDev: boolean;
   onInspect: (color: Color) => void;
 }) {
   const meta = PLAYER_COLOR_META[seat.color];
@@ -284,6 +297,7 @@ function PlayerCard({
       className={cn("cu-player-card", seat.color, {
         "cu-player-card--active": seat.isActive,
         "cu-player-card--winner": seat.isWinner,
+        "cu-player-card--taken-over": seat.isTakenOver,
       })}
       style={
         {
@@ -293,7 +307,7 @@ function PlayerCard({
         } as React.CSSProperties
       }
       onClick={() => onInspect(seat.color)}
-      title={`${seat.name} • Peças: ${seat.builtSettlements}/5 Aldeias, ${seat.builtCities}/4 Cidades, ${seat.builtRoads}/15 Estradas`}
+      title={`${seat.name}${seat.isTakenOver ? " (Bot assumiu)" : ""} • Peças: ${seat.builtSettlements}/5 Aldeias, ${seat.builtCities}/4 Cidades, ${seat.builtRoads}/15 Estradas`}
     >
       <button
         type="button"
@@ -338,6 +352,14 @@ function PlayerCard({
 
       {/* RIGHT HALF: Crisp 2x3 Stat Grid on Dark Slate */}
       <div className="cu-player-card__stats-col">
+        {seat.isTakenOver && (
+          <div
+            className="cu-player-card__takeover-chip"
+            title="Jogador desconectou ou saiu — Bot IA assumiu o controle"
+          >
+            🤖 Bot assumiu
+          </div>
+        )}
         {/* Row 1: Knights & Longest Road */}
         <div className="cu-stat-row cu-stat-row--awards">
           <div
@@ -396,7 +418,9 @@ function PlayerCard({
             <ResourceStatSvg />
           </div>
           <div
-            className="cu-stat cu-stat--devcards"
+            className={cn("cu-stat cu-stat--devcards", {
+              "cu-stat--recent": isRecentDev,
+            })}
             title="Cartas de Desenvolvimento na mão"
           >
             <span className="cu-stat__num">{seat.devCards}</span>
@@ -454,7 +478,13 @@ function PlayerCard({
 /* Main Bar Component & Tap-to-Inspect Dialog                                 */
 /* -------------------------------------------------------------------------- */
 
-export default function PlayerTopBar({ gameState }: { gameState: GameState }) {
+export default function PlayerTopBar({
+  gameState,
+  recentDevColor = null,
+}: {
+  gameState: GameState;
+  recentDevColor?: Color | null;
+}) {
   const { state } = useContext(store);
   const [inspectedColor, setInspectedColor] = useState<Color | null>(null);
 
@@ -472,6 +502,7 @@ export default function PlayerTopBar({ gameState }: { gameState: GameState }) {
             key={seat.color}
             seat={seat}
             isInspected={inspectedColor === seat.color}
+            isRecentDev={recentDevColor === seat.color}
             onInspect={setInspectedColor}
           />
         ))}
@@ -506,8 +537,16 @@ export default function PlayerTopBar({ gameState }: { gameState: GameState }) {
                     >
                       {PLAYER_COLOR_META[inspectedSeat.color].label}
                     </span>
-                    <span className="cu-inspect-tag">
-                      {inspectedSeat.isBot ? "Bot IA" : "Jogador"}
+                    <span
+                      className={cn("cu-inspect-tag", {
+                        "cu-inspect-tag--takeover": inspectedSeat.isTakenOver,
+                      })}
+                    >
+                      {inspectedSeat.isTakenOver
+                        ? "Substituto IA"
+                        : inspectedSeat.isBot
+                          ? "Bot IA"
+                          : "Jogador"}
                     </span>
                     {inspectedSeat.isActive && (
                       <span className="cu-inspect-tag cu-inspect-tag--active">

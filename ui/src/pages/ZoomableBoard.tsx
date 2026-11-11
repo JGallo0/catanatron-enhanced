@@ -89,9 +89,15 @@ function buildEdgeActions(state: CatanState) {
 
 type ZoomableBoardProps = {
   replayMode: boolean;
+  recentNodeId?: number | null;
+  recentEdgeId?: string | null;
 };
 
-export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
+export default function ZoomableBoard({
+  replayMode,
+  recentNodeId = null,
+  recentEdgeId = null,
+}: ZoomableBoardProps) {
   const { gameId } = useParams();
   const { state, dispatch } = useContext(store);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
@@ -261,6 +267,8 @@ export default function ZoomableBoard({ replayMode }: ZoomableBoardProps) {
                 isMobile={isMobile}
                 isMovingRobber={isRobberPhase}
                 robberCoordinates={robberCoordinates}
+                recentNodeId={recentNodeId}
+                recentEdgeId={recentEdgeId}
               />
             </TransformComponent>
           </div>

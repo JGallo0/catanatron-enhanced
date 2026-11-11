@@ -36,6 +36,7 @@ type EdgeProps = {
   direction: Direction;
   color: Color | null;
   flashing: boolean;
+  isRecent?: boolean;
   onClick: React.MouseEventHandler;
 };
 
@@ -47,6 +48,7 @@ export default function Edge({
   direction,
   color,
   flashing,
+  isRecent,
   onClick,
 }: EdgeProps) {
   const [centerX, centerY] = center;
@@ -59,6 +61,7 @@ export default function Edge({
       className={cn("edge", direction, {
         "edge--occupied": !!color,
         "edge--buildable": flashing,
+        "edge--recent": !!isRecent,
       })}
       style={{
         left: tileX,

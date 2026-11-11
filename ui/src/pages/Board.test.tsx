@@ -74,3 +74,36 @@ test("fits narrow portrait and landscape mobile viewports without overflowing ho
   expect(parseInt(landscapeBoard.style.width, 10)).toBeLessThanOrEqual(667);
   expect(parseInt(landscapeBoard.style.height, 10)).toBeLessThanOrEqual(240);
 });
+
+test("highlights recently placed node and normalized edge with .node--recent and .edge--recent", () => {
+  const gameState = makeGameState({
+    edges: [
+      {
+        id: [1, 0],
+        color: "RED",
+        direction: "WEST",
+        tile_coordinate: [0, 0, 0],
+      },
+    ],
+  });
+
+  const { container } = render(
+    <Board
+      width={1200}
+      height={900}
+      buildOnNodeClick={() => () => undefined}
+      buildOnEdgeClick={() => () => undefined}
+      handleTileClick={() => undefined}
+      replayMode={false}
+      gameState={gameState}
+      isMobile={false}
+      show
+      isMovingRobber={false}
+      recentNodeId={0}
+      recentEdgeId="0,1"
+    />
+  );
+
+  expect(container.querySelectorAll(".node--recent")).toHaveLength(1);
+  expect(container.querySelectorAll(".edge--recent")).toHaveLength(1);
+});

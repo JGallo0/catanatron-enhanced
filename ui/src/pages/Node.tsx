@@ -58,6 +58,7 @@ type NodeProps = {
   building: BuildingType | null;
   color: Color | null;
   flashing: boolean;
+  isRecent?: boolean;
   onClick: React.MouseEventHandler<HTMLDivElement>;
 };
 
@@ -69,6 +70,7 @@ export default function Node({
   building,
   color,
   flashing,
+  isRecent,
   onClick,
 }: NodeProps) {
   const [centerX, centerY] = center;
@@ -85,6 +87,7 @@ export default function Node({
       className={cn("node", {
         "node--occupied": !!color,
         "node--buildable": flashing,
+        "node--recent": !!isRecent,
       })}
       style={{
         width: nodeDiameter,
