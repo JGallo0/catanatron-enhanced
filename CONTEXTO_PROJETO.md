@@ -153,9 +153,48 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
   - Marca atualizada nas telas e metadados (`index.html`, `manifest.json`, `HomePage.tsx`, `GameScreen.tsx`, `ReplayScreen.tsx`, `RoomLobbyPage.tsx` e `apiClient.ts`), preservando chaves internas (`CATANATRON`, pacotes Python e chaves de `localStorage`) e exibindo créditos ao motor Catanatron (Bryan Collazo) sob licença **GNU GPL-3.0**.
 - **Correção de bots travando no meio do jogo & Typecheck:**
   - Histórico completo de estados desacoplado de gravações síncronas pesadas no `localStorage`, evitando erro de estouro de cota e congelamento de IA, e `npx tsc --noEmit` 100% limpo.
+- **Bloco 1 Concluído: Autenticação Persistente, Histórico de Partidas e Ranking Global (Leaderboard):**
+  - **Autenticação Multi-dispositivo sem envio de e-mails (Compatível com Plano Free do Supabase/Vercel):**
+    - Abas separadas na Home para **Entrar** e **Criar Conta**, além de botão **Google Sign-In** automático (`accounts.google.com/gsi/client`).
+    - Senhas seguras com hash PBKDF2 + salt aleatório (`120.000` iterações SHA-256) e suporte a upgrade transparente de hashes legados.
+    - Sessões independentes por dispositivo na tabela `user_sessions` (`sess_<hex>`), permitindo manter login no PC e no celular simultaneamente e fazer logout isolado.
+    - Endpoints REST completos: `/api/auth/register`, `/api/auth/login`, `/api/auth/google`, `/api/auth/me`, `/api/auth/logout`, `/api/auth/profile` e `/api/auth/config`.
+  - **Gravação Idempotente de Histórico de Partidas (`matches` e `match_participants`):**
+    - Todas as partidas finalizadas são salvas automaticamente com chave primária `game_id` (garantindo idempotência mesmo se acionada múltiplas vezes).
+    - Vitórias de robôs/IAs são gravadas no histórico (`winner_is_bot = True`, `winner_username = null`). Partidas incompletas/abandonadas não são gravadas.
+    - Vínculo invariante entre o assento (Cor) e a identidade do usuário (`USER`, `GUEST` ou `BOT`) mantido mesmo após o embaralhamento de ordem de turno do motor de Catan.
+  - **Ranking Global (Leaderboard):**
+    - **Apenas jogadores humanos registrados** são classificados no ranking oficial (robôs e convidados temporários são excluídos da classificação).
+    - Ordenação: `vitórias DESC, % vitórias DESC, partidas jogadas DESC, usuário ASC`.
+    - Taxa de vitórias calculada por `(vitórias / partidas jogadas) * 100`, considerando apenas as partidas disputadas pelo usuário.
+    - Modal interativo **🏆 Ranking Global & Histórico** acessível da tela inicial, com abas dedicadas para o Ranking e para o Histórico de Partidas (com filtro *"Só Minhas Partidas"*).
+  - **Espelho Offline Total (`localEngine.ts`):**
+    - Cadastro, login, histórico e ranking continuam funcionando diretamente no navegador via `localStorage` mesmo sem backend ou sem internet.
 
-### Próximos Passos:
-1. **Substituir os 4 Avatares Antes de Lançamento Público/Comercial:** Gerar retratos 100% originais via Nano Banana Pro em `ui/public/assets/illustrations/avatars/{red,orange,white,blue}.webp` no estilo **Rule the Isle** (sem personagens proprietários do *Catan Universe*).
-2. **Persistência Multiplayer Online Completa (Banco Externo na Vercel):** Conectar uma instância gratuita do **Neon Postgres** ou **Supabase** na variável `DATABASE_URL` do painel da Vercel para que salas compartilhadas entre diferentes computadores persistam no banco SQL em nuvem.
-3. **Negociação Entre Jogadores no Lobby Online:** UI para enviar/aceitar propostas de troca direta entre amigos humanos conectados na mesma sala.
-4. **Polimento Final Mobile/Tablet:** Revisar responsividade em telas estreitas após validar a doca horizontal no desktop.
+---
+
+## 6. Guia de Variáveis de Ambiente (Vercel & Supabase Gratuito)
+
+Para colocar o backend em produção na **Vercel** com persistência no **Supabase**:
+
+| Variável | Onde obter | Descrição |
+|---|---|---|
+| `DATABASE_URL` | **Supabase Dashboard** -> Project Settings -> Database -> Connection Pooling (Session ou Transaction mode, porta `6543` / IPv4) | URL de conexão PostgreSQL (ex: `postgresql://postgres.[ref]:[senha]@aws-0-[regiao].pooler.supabase.com:6543/postgres`). Evita problemas de IPv6 na Vercel Serverless. As tabelas e colunas são criadas/migradas automaticamente pelo `models.py` na inicialização. |
+| `GOOGLE_CLIENT_ID` | **Google Cloud Console** -> APIs & Services -> Credentials -> OAuth 2.0 Client IDs (Web application) | ID do cliente Google para login com 1 clique (ex: `123456...apps.googleusercontent.com`). Adicionar `http://localhost:5173` e a URL da Vercel (`https://*.vercel.app`) em *Authorized JavaScript origins*. |
+| `SECRET_KEY` | Qualquer string aleatória | Chave de segurança usada internamente pelo Flask para assinar sessões. |
+
+> **Nota sobre o plano gratuito do Supabase:** Nossa arquitetura de login utiliza Google OAuth via ID Token + PBKDF2 direto no banco SQL. Isso significa que **nenhum e-mail transacional é disparado pelo Supabase**, garantindo que o sistema funcione 100% dentro dos limites do plano gratuito sem bloqueios de cota de SMTP!
+
+---
+
+## 7. Próximos Passos (Bloco 2 e Bloco 3)
+
+1. **Bloco 2 — Customização de Avatar e Perfil (estilo Catan Universe):**
+   - Seletor e criador de avatar personalizado (combinações de estilo, trajes e cores).
+   - Armazenamento em `users.avatar_json` e sincronização no perfil `/api/auth/profile`.
+   - Exibição do avatar na barra superior de jogadores e nas mesas multiplayer.
+2. **Bloco 3 — Redesign da Tela Inicial e Lobby Aberto:**
+   - Remoção do card sólido central que encobre a arte de fundo (`lobby_hero.webp`).
+   - Apresentação do avatar do jogador no lobby com seus dados e ranking.
+   - Botões de ação bem posicionados e dedicados para cada modo: *Partida Rápida (Solo/IA)*, *Criar Sala Online*, *Salas Abertas*, *Ranking & Histórico* e *Personalizar Avatar*.
+3. **Substituir os 4 Avatares Padrão:** Gerar retratos 100% originais via Nano Banana Pro em `ui/public/assets/illustrations/avatars/{red,orange,white,blue}.webp`.
