@@ -73,11 +73,26 @@ const StateProvider = ({ children }: { children: React.ReactNode }) => {
             isMovingRobber: false,
           };
         case ACTIONS.TOGGLE_BUILDING_ROAD:
-          return { ...state, isBuildingRoad: !state.isBuildingRoad };
+          return {
+            ...state,
+            isBuildingRoad: !state.isBuildingRoad,
+            isBuildingSettlement: false,
+            isBuildingCity: false,
+          };
         case ACTIONS.SET_IS_BUILDING_SETTLEMENT:
-          return { ...state, isBuildingSettlement: true };
+          return {
+            ...state,
+            isBuildingRoad: false,
+            isBuildingSettlement: !state.isBuildingSettlement,
+            isBuildingCity: false,
+          };
         case ACTIONS.SET_IS_BUILDING_CITY:
-          return { ...state, isBuildingCity: true };
+          return {
+            ...state,
+            isBuildingRoad: false,
+            isBuildingSettlement: false,
+            isBuildingCity: !state.isBuildingCity,
+          };
         case ACTIONS.SET_IS_PLAYING_MONOPOLY:
           return { ...state, isPlayingMonopoly: true };
         case ACTIONS.CANCEL_MONOPOLY:

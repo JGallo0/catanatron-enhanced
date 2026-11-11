@@ -133,6 +133,24 @@ const TurnSpinSvg: React.FC = () => (
   </svg>
 );
 
+const MiniSettlementIcon: React.FC = () => (
+  <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">
+    <path d="M8 2L2 7v7h12V7L8 2z" />
+  </svg>
+);
+
+const MiniCityIcon: React.FC = () => (
+  <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">
+    <path d="M2 14V6l3-3 3 3v2h2V4l2-2 2 2v10H2z" />
+  </svg>
+);
+
+const MiniRoadIcon: React.FC = () => (
+  <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">
+    <rect x="2" y="6.5" width="12" height="3" rx="1.2" transform="rotate(-24 8 8)" />
+  </svg>
+);
+
 /* -------------------------------------------------------------------------- */
 /* Individual Player Card                                                     */
 /* -------------------------------------------------------------------------- */
@@ -221,14 +239,34 @@ function PlayerCard({
             title={hasArmy ? "Maior Exército (+2 PV)" : "Cavaleiros Jogados"}
           >
             <span className="cu-stat__num">{knights}</span>
-            <SwordStatSvg />
+            {hasArmy ? (
+              <span className="cu-stat__medallion">
+                <HybridIllustration
+                  src="/assets/illustrations/ui/largest_army.webp"
+                  alt="Maior Exército"
+                  fallback={<SwordStatSvg />}
+                />
+              </span>
+            ) : (
+              <SwordStatSvg />
+            )}
           </div>
           <div
             className={cn("cu-stat", { "cu-stat--awarded": hasRoad })}
             title={hasRoad ? "Maior Estrada (+2 PV)" : "Sequência de Estrada"}
           >
             <span className="cu-stat__num">{roadLength}</span>
-            <RoadStatSvg />
+            {hasRoad ? (
+              <span className="cu-stat__medallion">
+                <HybridIllustration
+                  src="/assets/illustrations/ui/longest_road.webp"
+                  alt="Maior Estrada"
+                  fallback={<RoadStatSvg />}
+                />
+              </span>
+            ) : (
+              <RoadStatSvg />
+            )}
           </div>
         </div>
 
@@ -254,7 +292,7 @@ function PlayerCard({
           </div>
         </div>
 
-        {/* Row 3: Victory Points (Highlighted in Player Color) */}
+        {/* Row 3: Victory Points + Built Pieces Summary */}
         <div className="cu-stat-row cu-stat-row--vp">
           <div
             className="cu-stat cu-stat--vp"
@@ -262,6 +300,33 @@ function PlayerCard({
           >
             <span className="cu-stat__num cu-stat__num--vp">{vps}</span>
             <TrophyStatSvg />
+          </div>
+
+          <div
+            className="cu-pieces-mini"
+            title={`Peças no mapa: ${builtSettlements}/5 Aldeias · ${builtCities}/4 Cidades · ${builtRoads}/15 Estradas`}
+          >
+            <span
+              className="cu-piece-chip"
+              title={`${builtSettlements} Aldeia(s) construída(s) (${settlementsLeft} restante(s))`}
+            >
+              <MiniSettlementIcon />
+              <span>{builtSettlements}</span>
+            </span>
+            <span
+              className="cu-piece-chip"
+              title={`${builtCities} Cidade(s) construída(s) (${citiesLeft} restante(s))`}
+            >
+              <MiniCityIcon />
+              <span>{builtCities}</span>
+            </span>
+            <span
+              className="cu-piece-chip"
+              title={`${builtRoads} Estrada(s) construída(s) (${roadsLeft} restante(s))`}
+            >
+              <MiniRoadIcon />
+              <span>{builtRoads}</span>
+            </span>
           </div>
         </div>
       </div>

@@ -1,9 +1,11 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import { GridLoader } from "react-spinners";
 import { useSnackbar } from "notistack";
 import { Divider } from "@mui/material";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 
 import ZoomableBoard from "./ZoomableBoard";
 import ActionsToolbar from "./ActionsToolbar";
@@ -26,6 +28,12 @@ import AnalysisBox from "../components/AnalysisBox";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import type { Color, GameState } from "../utils/api.types";
 import { getSavedGameSeat } from "./RoomLobbyPage";
+import {
+  isSoundMuted,
+  setSoundMuted,
+  playActionRecordSound,
+  playVictorySound,
+} from "../utils/soundEffects";
 
 const ROBOT_THINKING_TIME = 300;
 const VALID_COLORS = new Set<Color>(["RED", "BLUE", "ORANGE", "WHITE"]);
@@ -68,6 +76,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const { state, dispatch } = useContext(store);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const [isBotThinking, setIsBotThinking] = useState(false);
+  const [muted, setMuted] = useState(() => isSoundMuted());
+  const prevStateIndexRef = useRef<number | null>(null);
+  const prevWinnerRef = useRef<Color | null>(null);
 
   // Automatically apply seat perspective if ?seat=COLOR is in URL or saved from Room Lobby
   useEffect(() => {
@@ -129,6 +140,34 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
     return () => clearInterval(interval);
   }, [gameId, replayMode, state.gameState, state.perspective, dispatch]);
+
+  // Play tactile tabletop audio cues on state transitions
+  useEffect(() => {
+    const gs = state.gameState;
+    if (!gs || replayMode) return;
+
+    if (prevStateIndexRef.current === null) {
+      prevStateIndexRef.current = gs.state_index;
+      prevWinnerRef.current = gs.winning_color;
+      return;
+    }
+
+    if (gs.state_index > prevStateIndexRef.current) {
+      const latestRecord = gs.action_records?.[gs.action_records.length - 1];
+      playActionRecordSound(latestRecord);
+      if (gs.winning_color && !prevWinnerRef.current) {
+        playVictorySound();
+      }
+    }
+    prevStateIndexRef.current = gs.state_index;
+    prevWinnerRef.current = gs.winning_color;
+  }, [state.gameState, replayMode]);
+
+  const toggleSoundMute = () => {
+    const next = !muted;
+    setMuted(next);
+    setSoundMuted(next);
+  };
 
   // Advance bot turns automatically
   useEffect(() => {
@@ -254,6 +293,15 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             title="Abrir Análise de Probabilidade de Vitória (IA MCTS)"
           >
             📊 Chances (IA)
+          </button>
+          <button
+            type="button"
+            className="game-top-hud__sound-btn"
+            onClick={toggleSoundMute}
+            title={muted ? "Ativar efeitos sonoros" : "Silenciar efeitos sonoros"}
+            aria-label={muted ? "Ativar som" : "Silenciar som"}
+          >
+            {muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
           </button>
         </div>
       </header>

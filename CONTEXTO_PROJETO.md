@@ -140,14 +140,19 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
 
 ### Concluído Recentemente:
 - **Barra Superior Catan Universe (`PlayerTopBar.tsx`):**
-  - Grid de estatísticas 2×3 limpo com ícones vetoriais nítidos (Cavaleiros `🗡️`, Maior Estrada `〰️`, Recursos `🂠`, Cartas de Dev `🎴`, Pontos de Vitória `🏆`).
+  - Grid de estatísticas 2×3 limpo com ícones vetoriais nítidos (Cavaleiros `🗡️`, Maior Estrada `〰️`, Recursos `🂠`, Cartas de Dev `🎴`, Pontos de Vitória `🏆`) + medalhões customizados (`largest_army.webp`, `longest_road.webp`) quando conquistados + contadores compactos de peças construídas (`Aldeias`, `Cidades`, `Estradas`).
   - Avatares oficiais integrados em `ui/public/assets/illustrations/avatars/{red,orange,white,blue}.webp`.
   - Remoção da coluna lateral fixa de 300px; tabuleiro centralizado e com aproveitamento total da tela.
   - Histórico de jogadas convertido em gaveta recolhível (`LeftDrawer.tsx`) com acionamento pelo botão `📜 Histórico`.
   - Mesa de jogo com textura de madeira nobre quente e iluminação radial suave em `GameScreen.scss`.
-- **Correção de bots travando no meio do jogo:** Histórico completo de estados desacoplado de gravações síncronas pesadas no `localStorage`, evitando erro de estouro de cota e congelamento de IA.
+- **Doca Inferior Catan Universe (`ActionsToolbar.tsx` / `ResourceCards.tsx`):**
+  - Console horizontal em 3 zonas estilo Steam: construção direta 1-clique (`Estrada`, `Aldeia`, `Cidade`, `Carta Dev`) com estoque restante e destaque de modo ativo + `Trocar`, `Usar Carta` e `Custos`; baralho central com ilustrações nítidas em `.webp` sem película escura + contador `Mão X/7`; e dados 2D6 + **botão circular dourado** (`ROLAR DADOS` / `PASSAR VEZ` / `DESCARTAR` / `ROUBAR`).
+- **Efeitos Sonoros Táteis (`soundEffects.ts`):**
+  - Síntese Web Audio API leve (dados, construções, compra de carta/troca, ladrão, fim de turno e vitória) com botão `🔊/🔇` persistente no topo.
+- **Correção de bots travando no meio do jogo & Typecheck:**
+  - Histórico completo de estados desacoplado de gravações síncronas pesadas no `localStorage`, evitando erro de estouro de cota e congelamento de IA, e `npx tsc --noEmit` 100% limpo.
 
 ### Próximos Passos:
-1. **Doca Inferior Catan Universe:** Alinhar a barra de ações e recursos da base da tela para formato idêntico ao console da Steam (recursos em linha central e botão dourado circular de rolar/passar).
-2. **Persistência Multiplayer Online Completa (Banco Externo na Vercel):** Conectar uma instância gratuita do **Neon Postgres** ou **Supabase** na variável `DATABASE_URL` do painel da Vercel para que salas compartilhadas entre diferentes computadores persistam no banco SQL em nuvem.
-3. **Efeitos Sonoros:** Adicionar áudio opcional para rolagem de dados 2D6, colocação de peças e término de turno.
+1. **Persistência Multiplayer Online Completa (Banco Externo na Vercel):** Conectar uma instância gratuita do **Neon Postgres** ou **Supabase** na variável `DATABASE_URL` do painel da Vercel para que salas compartilhadas entre diferentes computadores persistam no banco SQL em nuvem.
+2. **Negociação Entre Jogadores no Lobby Online:** UI para enviar/aceitar propostas de troca direta entre amigos humanos conectados na mesma sala.
+3. **Polimento Final Mobile/Tablet:** Revisar responsividade em telas estreitas após validar a doca horizontal no desktop.

@@ -6,30 +6,46 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { Button, Dialog, DialogTitle, DialogContent } from "@mui/material";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import cn from "classnames";
+import {
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Tooltip,
+} from "@mui/material";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import BuildIcon from "@mui/icons-material/Build";
+import CasinoIcon from "@mui/icons-material/Casino";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import SimCardIcon from "@mui/icons-material/SimCard";
+import GavelIcon from "@mui/icons-material/Gavel";
+import PanToolAltIcon from "@mui/icons-material/PanToolAlt";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import MenuItem from "@mui/material/MenuItem";
 import ClickAwayListener from "@mui/material/ClickAwayListener";
 import Grow from "@mui/material/Grow";
 import Paper from "@mui/material/Paper";
 import Popper from "@mui/material/Popper";
 import MenuList from "@mui/material/MenuList";
-import SimCardIcon from "@mui/icons-material/SimCard";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
-import Hidden from "../components/Hidden";
 import Prompt from "../components/Prompt";
 import ResourceCards from "../components/ResourceCards";
 import ResourceSelector from "../components/ResourceSelector";
 import DiscardPlannerDialog from "../components/DiscardPlannerDialog";
 import TradeModal from "../components/TradeModal";
-import { DiceFaceSvg, ResourceIcon } from "../components/icons/GameIcons";
-import { BUILDING_COSTS, RESOURCE_META } from "../config/assetRegistry";
+import {
+  CitySvgPiece,
+  DiceFaceSvg,
+  ResourceIcon,
+  SettlementSvgPiece,
+} from "../components/icons/GameIcons";
+import {
+  BUILDING_COSTS,
+  PLAYER_COLOR_META,
+  RESOURCE_META,
+} from "../config/assetRegistry";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import type {
@@ -65,249 +81,92 @@ function getLatestRollPair(gameState: GameState): [number, number] | null {
   return null;
 }
 
-function PlayButtons() {
+export default function ActionsToolbar({
+  isBotThinking,
+  replayMode,
+}: {
+  isBotThinking: boolean;
+  replayMode: boolean;
+}) {
   const { gameId } = useParams();
-  if (!gameId) {
-    console.error("Game ID is not found in URL parameters.");
-    return null;
-  }
   const { state, dispatch } = useContext(store);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+
   const [resourceSelectorOpen, setResourceSelectorOpen] = useState(false);
   const [discardPlannerOpen, setDiscardPlannerOpen] = useState(false);
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [costsModalOpen, setCostsModalOpen] = useState(false);
   const { isSubmitting, submitDiscardBatch } = useDiscardBatchSubmission();
 
-  const executeGameAction = useCallback(
-    async (action?: GameAction) => {
-      const nextState = await postAction(gameId, action);
-      dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
-      dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
-    },
-    [gameId, dispatch, enqueueSnackbar, closeSnackbar]
-  );
-
-  const carryOutAction = useCallback(
-    (action?: GameAction) => async () => {
-      await executeGameAction(action);
-    },
-    [executeGameAction]
-  );
-
   const {
     gameState,
+    isBuildingRoad,
+    isBuildingSettlement,
+    isBuildingCity,
     isPlayingMonopoly,
     isPlayingYearOfPlenty,
     isRoadBuilding,
   } = state;
-  if (gameState === null) {
+
+  if (!gameState) {
     return null;
   }
-  const key = playerKey(gameState, gameState.current_color);
+
+  const resolvedGameId = gameId ?? gameState.game?.id ?? "";
+  const botsTurn = gameState.bot_colors.includes(gameState.current_color);
+  const isOtherHumansTurn =
+    !botsTurn &&
+    state.perspective !== null &&
+    gameState.current_color !== state.perspective;
+  const isInteractiveTurn =
+    !(botsTurn || isOtherHumansTurn || gameState.winning_color) && !replayMode;
+
+  const humanColor = getHumanColor(gameState, state.perspective);
+  const humanKey = humanColor ? playerKey(gameState, humanColor) : null;
+  const activeKey = playerKey(gameState, gameState.current_color);
+
+  const executeGameAction = useCallback(
+    async (action?: GameAction) => {
+      if (!resolvedGameId) return;
+      const nextState = await postAction(resolvedGameId, action);
+      dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+      dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+    },
+    [resolvedGameId, dispatch, enqueueSnackbar, closeSnackbar]
+  );
+
   const isRoll =
     gameState.current_prompt === "PLAY_TURN" &&
-    !gameState.player_state[`${key}_HAS_ROLLED`];
+    !gameState.player_state[`${activeKey}_HAS_ROLLED`];
   const isDiscard = gameState.current_prompt === "DISCARD";
   const isMoveRobber = gameState.current_prompt === "MOVE_ROBBER";
   const isPlayingDevCard =
     isPlayingMonopoly || isPlayingYearOfPlenty || isRoadBuilding;
-  const playableDevCardTypes = new Set(
-    gameState.current_playable_actions
-      .filter((action) => action[1].startsWith("PLAY"))
-      .map((action) => action[1])
-  );
-  const humanColor = getHumanColor(gameState, state.perspective);
-  const discardActionType =
-    gameState.current_playable_actions.find(
-      (action) => action[1] === "DISCARD_RESOURCE"
-    )?.[1] ?? "DISCARD_RESOURCE";
 
-  const setIsPlayingMonopoly = useCallback(() => {
-    dispatch({ type: ACTIONS.SET_IS_PLAYING_MONOPOLY });
-  }, [dispatch]);
-
-  const getDiscardResourceCounts = useCallback(() => {
-    return RESOURCE_ORDER.reduce(
-      (counts, resource) => {
-        const inHand = gameState.player_state[`${key}_${resource}_IN_HAND`];
-        if (inHand > 0) {
-          counts[resource] = inHand;
-        }
-        return counts;
-      },
-      {} as Partial<Record<ResourceCard, number>>
-    );
-  }, [gameState.player_state, key]);
-
-  const getValidYearOfPlentyOptions = useCallback(() => {
-    return gameState.current_playable_actions
-      .filter((action) => action[1] === "PLAY_YEAR_OF_PLENTY")
-      .map((action) => action[2]);
-  }, [gameState.current_playable_actions]);
-
-  const handleResourceSelection = useCallback(
-    async (selectedResources: ResourceCard | ResourceCard[]) => {
-      setResourceSelectorOpen(false);
-      let nextGameState;
-      let action: GameAction;
-      if (isPlayingMonopoly) {
-        action = [
-          humanColor,
-          "PLAY_MONOPOLY",
-          selectedResources as ResourceCard,
-        ];
-        nextGameState = await postAction(gameId, action);
-      } else if (isPlayingYearOfPlenty) {
-        action = [
-          humanColor,
-          "PLAY_YEAR_OF_PLENTY",
-          selectedResources as [ResourceCard] | [ResourceCard, ResourceCard],
-        ];
-        nextGameState = await postAction(gameId, action);
-      } else {
-        console.error("Invalid resource selector mode");
-        return;
-      }
-      dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextGameState });
-      dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextGameState);
-    },
-    [
-      gameId,
-      humanColor,
-      dispatch,
-      enqueueSnackbar,
-      closeSnackbar,
-      isPlayingMonopoly,
-      isPlayingYearOfPlenty,
-    ]
+  const playableDevCardTypes = useMemo(
+    () =>
+      new Set(
+        gameState.current_playable_actions
+          .filter((action) => action[1].startsWith("PLAY"))
+          .map((action) => action[1])
+      ),
+    [gameState.current_playable_actions]
   );
 
-  const handleOpenResourceSelector = useCallback(() => {
-    setResourceSelectorOpen(true);
-  }, []);
-
-  const handleOpenDiscardPlanner = useCallback(() => {
-    setDiscardPlannerOpen(true);
-  }, []);
-
-  const handleDiscardSelection = useCallback(
-    async (resources: ResourceCard[]) => {
-      setDiscardPlannerOpen(false);
-      const nextGameState = await submitDiscardBatch({
-        discardActionType,
-        gameId,
-        humanColor,
-        resources,
-      });
-      dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextGameState });
-      dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextGameState);
-    },
-    [
-      discardActionType,
-      gameId,
-      humanColor,
-      submitDiscardBatch,
-      dispatch,
-      enqueueSnackbar,
-      closeSnackbar,
-    ]
+  const buildActionTypes = useMemo(
+    () =>
+      new Set(
+        gameState.is_initial_build_phase
+          ? []
+          : gameState.current_playable_actions
+              .filter(
+                (action) =>
+                  action[1].startsWith("BUY") || action[1].startsWith("BUILD")
+              )
+              .map((a) => a[1])
+      ),
+    [gameState.is_initial_build_phase, gameState.current_playable_actions]
   );
-
-  const setIsPlayingYearOfPlenty = useCallback(() => {
-    dispatch({ type: ACTIONS.SET_IS_PLAYING_YEAR_OF_PLENTY });
-  }, [dispatch]);
-
-  const playRoadBuilding = useCallback(async () => {
-    const action: GameAction = [humanColor, "PLAY_ROAD_BUILDING", null];
-    const nextState = await postAction(gameId, action);
-    dispatch({ type: ACTIONS.PLAY_ROAD_BUILDING });
-    dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
-    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
-  }, [gameId, dispatch, enqueueSnackbar, closeSnackbar, humanColor]);
-
-  const playKnightCard = useCallback(async () => {
-    const action: GameAction = [humanColor, "PLAY_KNIGHT_CARD", null];
-    const nextState = await postAction(gameId, action);
-    dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
-    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
-  }, [gameId, dispatch, enqueueSnackbar, closeSnackbar, humanColor]);
-
-  const useItems = [
-    {
-      label: "👑 Monopólio (Monopoly)",
-      disabled: !playableDevCardTypes.has("PLAY_MONOPOLY"),
-      onClick: setIsPlayingMonopoly,
-    },
-    {
-      label: "🌾 Ano da Fartura (Year of Plenty)",
-      disabled: !playableDevCardTypes.has("PLAY_YEAR_OF_PLENTY"),
-      onClick: setIsPlayingYearOfPlenty,
-    },
-    {
-      label: "🛤️ Construção de Estradas (2 grátis)",
-      disabled: !playableDevCardTypes.has("PLAY_ROAD_BUILDING"),
-      onClick: playRoadBuilding,
-    },
-    {
-      label: "⚔️ Cavaleiro (Mover Ladrão)",
-      disabled: !playableDevCardTypes.has("PLAY_KNIGHT_CARD"),
-      onClick: playKnightCard,
-    },
-  ];
-
-  const buildActionTypes = new Set(
-    gameState.is_initial_build_phase
-      ? []
-      : gameState.current_playable_actions
-          .filter(
-            (action) =>
-              action[1].startsWith("BUY") || action[1].startsWith("BUILD")
-          )
-          .map((a) => a[1])
-  );
-
-  const buyDevCard = useCallback(async () => {
-    const action: GameAction = [humanColor, "BUY_DEVELOPMENT_CARD", null];
-    const nextState = await postAction(gameId, action);
-    dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
-    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
-  }, [gameId, dispatch, enqueueSnackbar, closeSnackbar, humanColor]);
-
-  const setIsBuildingSettlement = useCallback(() => {
-    dispatch({ type: ACTIONS.SET_IS_BUILDING_SETTLEMENT });
-  }, [dispatch]);
-
-  const setIsBuildingCity = useCallback(() => {
-    dispatch({ type: ACTIONS.SET_IS_BUILDING_CITY });
-  }, [dispatch]);
-
-  const toggleBuildingRoad = useCallback(() => {
-    dispatch({ type: ACTIONS.TOGGLE_BUILDING_ROAD });
-  }, [dispatch]);
-
-  const buildItems = [
-    {
-      label: "🛤️ Estrada (1 Madeira + 1 Argila)",
-      disabled: !buildActionTypes.has("BUILD_ROAD"),
-      onClick: toggleBuildingRoad,
-    },
-    {
-      label: "🏠 Aldeia (1 Mad + 1 Arg + 1 Lã + 1 Tri)",
-      disabled: !buildActionTypes.has("BUILD_SETTLEMENT"),
-      onClick: setIsBuildingSettlement,
-    },
-    {
-      label: "🏰 Cidade (2 Trigos + 3 Minérios)",
-      disabled: !buildActionTypes.has("BUILD_CITY"),
-      onClick: setIsBuildingCity,
-    },
-    {
-      label: "🃏 Carta de Desenv. (1 Lã + 1 Tri + 1 Min)",
-      disabled: !buildActionTypes.has("BUY_DEVELOPMENT_CARD"),
-      onClick: buyDevCard,
-    },
-  ];
 
   const tradeActions = useMemo(
     () =>
@@ -318,91 +177,445 @@ function PlayButtons() {
     [gameState.current_playable_actions]
   );
 
-  const setIsMovingRobber = useCallback(() => {
-    dispatch({ type: ACTIONS.SET_IS_MOVING_ROBBER });
-  }, [dispatch]);
+  const discardActionType =
+    gameState.current_playable_actions.find(
+      (action) => action[1] === "DISCARD_RESOURCE"
+    )?.[1] ?? "DISCARD_RESOURCE";
 
-  const rollAction = carryOutAction([humanColor, "ROLL", null]);
-  const endTurnAction = carryOutAction([humanColor, "END_TURN", null]);
+  const getDiscardResourceCounts = useCallback(() => {
+    return RESOURCE_ORDER.reduce(
+      (counts, resource) => {
+        const inHand = gameState.player_state[`${activeKey}_${resource}_IN_HAND`];
+        if (inHand > 0) {
+          counts[resource] = inHand;
+        }
+        return counts;
+      },
+      {} as Partial<Record<ResourceCard, number>>
+    );
+  }, [gameState.player_state, activeKey]);
+
+  const getValidYearOfPlentyOptions = useCallback(() => {
+    return gameState.current_playable_actions
+      .filter((action) => action[1] === "PLAY_YEAR_OF_PLENTY")
+      .map((action) => action[2]);
+  }, [gameState.current_playable_actions]);
+
+  const handleResourceSelection = useCallback(
+    async (selectedResources: ResourceCard | ResourceCard[]) => {
+      setResourceSelectorOpen(false);
+      let action: GameAction;
+      if (isPlayingMonopoly) {
+        action = [
+          humanColor,
+          "PLAY_MONOPOLY",
+          selectedResources as ResourceCard,
+        ];
+      } else if (isPlayingYearOfPlenty) {
+        action = [
+          humanColor,
+          "PLAY_YEAR_OF_PLENTY",
+          selectedResources as [ResourceCard] | [ResourceCard, ResourceCard],
+        ];
+      } else {
+        console.error("Invalid resource selector mode");
+        return;
+      }
+      await executeGameAction(action);
+    },
+    [humanColor, isPlayingMonopoly, isPlayingYearOfPlenty, executeGameAction]
+  );
+
+  const handleDiscardSelection = useCallback(
+    async (resources: ResourceCard[]) => {
+      setDiscardPlannerOpen(false);
+      const nextGameState = await submitDiscardBatch({
+        discardActionType,
+        gameId: resolvedGameId,
+        humanColor,
+        resources,
+      });
+      dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextGameState });
+      dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextGameState);
+    },
+    [
+      discardActionType,
+      resolvedGameId,
+      humanColor,
+      submitDiscardBatch,
+      dispatch,
+      enqueueSnackbar,
+      closeSnackbar,
+    ]
+  );
+
+  const playRoadBuilding = useCallback(async () => {
+    const nextState = await postAction(resolvedGameId, [
+      humanColor,
+      "PLAY_ROAD_BUILDING",
+      null,
+    ]);
+    dispatch({ type: ACTIONS.PLAY_ROAD_BUILDING });
+    dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+  }, [resolvedGameId, dispatch, enqueueSnackbar, closeSnackbar, humanColor]);
+
+  const playKnightCard = useCallback(async () => {
+    await executeGameAction([humanColor, "PLAY_KNIGHT_CARD", null]);
+  }, [humanColor, executeGameAction]);
+
+  const buyDevCard = useCallback(async () => {
+    await executeGameAction([humanColor, "BUY_DEVELOPMENT_CARD", null]);
+  }, [humanColor, executeGameAction]);
+
+  const useItems = [
+    {
+      label: "⚔️ Cavaleiro (Mover Ladrão)",
+      disabled: !playableDevCardTypes.has("PLAY_KNIGHT_CARD"),
+      onClick: playKnightCard,
+    },
+    {
+      label: "👑 Monopólio",
+      disabled: !playableDevCardTypes.has("PLAY_MONOPOLY"),
+      onClick: () => dispatch({ type: ACTIONS.SET_IS_PLAYING_MONOPOLY }),
+    },
+    {
+      label: "🌾 Ano da Fartura (+2 Recursos)",
+      disabled: !playableDevCardTypes.has("PLAY_YEAR_OF_PLENTY"),
+      onClick: () => dispatch({ type: ACTIONS.SET_IS_PLAYING_YEAR_OF_PLENTY }),
+    },
+    {
+      label: "🛤️ Construção de Estradas (2 grátis)",
+      disabled: !playableDevCardTypes.has("PLAY_ROAD_BUILDING"),
+      onClick: playRoadBuilding,
+    },
+  ];
+
+  // Stock & card totals for player's own seat
+  const mySettlementsLeft = humanKey
+    ? gameState.player_state[`${humanKey}_SETTLEMENTS_AVAILABLE`] ?? 5
+    : 5;
+  const myCitiesLeft = humanKey
+    ? gameState.player_state[`${humanKey}_CITIES_AVAILABLE`] ?? 4
+    : 4;
+  const myRoadsLeft = humanKey
+    ? gameState.player_state[`${humanKey}_ROADS_AVAILABLE`] ?? 15
+    : 15;
+  const myResourceTotal = humanKey
+    ? RESOURCE_ORDER.reduce(
+        (sum, r) =>
+          sum + (gameState.player_state[`${humanKey}_${r}_IN_HAND`] ?? 0),
+        0
+      )
+    : 0;
+  const discardLimit = gameState.game?.discard_limit ?? 7;
+
+  const latestDice = useMemo(() => getLatestRollPair(gameState), [gameState]);
+  const diceSum = latestDice ? latestDice[0] + latestDice[1] : null;
+
+  // Primary CTA orb state
+  const ctaConfig = useMemo(() => {
+    if (isDiscard) {
+      return {
+        label: "DESCARTAR",
+        shortSub: `${gameState.current_discard_count} cartas`,
+        variant: "danger",
+        icon: <PanToolAltIcon />,
+        onClick: () => setDiscardPlannerOpen(true),
+      };
+    }
+    if (isMoveRobber) {
+      return {
+        label: "ROUBAR",
+        shortSub: "Mover Ladrão",
+        variant: "danger",
+        icon: <GavelIcon />,
+        onClick: () => dispatch({ type: ACTIONS.SET_IS_MOVING_ROBBER }),
+      };
+    }
+    if (isPlayingYearOfPlenty || isPlayingMonopoly) {
+      return {
+        label: "ESCOLHER",
+        shortSub: isPlayingMonopoly ? "Monopólio" : "Fartura",
+        variant: "gold",
+        icon: <AutoAwesomeIcon />,
+        onClick: () => setResourceSelectorOpen(true),
+      };
+    }
+    if (isRoll) {
+      return {
+        label: "ROLAR DADOS",
+        shortSub: "Iniciar Turno",
+        variant: "gold",
+        icon: <CasinoIcon />,
+        onClick: () => executeGameAction([humanColor, "ROLL", null]),
+      };
+    }
+    return {
+      label: "PASSAR VEZ",
+      shortSub: "Encerrar",
+      variant: "emerald",
+      icon: <NavigateNextIcon />,
+      onClick: () => executeGameAction([humanColor, "END_TURN", null]),
+    };
+  }, [
+    isDiscard,
+    isMoveRobber,
+    isPlayingYearOfPlenty,
+    isPlayingMonopoly,
+    isRoll,
+    gameState.current_discard_count,
+    dispatch,
+    executeGameAction,
+    humanColor,
+  ]);
+
+  const activeBuildHint = isBuildingRoad
+    ? "Clique em uma aresta iluminada para construir sua Estrada (ou clique no botão novamente para cancelar)"
+    : isBuildingSettlement
+      ? "Clique em um vértice iluminado para fundar sua Aldeia (ou clique no botão novamente para cancelar)"
+      : isBuildingCity
+        ? "Clique em uma das suas Aldeias para evoluir para Cidade"
+        : isRoadBuilding
+          ? `Estrada Gratuita (${state.freeRoadsAvailable} restante${state.freeRoadsAvailable === 1 ? "" : "s"}): clique em uma aresta iluminada`
+          : null;
+
+  const canRoad =
+    isInteractiveTurn && !isPlayingDevCard && buildActionTypes.has("BUILD_ROAD");
+  const canSettlement =
+    isInteractiveTurn &&
+    !isPlayingDevCard &&
+    buildActionTypes.has("BUILD_SETTLEMENT");
+  const canCity =
+    isInteractiveTurn && !isPlayingDevCard && buildActionTypes.has("BUILD_CITY");
+  const canBuyDev =
+    isInteractiveTurn &&
+    !isPlayingDevCard &&
+    buildActionTypes.has("BUY_DEVELOPMENT_CARD");
 
   return (
-    <>
-      <Button
-        variant="outlined"
-        className="hud-btn hud-btn--ghost"
-        onClick={() => setCostsModalOpen(true)}
-        title="Tabela de Custos de Construção"
-      >
-        <MenuBookIcon fontSize="small" />
-        <span>Custos</span>
-      </Button>
+    <div className="cu-console-wrapper">
+      {activeBuildHint && (
+        <div className="cu-build-hint-pill" role="status">
+          ✨ {activeBuildHint}
+        </div>
+      )}
 
-      <OptionsButton
-        disabled={playableDevCardTypes.size === 0 || isPlayingDevCard}
-        menuListId="use-menu-list"
-        icon={<SimCardIcon />}
-        items={useItems}
-      >
-        Usar Carta
-      </OptionsButton>
+      <div className="cu-bottom-console">
+        {/* LEFT ZONE: Quick Build & Tactical Actions (or Bot/Opponent status) */}
+        <div className="cu-console__actions">
+          {isInteractiveTurn ? (
+            <>
+              <div className="cu-build-strip" role="group" aria-label="Construções">
+                <Tooltip title="Construir Estrada (1 Madeira + 1 Argila) — Maior Estrada (+2 PV)" arrow placement="top">
+                  <span>
+                    <button
+                      type="button"
+                      className={cn("cu-build-tile", {
+                        "is-selected": isBuildingRoad,
+                      })}
+                      style={
+                        humanColor
+                          ? ({ "--seat-color": PLAYER_COLOR_META[humanColor].primary } as React.CSSProperties)
+                          : undefined
+                      }
+                      disabled={!canRoad}
+                      onClick={() =>
+                        dispatch({ type: ACTIONS.TOGGLE_BUILDING_ROAD })
+                      }
+                    >
+                      <span className="cu-build-tile__piece cu-build-tile__piece--road" />
+                      <span className="cu-build-tile__name">Estrada</span>
+                      <span className="cu-build-tile__stock">{myRoadsLeft}</span>
+                    </button>
+                  </span>
+                </Tooltip>
 
-      <OptionsButton
-        disabled={buildActionTypes.size === 0 || isPlayingDevCard}
-        menuListId="build-menu-list"
-        icon={<BuildIcon />}
-        items={buildItems}
-      >
-        Construir
-      </OptionsButton>
+                <Tooltip title="Fundar Aldeia (1 Madeira + 1 Argila + 1 Lã + 1 Trigo) — +1 PV" arrow placement="top">
+                  <span>
+                    <button
+                      type="button"
+                      className={cn("cu-build-tile", {
+                        "is-selected": isBuildingSettlement,
+                      })}
+                      disabled={!canSettlement}
+                      onClick={() =>
+                        dispatch({ type: ACTIONS.SET_IS_BUILDING_SETTLEMENT })
+                      }
+                    >
+                      {humanColor && (
+                        <svg width="20" height="20" viewBox="-22 -24 44 42" aria-hidden="true">
+                          <SettlementSvgPiece color={humanColor} scale={0.9} />
+                        </svg>
+                      )}
+                      <span className="cu-build-tile__name">Aldeia</span>
+                      <span className="cu-build-tile__stock">{mySettlementsLeft}</span>
+                    </button>
+                  </span>
+                </Tooltip>
 
-      <Button
-        disabled={tradeActions.length === 0 || isPlayingDevCard}
-        variant="contained"
-        color="secondary"
-        className="hud-btn"
-        startIcon={<AccountBalanceIcon />}
-        onClick={() => setTradeModalOpen(true)}
-      >
-        Trocar
-      </Button>
+                <Tooltip title="Evoluir para Cidade (2 Trigos + 3 Minérios) — +2 PV & coleta em dobro" arrow placement="top">
+                  <span>
+                    <button
+                      type="button"
+                      className={cn("cu-build-tile", {
+                        "is-selected": isBuildingCity,
+                      })}
+                      disabled={!canCity}
+                      onClick={() =>
+                        dispatch({ type: ACTIONS.SET_IS_BUILDING_CITY })
+                      }
+                    >
+                      {humanColor && (
+                        <svg width="20" height="20" viewBox="-22 -24 44 42" aria-hidden="true">
+                          <CitySvgPiece color={humanColor} scale={0.85} />
+                        </svg>
+                      )}
+                      <span className="cu-build-tile__name">Cidade</span>
+                      <span className="cu-build-tile__stock">{myCitiesLeft}</span>
+                    </button>
+                  </span>
+                </Tooltip>
 
-      <Button
-        disabled={
-          gameState.is_initial_build_phase || isRoadBuilding || isSubmitting
-        }
-        variant="contained"
-        color="primary"
-        className="hud-btn hud-btn--cta"
-        startIcon={<NavigateNextIcon />}
-        onClick={
-          isDiscard
-            ? handleOpenDiscardPlanner
-            : isMoveRobber
-              ? setIsMovingRobber
-              : isPlayingYearOfPlenty || isPlayingMonopoly
-                ? handleOpenResourceSelector
-                : isRoll
-                  ? rollAction
-                  : endTurnAction
-        }
-      >
-        {isDiscard
-          ? "DESCARTAR"
-          : isMoveRobber
-            ? "ROUBAR"
-            : isPlayingYearOfPlenty || isPlayingMonopoly
-              ? "ESCOLHER"
-              : isRoll
-                ? "ROLAR DADOS"
-                : "PASSAR VEZ"}
-      </Button>
+                <Tooltip title="Comprar Carta de Desenvolvimento (1 Lã + 1 Trigo + 1 Minério)" arrow placement="top">
+                  <span>
+                    <button
+                      type="button"
+                      className="cu-build-tile"
+                      disabled={!canBuyDev}
+                      onClick={buyDevCard}
+                    >
+                      <span className="cu-build-tile__emoji" aria-hidden="true">
+                        🃏
+                      </span>
+                      <span className="cu-build-tile__name">Carta Dev</span>
+                      <span className="cu-build-tile__stock">+1</span>
+                    </button>
+                  </span>
+                </Tooltip>
+              </div>
 
+              <div className="cu-tactical-strip">
+                <Button
+                  disabled={tradeActions.length === 0 || isPlayingDevCard}
+                  variant="contained"
+                  color="secondary"
+                  className="cu-tactical-btn"
+                  startIcon={<AccountBalanceIcon fontSize="small" />}
+                  onClick={() => setTradeModalOpen(true)}
+                >
+                  Trocar
+                </Button>
+
+                <OptionsButton
+                  disabled={playableDevCardTypes.size === 0 || isPlayingDevCard}
+                  menuListId="use-menu-list"
+                  icon={<SimCardIcon fontSize="small" />}
+                  badgeCount={playableDevCardTypes.size}
+                  items={useItems}
+                >
+                  Usar Carta
+                </OptionsButton>
+
+                <Tooltip title="Tabela de Custos de Construção" arrow placement="top">
+                  <button
+                    type="button"
+                    className="cu-costs-icon-btn"
+                    onClick={() => setCostsModalOpen(true)}
+                    aria-label="Custos"
+                  >
+                    <MenuBookIcon fontSize="small" />
+                    <span>Custos</span>
+                  </button>
+                </Tooltip>
+              </div>
+            </>
+          ) : (
+            <div className="cu-status-panel">
+              <Prompt gameState={gameState} isBotThinking={isBotThinking} />
+              {gameState.winning_color && (
+                <Link to="/" className="cu-victory-lobby-btn">
+                  🔄 Nova Partida / Lobby
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* CENTER ZONE: Illustrated Hand Deck (Always visible in player perspective) */}
+        {humanColor && (
+          <div className="cu-console__hand">
+            <ResourceCards
+              playerState={gameState.player_state}
+              playerKey={playerKey(gameState, humanColor)}
+              showEmptySlots={true}
+            />
+            <div
+              className={cn("cu-hand-limit-pill", {
+                "is-over-limit": myResourceTotal > discardLimit,
+              })}
+              title={`Total de cartas de recurso na mão: ${myResourceTotal}. Se tirar 7 nos dados acima de ${discardLimit}, descarta metade!`}
+            >
+              <span>Mão</span>
+              <strong>
+                {myResourceTotal}/{discardLimit}
+              </strong>
+            </div>
+          </div>
+        )}
+
+        {/* RIGHT ZONE: 2D6 Dice + Circular Golden CTA Orb */}
+        <div className="cu-console__cta-zone">
+          {latestDice && (
+            <div
+              className="dice-widget-pill"
+              title={`Última rolagem: ${latestDice[0]} + ${latestDice[1]} = ${diceSum}`}
+            >
+              <div className="dice-widget-pill__faces">
+                <DiceFaceSvg
+                  value={latestDice[0]}
+                  size={26}
+                  isHot={diceSum === 6 || diceSum === 8}
+                />
+                <DiceFaceSvg
+                  value={latestDice[1]}
+                  size={26}
+                  isHot={diceSum === 6 || diceSum === 8}
+                />
+              </div>
+              <span className="dice-widget-pill__sum">Σ {diceSum}</span>
+            </div>
+          )}
+
+          {isInteractiveTurn && (
+            <button
+              type="button"
+              disabled={
+                gameState.is_initial_build_phase ||
+                isRoadBuilding ||
+                isSubmitting
+              }
+              onClick={ctaConfig.onClick}
+              className={cn("cu-cta-orb", `cu-cta-orb--${ctaConfig.variant}`)}
+              aria-label={ctaConfig.label}
+              title={ctaConfig.label}
+            >
+              <span className="cu-cta-orb__icon" aria-hidden="true">
+                {ctaConfig.icon}
+              </span>
+              <span className="cu-cta-orb__label">{ctaConfig.label}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Modals & Dialogs */}
       <TradeModal
         open={tradeModalOpen}
         onClose={() => setTradeModalOpen(false)}
         tradeActions={tradeActions}
         playerState={gameState.player_state}
-        playerKey={key}
+        playerKey={activeKey}
         onExecuteTrade={executeGameAction}
       />
 
@@ -465,100 +678,6 @@ function PlayButtons() {
         discardResourceCounts={getDiscardResourceCounts()}
         submitting={isSubmitting}
       />
-    </>
-  );
-}
-
-export default function ActionsToolbar({
-  isBotThinking,
-  replayMode,
-}: {
-  isBotThinking: boolean;
-  replayMode: boolean;
-}) {
-  const { state, dispatch } = useContext(store);
-  const { gameState } = state;
-  if (gameState === null) {
-    console.error("No gameState found...");
-    return null;
-  }
-  const openLeftDrawer = useCallback(() => {
-    dispatch({
-      type: ACTIONS.SET_LEFT_DRAWER_OPENED,
-      data: true,
-    });
-  }, [dispatch]);
-
-  const openRightDrawer = useCallback(() => {
-    dispatch({
-      type: ACTIONS.SET_RIGHT_DRAWER_OPENED,
-      data: true,
-    });
-  }, [dispatch]);
-
-  const botsTurn = gameState.bot_colors.includes(gameState.current_color);
-  const isOtherHumansTurn =
-    !botsTurn &&
-    state.perspective !== null &&
-    gameState.current_color !== state.perspective;
-  const humanColor = getHumanColor(gameState, state.perspective);
-  const latestDice = useMemo(() => getLatestRollPair(gameState), [gameState]);
-  const diceSum = latestDice ? latestDice[0] + latestDice[1] : null;
-
-  return (
-    <div className="hud-bottom-dock">
-      <div className="state-summary">
-        <Hidden breakpoint={{ size: "md", direction: "up" }}>
-          <Button className="open-drawer-btn" onClick={openLeftDrawer}>
-            <ChevronLeftIcon />
-          </Button>
-        </Hidden>
-
-        {humanColor && (
-          <ResourceCards
-            playerState={gameState.player_state}
-            playerKey={playerKey(gameState, humanColor)}
-            showEmptySlots={true}
-          />
-        )}
-
-        {latestDice && (
-          <div
-            className="dice-widget-pill"
-            title={`Última rolagem: ${latestDice[0]} + ${latestDice[1]} = ${diceSum}`}
-          >
-            <DiceFaceSvg
-              value={latestDice[0]}
-              size={28}
-              isHot={diceSum === 6 || diceSum === 8}
-            />
-            <DiceFaceSvg
-              value={latestDice[1]}
-              size={28}
-              isHot={diceSum === 6 || diceSum === 8}
-            />
-            <span className="dice-widget-pill__sum">= {diceSum}</span>
-          </div>
-        )}
-
-        <Hidden breakpoint={{ size: "lg", direction: "up" }}>
-          <Button
-            className="open-drawer-btn"
-            onClick={openRightDrawer}
-            style={{ marginLeft: "auto" }}
-          >
-            <ChevronRightIcon />
-          </Button>
-        </Hidden>
-      </div>
-
-      <div className="actions-toolbar">
-        {!(botsTurn || isOtherHumansTurn || gameState.winning_color) &&
-          !replayMode && <PlayButtons />}
-        {(botsTurn || isOtherHumansTurn || gameState.winning_color) && (
-          <Prompt gameState={gameState} isBotThinking={isBotThinking} />
-        )}
-      </div>
     </div>
   );
 }
@@ -571,10 +690,11 @@ type OptionItem = {
 
 type OptionsButtonProps = {
   menuListId: string;
-  icon: any;
+  icon: React.ReactNode;
   children: React.ReactNode;
   items: OptionItem[];
   disabled: boolean;
+  badgeCount?: number;
 };
 
 function OptionsButton({
@@ -583,9 +703,10 @@ function OptionsButton({
   children,
   items,
   disabled,
+  badgeCount = 0,
 }: OptionsButtonProps) {
   const [open, setOpen] = useState(false);
-  const anchorRef = useRef<HTMLAnchorElement>(null);
+  const anchorRef = useRef<HTMLButtonElement>(null);
 
   const handleToggle = () => {
     setOpen((prevOpen) => !prevOpen);
@@ -614,7 +735,6 @@ function OptionsButton({
     if (prevOpen.current === true && open === false) {
       anchorRef.current && anchorRef.current.focus();
     }
-
     prevOpen.current = open;
   }, [open]);
 
@@ -623,16 +743,18 @@ function OptionsButton({
       <Button
         disabled={disabled}
         ref={anchorRef}
-        href="#"
         aria-controls={open ? menuListId : undefined}
         aria-haspopup="true"
         variant="contained"
         color="secondary"
-        className="hud-btn"
+        className="cu-tactical-btn"
         startIcon={icon}
         onClick={handleToggle}
       >
         {children}
+        {badgeCount > 0 && !disabled && (
+          <span className="cu-tactical-badge">{badgeCount}</span>
+        )}
       </Button>
       <Popper
         className="action-popover"
@@ -641,6 +763,7 @@ function OptionsButton({
         role={undefined}
         transition
         disablePortal
+        placement="top-start"
       >
         {({ TransitionProps, placement }) => (
           <Grow

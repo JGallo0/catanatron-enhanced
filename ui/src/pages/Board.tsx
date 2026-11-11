@@ -78,10 +78,10 @@ export default function Board({
   isMovingRobber,
   robberCoordinates,
 }: BoardProps) {
-  // Exact available viewport after accounting for LeftDrawer (300px on desktop) and top/bottom HUD bars
+  // Exact available viewport after accounting for PlayerTopBar (~145px) and Catan Universe bottom console (~105px)
   const leftSidebarWidth = 0;
   const canvasWidth = Math.max(320, width - leftSidebarWidth);
-  const canvasHeight = Math.max(320, height - (isMobile ? 280 : 265));
+  const canvasHeight = Math.max(320, height - (isMobile ? 255 : 238));
 
   const center: [number, number] = [canvasWidth / 2, canvasHeight / 2];
   const size = computeDefaultSize(canvasWidth - 24, canvasHeight - 24);

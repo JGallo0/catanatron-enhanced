@@ -1,17 +1,17 @@
 @use "../variables.scss";
 
 .prompt {
-  padding: variables.$sm-gutter;
-
-  height: 60px;
+  padding: 4px 8px;
+  min-height: 28px;
   width: 100%;
-  font-size: 1rem;
-
-  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-
-  overflow-x: auto;
-  white-space: nowrap;
+  justify-content: center;
+  white-space: normal;
+  line-height: 1.25;
 }

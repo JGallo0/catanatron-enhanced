@@ -156,9 +156,31 @@
     }
 
     &--vp {
-      justify-content: flex-start;
-      padding-left: 16px;
-      background: rgba(0, 0, 0, 0.25);
+      justify-content: space-between;
+      padding: 0 10px 0 12px;
+      background: rgba(0, 0, 0, 0.28);
+      gap: 6px;
+    }
+  }
+
+  .cu-pieces-mini {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .cu-piece-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #94a3b8;
+    font-variant-numeric: tabular-nums;
+
+    svg {
+      color: var(--cu-color);
+      opacity: 0.9;
     }
   }
 
@@ -183,6 +205,19 @@
       height: 18px;
       flex-shrink: 0;
       filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+    }
+
+    &__medallion {
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 1px solid #facc15;
+      box-shadow: 0 0 8px rgba(250, 204, 21, 0.85);
+      flex-shrink: 0;
     }
 
     /* Warning when hand has > 7 cards */

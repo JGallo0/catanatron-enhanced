@@ -118,22 +118,35 @@ export default function ResourceCards({
               resource={res}
               className="resource-card-item__bg-art"
             />
-            <div className="resource-card-item__inner">
-              <div className="resource-card-item__badge">
-                <ResourceIcon
-                  resource={res}
-                  size={compact ? 15 : showEmptySlots ? 20 : 18}
-                />
+            {showEmptySlots ? (
+              <div className="resource-card-item__deck-chrome">
+                <div className="resource-card-item__top-row">
+                  <span className="resource-card-item__crest">
+                    <ResourceIcon resource={res} size={13} />
+                  </span>
+                  <span
+                    className={cn("resource-card-item__qty-pill", {
+                      "resource-card-item__qty-pill--zero": count === 0,
+                    })}
+                  >
+                    {count}
+                  </span>
+                </div>
+                <div className="resource-card-item__ribbon">{meta.label}</div>
               </div>
-              <span className="resource-card-item__count">
-                {showEmptySlots ? `×${count}` : count}
-              </span>
-              {!compact && (
-                <span className="resource-card-item__label">
-                  {showEmptySlots ? meta.label : meta.shortLabel}
-                </span>
-              )}
-            </div>
+            ) : (
+              <div className="resource-card-item__inner">
+                <div className="resource-card-item__badge">
+                  <ResourceIcon resource={res} size={compact ? 15 : 18} />
+                </div>
+                <span className="resource-card-item__count">{count}</span>
+                {!compact && (
+                  <span className="resource-card-item__label">
+                    {meta.shortLabel}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -158,9 +171,36 @@ export default function ResourceCards({
                   borderRadius: 10,
                   overflow: "hidden",
                   boxShadow: "0 12px 28px rgba(0,0,0,0.85)",
+                  border: `2px solid ${meta.accentColor}`,
+                  position: "relative",
+                  background: "#0f172a",
                 }}
               >
                 <CardArtIllustration cardType={id} />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: "auto 0 0 0",
+                    padding: "8px 10px",
+                    background:
+                      "linear-gradient(180deg, transparent 0%, rgba(2,6,23,0.94) 35%)",
+                    color: "#f8fafc",
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: "0.85rem" }}>
+                    {meta.label}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.68rem",
+                      color: "#cbd5e1",
+                      lineHeight: 1.25,
+                      marginTop: 2,
+                    }}
+                  >
+                    {meta.description}
+                  </div>
+                </div>
               </div>
             }
             slotProps={{
@@ -188,23 +228,33 @@ export default function ResourceCards({
                 cardType={id}
                 className="resource-card-item__bg-art"
               />
-              <div
-                className="resource-card-item__inner"
-                title={`${count} ${titleLabel} Card(s)`}
-              >
-                <div className="resource-card-item__badge">
-                  <DevCardIcon
-                    card={id}
-                    size={compact ? 15 : showEmptySlots ? 20 : 18}
-                  />
+              {showEmptySlots ? (
+                <div
+                  className="resource-card-item__deck-chrome"
+                  title={`${count} ${titleLabel} Card(s)`}
+                >
+                  <div className="resource-card-item__top-row">
+                    <span className="resource-card-item__crest">
+                      <DevCardIcon card={id} size={13} />
+                    </span>
+                    <span className="resource-card-item__qty-pill">
+                      {count}
+                    </span>
+                  </div>
+                  <div className="resource-card-item__ribbon">{ptLabel}</div>
                 </div>
-                <span className="resource-card-item__count">
-                  {showEmptySlots ? `×${count}` : count}
-                </span>
-                <span className="resource-card-item__label">
-                  {showEmptySlots ? ptLabel : code}
-                </span>
-              </div>
+              ) : (
+                <div
+                  className="resource-card-item__inner"
+                  title={`${count} ${titleLabel} Card(s)`}
+                >
+                  <div className="resource-card-item__badge">
+                    <DevCardIcon card={id} size={compact ? 15 : 18} />
+                  </div>
+                  <span className="resource-card-item__count">{count}</span>
+                  <span className="resource-card-item__label">{code}</span>
+                </div>
+              )}
             </div>
           </Tooltip>
         );

@@ -135,7 +135,7 @@ export default function PlayerStateBox({
             className="player-piece-badge__road-icon"
             style={{
               background: `linear-gradient(90deg, ${colorMeta.secondary}, ${colorMeta.primary})`,
-              borderColor: colorMeta.stroke,
+              borderColor: colorMeta.dark,
             }}
           />
           <div className="player-piece-badge__text">

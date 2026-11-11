@@ -92,9 +92,9 @@ export function humanizeActionRecordPt(
       const tile = findTileByCoordinate(gameState, robAction[2][0]);
       const tileInfo = tile.tile;
       const tileStr =
-        tileInfo.type === "DESERT"
-          ? "o Deserto"
-          : `${tileInfo.number} (${resPt(tileInfo.resource)})`;
+        tileInfo.type === "RESOURCE_TILE"
+          ? `${tileInfo.number} (${resPt(tileInfo.resource)})`
+          : "o Deserto";
       const robbedResource = actionRecord[1] as ResourceCard | null;
       const stolenStr = robbedResource ? ` e roubou ${resPt(robbedResource)}` : "";
       return `${player} moveu o Ladrão para ${tileStr}${stolenStr}`;

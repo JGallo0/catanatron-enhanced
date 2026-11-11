@@ -3,7 +3,6 @@ import type {
   DevelopmentCard,
   Direction,
   GameAction,
-  GameActionRecord,
   GameEdge,
   GameNode,
   GameState,
@@ -892,7 +891,8 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
             coordKey(pt.coordinate) !== coordKey(state.robber_coordinate)
           ) {
             const adj = state.adjacent_tiles[String(n.id)] || [];
-            if (adj.some((t) => "id" in t && t.id === pt.tile.id)) {
+            const targetTileId = pt.tile.id;
+            if (adj.some((t) => "id" in t && t.id === targetTileId)) {
               ps[`${nk}_${pt.tile.resource}_IN_HAND`] =
                 (ps[`${nk}_${pt.tile.resource}_IN_HAND`] ?? 0) + qty;
             }
