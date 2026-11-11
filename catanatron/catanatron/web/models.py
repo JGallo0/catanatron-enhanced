@@ -1,9 +1,11 @@
 """Persisting games as a document plus what happened to it, plus multiplayer rooms."""
 
 import hashlib
+import hmac
 import json
 import os
 import random
+import secrets
 import string
 import time
 import uuid
@@ -20,8 +22,21 @@ from catanatron.serialization import (
     state_from_json,
     state_to_json,
 )
-from catanatron.state_functions import get_state_index
-from sqlalchemy import Column, ForeignKey, Integer, MetaData, String, create_engine
+from catanatron.state_functions import get_actual_victory_points, get_state_index
+from sqlalchemy import (
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    MetaData,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+    inspect,
+    text,
+)
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 from flask_sqlalchemy import SQLAlchemy
@@ -31,6 +46,7 @@ metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
 SEAT_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"]
+SESSION_TTL_SECONDS = 90 * 24 * 60 * 60
 
 
 class StoredGame(Base):
@@ -45,6 +61,7 @@ class StoredGame(Base):
     base_state = Column(String, nullable=False)
     head_index = Column(Integer, nullable=False)
     head_state = Column(String, nullable=False)
+    seat_metadata_json = Column(Text, nullable=True)
 
 
 class StoredAction(Base):
@@ -71,14 +88,37 @@ class StoredRoom(Base):
 
 
 class StoredUser(Base):
-    """A lightweight player account so friends can log in from any device and resume rooms/games."""
+    """Persistent registered human account."""
 
     __tablename__ = "users"
 
     username = Column(String(32), primary_key=True)
     display_name = Column(String(48), nullable=False)
-    pin_hash = Column(String(128), nullable=False)
-    auth_token = Column(String(64), nullable=False)
+    pin_hash = Column(String(128), nullable=True)
+    auth_token = Column(String(64), nullable=True)
+    password_hash = Column(String(256), nullable=True)
+    google_sub = Column(String(64), unique=True, index=True, nullable=True)
+    email = Column(String(255), index=True, nullable=True)
+    avatar_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
+
+
+class StoredSession(Base):
+    """Per-device session token allowing simultaneous logins and isolated logout."""
+
+    __tablename__ = "user_sessions"
+
+    token = Column(String(64), primary_key=True)
+    username = Column(
+        String(32), ForeignKey("users.username"), index=True, nullable=False
+    )
+    created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
+    last_seen_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
+    expires_at = Column(
+        Integer,
+        nullable=False,
+        default=lambda: int(time.time()) + SESSION_TTL_SECONDS,
+    )
 
 
 db = SQLAlchemy(metadata=metadata)
@@ -260,6 +300,210 @@ def login_or_register_user(
         session.commit()
 
     return user, False
+
+
+def ensure_schema_columns(engine) -> None:
+    """Idempotently add new columns when upgrading an existing SQLite/Postgres DB."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    alter_statements: list[str] = []
+
+    if "users" in tables:
+        user_cols = {col["name"] for col in inspector.get_columns("users")}
+        if "password_hash" not in user_cols:
+            alter_statements.append(
+                "ALTER TABLE users ADD COLUMN password_hash VARCHAR(256)"
+            )
+        if "google_sub" not in user_cols:
+            alter_statements.append("ALTER TABLE users ADD COLUMN google_sub VARCHAR(64)")
+        if "email" not in user_cols:
+            alter_statements.append("ALTER TABLE users ADD COLUMN email VARCHAR(255)")
+        if "avatar_json" not in user_cols:
+            alter_statements.append(
+                "ALTER TABLE users ADD COLUMN avatar_json TEXT DEFAULT '{}'"
+            )
+        if "created_at" not in user_cols:
+            alter_statements.append(
+                "ALTER TABLE users ADD COLUMN created_at INTEGER DEFAULT 0"
+            )
+
+    if "games" in tables:
+        game_cols = {col["name"] for col in inspector.get_columns("games")}
+        if "seat_metadata_json" not in game_cols:
+            alter_statements.append("ALTER TABLE games ADD COLUMN seat_metadata_json TEXT")
+
+    if alter_statements:
+        with engine.begin() as conn:
+            for stmt in alter_statements:
+                conn.execute(text(stmt))
+            if "users" in tables:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_sub ON users (google_sub)"
+                    )
+                )
+
+
+def _normalize_username(username: str) -> str:
+    return "".join(
+        ch
+        for ch in (username or "").lower().strip()
+        if ch.isalnum() or ch in ("_", "-")
+    )[:24]
+
+
+def _hash_legacy_pin(username: str, pin: str) -> str:
+    payload = f"catanatron:{username.lower().strip()}:{pin.strip()}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000
+    ).hex()
+    return f"pbkdf2_sha256${salt}${digest}"
+
+
+def verify_password(user: StoredUser, password: str) -> bool:
+    if user.password_hash and user.password_hash.startswith("pbkdf2_sha256$"):
+        try:
+            _, salt, expected_digest = user.password_hash.split("$", 2)
+        except ValueError:
+            return False
+        actual = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000
+        ).hex()
+        return hmac.compare_digest(actual, expected_digest)
+    if user.pin_hash:
+        expected_legacy = _hash_legacy_pin(user.username, password.strip())
+        return hmac.compare_digest(user.pin_hash, expected_legacy)
+    return False
+
+
+def create_user_session(username: str, session_param=None) -> StoredSession:
+    session = session_param or db.session
+    now = int(time.time())
+    sess = StoredSession(
+        token=f"sess_{secrets.token_hex(24)}",
+        username=username,
+        created_at=now,
+        last_seen_at=now,
+        expires_at=now + SESSION_TTL_SECONDS,
+    )
+    session.add(sess)
+    session.commit()
+    return sess
+
+
+def resolve_user_from_token(token: str | None, session_param=None) -> StoredUser | None:
+    clean_token = (token or "").strip()
+    if not clean_token:
+        return None
+    session = session_param or db.session
+    now = int(time.time())
+    sess = session.get(StoredSession, clean_token)
+    if sess is not None:
+        if sess.expires_at < now:
+            session.delete(sess)
+            session.commit()
+            return None
+        sess.last_seen_at = now
+        session.commit()
+        return session.get(StoredUser, sess.username)
+    # Retrocompatibilidade com token legado único salvo em StoredUser.auth_token
+    return session.query(StoredUser).filter_by(auth_token=clean_token).first()
+
+
+def revoke_session_token(token: str | None, session_param=None) -> bool:
+    clean_token = (token or "").strip()
+    if not clean_token:
+        return False
+    session = session_param or db.session
+    sess = session.get(StoredSession, clean_token)
+    if sess is None:
+        return False
+    session.delete(sess)
+    session.commit()
+    return True
+
+
+def serialize_user(user: StoredUser, stats: dict | None = None) -> dict:
+    try:
+        avatar_cfg = json.loads(user.avatar_json or "{}")
+    except Exception:
+        avatar_cfg = {}
+    payload = {
+        "username": user.username,
+        "display_name": user.display_name,
+        "has_google": bool(user.google_sub),
+        "avatar_config": avatar_cfg if isinstance(avatar_cfg, dict) else {},
+    }
+    if stats is not None:
+        payload["stats"] = stats
+    return payload
+
+
+def register_user(
+    username: str, password: str, display_name: str | None = None
+) -> tuple[StoredUser, StoredSession]:
+    session = db.session
+    clean_user = _normalize_username(username)
+    if len(clean_user) < 2:
+        abort(400, description="O usuário deve ter pelo menos 2 caracteres alfanuméricos")
+    raw_password = password or ""
+    if not 4 <= len(raw_password) <= 128:
+        abort(400, description="A senha deve ter entre 4 e 128 caracteres")
+
+    if session.get(StoredUser, clean_user) is not None:
+        abort(409, description="Este nome de usuário já está cadastrado. Use a aba Entrar.")
+
+    clean_display = (display_name or username).strip()[:32] or clean_user
+    user = StoredUser(
+        username=clean_user,
+        display_name=clean_display,
+        password_hash=hash_password(raw_password),
+        pin_hash="",
+        auth_token=secrets.token_hex(16),
+        avatar_json="{}",
+        created_at=int(time.time()),
+    )
+    session.add(user)
+    session.commit()
+    sess = create_user_session(clean_user, session)
+    return user, sess
+
+
+def authenticate_user(username: str, password: str) -> tuple[StoredUser, StoredSession]:
+    session = db.session
+    clean_user = _normalize_username(username)
+    raw_password = password or ""
+    if len(clean_user) < 2 or len(raw_password) < 3:
+        abort(401, description="Usuário ou senha incorretos")
+
+    user = session.get(StoredUser, clean_user)
+    if user is None or not verify_password(user, raw_password):
+        abort(401, description="Usuário ou senha incorretos")
+
+    # Upgrade transparente de hash legado SHA-256 para PBKDF2 com salt aleatório
+    if not user.password_hash:
+        user.password_hash = hash_password(raw_password)
+        session.commit()
+
+    sess = create_user_session(clean_user, session)
+    return user, sess
+
+
+def update_user_profile(
+    user: StoredUser, display_name: str | None = None, avatar_config: dict | None = None
+) -> StoredUser:
+    session = db.session
+    if display_name is not None and display_name.strip():
+        user.display_name = display_name.strip()[:32]
+    if avatar_config is not None and isinstance(avatar_config, dict):
+        user.avatar_json = json.dumps(avatar_config)
+    session.commit()
+    return user
 
 
 def create_room(

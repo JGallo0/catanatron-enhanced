@@ -39,11 +39,12 @@ def create_app(test_config=None):
         app.config.update(test_config)
 
     # ===== Initialize Database
-    from catanatron.web.models import db
+    from catanatron.web.models import db, ensure_schema_columns
 
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        ensure_schema_columns(db.engine)
 
     # ===== Initialize Routes
     from . import api
