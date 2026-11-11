@@ -121,6 +121,49 @@ class StoredSession(Base):
     )
 
 
+class StoredMatch(Base):
+    """Completed game outcome persisted once per finished game."""
+
+    __tablename__ = "matches"
+
+    game_id = Column(String(64), primary_key=True)
+    room_code = Column(String(16), index=True, nullable=True)
+    mode = Column(String(16), nullable=False, default="SOLO")
+    map_template = Column(String(24), nullable=False, default="BASE")
+    vps_to_win = Column(Integer, nullable=False, default=10)
+    num_turns = Column(Integer, nullable=False, default=0)
+    winning_color = Column(String(16), nullable=False)
+    winner_name = Column(String(64), nullable=False)
+    winner_username = Column(String(32), index=True, nullable=True)
+    winner_is_bot = Column(Boolean, nullable=False, default=False)
+    finished_at = Column(
+        Integer, index=True, nullable=False, default=lambda: int(time.time())
+    )
+
+
+class StoredMatchParticipant(Base):
+    """Per-seat participation record linking finished games back to registered users."""
+
+    __tablename__ = "match_participants"
+    __table_args__ = (
+        UniqueConstraint("game_id", "color", name="uq_match_participant_game_color"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(
+        String(64), ForeignKey("matches.game_id"), index=True, nullable=False
+    )
+    color = Column(String(16), nullable=False)
+    seat_kind = Column(String(16), nullable=False)  # "USER" | "GUEST" | "BOT"
+    username = Column(
+        String(32), ForeignKey("users.username"), index=True, nullable=True
+    )
+    player_key = Column(String(32), nullable=False)
+    display_name = Column(String(64), nullable=False)
+    victory_points = Column(Integer, nullable=False, default=0)
+    is_winner = Column(Boolean, nullable=False, default=False)
+
+
 db = SQLAlchemy(metadata=metadata)
 
 
@@ -139,7 +182,9 @@ def database_session():
         session.close()
 
 
-def upsert_game_state(game: Game, session_param=None):
+def upsert_game_state(
+    game: Game, session_param=None, seat_metadata_by_color: dict | None = None
+):
     """Save a game: create its row the first time, then append what is new."""
     session = session_param or db.session
     head = get_state_index(game.state)
@@ -157,6 +202,11 @@ def upsert_game_state(game: Game, session_param=None):
             base_state=document,
             head_index=head,
             head_state=document,
+            seat_metadata_json=(
+                json.dumps(seat_metadata_by_color)
+                if seat_metadata_by_color is not None
+                else None
+            ),
         )
         session.add(stored)
 
@@ -517,13 +567,324 @@ def login_with_google_claims(claims: dict) -> tuple[StoredUser, StoredSession, b
     return user, sess, True
 
 
+COLOR_LABELS_PT = {
+    "RED": "Vermelho",
+    "BLUE": "Azul",
+    "ORANGE": "Laranja",
+    "WHITE": "Branco",
+}
+
+
+def build_seat_metadata_for_game(
+    player_keys: list,
+    auth_user: StoredUser | None = None,
+    host_name: str | None = None,
+) -> dict[str, dict]:
+    """Seat metadata keyed by color.
+
+    ``REGISTRY.build_all`` pairs the i-th spec with the i-th ``Color``, so the
+    i-th spec sits on ``SEAT_COLORS[i]``. ``State.__init__`` only shuffles the
+    turn order (``state.players``); each player keeps its color, so metadata
+    keyed by color stays correct regardless of the shuffle.
+    """
+    by_color: dict[str, dict] = {}
+    human_assigned = False
+    for idx, spec in enumerate(player_keys):
+        color = SEAT_COLORS[idx]
+        key = (
+            str(spec["key"]).upper()
+            if isinstance(spec, dict)
+            else str(spec).split(":")[0].upper()
+        )
+        if key == "HUMAN":
+            if not human_assigned and auth_user is not None:
+                by_color[color] = {
+                    "color": color,
+                    "seat_kind": "USER",
+                    "username": auth_user.username,
+                    "player_key": "HUMAN",
+                    "display_name": auth_user.display_name,
+                }
+            else:
+                guest_label = (
+                    (host_name or "").strip()[:32]
+                    if not human_assigned and (host_name or "").strip()
+                    else COLOR_LABELS_PT[color]
+                )
+                by_color[color] = {
+                    "color": color,
+                    "seat_kind": "GUEST",
+                    "username": None,
+                    "player_key": "HUMAN",
+                    "display_name": guest_label,
+                }
+            human_assigned = True
+        else:
+            by_color[color] = {
+                "color": color,
+                "seat_kind": "BOT",
+                "username": None,
+                "player_key": key,
+                "display_name": f"IA ({key})",
+            }
+    return by_color
+
+
+def _detect_map_template(game: Game) -> str:
+    land_count = len(game.state.board.map.land_tiles)
+    if land_count <= 7:
+        return "MINI"
+    return "BASE"
+
+
+def record_completed_match(game: Game, session_param=None) -> StoredMatch | None:
+    session = session_param or db.session
+    winner = game.winning_color()
+    if winner is None:
+        return None
+
+    existing = session.get(StoredMatch, game.id)
+    if existing is not None:
+        return existing
+
+    stored_game = session.get(StoredGame, game.id)
+    room = get_room_by_game_id(game.id)
+
+    seat_meta: dict[str, dict] = {}
+    if stored_game and stored_game.seat_metadata_json:
+        try:
+            seat_meta = json.loads(stored_game.seat_metadata_json)
+        except Exception:
+            seat_meta = {}
+    elif room is not None:
+        try:
+            for seat in json.loads(room.seats_json):
+                c = seat["color"]
+                is_bot = seat.get("player_key", "HUMAN") != "HUMAN"
+                uname = seat.get("username") if not is_bot else None
+                seat_meta[c] = {
+                    "color": c,
+                    "seat_kind": "BOT" if is_bot else ("USER" if uname else "GUEST"),
+                    "username": uname,
+                    "player_key": seat.get("player_key", "HUMAN"),
+                    "display_name": seat.get("player_name")
+                    or COLOR_LABELS_PT.get(c, c),
+                }
+        except Exception:
+            seat_meta = {}
+
+    win_color_str = winner.value
+    participants_rows: list[StoredMatchParticipant] = []
+    seen_usernames: set[str] = set()
+    winner_name = COLOR_LABELS_PT.get(win_color_str, win_color_str)
+    winner_username: str | None = None
+    winner_is_bot = False
+    human_count = 0
+
+    for player in game.state.players:
+        c = player.color.value
+        meta = seat_meta.get(c, {})
+        key = (
+            meta.get("player_key")
+            or getattr(player, "registry_key", None)
+            or ("HUMAN" if not player.is_bot else "BOT")
+        )
+        seat_kind = meta.get("seat_kind") or ("BOT" if player.is_bot else "GUEST")
+        uname = meta.get("username") if seat_kind == "USER" else None
+        if uname and uname in seen_usernames:
+            # Garante no máximo uma atribuição por usuário na mesma partida
+            uname = None
+            seat_kind = "GUEST"
+        if uname:
+            seen_usernames.add(uname)
+        if not player.is_bot:
+            human_count += 1
+
+        dname = meta.get("display_name") or (
+            f"IA ({key})" if player.is_bot else COLOR_LABELS_PT.get(c, c)
+        )
+        vps = int(get_actual_victory_points(game.state, player.color))
+        is_win = c == win_color_str
+        if is_win:
+            winner_name = dname
+            winner_username = uname
+            winner_is_bot = bool(player.is_bot)
+
+        participants_rows.append(
+            StoredMatchParticipant(
+                game_id=game.id,
+                color=c,
+                seat_kind=seat_kind,
+                username=uname,
+                player_key=str(key)[:32],
+                display_name=str(dname)[:64],
+                victory_points=vps,
+                is_winner=is_win,
+            )
+        )
+
+    mode = "MULTIPLAYER" if (room is not None or human_count >= 2) else "SOLO"
+    map_template = _detect_map_template(game)
+    if room is not None:
+        try:
+            map_template = json.loads(room.config_json).get("map_template", map_template)
+        except Exception:
+            pass
+
+    match_row = StoredMatch(
+        game_id=game.id,
+        room_code=room.room_code if room is not None else None,
+        mode=mode,
+        map_template=str(map_template)[:24],
+        vps_to_win=int(game.vps_to_win),
+        num_turns=int(game.state.num_turns),
+        winning_color=win_color_str,
+        winner_name=str(winner_name)[:64],
+        winner_username=winner_username,
+        winner_is_bot=winner_is_bot,
+        finished_at=int(time.time()),
+    )
+
+    try:
+        session.add(match_row)
+        session.flush()
+        for row in participants_rows:
+            session.add(row)
+        session.commit()
+        return match_row
+    except IntegrityError:
+        session.rollback()
+        return session.get(StoredMatch, game.id)
+
+
 def get_user_stats(username: str) -> dict:
+    rows = (
+        db.session.query(StoredMatchParticipant)
+        .filter_by(username=username, seat_kind="USER")
+        .all()
+    )
+    games_played = len(rows)
+    wins = sum(1 for r in rows if r.is_winner)
+    losses = max(0, games_played - wins)
+    win_rate = round((wins / games_played) * 100.0, 1) if games_played > 0 else 0.0
     return {
-        "wins": 0,
-        "losses": 0,
-        "games_played": 0,
-        "win_rate": 0.0,
+        "wins": wins,
+        "losses": losses,
+        "games_played": games_played,
+        "win_rate": win_rate,
     }
+
+
+def get_leaderboard(limit: int = 100) -> list[dict]:
+    users = db.session.query(StoredUser).all()
+    participants = (
+        db.session.query(StoredMatchParticipant).filter_by(seat_kind="USER").all()
+    )
+    counts: dict[str, list[int]] = {}
+    for p in participants:
+        if not p.username:
+            continue
+        bucket = counts.setdefault(p.username, [0, 0])  # [wins, games]
+        bucket[1] += 1
+        if p.is_winner:
+            bucket[0] += 1
+
+    board = []
+    for u in users:
+        wins, games_played = counts.get(u.username, [0, 0])
+        losses = max(0, games_played - wins)
+        win_rate = (
+            round((wins / games_played) * 100.0, 1) if games_played > 0 else 0.0
+        )
+        try:
+            avatar_cfg = json.loads(u.avatar_json or "{}")
+        except Exception:
+            avatar_cfg = {}
+        board.append(
+            {
+                "username": u.username,
+                "display_name": u.display_name,
+                "avatar_config": avatar_cfg if isinstance(avatar_cfg, dict) else {},
+                "wins": wins,
+                "losses": losses,
+                "games_played": games_played,
+                "win_rate": win_rate,
+            }
+        )
+
+    board.sort(
+        key=lambda item: (
+            -item["wins"],
+            -item["win_rate"],
+            -item["games_played"],
+            item["username"],
+        )
+    )
+    trimmed = board[:limit]
+    for idx, entry in enumerate(trimmed, start=1):
+        entry["rank"] = idx
+    return trimmed
+
+
+def get_match_history(username: str | None = None, limit: int = 30) -> list[dict]:
+    query = db.session.query(StoredMatch)
+    if username:
+        clean_user = _normalize_username(username)
+        game_ids = [
+            r.game_id
+            for r in db.session.query(StoredMatchParticipant.game_id)
+            .filter_by(username=clean_user, seat_kind="USER")
+            .all()
+        ]
+        if not game_ids:
+            return []
+        query = query.filter(StoredMatch.game_id.in_(game_ids))
+
+    matches = query.order_by(StoredMatch.finished_at.desc()).limit(limit).all()
+    if not matches:
+        return []
+
+    m_ids = [m.game_id for m in matches]
+    all_parts = (
+        db.session.query(StoredMatchParticipant)
+        .filter(StoredMatchParticipant.game_id.in_(m_ids))
+        .all()
+    )
+    parts_by_game: dict[str, list[dict]] = {}
+    for p in all_parts:
+        parts_by_game.setdefault(p.game_id, []).append(
+            {
+                "color": p.color,
+                "seat_kind": p.seat_kind,
+                "username": p.username,
+                "player_key": p.player_key,
+                "display_name": p.display_name,
+                "victory_points": p.victory_points,
+                "is_winner": p.is_winner,
+            }
+        )
+
+    result = []
+    for m in matches:
+        parts = parts_by_game.get(m.game_id, [])
+        parts.sort(key=lambda item: (-int(item["is_winner"]), -item["victory_points"]))
+        result.append(
+            {
+                "game_id": m.game_id,
+                "room_code": m.room_code,
+                "mode": m.mode,
+                "map_template": m.map_template,
+                "vps_to_win": m.vps_to_win,
+                "num_turns": m.num_turns,
+                "winning_color": m.winning_color,
+                "winner_name": m.winner_name,
+                "winner_username": m.winner_username,
+                "winner_is_bot": m.winner_is_bot,
+                "finished_at": m.finished_at,
+                "participants": parts,
+            }
+        )
+    return result
 
 
 def create_room(
@@ -534,6 +895,7 @@ def create_room(
     discard_limit: int = 7,
     friendly_robber: bool = True,
     host_token: str | None = None,
+    host_username: str | None = None,
 ) -> tuple[StoredRoom, str]:
     session = db.session
     room_code = _generate_room_code(session)
@@ -551,6 +913,8 @@ def create_room(
                     "player_key": "HUMAN",
                     "player_name": host_name.strip() or "Anfitrião",
                     "seat_token": resolved_host_token,
+                    "seat_kind": "USER" if host_username else "GUEST",
+                    "username": host_username,
                 }
             )
             host_seated = True
@@ -561,6 +925,8 @@ def create_room(
                     "player_key": "HUMAN",
                     "player_name": "Aguardando Amigo...",
                     "seat_token": None,
+                    "seat_kind": "GUEST",
+                    "username": None,
                 }
             )
         else:
@@ -570,6 +936,8 @@ def create_room(
                     "player_key": p_key,
                     "player_name": f"Bot ({p_key})",
                     "seat_token": None,
+                    "seat_kind": "BOT",
+                    "username": None,
                 }
             )
 

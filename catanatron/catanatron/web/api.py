@@ -14,13 +14,17 @@ from catanatron.web.models import (
     SEAT_COLORS,
     StoredRoom,
     authenticate_user,
+    build_seat_metadata_for_game,
     create_room,
     db,
     get_game_state,
+    get_leaderboard,
+    get_match_history,
     get_room_by_game_id,
     get_user_stats,
     list_active_rooms,
     login_with_google_claims,
+    record_completed_match,
     register_user,
     resolve_user_from_token,
     revoke_session_token,
@@ -105,7 +109,14 @@ def post_game_endpoint():
         vps_to_win=vps_to_win,
         catan_map=catan_map,
     )
-    upsert_game_state(game)
+    auth_user = resolve_user_from_token(_extract_auth_token())
+    host_name = request.json.get("host_name")
+    seat_meta = build_seat_metadata_for_game(
+        player_keys,
+        auth_user=auth_user,
+        host_name=str(host_name).strip() if host_name else None,
+    )
+    upsert_game_state(game, seat_metadata_by_color=seat_meta)
     return jsonify({"game_id": game.id})
 
 
@@ -253,6 +264,13 @@ def post_room_endpoint():
     discard_limit = int(body.get("discard_limit", 7))
     friendly_robber = bool(body.get("friendly_robber", True))
 
+    auth_user = resolve_user_from_token(_extract_auth_token())
+    if auth_user is not None:
+        host_name = (
+            host_name
+            if host_name and host_name != "Anfitrião"
+            else auth_user.display_name
+        )
     room, resolved_token = create_room(
         host_name=host_name,
         players=players,
@@ -260,7 +278,8 @@ def post_room_endpoint():
         vps_to_win=vps_to_win,
         discard_limit=discard_limit,
         friendly_robber=friendly_robber,
-        host_token=host_token,
+        host_token=host_token or _extract_auth_token(),
+        host_username=auth_user.username if auth_user else None,
     )
     return jsonify(
         {
@@ -290,6 +309,9 @@ def join_room_endpoint(room_code: str):
     player_name = str(body.get("player_name") or "Jogador").strip()[:32]
     preferred_color = body.get("preferred_color")
     token = body.get("token") or uuid.uuid4().hex
+    auth_user = resolve_user_from_token(_extract_auth_token())
+    seat_kind = "USER" if auth_user else "GUEST"
+    seat_username = auth_user.username if auth_user else None
 
     seats = json.loads(room.seats_json)
 
@@ -309,8 +331,12 @@ def join_room_endpoint(room_code: str):
             if current_seat and current_seat is not target:
                 current_seat["seat_token"] = None
                 current_seat["player_name"] = "Aguardando Amigo..."
+                current_seat["username"] = None
+                current_seat["seat_kind"] = "GUEST"
             target["seat_token"] = token
             target["player_name"] = player_name
+            target["seat_kind"] = seat_kind
+            target["username"] = seat_username
             room.seats_json = json.dumps(seats)
             db.session.commit()
             return jsonify(
@@ -323,6 +349,8 @@ def join_room_endpoint(room_code: str):
 
     if current_seat is not None:
         current_seat["player_name"] = player_name
+        current_seat["seat_kind"] = seat_kind
+        current_seat["username"] = seat_username
         room.seats_json = json.dumps(seats)
         db.session.commit()
         return jsonify(
@@ -343,6 +371,8 @@ def join_room_endpoint(room_code: str):
 
     open_seat["seat_token"] = token
     open_seat["player_name"] = player_name
+    open_seat["seat_kind"] = seat_kind
+    open_seat["username"] = seat_username
     room.seats_json = json.dumps(seats)
     db.session.commit()
 
@@ -404,6 +434,10 @@ def patch_room_endpoint(room_code: str):
                         "player_key": "HUMAN",
                         "player_name": item.get("player_name") or default_name,
                         "seat_token": seat_token,
+                        "seat_kind": (
+                            prev.get("seat_kind", "GUEST") if seat_token else "GUEST"
+                        ),
+                        "username": prev.get("username") if seat_token else None,
                     }
                 )
             else:
@@ -419,6 +453,8 @@ def patch_room_endpoint(room_code: str):
                         "player_key": p_key,
                         "player_name": bot_label,
                         "seat_token": None,
+                        "seat_kind": "BOT",
+                        "username": None,
                     }
                 )
         seats = updated_seats
@@ -458,7 +494,21 @@ def start_room_endpoint(room_code: str):
         vps_to_win=int(config.get("vps_to_win", 10)),
         catan_map=catan_map,
     )
-    upsert_game_state(game)
+    seat_meta = {
+        seat["color"]: {
+            "color": seat["color"],
+            "seat_kind": (
+                "BOT"
+                if seat["player_key"] != "HUMAN"
+                else ("USER" if seat.get("username") else "GUEST")
+            ),
+            "username": seat.get("username") if seat["player_key"] == "HUMAN" else None,
+            "player_key": seat["player_key"],
+            "display_name": seat.get("player_name") or seat["color"],
+        }
+        for seat in seats
+    }
+    upsert_game_state(game, seat_metadata_by_color=seat_meta)
 
     room.game_id = game.id
     room.status = "IN_PROGRESS"
@@ -489,6 +539,7 @@ def post_action_endpoint(game_id):
         abort(404, description="Resource not found")
 
     if game.winning_color() is not None:
+        record_completed_match(game)
         view = _enrich_view_with_room(game, web_view(game, _perspective(game)))
         return Response(
             response=json.dumps(view),
@@ -516,12 +567,28 @@ def post_action_endpoint(game_id):
         game.execute(action)
         upsert_game_state(game)
 
+    if game.winning_color() is not None:
+        record_completed_match(game)
+
     view = _enrich_view_with_room(game, web_view(game, _perspective(game)))
     return Response(
         response=json.dumps(view),
         status=200,
         mimetype="application/json",
     )
+
+
+@bp.route("/leaderboard", methods=("GET",))
+def get_leaderboard_endpoint():
+    limit = min(max(request.args.get("limit", 100, type=int), 1), 200)
+    return jsonify({"leaderboard": get_leaderboard(limit=limit)})
+
+
+@bp.route("/matches", methods=("GET",))
+def get_matches_endpoint():
+    username = request.args.get("username")
+    limit = min(max(request.args.get("limit", 30, type=int), 1), 100)
+    return jsonify({"matches": get_match_history(username=username, limit=limit)})
 
 
 @bp.route("/stress-test", methods=["GET"])

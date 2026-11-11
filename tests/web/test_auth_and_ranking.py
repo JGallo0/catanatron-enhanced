@@ -210,3 +210,151 @@ def test_google_auth_endpoint_creates_and_reuses_account(client, monkeypatch):
     )
     rejected = client.post("/api/auth/google", json={"credential": "invalid"})
     assert rejected.status_code == 401
+
+
+from catanatron.models.player import Color
+from catanatron.web.models import (
+    StoredGame,
+    StoredMatch,
+    StoredMatchParticipant,
+    get_game_state,
+    record_completed_match,
+    upsert_game_state,
+)
+
+
+def _force_win_and_record(app, game_id: str, winning_color: Color):
+    with app.app_context():
+        game = get_game_state(game_id)
+        idx = game.state.color_to_index[winning_color]
+        game.state.player_state[f"P{idx}_ACTUAL_VICTORY_POINTS"] = game.vps_to_win
+        game.state.player_state[f"P{idx}_VICTORY_POINTS"] = game.vps_to_win
+        upsert_game_state(game)
+        assert game.winning_color() == winning_color
+        # Chamar duas vezes para provar idempotência
+        record_completed_match(game)
+        record_completed_match(game)
+
+
+def test_ranking_counts_only_registered_humans_and_history_records_ai_wins(app, client):
+    joao_tok = client.post(
+        "/api/auth/register",
+        json={"username": "joao", "password": "pw1234", "display_name": "João"},
+    ).get_json()["auth_token"]
+    pedro_tok = client.post(
+        "/api/auth/register",
+        json={"username": "pedro", "password": "pw1234", "display_name": "Pedro"},
+    ).get_json()["auth_token"]
+
+    # 1. Partida Solo de João (HUMAN=RED) vs Bot (CATANATRON=BLUE): João vence
+    g1 = client.post(
+        "/api/games",
+        headers={"Authorization": f"Bearer {joao_tok}"},
+        json={"players": ["HUMAN", "CATANATRON"]},
+    ).get_json()["game_id"]
+    _force_win_and_record(app, g1, Color.RED)
+
+    # 2. Partida Solo de João vs Bot: IA (BLUE) vence!
+    g2 = client.post(
+        "/api/games",
+        headers={"Authorization": f"Bearer {joao_tok}"},
+        json={"players": ["HUMAN", "CATANATRON"]},
+    ).get_json()["game_id"]
+    _force_win_and_record(app, g2, Color.BLUE)
+
+    # 3. Pedro vence 1 de 1 (100%)
+    g3 = client.post(
+        "/api/games",
+        headers={"Authorization": f"Bearer {pedro_tok}"},
+        json={"players": ["HUMAN", "R"]},
+    ).get_json()["game_id"]
+    _force_win_and_record(app, g3, Color.RED)
+
+    # Ranking: João 1/2 = 50.0%; Pedro 1/1 = 100.0%. Bots não entram no ranking.
+    lb = client.get("/api/leaderboard").get_json()["leaderboard"]
+    assert [row["username"] for row in lb] == ["pedro", "joao"]
+    assert lb[0]["rank"] == 1
+    assert lb[0]["wins"] == 1
+    assert lb[0]["games_played"] == 1
+    assert lb[0]["win_rate"] == 100.0
+
+    assert lb[1]["rank"] == 2
+    assert lb[1]["wins"] == 1
+    assert lb[1]["games_played"] == 2
+    assert lb[1]["win_rate"] == 50.0
+
+    # Histórico global tem as 3 partidas, incluindo a vitória do Bot
+    hist = client.get("/api/matches").get_json()["matches"]
+    assert len(hist) == 3
+    bot_win_match = next(m for m in hist if m["game_id"] == g2)
+    assert bot_win_match["winner_is_bot"] is True
+    assert bot_win_match["winner_username"] is None
+
+    # Histórico filtrado por usuário
+    hist_joao = client.get("/api/matches?username=joao").get_json()["matches"]
+    assert {m["game_id"] for m in hist_joao} == {g1, g2}
+
+    # /api/auth/me reflete estatísticas atualizadas
+    me_joao = client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {joao_tok}"}
+    ).get_json()
+    assert me_joao["stats"] == {
+        "wins": 1,
+        "losses": 1,
+        "games_played": 2,
+        "win_rate": 50.0,
+    }
+
+    # Idempotência: 1 StoredMatch e 2 participantes por jogo
+    with app.app_context():
+        assert db.session.query(StoredMatch).count() == 3
+        assert db.session.query(StoredMatchParticipant).count() == 6
+
+
+def test_logged_user_sits_on_human_chair_even_when_not_first(app, client):
+    """O usuário logado deve ocupar a cadeira HUMAN, independente do embaralhamento da ordem de turnos."""
+    tok = client.post(
+        "/api/auth/register",
+        json={"username": "carla", "password": "pw1234"},
+    ).get_json()["auth_token"]
+    game_id = client.post(
+        "/api/games",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={"players": ["CATANATRON", "HUMAN", "CATANATRON"]},
+    ).get_json()["game_id"]
+
+    with app.app_context():
+        stored = db.session.get(StoredGame, game_id)
+        meta = json.loads(stored.seat_metadata_json)
+        game = get_game_state(game_id)
+        human_colors = [
+            p.color.value for p in game.state.players if not p.is_bot
+        ]
+        assert human_colors == ["BLUE"]
+        assert meta["BLUE"]["seat_kind"] == "USER"
+        assert meta["BLUE"]["username"] == "carla"
+        assert meta["RED"]["seat_kind"] == "BOT"
+        assert meta["ORANGE"]["seat_kind"] == "BOT"
+
+    _force_win_and_record(app, game_id, Color.BLUE)
+    with app.app_context():
+        part = (
+            db.session.query(StoredMatchParticipant)
+            .filter_by(game_id=game_id, username="carla")
+            .one()
+        )
+        assert part.color == "BLUE"
+        assert part.is_winner is True
+        assert part.player_key == "HUMAN"
+
+
+def test_guest_game_is_recorded_but_not_ranked(app, client):
+    game_id = client.post(
+        "/api/games", json={"players": ["HUMAN", "CATANATRON"]}
+    ).get_json()["game_id"]
+    _force_win_and_record(app, game_id, Color.RED)
+    assert client.get("/api/leaderboard").get_json()["leaderboard"] == []
+    matches = client.get("/api/matches").get_json()["matches"]
+    assert len(matches) == 1
+    assert matches[0]["winner_username"] is None
+    assert matches[0]["winner_is_bot"] is False
