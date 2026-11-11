@@ -186,16 +186,18 @@ function PlayerCard({
     >
       {/* LEFT HALF: Player Portrait & Name on Solid Color */}
       <div className="cu-player-card__portrait-col">
-        {isActive && (
-          <div
-            className="cu-player-card__turn-badge"
-            title="Jogador Ativo — É a vez deste jogador!"
-          >
-            <TurnSpinSvg />
-          </div>
-        )}
-        <div className="cu-player-card__name" title={name}>
-          {name}
+        <div className="cu-player-card__name-bar">
+          {isActive && (
+            <span
+              className="cu-player-card__turn-badge"
+              title="Jogador Ativo — É a vez deste jogador!"
+            >
+              <TurnSpinSvg />
+            </span>
+          )}
+          <span className="cu-player-card__name" title={name}>
+            {name}
+          </span>
         </div>
         <div className="cu-player-card__avatar-wrap">
           <HybridIllustration
