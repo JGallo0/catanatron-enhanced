@@ -1,0 +1,90 @@
+.player-avatar {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  &__frame {
+    position: relative;
+    border-radius: 50%;
+    padding: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, #a66c38, #5c3718);
+    box-shadow:
+      0 3px 10px rgba(0, 0, 0, 0.55),
+      inset 0 1px 1px rgba(255, 255, 255, 0.28);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  &--frame-wood &__frame {
+    background: linear-gradient(145deg, #a66d3b 0%, #734620 55%, #472910 100%);
+    border: 1.5px solid #c68b54;
+  }
+
+  &--frame-bronze &__frame {
+    background: linear-gradient(145deg, #f09c5a 0%, #b45309 55%, #6d2e07 100%);
+    border: 1.5px solid #fdba74;
+    box-shadow: 0 3px 12px rgba(217, 119, 6, 0.45);
+  }
+
+  &--frame-silver &__frame {
+    background: linear-gradient(145deg, #f8fafc 0%, #94a3b8 50%, #475569 100%);
+    border: 1.5px solid #f1f5f9;
+    box-shadow: 0 3px 14px rgba(148, 163, 184, 0.5);
+  }
+
+  &--frame-gold &__frame {
+    background: linear-gradient(145deg, #fef08a 0%, #eab308 50%, #92400e 100%);
+    border: 2px solid #fef9c3;
+    box-shadow:
+      0 0 14px rgba(250, 204, 21, 0.55),
+      inset 0 1px 2px rgba(255, 255, 255, 0.65);
+  }
+
+  &--frame-imperial &__frame {
+    padding: 3.5px;
+    background: linear-gradient(135deg, #10b981 0%, #facc15 48%, #047857 100%);
+    border: 2px solid #fde047;
+    box-shadow:
+      0 0 16px rgba(16, 185, 129, 0.55),
+      0 0 24px rgba(250, 204, 21, 0.45);
+    animation: player-avatar-imperial-pulse 3.2s ease-in-out infinite;
+  }
+
+  &__svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #0f172a;
+  }
+
+  &__frame-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fef08a;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(250, 204, 21, 0.35);
+    border-radius: 999px;
+    padding: 2px 10px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+}
+
+@keyframes player-avatar-imperial-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 14px rgba(16, 185, 129, 0.5),
+      0 0 22px rgba(250, 204, 21, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(16, 185, 129, 0.8),
+      0 0 30px rgba(250, 204, 21, 0.7);
+  }
+}
