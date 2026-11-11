@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import axios from "axios";
 
 import {
+  fetchCurrentAccount,
   getLeaderboard,
   getMatchHistory,
+  getSavedAccount,
   loginAccount,
   registerAccount,
   updateProfile,
@@ -13,6 +15,7 @@ import {
   localGetLeaderboard,
   localGetMatchHistory,
   localGetState,
+  localGetUserRankAndStats,
   localRecordCompletedMatch,
   localUpdateProfile,
 } from "./localEngine";
@@ -199,5 +202,90 @@ describe("local match history and leaderboard calculations", () => {
         avatarConfig: { hat: "crown_gold" },
       })
     ).toThrow(/7 vitória/);
+  });
+
+  test("computes offline leaderboard_rank and stats on register, login, update and fetchCurrentAccount", async () => {
+    vi.spyOn(axios, "post").mockRejectedValue(new Error("Offline"));
+
+    const bruno = await registerAccount({
+      username: "bruno_rank",
+      password: "pw1234",
+      displayName: "Bruno",
+    });
+    expect(bruno.leaderboard_rank).toBe(1);
+    expect(bruno.stats).toEqual({
+      wins: 0,
+      losses: 0,
+      games_played: 0,
+      win_rate: 0,
+    });
+
+    localRecordCompletedMatch({
+      game_id: "g-bruno-win",
+      mode: "SOLO",
+      map_template: "BASE",
+      vps_to_win: 10,
+      num_turns: 20,
+      winning_color: "RED",
+      winner_name: "Bruno",
+      winner_username: "bruno_rank",
+      winner_is_bot: false,
+      participants: [
+        {
+          color: "RED",
+          seat_kind: "USER",
+          username: "bruno_rank",
+          player_key: "HUMAN",
+          display_name: "Bruno",
+          victory_points: 10,
+          is_winner: true,
+        },
+        {
+          color: "BLUE",
+          seat_kind: "BOT",
+          username: null,
+          player_key: "CATANATRON",
+          display_name: "IA (CATANATRON)",
+          victory_points: 6,
+          is_winner: false,
+        },
+      ],
+    });
+
+    vi.spyOn(axios, "get").mockRejectedValueOnce(new Error("Offline"));
+    const hydrated = await fetchCurrentAccount();
+    expect(hydrated?.leaderboard_rank).toBe(1);
+    expect(hydrated?.stats).toMatchObject({
+      wins: 1,
+      games_played: 1,
+      win_rate: 100,
+    });
+
+    const direct = localGetUserRankAndStats("bruno_rank");
+    expect(direct.leaderboard_rank).toBe(1);
+    expect(getSavedAccount()?.leaderboard_rank).toBe(1);
+
+    const loggedIn = await loginAccount({
+      username: "bruno_rank",
+      password: "pw1234",
+    });
+    expect(loggedIn.leaderboard_rank).toBe(1);
+    expect(loggedIn.stats).toMatchObject({
+      wins: 1,
+      games_played: 1,
+      win_rate: 100,
+    });
+
+    vi.spyOn(axios, "patch").mockRejectedValueOnce(new Error("Offline"));
+    const updated = await updateProfile({
+      displayName: "Bruno Atualizado",
+    });
+    expect(updated.leaderboard_rank).toBe(1);
+    expect(updated.stats).toMatchObject({
+      wins: 1,
+      games_played: 1,
+      win_rate: 100,
+    });
+    expect(getSavedAccount()?.leaderboard_rank).toBe(1);
   });
 });

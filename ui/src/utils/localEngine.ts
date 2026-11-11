@@ -1,4 +1,5 @@
 import type {
+  AccountStats,
   AvatarConfig,
   Color,
   DevelopmentCard,
@@ -1449,6 +1450,40 @@ function loadLocalUsers(): Record<string, LocalUserRecord> {
   }
 }
 
+export function localGetUserRankAndStats(username: string): {
+  leaderboard_rank: number | null;
+  stats: AccountStats;
+} {
+  const cleanUser = username
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 24);
+  if (!cleanUser) {
+    return {
+      leaderboard_rank: null,
+      stats: { wins: 0, losses: 0, games_played: 0, win_rate: 0 },
+    };
+  }
+  const lb = localGetLeaderboard();
+  const row = lb.find((e) => e.username === cleanUser);
+  if (!row) {
+    return {
+      leaderboard_rank: null,
+      stats: { wins: 0, losses: 0, games_played: 0, win_rate: 0 },
+    };
+  }
+  return {
+    leaderboard_rank: row.rank,
+    stats: {
+      wins: row.wins,
+      losses: row.losses,
+      games_played: row.games_played,
+      win_rate: row.win_rate,
+    },
+  };
+}
+
 export function localRegisterUser(options: {
   username: string;
   password: string;
@@ -1478,11 +1513,14 @@ export function localRegisterUser(options: {
   } catch {
     // ignore
   }
+  const rankMeta = localGetUserRankAndStats(cleanUser);
   return {
     username: cleanUser,
     display_name,
     auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
     avatar_config: {},
+    stats: rankMeta.stats,
+    leaderboard_rank: rankMeta.leaderboard_rank,
     is_new: true,
   };
 }
@@ -1501,11 +1539,14 @@ export function localLoginUser(options: {
   if (!existing || existing.password !== options.password) {
     throw new Error("Usuário ou senha incorretos.");
   }
+  const rankMeta = localGetUserRankAndStats(existing.username);
   return {
     username: existing.username,
     display_name: existing.display_name,
     auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
     avatar_config: sanitizeAvatarConfig(existing.avatar_config),
+    stats: rankMeta.stats,
+    leaderboard_rank: rankMeta.leaderboard_rank,
     is_new: false,
   };
 }
@@ -1587,6 +1628,7 @@ export function localUpdateProfile(options: {
           ...saved,
           display_name: nextDisplay,
           avatar_config: mergedAvatar,
+          leaderboard_rank: statsEntry?.rank ?? saved.leaderboard_rank ?? null,
         })
       );
     }
@@ -1599,6 +1641,7 @@ export function localUpdateProfile(options: {
     display_name: nextDisplay,
     auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
     avatar_config: mergedAvatar,
+    leaderboard_rank: statsEntry?.rank ?? null,
     stats: statsEntry
       ? {
           wins: statsEntry.wins,

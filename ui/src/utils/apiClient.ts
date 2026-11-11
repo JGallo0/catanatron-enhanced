@@ -19,6 +19,7 @@ import {
   localGetMctsAnalysis,
   localGetRoom,
   localGetState,
+  localGetUserRankAndStats,
   localJoinRoom,
   localListActiveRooms,
   localLoginOrRegister,
@@ -57,6 +58,7 @@ export type PlayerAccount = {
   has_google?: boolean;
   avatar_config?: Partial<AvatarConfig>;
   stats?: AccountStats;
+  leaderboard_rank?: number | null;
   is_new?: boolean;
 };
 
@@ -206,7 +208,14 @@ export async function fetchCurrentAccount(): Promise<PlayerAccount | null> {
       return null;
     }
   }
-  return saved;
+  const offline = localGetUserRankAndStats(saved.username);
+  const hydrated: PlayerAccount = {
+    ...saved,
+    stats: offline.stats,
+    leaderboard_rank: offline.leaderboard_rank,
+  };
+  saveAccount(hydrated);
+  return hydrated;
 }
 
 export async function logoutAccount(): Promise<void> {
