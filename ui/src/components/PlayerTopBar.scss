@@ -28,7 +28,24 @@
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
   opacity: 0.88;
+  cursor: pointer;
   transition: opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+
+  &__inspect-trigger {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid #facc15;
+      outline-offset: -2px;
+    }
+  }
 
   &:hover {
     opacity: 1;
@@ -281,5 +298,354 @@
   }
   50% {
     box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+  }
+}
+
+.cu-mobile-award-badges {
+  display: none;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tap-to-Inspect Dialog (Mobile + Desktop)                                   */
+/* -------------------------------------------------------------------------- */
+
+.cu-player-inspect-paper {
+  max-height: 90dvh;
+
+  @media (max-width: 600px) {
+    margin: 10px !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+}
+
+.cu-player-inspect-header {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  &__left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+
+    strong {
+      color: #f8fafc;
+      font-size: 1rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+.cu-inspect-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #e2e8f0;
+
+  &--active {
+    background: rgba(250, 204, 21, 0.16);
+    border-color: rgba(250, 204, 21, 0.55);
+    color: #fde047;
+  }
+}
+
+.cu-player-inspect-close {
+  color: #cbd5e1 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  text-transform: none !important;
+  border-radius: 8px !important;
+  min-height: 36px;
+  flex-shrink: 0;
+}
+
+.cu-player-inspect-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 18px !important;
+}
+
+.cu-inspect-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cu-inspect-stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  span {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  strong {
+    font-size: 0.92rem;
+    color: #f8fafc;
+  }
+
+  &--vp {
+    border-color: rgba(250, 204, 21, 0.35);
+    strong {
+      color: #fde047;
+    }
+  }
+
+  &--warn {
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(127, 29, 29, 0.25);
+    strong {
+      color: #fca5a5;
+    }
+  }
+
+  &--award {
+    border-color: rgba(250, 204, 21, 0.5);
+    background: rgba(161, 98, 7, 0.2);
+    strong {
+      color: #fef08a;
+    }
+  }
+
+  &--full {
+    grid-column: 1 / -1;
+  }
+}
+
+.cu-inspect-pieces-card {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  h4 {
+    margin: 0 0 8px;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+  }
+}
+
+.cu-inspect-pieces-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  text-align: center;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px;
+    border-radius: 8px;
+    background: rgba(30, 41, 59, 0.65);
+
+    small {
+      font-size: 0.68rem;
+      color: #cbd5e1;
+      font-weight: 700;
+    }
+
+    strong {
+      font-size: 0.95rem;
+      color: #fef08a;
+    }
+
+    span {
+      font-size: 0.65rem;
+      color: #94a3b8;
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Compact Mobile & Landscape Horizontal Player Strip                         */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 768px), (max-height: 520px) {
+  .cu-player-top-bar {
+    padding: 3px 6px;
+    gap: 4px;
+    overflow-x: visible;
+  }
+
+  .cu-player-card {
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 0;
+    height: auto;
+    min-height: 54px;
+    flex-direction: column;
+    border-radius: 8px;
+
+    &__portrait-col {
+      width: 100%;
+      flex-direction: row;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 5px;
+      box-shadow: none;
+    }
+
+    &__avatar-wrap {
+      order: -1;
+      flex: 0 0 auto;
+      padding: 0;
+      background: transparent;
+      border-radius: 50%;
+    }
+
+    &__custom-avatar .player-avatar__frame {
+      width: 26px !important;
+      height: 26px !important;
+      padding: 2px !important;
+    }
+
+    &__name-bar {
+      flex: 1;
+      min-width: 0;
+      padding: 0;
+      min-height: 0;
+      background: transparent;
+      justify-content: flex-start;
+      gap: 3px;
+    }
+
+    &__turn-badge {
+      width: 13px;
+      height: 13px;
+
+      svg {
+        width: 10px;
+        height: 10px;
+      }
+    }
+
+    &__name {
+      font-size: 0.68rem;
+      letter-spacing: 0;
+    }
+
+    &__stats-col {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      border-left: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 2px 5px;
+      gap: 4px;
+    }
+
+    .cu-stat-row {
+      padding: 0;
+      border-bottom: none;
+      background: transparent;
+      flex: 0 1 auto;
+
+      &--awards {
+        display: none;
+      }
+
+      &--vp {
+        padding: 0;
+        gap: 3px;
+      }
+    }
+
+    .cu-stat--devcards,
+    .cu-pieces-mini {
+      display: none;
+    }
+
+    .cu-mobile-award-badges {
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      font-size: 0.65rem;
+      line-height: 1;
+    }
+
+    .cu-stat {
+      gap: 3px;
+
+      &__num {
+        font-size: 0.78rem;
+      }
+
+      .cu-icon {
+        width: 13px;
+        height: 13px;
+      }
+
+      &--vp {
+        gap: 3px;
+
+        .cu-stat__num--vp {
+          font-size: 0.86rem;
+        }
+
+        .cu-icon--trophy {
+          width: 14px;
+          height: 14px;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .cu-player-card {
+    min-height: 50px;
+
+    &__custom-avatar .player-avatar__frame {
+      width: 22px !important;
+      height: 22px !important;
+    }
+
+    &__name {
+      font-size: 0.63rem;
+    }
+
+    .cu-stat {
+      &__num {
+        font-size: 0.72rem;
+      }
+
+      &--vp .cu-stat__num--vp {
+        font-size: 0.8rem;
+      }
+    }
   }
 }

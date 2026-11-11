@@ -29,3 +29,48 @@ test("renders the nested tile, node, and edge shapes emitted by GameEncoder", ()
   expect(screen.getByText("11")).toBeInTheDocument();
   expect(screen.getByText("3:1")).toBeInTheDocument();
 });
+
+test("fits narrow portrait and landscape mobile viewports without overflowing horizontally", () => {
+  const gameState = makeGameState();
+
+  const portrait = render(
+    <Board
+      width={375}
+      height={667}
+      buildOnNodeClick={() => () => undefined}
+      buildOnEdgeClick={() => () => undefined}
+      handleTileClick={() => undefined}
+      replayMode={false}
+      gameState={gameState}
+      isMobile={true}
+      show
+      isMovingRobber={false}
+    />
+  );
+
+  const portraitBoard = portrait.container.querySelector(".board") as HTMLElement;
+  expect(portraitBoard).toBeTruthy();
+  expect(parseInt(portraitBoard.style.width, 10)).toBeLessThanOrEqual(375);
+  expect(parseInt(portraitBoard.style.height, 10)).toBeGreaterThanOrEqual(280);
+  portrait.unmount();
+
+  const landscape = render(
+    <Board
+      width={667}
+      height={375}
+      buildOnNodeClick={() => () => undefined}
+      buildOnEdgeClick={() => () => undefined}
+      handleTileClick={() => undefined}
+      replayMode={false}
+      gameState={gameState}
+      isMobile={true}
+      show
+      isMovingRobber={false}
+    />
+  );
+
+  const landscapeBoard = landscape.container.querySelector(".board") as HTMLElement;
+  expect(landscapeBoard).toBeTruthy();
+  expect(parseInt(landscapeBoard.style.width, 10)).toBeLessThanOrEqual(667);
+  expect(parseInt(landscapeBoard.style.height, 10)).toBeLessThanOrEqual(240);
+});

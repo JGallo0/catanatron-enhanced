@@ -189,3 +189,25 @@
     font-weight: 700;
   }
 }
+
+@media (max-width: 600px) {
+  .leaderboard-modal-paper {
+    margin: 10px !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 92dvh !important;
+  }
+
+  .leaderboard-modal-header {
+    padding: 12px 16px !important;
+  }
+
+  .leaderboard-table {
+    font-size: 0.82rem;
+
+    th,
+    td {
+      padding: 8px 8px;
+    }
+  }
+}

@@ -198,3 +198,27 @@
     padding: 0 10px;
   }
 }
+
+@media (max-width: 600px) {
+  .home-auth-paper {
+    margin: 10px !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 92dvh !important;
+  }
+
+  .home-auth-header {
+    padding: 14px 16px !important;
+  }
+
+  .home-auth-body {
+    padding: 14px 16px 18px !important;
+  }
+
+  .home-auth-tab-btn,
+  .home-auth-submit-btn,
+  .home-modal-input {
+    min-height: 44px;
+    height: auto;
+  }
+}

@@ -328,14 +328,46 @@
 }
 
 @media (max-width: 600px) {
+  .home-page--stage {
+    padding: 12px 10px max(12px, env(safe-area-inset-bottom));
+  }
+
   .home-topbar {
     grid-template-columns: 1fr;
+    gap: 10px;
+
+    .logo {
+      font-size: clamp(1.65rem, 8vw, 2.2rem);
+    }
+  }
+
+  .home-hero-subtitle {
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+  }
+
+  .home-identity-pill,
+  .home-rank-pill {
+    padding: 8px 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .home-logout-btn,
+  .home-login-cta-btn {
+    min-height: 40px;
+  }
+
+  .home-stage-window {
+    min-height: 72px;
   }
 
   .home-mode-dock {
     width: 100%;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px;
+    gap: 8px;
   }
 
   .home-dock-btn--solo {
@@ -343,7 +375,17 @@
   }
 
   .home-dock-btn {
-    padding: 0 10px !important;
-    font-size: 0.82rem !important;
+    min-height: 44px;
+    height: auto;
+    padding: 8px 10px !important;
+    font-size: 0.8rem !important;
+    white-space: normal;
+    line-height: 1.2;
+  }
+}
+
+@media (max-height: 520px) {
+  .home-stage-window {
+    min-height: 36px;
   }
 }

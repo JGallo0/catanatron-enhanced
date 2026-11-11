@@ -211,3 +211,15 @@
   width: 52%;
   height: 52%;
 }
+
+@media (max-width: 768px), (pointer: coarse) {
+  .node .pulse {
+    width: 68%;
+    height: 68%;
+  }
+
+  .edge .pulse {
+    width: 84%;
+    height: 112%;
+  }
+}

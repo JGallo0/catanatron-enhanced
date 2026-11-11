@@ -275,7 +275,8 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             className="game-top-hud__bank-chip"
             title="Cartas de Desenvolvimento restantes no baralho do banco"
           >
-            🃏 Baralho Dev: <strong>{devCardsRemaining}</strong>
+            🃏 <span className="hud-btn-label">Baralho Dev: </span>
+            <strong>{devCardsRemaining}</strong>
           </span>
           <button
             type="button"
@@ -286,9 +287,10 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                 data: !state.isLeftDrawerOpen,
               })
             }
+            aria-label="Histórico"
             title="Abrir Histórico de Jogadas"
           >
-            📜 Histórico
+            📜 <span className="hud-btn-label">Histórico</span>
           </button>
           <button
             type="button"
@@ -299,9 +301,10 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                 data: !state.isRightDrawerOpen,
               })
             }
+            aria-label="Chances (IA)"
             title="Abrir Análise de Probabilidade de Vitória (IA MCTS)"
           >
-            📊 Chances (IA)
+            📊 <span className="hud-btn-label">Chances (IA)</span>
           </button>
           <button
             type="button"

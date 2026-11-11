@@ -13,8 +13,13 @@ $dark-divider: rgb(0 0 0 / 80%);
 
   .MuiDrawer-paper {
     width: 280px;
+    max-width: 90vw;
     background: variables.$dark-gray;
     color: white;
+
+    @media (max-width: 600px) {
+      width: min(88vw, 300px);
+    }
   }
 
   .MuiDivider-root {

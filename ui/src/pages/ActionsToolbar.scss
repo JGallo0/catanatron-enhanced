@@ -447,6 +447,184 @@
   }
 }
 
+@media screen and (max-width: 768px) {
+  .cu-console-wrapper {
+    padding: 0 6px max(6px, env(safe-area-inset-bottom));
+  }
+
+  .cu-build-hint-pill {
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    max-width: 100%;
+  }
+
+  .cu-bottom-console {
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 14px;
+  }
+
+  .cu-console__hand {
+    justify-content: center;
+    padding: 2px 0;
+    gap: 4px;
+  }
+
+  .cu-console__actions {
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .cu-build-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+
+    > span {
+      display: flex;
+      min-width: 0;
+    }
+  }
+
+  .cu-build-tile {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    min-height: 44px;
+    padding: 2px;
+
+    &__name {
+      font-size: 0.54rem;
+    }
+  }
+
+  .cu-tactical-strip {
+    gap: 4px;
+  }
+
+  .cu-tactical-btn {
+    min-width: 0 !important;
+    flex: 1 1 0;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 6px !important;
+    font-size: 0.65rem !important;
+  }
+
+  .cu-costs-icon-btn {
+    height: 42px;
+    min-height: 42px;
+    padding: 0 8px;
+  }
+
+  .cu-status-panel {
+    min-height: 54px;
+    padding: 4px 8px;
+  }
+
+  .cu-console__cta-zone {
+    gap: 6px;
+  }
+
+  .dice-widget-pill {
+    padding: 4px 5px;
+    gap: 2px;
+
+    &__sum {
+      font-size: 0.7rem;
+    }
+  }
+
+  .cu-cta-orb {
+    width: 62px;
+    height: 62px;
+    padding: 4px;
+
+    &__icon svg {
+      font-size: 1.2rem;
+    }
+
+    &__label {
+      font-size: 0.54rem;
+    }
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .cu-costs-icon-btn span {
+    display: none;
+  }
+
+  .cu-tactical-btn {
+    font-size: 0.6rem !important;
+    padding: 0 5px !important;
+
+    .MuiButton-startIcon {
+      margin-right: 3px !important;
+    }
+  }
+
+  .cu-cta-orb {
+    width: 56px;
+    height: 56px;
+    border-width: 2.5px;
+
+    &__label {
+      font-size: 0.5rem;
+    }
+  }
+
+  .costs-reference-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media screen and (max-height: 520px) {
+  .cu-console-wrapper {
+    padding: 0 6px 4px;
+  }
+
+  .cu-bottom-console {
+    flex-wrap: nowrap;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .cu-console__hand {
+    order: 0;
+    width: auto;
+    flex: 1 1 auto;
+    justify-content: flex-start;
+  }
+
+  .cu-console__actions {
+    flex: 0 0 auto;
+    min-width: 0;
+    gap: 3px;
+  }
+
+  .cu-build-tile {
+    width: 46px;
+    height: 36px;
+    min-height: 36px;
+  }
+
+  .cu-tactical-btn,
+  .cu-costs-icon-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+  }
+
+  .cu-cta-orb {
+    width: 54px;
+    height: 54px;
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Menus & Dialogs (Trade Workbench, Costs Table, Robber Victim)              */
 /* -------------------------------------------------------------------------- */
@@ -475,6 +653,13 @@
   border: 1px solid rgba(250, 204, 21, 0.3) !important;
   border-radius: 18px !important;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.8) !important;
+
+  @media (max-width: 600px) {
+    margin: 10px !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 92dvh !important;
+  }
 }
 
 .catan-modal-title {

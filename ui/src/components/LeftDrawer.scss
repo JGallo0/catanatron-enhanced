@@ -3,10 +3,15 @@
 .left-drawer {
   .MuiDrawer-paper {
     width: 300px;
+    max-width: 90vw;
     background: linear-gradient(180deg, #0b1322 0%, #0f172a 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     color: #f8fafc;
     overflow: hidden;
+
+    @media (max-width: 600px) {
+      width: min(88vw, 320px);
+    }
   }
 }
 

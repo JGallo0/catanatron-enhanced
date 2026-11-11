@@ -78,13 +78,19 @@ export default function Board({
   isMovingRobber,
   robberCoordinates,
 }: BoardProps) {
-  // Exact available viewport after accounting for PlayerTopBar (~145px) and Catan Universe bottom console (~105px)
+  // Exact available viewport after accounting for HUD, PlayerTopBar and bottom console
   const leftSidebarWidth = 0;
-  const canvasWidth = Math.max(320, width - leftSidebarWidth);
-  const canvasHeight = Math.max(320, height - (isMobile ? 255 : 238));
+  const isCompactHeight = height <= 520;
+  const canvasWidth = Math.max(280, width - leftSidebarWidth);
+  const reservedHeight = isCompactHeight ? 184 : isMobile ? 248 : 238;
+  const canvasHeight = Math.max(
+    isCompactHeight ? 200 : 280,
+    height - reservedHeight
+  );
+  const margin = isMobile ? 12 : 24;
 
   const center: [number, number] = [canvasWidth / 2, canvasHeight / 2];
-  const size = computeDefaultSize(canvasWidth - 24, canvasHeight - 24);
+  const size = computeDefaultSize(canvasWidth - margin, canvasHeight - margin);
 
   const lastRolledSum = useMemo(() => getLastRolledSum(gameState), [gameState]);
   const robberCoordKey = `${gameState.robber_coordinate}`;

@@ -288,7 +288,36 @@
 }
 
 @media (max-width: 720px) {
+  .avatar-studio-paper {
+    margin: 10px !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 92dvh !important;
+  }
+
+  .avatar-studio-header {
+    padding: 12px 14px !important;
+    font-size: 0.96rem !important;
+  }
+
   .avatar-studio-body {
     grid-template-columns: 1fr;
+    padding: 12px 14px !important;
+    gap: 14px;
+  }
+
+  .avatar-options-grid {
+    grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+  }
+
+  .avatar-option-btn,
+  .avatar-studio-save-btn,
+  .avatar-studio-cancel-btn,
+  .avatar-studio-random-btn {
+    min-height: 44px;
+  }
+
+  .avatar-studio-footer {
+    padding: 10px 14px !important;
   }
 }

@@ -429,3 +429,58 @@
     font-weight: 700;
   }
 }
+
+@media (max-width: 768px) {
+  .resource-cards--deck {
+    min-height: 62px;
+    gap: 5px;
+  }
+
+  .resource-card-item--deck {
+    min-width: 48px;
+    width: 48px;
+    height: 64px;
+  }
+}
+
+@media (max-width: 480px) {
+  .resource-cards--deck {
+    min-height: 54px;
+    gap: 4px;
+  }
+
+  .resource-card-item--deck {
+    min-width: 43px;
+    width: 43px;
+    height: 56px;
+
+    .resource-card-item__crest {
+      width: 15px;
+      height: 15px;
+    }
+
+    .resource-card-item__qty-pill {
+      min-width: 16px;
+      height: 16px;
+      font-size: 0.66rem;
+    }
+
+    .resource-card-item__ribbon {
+      font-size: 0.52rem;
+      padding: 2px 1px;
+    }
+  }
+}
+
+@media (max-height: 520px) {
+  .resource-cards--deck {
+    min-height: 50px;
+    gap: 4px;
+  }
+
+  .resource-card-item--deck {
+    min-width: 40px;
+    width: 40px;
+    height: 52px;
+  }
+}

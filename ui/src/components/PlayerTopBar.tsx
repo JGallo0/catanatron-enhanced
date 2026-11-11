@@ -1,4 +1,5 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
+import { Button, Dialog, DialogContent, DialogTitle } from "@mui/material";
 import cn from "classnames";
 
 import "./PlayerTopBar.scss";
@@ -165,14 +166,33 @@ const MiniRoadIcon: React.FC = () => (
 /* Individual Player Card                                                     */
 /* -------------------------------------------------------------------------- */
 
-function PlayerCard({
-  gameState,
-  color,
-}: {
-  gameState: GameState;
+type PlayerSeatStats = {
   color: Color;
-}) {
-  const { state } = useContext(store);
+  name: string;
+  isBot: boolean;
+  isActive: boolean;
+  isWinner: boolean;
+  vps: number;
+  resources: number;
+  devCards: number;
+  knights: number;
+  roadLength: number;
+  hasArmy: boolean;
+  hasRoad: boolean;
+  settlementsLeft: number;
+  citiesLeft: number;
+  roadsLeft: number;
+  builtSettlements: number;
+  builtCities: number;
+  builtRoads: number;
+  resolvedAvatar: ReturnType<typeof resolveSeatAvatarProps>;
+};
+
+function computeSeatStats(
+  gameState: GameState,
+  color: Color,
+  perspective: Color | null
+): PlayerSeatStats {
   const key = playerKey(gameState, color);
   const ps = gameState.player_state;
   const meta = PLAYER_COLOR_META[color];
@@ -205,8 +225,8 @@ function PlayerCard({
   );
   const isMySeat =
     !isBot &&
-    (state.perspective !== null
-      ? state.perspective === color
+    (perspective !== null
+      ? perspective === color
       : savedAcct
         ? seatAvatar?.seat_kind === "USER" &&
           seatAvatar.username === savedAcct.username
@@ -225,11 +245,45 @@ function PlayerCard({
       : undefined,
   });
 
+  return {
+    color,
+    name,
+    isBot,
+    isActive,
+    isWinner,
+    vps,
+    resources,
+    devCards,
+    knights,
+    roadLength,
+    hasArmy,
+    hasRoad,
+    settlementsLeft,
+    citiesLeft,
+    roadsLeft,
+    builtSettlements,
+    builtCities,
+    builtRoads,
+    resolvedAvatar,
+  };
+}
+
+function PlayerCard({
+  seat,
+  isInspected,
+  onInspect,
+}: {
+  seat: PlayerSeatStats;
+  isInspected: boolean;
+  onInspect: (color: Color) => void;
+}) {
+  const meta = PLAYER_COLOR_META[seat.color];
+
   return (
     <div
-      className={cn("cu-player-card", color, {
-        "cu-player-card--active": isActive,
-        "cu-player-card--winner": isWinner,
+      className={cn("cu-player-card", seat.color, {
+        "cu-player-card--active": seat.isActive,
+        "cu-player-card--winner": seat.isWinner,
       })}
       style={
         {
@@ -238,12 +292,24 @@ function PlayerCard({
           "--cu-glow": meta.glow,
         } as React.CSSProperties
       }
-      title={`${name} • Peças: ${builtSettlements}/5 Aldeias, ${builtCities}/4 Cidades, ${builtRoads}/15 Estradas`}
+      onClick={() => onInspect(seat.color)}
+      title={`${seat.name} • Peças: ${seat.builtSettlements}/5 Aldeias, ${seat.builtCities}/4 Cidades, ${seat.builtRoads}/15 Estradas`}
     >
+      <button
+        type="button"
+        className="cu-player-card__inspect-trigger"
+        aria-label={`Inspecionar ${seat.name}`}
+        aria-expanded={isInspected}
+        onClick={(e) => {
+          e.stopPropagation();
+          onInspect(seat.color);
+        }}
+      />
+
       {/* LEFT HALF: Player Portrait & Name on Solid Color */}
       <div className="cu-player-card__portrait-col">
         <div className="cu-player-card__name-bar">
-          {isActive && (
+          {seat.isActive && (
             <span
               className="cu-player-card__turn-badge"
               title="Jogador Ativo — É a vez deste jogador!"
@@ -251,18 +317,19 @@ function PlayerCard({
               <TurnSpinSvg />
             </span>
           )}
-          <span className="cu-player-card__name" title={name}>
-            {name}
+          <span className="cu-player-card__name" title={seat.name}>
+            {seat.name}
           </span>
         </div>
         <div
           className={cn("cu-player-card__avatar-wrap", {
-            "cu-player-card__avatar-wrap--custom": resolvedAvatar.isCustomUserOrGuest,
+            "cu-player-card__avatar-wrap--custom":
+              seat.resolvedAvatar.isCustomUserOrGuest,
           })}
         >
           <PlayerAvatar
-            config={resolvedAvatar.config}
-            username={resolvedAvatar.username}
+            config={seat.resolvedAvatar.config}
+            username={seat.resolvedAvatar.username}
             size={58}
             className="cu-player-card__custom-avatar"
           />
@@ -272,13 +339,15 @@ function PlayerCard({
       {/* RIGHT HALF: Crisp 2x3 Stat Grid on Dark Slate */}
       <div className="cu-player-card__stats-col">
         {/* Row 1: Knights & Longest Road */}
-        <div className="cu-stat-row">
+        <div className="cu-stat-row cu-stat-row--awards">
           <div
-            className={cn("cu-stat", { "cu-stat--awarded": hasArmy })}
-            title={hasArmy ? "Maior Exército (+2 PV)" : "Cavaleiros Jogados"}
+            className={cn("cu-stat", { "cu-stat--awarded": seat.hasArmy })}
+            title={
+              seat.hasArmy ? "Maior Exército (+2 PV)" : "Cavaleiros Jogados"
+            }
           >
-            <span className="cu-stat__num">{knights}</span>
-            {hasArmy ? (
+            <span className="cu-stat__num">{seat.knights}</span>
+            {seat.hasArmy ? (
               <span className="cu-stat__medallion">
                 <HybridIllustration
                   src="/assets/illustrations/ui/largest_army.webp"
@@ -291,11 +360,13 @@ function PlayerCard({
             )}
           </div>
           <div
-            className={cn("cu-stat", { "cu-stat--awarded": hasRoad })}
-            title={hasRoad ? "Maior Estrada (+2 PV)" : "Sequência de Estrada"}
+            className={cn("cu-stat", { "cu-stat--awarded": seat.hasRoad })}
+            title={
+              seat.hasRoad ? "Maior Estrada (+2 PV)" : "Sequência de Estrada"
+            }
           >
-            <span className="cu-stat__num">{roadLength}</span>
-            {hasRoad ? (
+            <span className="cu-stat__num">{seat.roadLength}</span>
+            {seat.hasRoad ? (
               <span className="cu-stat__medallion">
                 <HybridIllustration
                   src="/assets/illustrations/ui/longest_road.webp"
@@ -310,61 +381,67 @@ function PlayerCard({
         </div>
 
         {/* Row 2: Resources & Dev Cards */}
-        <div className="cu-stat-row">
+        <div className="cu-stat-row cu-stat-row--cards">
           <div
-            className={cn("cu-stat", { "cu-stat--danger": resources > 7 })}
+            className={cn("cu-stat cu-stat--resources", {
+              "cu-stat--danger": seat.resources > 7,
+            })}
             title={
-              resources > 7
-                ? `Atenção: ${resources} cartas! Perderá metade se rolar 7.`
+              seat.resources > 7
+                ? `Atenção: ${seat.resources} cartas! Perderá metade se rolar 7.`
                 : "Cartas de Recurso na mão"
             }
           >
-            <span className="cu-stat__num">{resources}</span>
+            <span className="cu-stat__num">{seat.resources}</span>
             <ResourceStatSvg />
           </div>
           <div
-            className="cu-stat"
+            className="cu-stat cu-stat--devcards"
             title="Cartas de Desenvolvimento na mão"
           >
-            <span className="cu-stat__num">{devCards}</span>
+            <span className="cu-stat__num">{seat.devCards}</span>
             <DevCardStatSvg />
           </div>
         </div>
 
         {/* Row 3: Victory Points + Built Pieces Summary */}
         <div className="cu-stat-row cu-stat-row--vp">
-          <div
-            className="cu-stat cu-stat--vp"
-            title="Victory Points"
-          >
-            <span className="cu-stat__num cu-stat__num--vp">{vps}</span>
+          <div className="cu-stat cu-stat--vp" title="Victory Points">
+            <span className="cu-stat__num cu-stat__num--vp">{seat.vps}</span>
             <TrophyStatSvg />
           </div>
 
+          {(seat.hasArmy || seat.hasRoad) && (
+            <div className="cu-mobile-award-badges" aria-hidden="true">
+              {seat.hasArmy && <span title="Maior Exército">⚔️</span>}
+              {seat.hasRoad && <span title="Maior Estrada">🛤️</span>}
+            </div>
+          )}
+
           <div
             className="cu-pieces-mini"
-            title={`Peças no mapa: ${builtSettlements}/5 Aldeias · ${builtCities}/4 Cidades · ${builtRoads}/15 Estradas`}
+            title={`Peças no mapa: ${seat.builtSettlements}/5 Aldeias · ${seat.builtCities}/4 Cidades · ${seat.builtRoads}/15 Estradas`}
           >
             <span
               className="cu-piece-chip"
-              title={`${builtSettlements} Aldeia(s) construída(s) (${settlementsLeft} restante(s))`}
+              title={`${seat.builtSettlements} Aldeia(s) construída(s) (${seat.settlementsLeft} restante(s))`}
             >
               <MiniSettlementIcon />
-              <span>{builtSettlements}</span>
+              <span>{seat.builtSettlements}</span>
             </span>
             <span
               className="cu-piece-chip"
-              title={`${builtCities} Cidade(s) construída(s) (${citiesLeft} restante(s))`}
+              title={`${seat.builtCities} Cidade(s) construída(s) (${seat.citiesLeft} restante(s))`}
             >
               <MiniCityIcon />
-              <span>{builtCities}</span>
+              <span>{seat.builtCities}</span>
             </span>
             <span
               className="cu-piece-chip"
-              title={`${builtRoads} Estrada(s) construída(s) (${roadsLeft} restante(s))`}
+              title={`${seat.builtRoads} Estrada(s) construída(s) (${seat.roadsLeft} restante(s))`}
             >
               <MiniRoadIcon />
-              <span>{builtRoads}</span>
+              <span>{seat.builtRoads}</span>
             </span>
           </div>
         </div>
@@ -374,15 +451,148 @@ function PlayerCard({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Main Bar Component                                                         */
+/* Main Bar Component & Tap-to-Inspect Dialog                                 */
 /* -------------------------------------------------------------------------- */
 
 export default function PlayerTopBar({ gameState }: { gameState: GameState }) {
+  const { state } = useContext(store);
+  const [inspectedColor, setInspectedColor] = useState<Color | null>(null);
+
+  const seats = gameState.colors.map((color) =>
+    computeSeatStats(gameState, color, state.perspective)
+  );
+  const inspectedSeat =
+    seats.find((s) => s.color === inspectedColor) ?? null;
+
   return (
-    <header className="cu-player-top-bar" aria-label="Jogadores">
-      {gameState.colors.map((color) => (
-        <PlayerCard key={color} gameState={gameState} color={color} />
-      ))}
-    </header>
+    <>
+      <header className="cu-player-top-bar" aria-label="Jogadores">
+        {seats.map((seat) => (
+          <PlayerCard
+            key={seat.color}
+            seat={seat}
+            isInspected={inspectedColor === seat.color}
+            onInspect={setInspectedColor}
+          />
+        ))}
+      </header>
+
+      <Dialog
+        open={Boolean(inspectedSeat)}
+        onClose={() => setInspectedColor(null)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          className: "catan-modal-paper cu-player-inspect-paper",
+        }}
+      >
+        {inspectedSeat && (
+          <>
+            <DialogTitle className="cu-player-inspect-header">
+              <div className="cu-player-inspect-header__left">
+                <PlayerAvatar
+                  config={inspectedSeat.resolvedAvatar.config}
+                  username={inspectedSeat.resolvedAvatar.username}
+                  size={52}
+                />
+                <div className="cu-player-inspect-header__meta">
+                  <strong>{inspectedSeat.name}</strong>
+                  <div className="cu-player-inspect-header__tags">
+                    <span
+                      className="cu-inspect-tag"
+                      style={{
+                        borderColor: PLAYER_COLOR_META[inspectedSeat.color].primary,
+                      }}
+                    >
+                      {PLAYER_COLOR_META[inspectedSeat.color].label}
+                    </span>
+                    <span className="cu-inspect-tag">
+                      {inspectedSeat.isBot ? "Bot IA" : "Jogador"}
+                    </span>
+                    {inspectedSeat.isActive && (
+                      <span className="cu-inspect-tag cu-inspect-tag--active">
+                        Vez atual
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <Button
+                size="small"
+                variant="outlined"
+                className="cu-player-inspect-close"
+                onClick={() => setInspectedColor(null)}
+              >
+                Fechar
+              </Button>
+            </DialogTitle>
+
+            <DialogContent className="cu-player-inspect-body">
+              <div className="cu-inspect-stats-grid">
+                <div className="cu-inspect-stat-box cu-inspect-stat-box--vp">
+                  <span>Pontos de Vitória</span>
+                  <strong>🏆 {inspectedSeat.vps} PV</strong>
+                </div>
+                <div
+                  className={cn("cu-inspect-stat-box", {
+                    "cu-inspect-stat-box--warn": inspectedSeat.resources > 7,
+                  })}
+                >
+                  <span>Cartas de Recurso</span>
+                  <strong>🃏 {inspectedSeat.resources}</strong>
+                </div>
+                <div className="cu-inspect-stat-box">
+                  <span>Cartas Dev</span>
+                  <strong>📜 {inspectedSeat.devCards}</strong>
+                </div>
+                <div
+                  className={cn("cu-inspect-stat-box", {
+                    "cu-inspect-stat-box--award": inspectedSeat.hasArmy,
+                  })}
+                >
+                  <span>Cavaleiros</span>
+                  <strong>
+                    ⚔️ {inspectedSeat.knights}
+                    {inspectedSeat.hasArmy ? " • Maior Exército" : ""}
+                  </strong>
+                </div>
+                <div
+                  className={cn("cu-inspect-stat-box cu-inspect-stat-box--full", {
+                    "cu-inspect-stat-box--award": inspectedSeat.hasRoad,
+                  })}
+                >
+                  <span>Maior Estrada</span>
+                  <strong>
+                    🛤️ {inspectedSeat.roadLength} segmentos
+                    {inspectedSeat.hasRoad ? " • +2 PV Ativo" : ""}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="cu-inspect-pieces-card">
+                <h4>Peças no Tabuleiro</h4>
+                <div className="cu-inspect-pieces-row">
+                  <div>
+                    <small>Aldeias</small>
+                    <strong>{inspectedSeat.builtSettlements}/5</strong>
+                    <span>{inspectedSeat.settlementsLeft} rest.</span>
+                  </div>
+                  <div>
+                    <small>Cidades</small>
+                    <strong>{inspectedSeat.builtCities}/4</strong>
+                    <span>{inspectedSeat.citiesLeft} rest.</span>
+                  </div>
+                  <div>
+                    <small>Estradas</small>
+                    <strong>{inspectedSeat.builtRoads}/15</strong>
+                    <span>{inspectedSeat.roadsLeft} rest.</span>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </>
+        )}
+      </Dialog>
+    </>
   );
 }

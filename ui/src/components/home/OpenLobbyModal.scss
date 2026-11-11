@@ -244,3 +244,34 @@
   text-transform: none !important;
   flex-shrink: 0;
 }
+
+@media (max-width: 600px) {
+  .open-lobby-paper {
+    margin: 10px !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 92dvh !important;
+  }
+
+  .open-lobby-header {
+    padding: 12px 14px !important;
+    flex-wrap: wrap;
+  }
+
+  .open-lobby-body {
+    padding: 14px !important;
+  }
+
+  .open-lobby-code-input {
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .open-lobby-code-btn,
+  .open-lobby-filter-pill,
+  .open-lobby-join-btn,
+  .open-lobby-create-btn {
+    min-height: 42px;
+  }
+}
