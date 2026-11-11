@@ -4,16 +4,21 @@ import { Button, MenuItem, Select } from "@mui/material";
 import { GridLoader } from "react-spinners";
 import {
   DEFAULT_PLAYERS,
+  fetchCurrentAccount,
   getPlayers,
   getRoom,
   getSavedAccount,
   joinRoom,
   updateRoom,
   startRoomGame,
+  type PlayerAccount,
   type PlayerEntry,
 } from "../utils/apiClient";
 import type { Color, RoomState } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import PlayerAvatar from "../components/PlayerAvatar";
+import AvatarStudioModal from "../components/AvatarStudioModal";
+import { HybridIllustration } from "../components/icons/GameIcons";
 
 import "./RoomLobbyPage.scss";
 
@@ -70,6 +75,23 @@ export default function RoomLobbyPage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [account, setAccount] = useState<PlayerAccount | null>(() =>
+    getSavedAccount()
+  );
+  const [avatarStudioOpen, setAvatarStudioOpen] = useState(false);
+
+  useEffect(() => {
+    fetchCurrentAccount()
+      .then((acct) => {
+        if (acct) {
+          setAccount(acct);
+          setPlayerName((prev) =>
+            prev === "Jogador" || !prev.trim() ? acct.display_name : prev
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const token = getStoredToken(roomCode);
 
@@ -285,6 +307,16 @@ export default function RoomLobbyPage() {
                   ? `Atualizar Nome (${PLAYER_COLOR_META[room.my_color].label})`
                   : "🪑 Ocupar Vaga Humana"}
               </Button>
+              {account && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  className="identity-avatar-btn"
+                  onClick={() => setAvatarStudioOpen(true)}
+                >
+                  🎨 Editar Meu Avatar
+                </Button>
+              )}
             </div>
 
             {/* Seats List */}
@@ -311,18 +343,37 @@ export default function RoomLobbyPage() {
                       }}
                     >
                       <div className="lobby-seat-row__color">
-                        <span
-                          className="lobby-seat-row__dot"
-                          style={{
-                            background: palette.primary,
-                            boxShadow: `0 0 8px ${palette.glow}`,
-                          }}
-                        />
+                        {seat.seat_kind === "USER" ? (
+                          <PlayerAvatar
+                            config={seat.avatar_config}
+                            username={seat.username || seat.player_name}
+                            size={42}
+                          />
+                        ) : (
+                          <span
+                            className="lobby-seat-row__classic-wrap"
+                            style={{ borderColor: palette.primary }}
+                          >
+                            <HybridIllustration
+                              src={`/assets/illustrations/avatars/${seat.color.toLowerCase()}.webp`}
+                              alt={seat.player_name}
+                              fallback={
+                                <span
+                                  className="lobby-seat-row__dot"
+                                  style={{
+                                    background: palette.primary,
+                                    boxShadow: `0 0 8px ${palette.glow}`,
+                                  }}
+                                />
+                              }
+                            />
+                          </span>
+                        )}
                         <div>
                           <strong>{palette.label}</strong>
                           <small>
                             {seat.is_me
-                              ? "★ Seu Assento"
+                              ? `★ Seu Assento (${seat.player_name})`
                               : isOpenHuman
                                 ? "🔓 Vaga Aberta"
                                 : seat.player_name}
@@ -414,6 +465,34 @@ export default function RoomLobbyPage() {
           </>
         )}
       </div>
+
+      {account && (
+        <AvatarStudioModal
+          open={avatarStudioOpen}
+          onClose={() => setAvatarStudioOpen(false)}
+          account={account}
+          onSaved={async (updated) => {
+            setAccount(updated);
+            setPlayerName(updated.display_name);
+            localStorage.setItem("catan_player_name", updated.display_name);
+            if (room?.my_color && roomCode) {
+              try {
+                const res = await joinRoom(roomCode, {
+                  playerName: updated.display_name,
+                  preferredColor: room.my_color,
+                  token: getStoredToken(roomCode),
+                });
+                saveStoredToken(roomCode, res.seat_token);
+                setRoom(res.room);
+                return;
+              } catch {
+                // fallback to polling refresh
+              }
+            }
+            fetchRoomState();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import type { Color, GameState } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { playerKey } from "../utils/stateUtils";
 import { HybridIllustration } from "./icons/GameIcons";
+import PlayerAvatar from "./PlayerAvatar";
 
 /* -------------------------------------------------------------------------- */
 /* Crisp Catan Universe Style Vector Stat Icons                               */
@@ -186,6 +187,8 @@ function PlayerCard({
   const builtRoads = Math.max(0, 15 - roadsLeft);
 
   const avatarSrc = `/assets/illustrations/avatars/${color.toLowerCase()}.webp`;
+  const seatAvatar = gameState.seat_avatars?.[color];
+  const isRegisteredUserSeat = seatAvatar?.seat_kind === "USER";
 
   return (
     <div
@@ -217,16 +220,29 @@ function PlayerCard({
             {name}
           </span>
         </div>
-        <div className="cu-player-card__avatar-wrap">
-          <HybridIllustration
-            src={avatarSrc}
-            alt={name}
-            fallback={
-              <div className="cu-player-card__avatar-fallback">
-                {isBot ? "🤖" : "🧑"}
-              </div>
-            }
-          />
+        <div
+          className={cn("cu-player-card__avatar-wrap", {
+            "cu-player-card__avatar-wrap--custom": isRegisteredUserSeat,
+          })}
+        >
+          {seatAvatar?.seat_kind === "USER" ? (
+            <PlayerAvatar
+              config={seatAvatar.avatar_config}
+              username={seatAvatar.username || name}
+              size={58}
+              className="cu-player-card__custom-avatar"
+            />
+          ) : (
+            <HybridIllustration
+              src={avatarSrc}
+              alt={name}
+              fallback={
+                <div className="cu-player-card__avatar-fallback">
+                  {isBot ? "🤖" : "🧑"}
+                </div>
+              }
+            />
+          )}
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogTitle, Tab, Tabs, Button } from "@mui/mate
 import { getLeaderboard, getMatchHistory } from "../utils/apiClient";
 import type { LeaderboardEntry, MatchRecord } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import PlayerAvatar from "./PlayerAvatar";
 import "./LeaderboardModal.scss";
 
 export default function LeaderboardModal({
@@ -89,8 +90,17 @@ export default function LeaderboardModal({
                     >
                       <td>#{row.rank}</td>
                       <td>
-                        <strong>{row.display_name}</strong>{" "}
-                        <small>@{row.username}</small>
+                        <div className="leaderboard-player-cell">
+                          <PlayerAvatar
+                            config={row.avatar_config}
+                            username={row.username}
+                            size={34}
+                          />
+                          <div>
+                            <strong>{row.display_name}</strong>{" "}
+                            <small>@{row.username}</small>
+                          </div>
+                        </div>
                       </td>
                       <td>{row.wins}</td>
                       <td>{row.games_played}</td>

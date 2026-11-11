@@ -148,3 +148,41 @@ test("loads a historical state without advancing bots in replay mode", async () 
     screen.queryByRole("button", { name: "ROLAR DADOS" })
   ).not.toBeInTheDocument();
 });
+
+test("renders custom SVG PlayerAvatar for registered USER seats while keeping classic portraits for bots", async () => {
+  const mixedState = makeGameState({
+    seat_names: { RED: "Bot", BLUE: "João" },
+    seat_avatars: {
+      RED: { seat_kind: "BOT", username: null, avatar_config: {} },
+      BLUE: {
+        seat_kind: "USER",
+        username: "joao",
+        avatar_config: { hat: "captain", background: "ocean", frame: "gold" },
+      },
+    },
+  });
+  vi.mocked(getState).mockResolvedValue(mixedState);
+
+  renderGameScreen();
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  const customAvatars = screen.getAllByTestId("player-avatar");
+  expect(customAvatars).toHaveLength(1);
+  expect(customAvatars[0]).toHaveAttribute("data-frame", "gold");
+});
+
+test("keeps classic portraits for GUEST seats instead of rendering PlayerAvatar", async () => {
+  const guestState = makeGameState({
+    seat_names: { RED: "Bot", BLUE: "Convidado" },
+    seat_avatars: {
+      RED: { seat_kind: "BOT", username: null, avatar_config: {} },
+      BLUE: { seat_kind: "GUEST", username: null, avatar_config: {} },
+    },
+  });
+  vi.mocked(getState).mockResolvedValue(guestState);
+
+  renderGameScreen();
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  expect(screen.queryByTestId("player-avatar")).not.toBeInTheDocument();
+});

@@ -34,6 +34,8 @@ import type { RoomState } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import LeaderboardModal from "../components/LeaderboardModal";
+import PlayerAvatar from "../components/PlayerAvatar";
+import AvatarStudioModal from "../components/AvatarStudioModal";
 
 import "./HomePage.scss";
 
@@ -80,6 +82,7 @@ export default function HomePage() {
   const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [avatarStudioOpen, setAvatarStudioOpen] = useState(false);
   const [activeRooms, setActiveRooms] = useState<RoomState[]>([]);
 
   const [hostName, setHostName] = useState(
@@ -206,6 +209,7 @@ export default function HomePage() {
   };
 
   const handleLogout = async () => {
+    setAvatarStudioOpen(false);
     await logoutAccount();
     setAccount(null);
     refreshRooms();
@@ -306,21 +310,43 @@ export default function HomePage() {
             <div className="account-bar">
               {account ? (
                 <div className="account-bar__logged">
-                  <div className="account-bar__info">
-                    <span className="account-bar__badge">👤 CONTA ONLINE</span>
-                    <strong>{account.display_name}</strong>
-                    <small>
-                      @{account.username} • Suas salas e assentos ficam salvos em qualquer dispositivo
-                    </small>
-                    {account.stats && (
-                      <div className="account-bar__stats">
-                        <span>Vitórias: <strong>{account.stats.wins}</strong></span>
-                        <span>Partidas: <strong>{account.stats.games_played}</strong></span>
-                        <span>Aproveitamento: <strong>{account.stats.win_rate}%</strong></span>
-                      </div>
-                    )}
+                  <div className="account-bar__identity">
+                    <button
+                      type="button"
+                      className="account-bar__avatar-btn"
+                      onClick={() => setAvatarStudioOpen(true)}
+                      title="Personalizar seu avatar"
+                    >
+                      <PlayerAvatar
+                        config={account.avatar_config}
+                        username={account.username}
+                        size={52}
+                      />
+                    </button>
+                    <div className="account-bar__info">
+                      <span className="account-bar__badge">👤 CONTA ONLINE</span>
+                      <strong>{account.display_name}</strong>
+                      <small>
+                        @{account.username} • Suas salas e assentos ficam salvos em qualquer dispositivo
+                      </small>
+                      {account.stats && (
+                        <div className="account-bar__stats">
+                          <span>Vitórias: <strong>{account.stats.wins}</strong></span>
+                          <span>Partidas: <strong>{account.stats.games_played}</strong></span>
+                          <span>Aproveitamento: <strong>{account.stats.win_rate}%</strong></span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="account-bar__actions">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      className="account-avatar-btn"
+                      onClick={() => setAvatarStudioOpen(true)}
+                    >
+                      🎨 Personalizar Avatar
+                    </Button>
                     <Button
                       size="small"
                       variant="outlined"
@@ -734,6 +760,19 @@ export default function HomePage() {
         onClose={() => setLeaderboardOpen(false)}
         currentUsername={account?.username}
       />
+
+      {account && (
+        <AvatarStudioModal
+          open={avatarStudioOpen}
+          onClose={() => setAvatarStudioOpen(false)}
+          account={account}
+          onSaved={(updated) => {
+            setAccount(updated);
+            setHostName(updated.display_name);
+            refreshRooms();
+          }}
+        />
+      )}
     </div>
   );
 }

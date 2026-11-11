@@ -110,6 +110,12 @@
   }
 }
 
+.leaderboard-player-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .match-history-wrap {
   display: flex;
   flex-direction: column;

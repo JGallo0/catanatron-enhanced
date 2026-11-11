@@ -12,6 +12,7 @@ vi.mock("../utils/apiClient", () => ({
         rank: 1,
         username: "pedro",
         display_name: "Pedro",
+        avatar_config: { hat: "captain", background: "ocean", frame: "bronze" },
         wins: 4,
         losses: 1,
         games_played: 5,
@@ -64,6 +65,7 @@ describe("LeaderboardModal", () => {
     render(<LeaderboardModal open={true} onClose={() => {}} currentUsername="pedro" />);
 
     expect(await screen.findByText("Pedro")).toBeInTheDocument();
+    expect(screen.getAllByTestId("player-avatar").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
 
