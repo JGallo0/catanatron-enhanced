@@ -238,7 +238,7 @@ def post_auth_register_endpoint():
         password=password,
         display_name=str(display_name).strip() if display_name else None,
     )
-    payload = serialize_user(user)
+    payload = serialize_user(user, get_user_stats(user.username))
     payload.update({"auth_token": sess.token, "is_new": True})
     return jsonify(payload)
 

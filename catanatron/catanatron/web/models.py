@@ -513,6 +513,7 @@ def serialize_user(user: StoredUser, stats: dict | None = None) -> dict:
     }
     if stats is not None:
         payload["stats"] = stats
+        payload["leaderboard_rank"] = get_user_rank(user.username)
     return payload
 
 
@@ -860,7 +861,7 @@ def get_user_stats(username: str) -> dict:
     }
 
 
-def get_leaderboard(limit: int = 100) -> list[dict]:
+def _build_leaderboard_rows() -> list[dict]:
     users = db.session.query(StoredUser).all()
     participants = (
         db.session.query(StoredMatchParticipant).filter_by(seat_kind="USER").all()
@@ -905,10 +906,23 @@ def get_leaderboard(limit: int = 100) -> list[dict]:
             item["username"],
         )
     )
-    trimmed = board[:limit]
-    for idx, entry in enumerate(trimmed, start=1):
+    for idx, entry in enumerate(board, start=1):
         entry["rank"] = idx
-    return trimmed
+    return board
+
+
+def get_leaderboard(limit: int = 100) -> list[dict]:
+    return _build_leaderboard_rows()[:limit]
+
+
+def get_user_rank(username: str) -> int | None:
+    clean = _normalize_username(username)
+    if not clean:
+        return None
+    for row in _build_leaderboard_rows():
+        if row["username"] == clean:
+            return int(row["rank"])
+    return None
 
 
 def get_match_history(username: str | None = None, limit: int = 30) -> list[dict]:

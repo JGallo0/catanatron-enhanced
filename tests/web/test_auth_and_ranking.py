@@ -476,3 +476,52 @@ def test_game_state_and_room_serialize_user_seat_avatars(app, client):
     assert mp_view["room_code"] == room_res["room_code"]
     assert mp_view["seat_avatars"]["RED"]["seat_kind"] == "USER"
     assert mp_view["seat_avatars"]["RED"]["avatar_config"]["hair"] == "braids"
+
+
+def test_auth_endpoints_expose_leaderboard_rank_without_altering_stats_keys(app, client):
+    joao_reg = client.post(
+        "/api/auth/register",
+        json={"username": "joao_rank", "password": "pw1234", "display_name": "João"},
+    )
+    assert joao_reg.status_code == 200
+    joao_payload = joao_reg.get_json()
+    assert joao_payload["leaderboard_rank"] == 1
+    assert set(joao_payload["stats"].keys()) == {
+        "wins",
+        "losses",
+        "games_played",
+        "win_rate",
+    }
+
+    maria_reg = client.post(
+        "/api/auth/register",
+        json={"username": "maria_rank", "password": "pw1234", "display_name": "Maria"},
+    )
+    assert maria_reg.status_code == 200
+    maria_tok = maria_reg.get_json()["auth_token"]
+
+    # Maria vence uma partida e assume o 1º lugar (#1); João cai para #2
+    gid = client.post(
+        "/api/games",
+        headers={"Authorization": f"Bearer {maria_tok}"},
+        json={"players": ["HUMAN", "R"]},
+    ).get_json()["game_id"]
+    _force_win_and_record(app, gid, Color.RED)
+
+    maria_me = client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {maria_tok}"}
+    ).get_json()
+    assert maria_me["leaderboard_rank"] == 1
+    assert maria_me["stats"] == {
+        "wins": 1,
+        "losses": 0,
+        "games_played": 1,
+        "win_rate": 100.0,
+    }
+
+    joao_login = client.post(
+        "/api/auth/login",
+        json={"username": "joao_rank", "password": "pw1234"},
+    ).get_json()
+    assert joao_login["leaderboard_rank"] == 2
+
