@@ -18,6 +18,14 @@ describe("avatarCatalog", () => {
     expect(isAvatarItemUnlocked("frame", first.frame, 0)).toBe(true);
     expect(isAvatarItemUnlocked("hat", first.hat, 0)).toBe(true);
     expect(first).not.toEqual(other);
+
+    // Ensure unsigned bit-shifting never returns undefined for bit-31-set FNV hashes (e.g. "cavaleiro")
+    for (const uname of ["cavaleiro", "ana", "pedro", "bruno", "diana", "sol"]) {
+      const resolved = resolveAvatarConfig({}, uname);
+      expect(Object.values(resolved).every((v) => typeof v === "string" && v.length > 0)).toBe(
+        true
+      );
+    }
   });
 
   test("enforces ranked win unlock thresholds accurately", () => {

@@ -313,7 +313,7 @@ export function resolveAvatarConfig(
 ): AvatarConfig {
   const seed = hashUsername((username || "colono").toLowerCase().trim() || "colono");
   const pick = <T extends string>(arr: readonly T[], shift: number): T =>
-    arr[(seed >> shift) % arr.length];
+    arr[(seed >>> shift) % arr.length];
 
   const baseHats = AVATAR_HAT_OPTIONS.filter((h) => !h.requiredWins).map((h) => h.value);
   const defaults: AvatarConfig = {
