@@ -6,11 +6,15 @@ import {
   getMatchHistory,
   loginAccount,
   registerAccount,
+  updateProfile,
 } from "./apiClient";
 import {
+  localCreateGame,
   localGetLeaderboard,
   localGetMatchHistory,
+  localGetState,
   localRecordCompletedMatch,
+  localUpdateProfile,
 } from "./localEngine";
 
 describe("local match history and leaderboard calculations", () => {
@@ -133,5 +137,67 @@ describe("local match history and leaderboard calculations", () => {
     expect(lbRes.is_offline_fallback).toBe(true);
     const matchRes = await getMatchHistory();
     expect(matchRes.is_offline_fallback).toBe(true);
+  });
+
+  test("updateProfile propagates 403 error and offline mirror enforces unlock thresholds and updates leaderboard/games", async () => {
+    vi.spyOn(axios, "post").mockRejectedValue(new Error("Offline"));
+    const acct = await registerAccount({
+      username: "helena",
+      password: "pw1234",
+      displayName: "Helena",
+    });
+
+    // 403 vindo do backend deve propagar e NÃO cair silenciosamente no offline
+    vi.spyOn(axios, "patch").mockRejectedValueOnce({
+      response: {
+        status: 403,
+        data: {
+          description:
+            "Este item requer 3 vitória(s) no Ranking para ser desbloqueado (você tem 0).",
+        },
+      },
+    });
+    await expect(
+      updateProfile({ displayName: "Helena", avatarConfig: { frame: "silver" } })
+    ).rejects.toMatchObject({ response: { status: 403 } });
+
+    // Offline fallback valida bloqueio de moldura com 0 vitórias
+    vi.spyOn(axios, "patch").mockRejectedValue(new Error("Network Error"));
+    await expect(
+      updateProfile({ displayName: "Helena", avatarConfig: { frame: "bronze" } })
+    ).rejects.toBeDefined();
+
+    // Atualizar item gratuito offline funciona e aparece no leaderboard e localCreateGame
+    const updated = await updateProfile({
+      displayName: "Cap. Helena",
+      avatarConfig: { frame: "wood", hat: "captain", background: "ocean" },
+    });
+    expect(updated.display_name).toBe("Cap. Helena");
+    expect(updated.avatar_config?.hat).toBe("captain");
+    expect(acct.username).toBe("helena");
+
+    const lb = localGetLeaderboard();
+    const helenaRow = lb.find((r) => r.username === "helena");
+    expect(helenaRow?.avatar_config?.hat).toBe("captain");
+
+    const localGameId = localCreateGame({
+      players: ["HUMAN", "CATANATRON"],
+      mapTemplate: "BASE",
+      vpsToWin: 10,
+      discardLimit: 7,
+      friendlyRobber: true,
+    });
+    const st = localGetState(localGameId);
+    expect(st.seat_avatars?.RED?.seat_kind).toBe("USER");
+    expect(st.seat_avatars?.RED?.avatar_config?.hat).toBe("captain");
+    expect(st.seat_avatars?.BLUE?.seat_kind).toBe("BOT");
+
+    // Verificar também chamada direta a localUpdateProfile
+    expect(() =>
+      localUpdateProfile({
+        username: "helena",
+        avatarConfig: { hat: "crown_gold" },
+      })
+    ).toThrow(/7 vitória/);
   });
 });

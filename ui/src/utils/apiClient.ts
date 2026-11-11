@@ -3,6 +3,7 @@ import axios from "axios";
 import { API_URL } from "../configuration";
 import type {
   AccountStats,
+  AvatarConfig,
   Color,
   GameAction,
   GameState,
@@ -23,9 +24,9 @@ import {
   localLoginOrRegister,
   localLoginUser,
   localPostAction,
-  localRecordCompletedMatch,
   localRegisterUser,
   localStartRoomGame,
+  localUpdateProfile,
   localUpdateRoom,
 } from "./localEngine";
 
@@ -54,7 +55,7 @@ export type PlayerAccount = {
   display_name: string;
   auth_token: string;
   has_google?: boolean;
-  avatar_config?: Record<string, unknown>;
+  avatar_config?: Partial<AvatarConfig>;
   stats?: AccountStats;
   is_new?: boolean;
 };
@@ -225,25 +226,43 @@ export async function logoutAccount(): Promise<void> {
 
 export async function updateProfile(payload: {
   displayName?: string;
-  avatarConfig?: Record<string, unknown>;
+  avatarConfig?: Partial<AvatarConfig>;
 }): Promise<PlayerAccount> {
   const saved = getSavedAccount();
   if (!saved?.auth_token) throw new Error("Não autenticado");
-  const response = await axios.patch<PlayerAccount>(
-    `${API_URL}/api/auth/profile`,
-    {
-      display_name: payload.displayName,
-      avatar_config: payload.avatarConfig,
-    },
-    { headers: authHeaders(saved.auth_token) }
-  );
-  const updated: PlayerAccount = {
-    ...saved,
-    ...response.data,
-    auth_token: saved.auth_token,
-  };
-  saveAccount(updated);
-  return updated;
+  try {
+    const response = await axios.patch<PlayerAccount>(
+      `${API_URL}/api/auth/profile`,
+      {
+        display_name: payload.displayName,
+        avatar_config: payload.avatarConfig,
+      },
+      { headers: authHeaders(saved.auth_token) }
+    );
+    const updated: PlayerAccount = {
+      ...saved,
+      ...response.data,
+      auth_token: saved.auth_token,
+    };
+    saveAccount(updated);
+    return updated;
+  } catch (err: any) {
+    if (err?.response && err.response.status >= 400 && err.response.status < 500) {
+      throw err;
+    }
+    const localUpdated = localUpdateProfile({
+      username: saved.username,
+      displayName: payload.displayName,
+      avatarConfig: payload.avatarConfig,
+    });
+    const merged: PlayerAccount = {
+      ...saved,
+      ...localUpdated,
+      auth_token: saved.auth_token,
+    };
+    saveAccount(merged);
+    return merged;
+  }
 }
 
 export async function getLeaderboard(): Promise<{
@@ -581,7 +600,7 @@ export async function joinRoom(
         preferred_color: options.preferredColor,
         token: resolvedToken,
       },
-      { headers: authHeaders(resolvedToken) }
+      { headers: authHeaders() }
     );
     if (
       response.data &&
@@ -613,12 +632,11 @@ export async function updateRoom(
     }>;
   }
 ): Promise<RoomState> {
-  const resolvedToken = payload.token ?? getSavedAccount()?.auth_token;
   try {
     const response = await axios.patch<RoomState>(
       `${API_URL}/api/rooms/${roomCode}`,
       payload,
-      { headers: authHeaders(resolvedToken) }
+      { headers: authHeaders() }
     );
     if (
       response.data &&

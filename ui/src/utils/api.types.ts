@@ -114,6 +114,36 @@ export type GameEdge = {
   tile_coordinate: TileCoordinate;
 };
 
+export type AvatarSkin = "porcelain" | "fair" | "warm" | "tan" | "brown" | "deep";
+export type AvatarEyes = "calm" | "cheerful" | "sharp" | "wise";
+export type AvatarHair = "none" | "short" | "wavy" | "bun" | "braids" | "curly" | "long";
+export type AvatarHairColor = "brown" | "black" | "blonde" | "red" | "silver" | "navy";
+export type AvatarBeard = "none" | "goatee" | "full" | "mustache";
+export type AvatarHat = "none" | "captain" | "explorer" | "bandana" | "helm" | "crown_gold";
+export type AvatarOutfit = "settler" | "captain" | "armor" | "merchant";
+export type AvatarOutfitColor = "crimson" | "royal" | "emerald" | "amber" | "slate";
+export type AvatarBackground = "ocean" | "sunset" | "forest" | "mountain" | "gold" | "crimson";
+export type AvatarFrame = "wood" | "bronze" | "silver" | "gold" | "imperial";
+
+export type AvatarConfig = {
+  skin: AvatarSkin;
+  eyes: AvatarEyes;
+  hair: AvatarHair;
+  hairColor: AvatarHairColor;
+  beard: AvatarBeard;
+  hat: AvatarHat;
+  outfit: AvatarOutfit;
+  outfitColor: AvatarOutfitColor;
+  background: AvatarBackground;
+  frame: AvatarFrame;
+};
+
+export type SeatAvatarMeta = {
+  seat_kind: "USER" | "GUEST" | "BOT";
+  username: string | null;
+  avatar_config?: Partial<AvatarConfig> | null;
+};
+
 export type RoomSeat = {
   color: Color;
   player_key: string;
@@ -121,6 +151,9 @@ export type RoomSeat = {
   is_bot: boolean;
   claimed: boolean;
   is_me: boolean;
+  seat_kind?: "USER" | "GUEST" | "BOT";
+  username?: string | null;
+  avatar_config?: Partial<AvatarConfig> | null;
 };
 
 export type RoomState = {
@@ -159,6 +192,7 @@ export type GameState = {
   nodeActions?: GameAction[];
   state_index: number;
   seat_names?: Partial<Record<Color, string>>;
+  seat_avatars?: Partial<Record<Color, SeatAvatarMeta>>;
   room_code?: string;
 
   // Also present, from the state document itself.
@@ -200,7 +234,7 @@ export type LeaderboardEntry = {
   rank: number;
   username: string;
   display_name: string;
-  avatar_config?: Record<string, unknown>;
+  avatar_config?: Partial<AvatarConfig>;
   wins: number;
   losses: number;
   games_played: number;

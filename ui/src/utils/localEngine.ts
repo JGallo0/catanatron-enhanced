@@ -1,5 +1,5 @@
 import type {
-  AccountStats,
+  AvatarConfig,
   Color,
   DevelopmentCard,
   Direction,
@@ -13,11 +13,17 @@ import type {
   PlacedTile,
   ResourceCard,
   RoomState,
+  SeatAvatarMeta,
   Tile,
   TileCoordinate,
 } from "./api.types";
 import type { MapTemplate, MCTSProbabilities, PlayerAccount } from "./apiClient";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import {
+  AVATAR_UNLOCK_REQUIREMENTS,
+  isAvatarItemUnlocked,
+  sanitizeAvatarConfig,
+} from "../config/avatarCatalog";
 
 const SEAT_COLORS: Color[] = ["RED", "BLUE", "ORANGE", "WHITE"];
 const RESOURCES: ResourceCard[] = ["WOOD", "BRICK", "SHEEP", "WHEAT", "ORE"];
@@ -418,6 +424,7 @@ export type LocalSeatMeta = {
   username: string | null;
   player_key: string;
   display_name: string;
+  avatar_config?: Partial<AvatarConfig> | null;
 };
 
 type StoredLocalGame = {
@@ -432,6 +439,79 @@ type StoredLocalGame = {
 
 const GAMES_STORAGE_KEY = "catan_local_games_v1";
 const ROOMS_STORAGE_KEY = "catan_local_rooms_v1";
+
+function getSavedPlayerAccount(): PlayerAccount | null {
+  try {
+    const raw = localStorage.getItem("catan_player_account");
+    return raw ? (JSON.parse(raw) as PlayerAccount) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getLocalUserDirectory(): Record<
+  string,
+  { username: string; display_name: string; avatar_config: Partial<AvatarConfig> }
+> {
+  const dir: Record<
+    string,
+    { username: string; display_name: string; avatar_config: Partial<AvatarConfig> }
+  > = {};
+  for (const [k, u] of Object.entries(loadLocalUsers())) {
+    dir[k] = {
+      username: u.username,
+      display_name: u.display_name,
+      avatar_config: sanitizeAvatarConfig(u.avatar_config),
+    };
+  }
+  const saved = getSavedPlayerAccount();
+  if (saved?.username) {
+    const clean = saved.username
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9_-]/g, "")
+      .slice(0, 24);
+    if (clean) {
+      dir[clean] = {
+        username: clean,
+        display_name: saved.display_name || dir[clean]?.display_name || clean,
+        avatar_config: {
+          ...(dir[clean]?.avatar_config || {}),
+          ...sanitizeAvatarConfig(saved.avatar_config),
+        },
+      };
+    }
+  }
+  return dir;
+}
+
+function buildSeatViewsFromMeta(
+  seatMeta?: Partial<Record<Color, LocalSeatMeta>>
+): {
+  seatNames: Partial<Record<Color, string>>;
+  seatAvatars: Partial<Record<Color, SeatAvatarMeta>>;
+} {
+  const seatNames: Partial<Record<Color, string>> = {};
+  const seatAvatars: Partial<Record<Color, SeatAvatarMeta>> = {};
+  if (!seatMeta) return { seatNames, seatAvatars };
+
+  const dir = getLocalUserDirectory();
+  for (const [colorKey, meta] of Object.entries(seatMeta)) {
+    const color = colorKey as Color;
+    if (!meta) continue;
+    const uname = meta.seat_kind === "USER" ? meta.username : null;
+    const liveUser = uname ? dir[uname] : undefined;
+    seatNames[color] = liveUser?.display_name || meta.display_name;
+    seatAvatars[color] = {
+      seat_kind: meta.seat_kind,
+      username: uname,
+      avatar_config: uname
+        ? liveUser?.avatar_config || sanitizeAvatarConfig(meta.avatar_config)
+        : {},
+    };
+  }
+  return { seatNames, seatAvatars };
+}
 
 function loadGamesMap(): Record<string, StoredLocalGame> {
   try {
@@ -1006,7 +1086,7 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
 
   if (state.winning_color) {
     const winnerColor = state.winning_color;
-    const meta = game.seatMeta || {};
+    const meta: Partial<Record<Color, LocalSeatMeta>> = game.seatMeta || {};
     const participants: MatchParticipant[] = state.colors.map((c) => {
       const pIndexKey = pKey(state, c);
       const vps = state.player_state[`${pIndexKey}_ACTUAL_VICTORY_POINTS`] ?? 0;
@@ -1123,18 +1203,14 @@ export function localCreateGame(options: {
   const gameId =
     "local-" + Math.random().toString(36).substring(2, 10);
 
-  let defaultUser: { username: string; display_name: string } | null = null;
-  try {
-    const rawAcct = localStorage.getItem("catan_player_account");
-    if (rawAcct) {
-      const parsed = JSON.parse(rawAcct);
-      if (parsed?.username) {
-        defaultUser = { username: parsed.username, display_name: parsed.display_name || parsed.username };
+  const savedAcct = getSavedPlayerAccount();
+  const defaultUser = savedAcct?.username
+    ? {
+        username: savedAcct.username,
+        display_name: savedAcct.display_name || savedAcct.username,
+        avatar_config: sanitizeAvatarConfig(savedAcct.avatar_config),
       }
-    }
-  } catch {
-    // ignore
-  }
+    : null;
 
   const resolvedSeatMeta: Record<Color, LocalSeatMeta> = options.seatMeta
     ? { ...options.seatMeta }
@@ -1152,6 +1228,7 @@ export function localCreateGame(options: {
             username: defaultUser.username,
             player_key: "HUMAN",
             display_name: options.seatNames?.[c] || defaultUser.display_name,
+            avatar_config: defaultUser.avatar_config,
           };
           userAssigned = true;
         } else {
@@ -1161,6 +1238,7 @@ export function localCreateGame(options: {
             username: null,
             player_key: "HUMAN",
             display_name: options.seatNames?.[c] || PLAYER_COLOR_META[c].label,
+            avatar_config: {},
           };
         }
       } else {
@@ -1170,10 +1248,13 @@ export function localCreateGame(options: {
           username: null,
           player_key: pKey,
           display_name: options.seatNames?.[c] || `Bot (${pKey})`,
+          avatar_config: {},
         };
       }
     });
   }
+
+  const { seatNames: metaNames, seatAvatars } = buildSeatViewsFromMeta(resolvedSeatMeta);
 
   const playerState: Record<string, any> = {};
   colors.forEach((_, idx) => {
@@ -1228,7 +1309,8 @@ export function localCreateGame(options: {
     is_initial_build_phase: true,
     longest_roads_by_player: {},
     state_index: 0,
-    seat_names: options.seatNames,
+    seat_names: { ...metaNames, ...(options.seatNames || {}) },
+    seat_avatars: seatAvatars,
     room_code: options.roomCode,
     schema_version: 2,
     game: {
@@ -1284,11 +1366,18 @@ export function localGetState(
     freshMap[gameId] = game;
     saveGamesMap(freshMap);
   }
-  if (stateIndex === "latest") {
-    return JSON.parse(JSON.stringify(game.state));
-  }
   const idx = Number(stateIndex);
-  return JSON.parse(JSON.stringify(game.history[idx] || game.state));
+  const rawState =
+    stateIndex === "latest"
+      ? game.state
+      : game.history[idx] || game.state;
+  const cloned = JSON.parse(JSON.stringify(rawState)) as GameState;
+  if (game.seatMeta) {
+    const { seatNames, seatAvatars } = buildSeatViewsFromMeta(game.seatMeta);
+    cloned.seat_names = { ...seatNames, ...(cloned.seat_names || {}) };
+    cloned.seat_avatars = seatAvatars;
+  }
+  return cloned;
 }
 
 export function localPostAction(
@@ -1305,7 +1394,13 @@ export function localPostAction(
     applyActionToGame(game, chosen);
     saveGamesMap(map);
   }
-  return JSON.parse(JSON.stringify(game.state));
+  const cloned = JSON.parse(JSON.stringify(game.state)) as GameState;
+  if (game.seatMeta) {
+    const { seatNames, seatAvatars } = buildSeatViewsFromMeta(game.seatMeta);
+    cloned.seat_names = { ...seatNames, ...(cloned.seat_names || {}) };
+    cloned.seat_avatars = seatAvatars;
+  }
+  return cloned;
 }
 
 export function localGetMctsAnalysis(gameId: string): {
@@ -1342,6 +1437,7 @@ type LocalUserRecord = {
   username: string;
   display_name: string;
   password: string;
+  avatar_config?: Partial<AvatarConfig>;
 };
 
 function loadLocalUsers(): Record<string, LocalUserRecord> {
@@ -1371,7 +1467,12 @@ export function localRegisterUser(options: {
     throw new Error("Este usuário já está cadastrado localmente.");
   }
   const display_name = (options.displayName || options.username).trim() || cleanUser;
-  users[cleanUser] = { username: cleanUser, display_name, password: options.password };
+  users[cleanUser] = {
+    username: cleanUser,
+    display_name,
+    password: options.password,
+    avatar_config: {},
+  };
   try {
     localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
   } catch {
@@ -1381,6 +1482,7 @@ export function localRegisterUser(options: {
     username: cleanUser,
     display_name,
     auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
+    avatar_config: {},
     is_new: true,
   };
 }
@@ -1403,6 +1505,108 @@ export function localLoginUser(options: {
     username: existing.username,
     display_name: existing.display_name,
     auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
+    avatar_config: sanitizeAvatarConfig(existing.avatar_config),
+    is_new: false,
+  };
+}
+
+export function localUpdateProfile(options: {
+  username: string;
+  displayName?: string;
+  avatarConfig?: Partial<AvatarConfig> | null;
+}): PlayerAccount {
+  const cleanUser = options.username
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 24);
+  if (!cleanUser) {
+    throw new Error("Usuário inválido.");
+  }
+
+  const users = loadLocalUsers();
+  let existing = users[cleanUser];
+  if (!existing) {
+    const saved = getSavedPlayerAccount();
+    const savedMatches = saved?.username === cleanUser;
+    existing = {
+      username: cleanUser,
+      display_name: savedMatches ? saved.display_name || cleanUser : cleanUser,
+      password: "",
+      avatar_config: savedMatches
+        ? sanitizeAvatarConfig(saved.avatar_config)
+        : {},
+    };
+  }
+
+  const existingAvatar = sanitizeAvatarConfig(existing.avatar_config);
+  const incomingAvatar = sanitizeAvatarConfig(options.avatarConfig || {});
+  const mergedAvatar: Partial<AvatarConfig> = {
+    ...existingAvatar,
+    ...incomingAvatar,
+  };
+
+  const statsEntry = localGetLeaderboard().find((e) => e.username === cleanUser);
+  const wins = statsEntry?.wins ?? 0;
+
+  for (const [field, rules] of Object.entries(AVATAR_UNLOCK_REQUIREMENTS)) {
+    const val = (mergedAvatar as Record<string, string | undefined>)[field];
+    if (
+      val &&
+      rules &&
+      val in rules &&
+      !isAvatarItemUnlocked(field as keyof AvatarConfig, val, wins)
+    ) {
+      const reqWins = rules[val];
+      const msg = `Este item requer ${reqWins} vitória(s) no Ranking para ser desbloqueado (você tem ${wins}).`;
+      const err = new Error(msg) as Error & {
+        response?: { status: number; data: { description: string } };
+      };
+      err.response = { status: 403, data: { description: msg } };
+      throw err;
+    }
+  }
+
+  const nextDisplay =
+    options.displayName && options.displayName.trim()
+      ? options.displayName.trim().slice(0, 32)
+      : existing.display_name;
+
+  users[cleanUser] = {
+    ...existing,
+    display_name: nextDisplay,
+    avatar_config: mergedAvatar,
+  };
+  try {
+    localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+    const saved = getSavedPlayerAccount();
+    if (saved?.username === cleanUser) {
+      localStorage.setItem(
+        "catan_player_account",
+        JSON.stringify({
+          ...saved,
+          display_name: nextDisplay,
+          avatar_config: mergedAvatar,
+        })
+      );
+    }
+  } catch {
+    // ignore
+  }
+
+  return {
+    username: cleanUser,
+    display_name: nextDisplay,
+    auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
+    avatar_config: mergedAvatar,
+    stats: statsEntry
+      ? {
+          wins: statsEntry.wins,
+          losses: statsEntry.losses,
+          games_played: statsEntry.games_played,
+          win_rate: statsEntry.win_rate,
+        }
+      : { wins: 0, losses: 0, games_played: 0, win_rate: 0 },
     is_new: false,
   };
 }
@@ -1445,14 +1649,22 @@ export function localGetMatchHistory(username?: string): MatchRecord[] {
 }
 
 export function localGetLeaderboard(
-  extraUsers?: Array<{ username: string; display_name: string }>
+  extraUsers?: Array<{
+    username: string;
+    display_name: string;
+    avatar_config?: Partial<AvatarConfig>;
+  }>
 ): LeaderboardEntry[] {
-  const usersMap: Record<string, { username: string; display_name: string }> = {};
-  for (const [k, u] of Object.entries(loadLocalUsers())) {
-    usersMap[k] = { username: u.username, display_name: u.display_name };
-  }
+  const usersMap = getLocalUserDirectory();
   for (const u of extraUsers || []) {
-    usersMap[u.username] = u;
+    const existing = usersMap[u.username];
+    usersMap[u.username] = {
+      username: u.username,
+      display_name: u.display_name,
+      avatar_config: sanitizeAvatarConfig(
+        u.avatar_config ?? existing?.avatar_config
+      ),
+    };
   }
 
   const counts: Record<string, { wins: number; games: number }> = {};
@@ -1460,7 +1672,11 @@ export function localGetLeaderboard(
     for (const p of match.participants) {
       if (p.seat_kind !== "USER" || !p.username) continue;
       if (!usersMap[p.username]) {
-        usersMap[p.username] = { username: p.username, display_name: p.display_name };
+        usersMap[p.username] = {
+          username: p.username,
+          display_name: p.display_name,
+          avatar_config: {},
+        };
       }
       const bucket = counts[p.username] || { wins: 0, games: 0 };
       bucket.games += 1;
@@ -1477,6 +1693,7 @@ export function localGetLeaderboard(
       rank: 0,
       username: u.username,
       display_name: u.display_name,
+      avatar_config: sanitizeAvatarConfig(u.avatar_config),
       wins,
       losses,
       games_played: games,
@@ -1547,6 +1764,7 @@ export function localCreateRoom(options: {
     code += alphabet[Math.floor(Math.random() * alphabet.length)];
   }
   const hostToken = options.token || "tok_" + Math.random().toString(36).slice(2, 10);
+  const savedAcct = getSavedPlayerAccount();
   const seatTokens: Record<string, string | null> = {};
   let hostSeated = false;
 
@@ -1562,6 +1780,11 @@ export function localCreateRoom(options: {
         is_bot: false,
         claimed: true,
         is_me: true,
+        seat_kind: savedAcct?.username ? ("USER" as const) : ("GUEST" as const),
+        username: savedAcct?.username ?? null,
+        avatar_config: savedAcct?.username
+          ? sanitizeAvatarConfig(savedAcct.avatar_config)
+          : {},
       };
     } else if (pk === "HUMAN") {
       seatTokens[color] = null;
@@ -1572,6 +1795,9 @@ export function localCreateRoom(options: {
         is_bot: false,
         claimed: false,
         is_me: false,
+        seat_kind: "GUEST" as const,
+        username: null,
+        avatar_config: {},
       };
     } else {
       seatTokens[color] = null;
@@ -1582,6 +1808,9 @@ export function localCreateRoom(options: {
         is_bot: true,
         claimed: true,
         is_me: false,
+        seat_kind: "BOT" as const,
+        username: null,
+        avatar_config: {},
       };
     }
   });
@@ -1637,11 +1866,21 @@ export function localGetRoom(
   }
 
   let myColor: Color | null = null;
+  const dir = getLocalUserDirectory();
   const seats = stored.seats.map((s) => {
     const isMe = Boolean(token && stored.seat_tokens[s.color] === token);
     if (isMe) myColor = s.color;
+    const uname = !s.is_bot && s.seat_kind === "USER" ? s.username || null : null;
+    const resolvedKind: "USER" | "GUEST" | "BOT" = s.is_bot
+      ? "BOT"
+      : s.seat_kind || (uname ? "USER" : "GUEST");
     return {
       ...s,
+      seat_kind: resolvedKind,
+      username: uname,
+      avatar_config: uname
+        ? dir[uname]?.avatar_config || sanitizeAvatarConfig(s.avatar_config)
+        : {},
       claimed: s.is_bot || Boolean(stored.seat_tokens[s.color]),
       is_me: isMe,
     };
@@ -1672,6 +1911,12 @@ export function localJoinRoom(
   const stored = rooms[code];
   const token =
     options.token || "tok_" + Math.random().toString(36).slice(2, 10);
+  const savedAcct = getSavedPlayerAccount();
+  const seatKind: "USER" | "GUEST" = savedAcct?.username ? "USER" : "GUEST";
+  const seatUsername = savedAcct?.username ?? null;
+  const seatAvatar = savedAcct?.username
+    ? sanitizeAvatarConfig(savedAcct.avatar_config)
+    : {};
 
   let targetSeat = options.preferredColor
     ? stored.seats.find((s) => s.color === options.preferredColor)
@@ -1689,6 +1934,9 @@ export function localJoinRoom(
       stored.seat_tokens[s.color] = null;
       s.player_name = "Aguardando Amigo...";
       s.claimed = false;
+      s.seat_kind = "GUEST";
+      s.username = null;
+      s.avatar_config = {};
     }
   }
 
@@ -1696,6 +1944,9 @@ export function localJoinRoom(
   targetSeat.is_bot = false;
   targetSeat.player_name = options.playerName || "Jogador";
   targetSeat.claimed = true;
+  targetSeat.seat_kind = seatKind;
+  targetSeat.username = seatUsername;
+  targetSeat.avatar_config = seatAvatar;
   stored.seat_tokens[targetSeat.color] = token;
   saveRoomsMap(rooms);
 
@@ -1723,23 +1974,40 @@ export function localUpdateRoom(
     stored.config = { ...stored.config, ...payload.config };
   }
   if (payload.seats) {
+    const oldByColor = Object.fromEntries(
+      stored.seats.map((s) => [s.color, s])
+    );
     stored.seats = payload.seats.map((item, idx) => {
       const color = SEAT_COLORS[idx];
+      const prev = oldByColor[color];
       const isBot = item.player_key !== "HUMAN";
       if (isBot) {
         stored.seat_tokens[color] = null;
+        return {
+          color,
+          player_key: item.player_key,
+          player_name: item.player_name || `🤖 IA (${item.player_key})`,
+          is_bot: true,
+          claimed: true,
+          is_me: false,
+          seat_kind: "BOT" as const,
+          username: null,
+          avatar_config: {},
+        };
       }
+      const hasClaim = Boolean(stored.seat_tokens[color]);
       return {
         color,
-        player_key: item.player_key,
-        player_name:
-          item.player_name ||
-          (isBot ? `🤖 IA (${item.player_key})` : "Aguardando Amigo..."),
-        is_bot: isBot,
-        claimed: isBot || Boolean(stored.seat_tokens[color]),
+        player_key: "HUMAN",
+        player_name: item.player_name || "Aguardando Amigo...",
+        is_bot: false,
+        claimed: hasClaim,
         is_me: Boolean(
           payload.token && stored.seat_tokens[color] === payload.token
         ),
+        seat_kind: hasClaim ? prev?.seat_kind || "GUEST" : ("GUEST" as const),
+        username: hasClaim ? prev?.username ?? null : null,
+        avatar_config: hasClaim ? prev?.avatar_config ?? {} : {},
       };
     });
   }
@@ -1753,17 +2021,31 @@ export function localStartRoomGame(
   token?: string | null
 ): { game_id: string; room: RoomState } {
   const code = roomCode.toUpperCase();
-  localGetRoom(code, token);
+  const resolvedRoom = localGetRoom(code, token);
   const rooms = loadRoomsMap();
   const stored = rooms[code];
 
   if (!stored.game_id) {
     const seatNames: Partial<Record<Color, string>> = {};
-    for (const s of stored.seats) {
-      seatNames[s.color] =
+    const seatMeta = {} as Record<Color, LocalSeatMeta>;
+    for (const s of resolvedRoom.seats) {
+      const cleanLabel =
         s.player_name === "Aguardando Amigo..."
           ? PLAYER_COLOR_META[s.color].label
           : s.player_name;
+      seatNames[s.color] = cleanLabel;
+      seatMeta[s.color] = {
+        color: s.color,
+        seat_kind: s.is_bot
+          ? "BOT"
+          : s.username
+            ? "USER"
+            : "GUEST",
+        username: s.is_bot ? null : s.username ?? null,
+        player_key: s.player_key,
+        display_name: cleanLabel,
+        avatar_config: s.avatar_config ?? {},
+      };
     }
     stored.game_id = localCreateGame({
       players: stored.seats.map((s) => s.player_key),
@@ -1772,6 +2054,7 @@ export function localStartRoomGame(
       discardLimit: stored.config.discard_limit,
       friendlyRobber: stored.config.friendly_robber,
       seatNames,
+      seatMeta,
       roomCode: code,
     });
     stored.status = "IN_PROGRESS";
