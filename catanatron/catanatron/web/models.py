@@ -48,6 +48,50 @@ Base = declarative_base(metadata=metadata)
 SEAT_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"]
 SESSION_TTL_SECONDS = 90 * 24 * 60 * 60
 
+AVATAR_VALID_VALUES: dict[str, tuple[str, ...]] = {
+    "skin": ("porcelain", "fair", "warm", "tan", "brown", "deep"),
+    "eyes": ("calm", "cheerful", "sharp", "wise"),
+    "hair": ("none", "short", "wavy", "bun", "braids", "curly", "long"),
+    "hairColor": ("brown", "black", "blonde", "red", "silver", "navy"),
+    "beard": ("none", "goatee", "full", "mustache"),
+    "hat": ("none", "captain", "explorer", "bandana", "helm", "crown_gold"),
+    "outfit": ("settler", "captain", "armor", "merchant"),
+    "outfitColor": ("crimson", "royal", "emerald", "amber", "slate"),
+    "background": ("ocean", "sunset", "forest", "mountain", "gold", "crimson"),
+    "frame": ("wood", "bronze", "silver", "gold", "imperial"),
+}
+
+AVATAR_UNLOCK_REQUIREMENTS: dict[str, dict[str, int]] = {
+    "frame": {"bronze": 1, "silver": 3, "gold": 5, "imperial": 10},
+    "hat": {"crown_gold": 7},
+}
+
+
+def sanitize_avatar_config(raw: dict | None) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    sanitized: dict[str, str] = {}
+    for field, allowed in AVATAR_VALID_VALUES.items():
+        val = raw.get(field)
+        if isinstance(val, str) and val in allowed:
+            sanitized[field] = val
+    return sanitized
+
+
+def _load_avatars_by_username(usernames: list[str]) -> dict[str, dict[str, str]]:
+    clean = sorted({u for u in usernames if isinstance(u, str) and u})
+    if not clean:
+        return {}
+    users = db.session.query(StoredUser).filter(StoredUser.username.in_(clean)).all()
+    by_user: dict[str, dict[str, str]] = {}
+    for u in users:
+        try:
+            parsed = json.loads(u.avatar_json or "{}")
+        except Exception:
+            parsed = {}
+        by_user[u.username] = sanitize_avatar_config(parsed)
+    return by_user
+
 
 class StoredGame(Base):
     """A game: where it started, who is playing, and where its rng is now."""
@@ -285,18 +329,37 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
     my_color = None
     is_host = bool(caller_token and caller_token == room.host_token)
 
+    user_names = [
+        s.get("username")
+        for s in seats
+        if s.get("player_key") == "HUMAN" and s.get("username")
+    ]
+    avatars = _load_avatars_by_username(user_names)
+
     public_seats = []
     for seat in seats:
         if caller_token and seat.get("seat_token") == caller_token:
             my_color = seat["color"]
+        is_bot = seat["player_key"] != "HUMAN"
+        uname = seat.get("username") if not is_bot else None
+        seat_kind = (
+            "BOT"
+            if is_bot
+            else (seat.get("seat_kind") or ("USER" if uname else "GUEST"))
+        )
         public_seats.append(
             {
                 "color": seat["color"],
                 "player_key": seat["player_key"],
                 "player_name": seat["player_name"],
-                "is_bot": seat["player_key"] != "HUMAN",
-                "claimed": bool(seat.get("seat_token")) or seat["player_key"] != "HUMAN",
+                "is_bot": is_bot,
+                "claimed": bool(seat.get("seat_token")) or is_bot,
                 "is_me": bool(caller_token and seat.get("seat_token") == caller_token),
+                "seat_kind": seat_kind,
+                "username": uname,
+                "avatar_config": (
+                    avatars.get(uname, {}) if (seat_kind == "USER" and uname) else {}
+                ),
             }
         )
 
@@ -446,7 +509,7 @@ def serialize_user(user: StoredUser, stats: dict | None = None) -> dict:
         "username": user.username,
         "display_name": user.display_name,
         "has_google": bool(user.google_sub),
-        "avatar_config": avatar_cfg if isinstance(avatar_cfg, dict) else {},
+        "avatar_config": sanitize_avatar_config(avatar_cfg),
     }
     if stats is not None:
         payload["stats"] = stats
@@ -507,10 +570,32 @@ def update_user_profile(
     user: StoredUser, display_name: str | None = None, avatar_config: dict | None = None
 ) -> StoredUser:
     session = db.session
-    if display_name is not None and display_name.strip():
-        user.display_name = display_name.strip()[:32]
-    if avatar_config is not None and isinstance(avatar_config, dict):
-        user.avatar_json = json.dumps(avatar_config)
+    if avatar_config is not None:
+        if not isinstance(avatar_config, dict):
+            abort(400, description="Configuração de avatar inválida.")
+        try:
+            existing_cfg = sanitize_avatar_config(json.loads(user.avatar_json or "{}"))
+        except Exception:
+            existing_cfg = {}
+        incoming_cfg = sanitize_avatar_config(avatar_config)
+        merged_cfg = {**existing_cfg, **incoming_cfg}
+
+        wins = get_user_stats(user.username)["wins"]
+        for field, rules in AVATAR_UNLOCK_REQUIREMENTS.items():
+            chosen = merged_cfg.get(field)
+            if chosen in rules and wins < rules[chosen]:
+                required = rules[chosen]
+                abort(
+                    403,
+                    description=(
+                        f"Este item requer {required} vitória(s) no Ranking para ser "
+                        f"desbloqueado (você tem {wins})."
+                    ),
+                )
+        user.avatar_json = json.dumps(merged_cfg)
+
+    if display_name is not None and str(display_name).strip():
+        user.display_name = str(display_name).strip()[:32]
     session.commit()
     return user
 
@@ -797,14 +882,14 @@ def get_leaderboard(limit: int = 100) -> list[dict]:
             round((wins / games_played) * 100.0, 1) if games_played > 0 else 0.0
         )
         try:
-            avatar_cfg = json.loads(u.avatar_json or "{}")
+            avatar_cfg = sanitize_avatar_config(json.loads(u.avatar_json or "{}"))
         except Exception:
             avatar_cfg = {}
         board.append(
             {
                 "username": u.username,
                 "display_name": u.display_name,
-                "avatar_config": avatar_cfg if isinstance(avatar_cfg, dict) else {},
+                "avatar_config": avatar_cfg,
                 "wins": wins,
                 "losses": losses,
                 "games_played": games_played,

@@ -358,3 +358,121 @@ def test_guest_game_is_recorded_but_not_ranked(app, client):
     assert len(matches) == 1
     assert matches[0]["winner_username"] is None
     assert matches[0]["winner_is_bot"] is False
+
+
+def test_avatar_unlock_requires_ranked_wins_and_returns_403_when_locked(app, client):
+    reg = client.post(
+        "/api/auth/register",
+        json={"username": "bruno", "password": "pw_bruno_1", "display_name": "Bruno"},
+    ).get_json()
+    tok = reg["auth_token"]
+
+    # Equipar item inicial gratuito (0 vitórias) funciona com 200
+    ok_base = client.patch(
+        "/api/auth/profile",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={
+            "display_name": "Bruno Nauta",
+            "avatar_config": {
+                "skin": "warm",
+                "hat": "captain",
+                "outfit": "captain",
+                "frame": "wood",
+            },
+        },
+    )
+    assert ok_base.status_code == 200
+    assert ok_base.get_json()["avatar_config"]["frame"] == "wood"
+
+    # Tentar equipar Moldura Prata (requer 3 vitórias) com 0 vitórias retorna 403
+    locked_frame = client.patch(
+        "/api/auth/profile",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={"avatar_config": {"frame": "silver"}},
+    )
+    assert locked_frame.status_code == 403
+    assert "3 vitória" in locked_frame.get_json().get("description", "")
+
+    # Tentar equipar Coroa Dourada (requer 7 vitórias) com 3 vitórias também retorna 403
+    for _ in range(3):
+        gid = client.post(
+            "/api/games",
+            headers={"Authorization": f"Bearer {tok}"},
+            json={"players": ["HUMAN", "R"]},
+        ).get_json()["game_id"]
+        _force_win_and_record(app, gid, Color.RED)
+
+    still_locked_crown = client.patch(
+        "/api/auth/profile",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={"avatar_config": {"hat": "crown_gold"}},
+    )
+    assert still_locked_crown.status_code == 403
+
+    # Com 3 vitórias, Moldura Prata (silver) agora desbloqueia e persiste mesclando campos antigos
+    unlocked_silver = client.patch(
+        "/api/auth/profile",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={"avatar_config": {"frame": "silver", "unknown_field": "hack"}},
+    )
+    assert unlocked_silver.status_code == 200
+    cfg = unlocked_silver.get_json()["avatar_config"]
+    assert cfg["frame"] == "silver"
+    assert cfg["hat"] == "captain"
+    assert "unknown_field" not in cfg
+
+
+def test_game_state_and_room_serialize_user_seat_avatars(app, client):
+    tok = client.post(
+        "/api/auth/register",
+        json={"username": "diana", "password": "pw_diana_1", "display_name": "Diana"},
+    ).get_json()["auth_token"]
+
+    client.patch(
+        "/api/auth/profile",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={
+            "avatar_config": {
+                "skin": "fair",
+                "hair": "braids",
+                "hat": "explorer",
+                "background": "forest",
+                "frame": "wood",
+            }
+        },
+    )
+
+    # 1. Partida Solo: Diana (HUMAN em BLUE) vs Bot (CATANATRON em RED)
+    solo_gid = client.post(
+        "/api/games",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={"players": ["CATANATRON", "HUMAN"]},
+    ).get_json()["game_id"]
+    state_view = client.get(f"/api/games/{solo_gid}/states/latest").get_json()
+    assert state_view["seat_names"]["BLUE"] == "Diana"
+    assert state_view["seat_avatars"]["BLUE"]["seat_kind"] == "USER"
+    assert state_view["seat_avatars"]["BLUE"]["username"] == "diana"
+    assert state_view["seat_avatars"]["BLUE"]["avatar_config"]["hat"] == "explorer"
+    assert state_view["seat_avatars"]["RED"]["seat_kind"] == "BOT"
+    assert state_view["seat_avatars"]["RED"]["avatar_config"] == {}
+
+    # 2. Sala Multiplayer: serialize_room e start expõem avatar_config
+    room_res = client.post(
+        "/api/rooms",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={"players": ["HUMAN", "CATANATRON"]},
+    ).get_json()
+    red_seat = next(s for s in room_res["room"]["seats"] if s["color"] == "RED")
+    assert red_seat["seat_kind"] == "USER"
+    assert red_seat["username"] == "diana"
+    assert red_seat["avatar_config"]["background"] == "forest"
+
+    started = client.post(
+        f"/api/rooms/{room_res['room_code']}/start",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={"token": room_res["seat_token"]},
+    ).get_json()
+    mp_view = client.get(f"/api/games/{started['game_id']}/states/latest").get_json()
+    assert mp_view["room_code"] == room_res["room_code"]
+    assert mp_view["seat_avatars"]["RED"]["seat_kind"] == "USER"
+    assert mp_view["seat_avatars"]["RED"]["avatar_config"]["hair"] == "braids"

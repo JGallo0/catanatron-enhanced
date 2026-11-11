@@ -9,10 +9,14 @@ import urllib.request
 import uuid
 
 from flask import Response, Blueprint, jsonify, abort, request
+from werkzeug.exceptions import HTTPException
 
 from catanatron.web.models import (
+    COLOR_LABELS_PT,
     SEAT_COLORS,
+    StoredGame,
     StoredRoom,
+    _load_avatars_by_username,
     authenticate_user,
     build_seat_metadata_for_game,
     create_room,
@@ -48,15 +52,68 @@ VALID_MAP_TEMPLATES = {"BASE", "MINI", "TOURNAMENT"}
 register_web_players()
 
 
-def _enrich_view_with_room(game: Game, view: dict) -> dict:
+@bp.app_errorhandler(HTTPException)
+def handle_http_exception(exc: HTTPException):
+    return (
+        jsonify(
+            {
+                "code": exc.code,
+                "name": exc.name,
+                "description": exc.description,
+            }
+        ),
+        exc.code or 500,
+    )
+
+
+def _enrich_view_with_seats(game: Game, view: dict) -> dict:
     try:
+        seat_meta: dict[str, dict] = {}
+        stored_game = db.session.get(StoredGame, game.id)
+        if stored_game and stored_game.seat_metadata_json:
+            parsed = json.loads(stored_game.seat_metadata_json)
+            if isinstance(parsed, dict):
+                seat_meta = parsed
+
         room = get_room_by_game_id(game.id)
         if room is not None:
-            seats = json.loads(room.seats_json)
-            view["seat_names"] = {
-                seat["color"]: seat["player_name"] for seat in seats
-            }
             view["room_code"] = room.room_code
+            if not seat_meta:
+                for seat in json.loads(room.seats_json):
+                    c = seat["color"]
+                    is_bot = seat.get("player_key", "HUMAN") != "HUMAN"
+                    uname = seat.get("username") if not is_bot else None
+                    seat_meta[c] = {
+                        "color": c,
+                        "seat_kind": "BOT" if is_bot else ("USER" if uname else "GUEST"),
+                        "username": uname,
+                        "player_key": seat.get("player_key", "HUMAN"),
+                        "display_name": seat.get("player_name")
+                        or COLOR_LABELS_PT.get(c, c),
+                    }
+
+        if seat_meta:
+            usernames = [
+                meta.get("username")
+                for meta in seat_meta.values()
+                if meta.get("seat_kind") == "USER" and meta.get("username")
+            ]
+            avatars = _load_avatars_by_username(usernames)
+            seat_names: dict[str, str] = {}
+            seat_avatars: dict[str, dict] = {}
+            for color, meta in seat_meta.items():
+                seat_kind = meta.get("seat_kind") or "GUEST"
+                uname = meta.get("username") if seat_kind == "USER" else None
+                seat_names[color] = meta.get("display_name") or COLOR_LABELS_PT.get(
+                    color, color
+                )
+                seat_avatars[color] = {
+                    "seat_kind": seat_kind,
+                    "username": uname,
+                    "avatar_config": avatars.get(uname, {}) if uname else {},
+                }
+            view["seat_names"] = seat_names
+            view["seat_avatars"] = seat_avatars
     except Exception:
         pass
     return view
@@ -524,7 +581,7 @@ def get_game_endpoint(game_id, state_index):
     if game is None:
         abort(404, description="Resource not found")
 
-    view = _enrich_view_with_room(game, web_view(game, _perspective(game)))
+    view = _enrich_view_with_seats(game, web_view(game, _perspective(game)))
     return Response(
         response=json.dumps(view),
         status=200,
@@ -540,7 +597,7 @@ def post_action_endpoint(game_id):
 
     if game.winning_color() is not None:
         record_completed_match(game)
-        view = _enrich_view_with_room(game, web_view(game, _perspective(game)))
+        view = _enrich_view_with_seats(game, web_view(game, _perspective(game)))
         return Response(
             response=json.dumps(view),
             status=200,
@@ -552,7 +609,7 @@ def post_action_endpoint(game_id):
 
     if bot_only and body_is_empty and not game.state.current_player().is_bot:
         # Another client in a multiplayer room already advanced the bot turn
-        view = _enrich_view_with_room(game, web_view(game, _perspective(game)))
+        view = _enrich_view_with_seats(game, web_view(game, _perspective(game)))
         return Response(
             response=json.dumps(view),
             status=200,
@@ -570,7 +627,7 @@ def post_action_endpoint(game_id):
     if game.winning_color() is not None:
         record_completed_match(game)
 
-    view = _enrich_view_with_room(game, web_view(game, _perspective(game)))
+    view = _enrich_view_with_seats(game, web_view(game, _perspective(game)))
     return Response(
         response=json.dumps(view),
         status=200,
