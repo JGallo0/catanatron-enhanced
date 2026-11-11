@@ -17,6 +17,7 @@ import type {
   ResourceCard,
   RoomState,
   SeatAvatarMeta,
+  SeatTakeoverInfo,
   Tile,
   TileCoordinate,
   TradeOfferTuple,
@@ -183,10 +184,29 @@ const MINI_TOPOLOGY: Array<[TileCoordinate, TopologyEntry]> = [
   [[2, -1, -1], { kind: "WATER" }],
 ];
 
+function randomIndex(maxExclusive: number): number {
+  if (maxExclusive <= 1) return 0;
+  const gCrypto =
+    typeof globalThis !== "undefined"
+      ? (globalThis as { crypto?: Crypto }).crypto
+      : undefined;
+  if (gCrypto?.getRandomValues) {
+    const arr = new Uint32Array(1);
+    const limit = Math.floor(0x100000000 / maxExclusive) * maxExclusive;
+    let val = 0;
+    do {
+      gCrypto.getRandomValues(arr);
+      val = arr[0];
+    } while (val >= limit);
+    return val % maxExclusive;
+  }
+  return Math.floor(Math.random() * maxExclusive);
+}
+
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomIndex(i + 1);
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
@@ -438,6 +458,14 @@ export type LocalSeatMeta = {
   player_key: string;
   display_name: string;
   avatar_config?: Partial<AvatarConfig> | null;
+  original_player_key?: string;
+  original_seat_kind?: "USER" | "GUEST" | "BOT";
+  original_username?: string | null;
+  original_display_name?: string;
+  original_avatar_config?: Partial<AvatarConfig> | null;
+  last_seen_at?: number;
+  taken_over_by_bot?: boolean;
+  takeover_reason?: string | null;
 };
 
 type StoredLocalGame = {
@@ -503,16 +531,65 @@ function buildSeatViewsFromMeta(
 ): {
   seatNames: Partial<Record<Color, string>>;
   seatAvatars: Partial<Record<Color, SeatAvatarMeta>>;
+  takenOverColors: Color[];
+  seatTakeover: Partial<Record<Color, SeatTakeoverInfo>>;
 } {
   const seatNames: Partial<Record<Color, string>> = {};
   const seatAvatars: Partial<Record<Color, SeatAvatarMeta>> = {};
-  if (!seatMeta) return { seatNames, seatAvatars };
+  const takenOverColors: Color[] = [];
+  const seatTakeover: Partial<Record<Color, SeatTakeoverInfo>> = {};
+  if (!seatMeta) {
+    return { seatNames, seatAvatars, takenOverColors, seatTakeover };
+  }
 
   const dir = getLocalUserDirectory();
   const usedBotNames = new Set<string>();
   for (const [colorKey, meta] of Object.entries(seatMeta)) {
     const color = colorKey as Color;
     if (!meta) continue;
+    const isTakenOver = Boolean(meta.taken_over_by_bot);
+    const origPlayerKey = meta.original_player_key || meta.player_key || "HUMAN";
+
+    if (isTakenOver) {
+      takenOverColors.push(color);
+      const rawOrig =
+        meta.original_display_name ||
+        meta.display_name ||
+        PLAYER_COLOR_META[color].label;
+      const origName = rawOrig.endsWith(" (Bot)")
+        ? rawOrig.slice(0, -6)
+        : rawOrig;
+      seatNames[color] = meta.display_name?.endsWith(" (Bot)")
+        ? meta.display_name
+        : `${origName} (Bot)`;
+
+      const origKind =
+        meta.original_seat_kind || (meta.original_username ? "USER" : "GUEST");
+      const origUname =
+        origKind === "USER" ? meta.original_username ?? null : null;
+      const liveOrigUser = origUname ? dir[origUname] : undefined;
+      const origAvatar =
+        origKind === "USER" && origUname
+          ? liveOrigUser?.avatar_config ||
+            sanitizeAvatarConfig(meta.original_avatar_config ?? meta.avatar_config)
+          : filterUnlockedAvatarConfig(
+              meta.original_avatar_config ?? meta.avatar_config,
+              0
+            );
+      seatAvatars[color] = {
+        seat_kind: "BOT",
+        username: null,
+        avatar_config: origAvatar,
+      };
+      seatTakeover[color] = {
+        taken_over: true,
+        reason: meta.takeover_reason ?? null,
+        original_username: origUname,
+        original_display_name: origName,
+      };
+      continue;
+    }
+
     if (meta.seat_kind === "BOT") {
       const candidate = meta.display_name?.trim();
       const botName =
@@ -538,7 +615,8 @@ function buildSeatViewsFromMeta(
 
     const uname = meta.seat_kind === "USER" ? meta.username : null;
     const liveUser = uname ? dir[uname] : undefined;
-    seatNames[color] = liveUser?.display_name || meta.display_name;
+    const resolvedName = liveUser?.display_name || meta.display_name;
+    seatNames[color] = resolvedName;
     const guestOrMetaAvatar =
       meta.seat_kind === "GUEST"
         ? filterUnlockedAvatarConfig(meta.avatar_config, 0)
@@ -550,8 +628,16 @@ function buildSeatViewsFromMeta(
         ? liveUser?.avatar_config || guestOrMetaAvatar
         : guestOrMetaAvatar,
     };
+    if (origPlayerKey === "HUMAN") {
+      seatTakeover[color] = {
+        taken_over: false,
+        reason: meta.takeover_reason ?? null,
+        original_username: meta.original_username ?? uname ?? null,
+        original_display_name: meta.original_display_name ?? resolvedName ?? null,
+      };
+    }
   }
-  return { seatNames, seatAvatars };
+  return { seatNames, seatAvatars, takenOverColors, seatTakeover };
 }
 
 function loadGamesMap(): Record<string, StoredLocalGame> {
@@ -1394,11 +1480,27 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
       const vps = state.player_state[`${pIndexKey}_ACTUAL_VICTORY_POINTS`] ?? 0;
       const m = meta[c];
       const isWinner = c === winnerColor;
+      const isTakenOver = Boolean(m?.taken_over_by_bot);
+      if (isTakenOver) {
+        return {
+          color: c,
+          seat_kind: "BOT",
+          username: null,
+          player_key: "CATANATRON",
+          display_name: m?.display_name ?? state.seat_names?.[c] ?? c,
+          victory_points: vps,
+          is_winner: isWinner,
+        };
+      }
+      const resolvedKind =
+        m?.seat_kind ?? (state.bot_colors.includes(c) ? "BOT" : "GUEST");
       return {
         color: c,
-        seat_kind: m?.seat_kind ?? (state.bot_colors.includes(c) ? "BOT" : "GUEST"),
-        username: m?.username ?? null,
-        player_key: m?.player_key ?? (state.bot_colors.includes(c) ? "CATANATRON" : "HUMAN"),
+        seat_kind: resolvedKind,
+        username: resolvedKind === "USER" ? m?.username ?? null : null,
+        player_key:
+          m?.player_key ??
+          (state.bot_colors.includes(c) ? "CATANATRON" : "HUMAN"),
         display_name: m?.display_name ?? state.seat_names?.[c] ?? c,
         victory_points: vps,
         is_winner: isWinner,
@@ -1406,10 +1508,13 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
     });
     const winnerPart = participants.find((p) => p.color === winnerColor);
     const winnerIsBot = winnerPart?.seat_kind === "BOT";
+    const origHumanCount = Object.values(meta).filter(
+      (m) => (m?.original_player_key || m?.player_key) === "HUMAN"
+    ).length;
     localRecordCompletedMatch({
       game_id: state.game.id,
       room_code: state.room_code || null,
-      mode: state.room_code ? "MULTIPLAYER" : "SOLO",
+      mode: state.room_code || origHumanCount >= 2 ? "MULTIPLAYER" : "SOLO",
       map_template: "BASE",
       vps_to_win: state.game.vps_to_win,
       num_turns: state.num_turns,
@@ -1581,8 +1686,12 @@ export function localCreateGame(options: {
   hostAvatarConfig?: Partial<AvatarConfig>;
 }): string {
   const built = buildLocalMap(options.mapTemplate);
-  const colors = SEAT_COLORS.slice(0, Math.max(2, Math.min(4, options.players.length)));
-  const botColors = colors.filter((_, idx) => options.players[idx] !== "HUMAN");
+  const count = Math.max(2, Math.min(4, options.players.length));
+  const rawPairs = SEAT_COLORS.slice(0, count).map((color, idx) => ({
+    color,
+    playerKey:
+      options.seatMeta?.[color]?.player_key || options.players[idx] || "HUMAN",
+  }));
   const gameId =
     "local-" + Math.random().toString(36).substring(2, 10);
 
@@ -1599,6 +1708,8 @@ export function localCreateGame(options: {
     ? { ...options.seatMeta }
     : ({} as Record<Color, LocalSeatMeta>);
 
+  const nowSec = Math.floor(Date.now() / 1000);
+
   if (!options.seatMeta) {
     const guestProfile = !defaultUser ? getGuestProfile() : null;
     const resolvedGuestAvatar = !defaultUser
@@ -1611,9 +1722,8 @@ export function localCreateGame(options: {
     const usedBotNames = new Set<string>();
     let userAssigned = false;
     let guestHostAssigned = false;
-    colors.forEach((c, idx) => {
-      const pKey = options.players[idx] || "HUMAN";
-      if (pKey === "HUMAN") {
+    rawPairs.forEach(({ color: c, playerKey }) => {
+      if (playerKey === "HUMAN") {
         if (defaultUser && !userAssigned) {
           resolvedSeatMeta[c] = {
             color: c,
@@ -1658,7 +1768,7 @@ export function localCreateGame(options: {
           color: c,
           seat_kind: "BOT",
           username: null,
-          player_key: pKey,
+          player_key: playerKey,
           display_name: botName,
           avatar_config: BOT_AVATAR_PROFILES[botName],
         };
@@ -1666,7 +1776,39 @@ export function localCreateGame(options: {
     });
   }
 
-  const { seatNames: metaNames, seatAvatars } = buildSeatViewsFromMeta(resolvedSeatMeta);
+  for (const { color: c } of rawPairs) {
+    const meta = resolvedSeatMeta[c];
+    if (!meta) continue;
+    resolvedSeatMeta[c] = {
+      ...meta,
+      original_player_key: meta.original_player_key ?? meta.player_key,
+      original_seat_kind: meta.original_seat_kind ?? meta.seat_kind,
+      original_username:
+        meta.original_username !== undefined
+          ? meta.original_username
+          : meta.username,
+      original_display_name: meta.original_display_name ?? meta.display_name,
+      original_avatar_config:
+        meta.original_avatar_config ??
+        (meta.avatar_config ? { ...meta.avatar_config } : {}),
+      last_seen_at: meta.last_seen_at ?? nowSec,
+      taken_over_by_bot: meta.taken_over_by_bot ?? false,
+      takeover_reason: meta.takeover_reason ?? null,
+    };
+  }
+
+  const seatPairs = shuffle(rawPairs);
+  const colors = seatPairs.map((p) => p.color);
+  const botColors = seatPairs
+    .filter((p) => p.playerKey !== "HUMAN")
+    .map((p) => p.color);
+
+  const {
+    seatNames: metaNames,
+    seatAvatars,
+    takenOverColors,
+    seatTakeover,
+  } = buildSeatViewsFromMeta(resolvedSeatMeta);
 
   const playerState: Record<string, any> = {};
   colors.forEach((_, idx) => {
@@ -1727,6 +1869,8 @@ export function localCreateGame(options: {
     seat_names: { ...metaNames, ...(options.seatNames || {}) },
     seat_avatars: seatAvatars,
     room_code: options.roomCode,
+    taken_over_colors: takenOverColors,
+    seat_takeover: seatTakeover,
     schema_version: 2,
     game: {
       id: gameId,
@@ -1788,34 +1932,199 @@ export function localGetState(
       : game.history[idx] || game.state;
   const cloned = JSON.parse(JSON.stringify(rawState)) as GameState;
   if (game.seatMeta) {
-    const { seatNames, seatAvatars } = buildSeatViewsFromMeta(game.seatMeta);
+    const {
+      seatNames,
+      seatAvatars,
+      takenOverColors,
+      seatTakeover,
+    } = buildSeatViewsFromMeta(game.seatMeta);
     cloned.seat_names = { ...(cloned.seat_names || {}), ...seatNames };
     cloned.seat_avatars = seatAvatars;
+    cloned.taken_over_colors = takenOverColors;
+    cloned.seat_takeover = seatTakeover;
   }
   return cloned;
 }
 
 export function localPostAction(
   gameId: string,
-  action?: GameAction
+  action?: GameAction,
+  options?: { botOnly?: boolean }
 ): GameState {
   const map = loadGamesMap();
   const game = map[gameId];
   if (!game) {
     return localGetState(gameId, "latest");
   }
+  const buildView = () => {
+    const cloned = JSON.parse(JSON.stringify(game.state)) as GameState;
+    if (game.seatMeta) {
+      const {
+        seatNames,
+        seatAvatars,
+        takenOverColors,
+        seatTakeover,
+      } = buildSeatViewsFromMeta(game.seatMeta);
+      cloned.seat_names = { ...(cloned.seat_names || {}), ...seatNames };
+      cloned.seat_avatars = seatAvatars;
+      cloned.taken_over_colors = takenOverColors;
+      cloned.seat_takeover = seatTakeover;
+    }
+    return cloned;
+  };
+  if (
+    options?.botOnly &&
+    !action &&
+    !game.state.bot_colors.includes(game.state.current_color)
+  ) {
+    return buildView();
+  }
   const chosen = action ?? chooseBotAction(game);
   if (chosen) {
     applyActionToGame(game, chosen);
     saveGamesMap(map);
   }
-  const cloned = JSON.parse(JSON.stringify(game.state)) as GameState;
-  if (game.seatMeta) {
-    const { seatNames, seatAvatars } = buildSeatViewsFromMeta(game.seatMeta);
-    cloned.seat_names = { ...(cloned.seat_names || {}), ...seatNames };
-    cloned.seat_avatars = seatAvatars;
+  return buildView();
+}
+
+export function localGameHeartbeat(
+  gameId: string,
+  color?: Color | null
+): {
+  ok: boolean;
+  bot_colors: Color[];
+  taken_over_colors: Color[];
+  my_seat_taken_over: boolean;
+} {
+  const map = loadGamesMap();
+  const game = map[gameId];
+  if (!game) {
+    return {
+      ok: true,
+      bot_colors: [],
+      taken_over_colors: [],
+      my_seat_taken_over: false,
+    };
   }
-  return cloned;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (
+    color &&
+    game.seatMeta?.[color] &&
+    !game.seatMeta[color].taken_over_by_bot
+  ) {
+    game.seatMeta[color].last_seen_at = nowSec;
+    saveGamesMap(map);
+  }
+  const takenOver = Object.entries(game.seatMeta || {})
+    .filter(([, m]) => Boolean(m?.taken_over_by_bot))
+    .map(([c]) => c as Color);
+  return {
+    ok: true,
+    bot_colors: [...game.state.bot_colors],
+    taken_over_colors: takenOver,
+    my_seat_taken_over: Boolean(
+      color && game.seatMeta?.[color]?.taken_over_by_bot
+    ),
+  };
+}
+
+export function localAbandonGame(
+  gameId: string,
+  color?: Color | null
+): GameState {
+  const map = loadGamesMap();
+  const game = map[gameId];
+  if (!game) return localGetState(gameId, "latest");
+
+  const targetColor =
+    color ||
+    game.state.colors.find((c) => !game.state.bot_colors.includes(c)) ||
+    game.state.colors[0];
+
+  if (!game.seatMeta) game.seatMeta = {} as Record<Color, LocalSeatMeta>;
+  const existing = game.seatMeta[targetColor] || {
+    color: targetColor,
+    seat_kind: "GUEST",
+    username: null,
+    player_key: "HUMAN",
+    display_name:
+      game.state.seat_names?.[targetColor] || PLAYER_COLOR_META[targetColor].label,
+    avatar_config: {},
+  };
+  const rawOrig =
+    existing.original_display_name ||
+    existing.display_name ||
+    PLAYER_COLOR_META[targetColor].label;
+  const origName = rawOrig.endsWith(" (Bot)") ? rawOrig.slice(0, -6) : rawOrig;
+  game.seatMeta[targetColor] = {
+    ...existing,
+    original_player_key: existing.original_player_key || existing.player_key || "HUMAN",
+    original_seat_kind: existing.original_seat_kind || existing.seat_kind || "GUEST",
+    original_username:
+      existing.original_username !== undefined
+        ? existing.original_username
+        : existing.username,
+    original_display_name: origName,
+    original_avatar_config:
+      existing.original_avatar_config || existing.avatar_config || {},
+    taken_over_by_bot: true,
+    takeover_reason: "ABANDONED",
+    player_key: "CATANATRON",
+    seat_kind: "BOT",
+    username: null,
+    display_name: `${origName} (Bot)`,
+  };
+  if (game.state.seat_names) {
+    game.state.seat_names[targetColor] = `${origName} (Bot)`;
+  }
+  if (!game.state.bot_colors.includes(targetColor)) {
+    game.state.bot_colors = [...game.state.bot_colors, targetColor];
+  }
+  recomputeScoresAndPlayableActions(game);
+  saveGamesMap(map);
+  return localGetState(gameId, "latest");
+}
+
+export function localReclaimGame(
+  gameId: string,
+  color?: Color | null
+): GameState {
+  const map = loadGamesMap();
+  const game = map[gameId];
+  if (!game || !game.seatMeta) return localGetState(gameId, "latest");
+
+  const targetColor =
+    color ||
+    (Object.keys(game.seatMeta).find(
+      (c) => game.seatMeta?.[c as Color]?.taken_over_by_bot
+    ) as Color | undefined);
+  if (!targetColor || !game.seatMeta[targetColor]) {
+    return localGetState(gameId, "latest");
+  }
+
+  const meta = game.seatMeta[targetColor];
+  const origKey = meta.original_player_key || "HUMAN";
+  const origKind = meta.original_seat_kind || "GUEST";
+  const restoredName =
+    meta.original_display_name || PLAYER_COLOR_META[targetColor].label;
+  game.seatMeta[targetColor] = {
+    ...meta,
+    taken_over_by_bot: false,
+    takeover_reason: null,
+    player_key: origKey,
+    seat_kind: origKind,
+    username: origKind === "USER" ? meta.original_username ?? null : null,
+    display_name: restoredName,
+    avatar_config: meta.original_avatar_config || meta.avatar_config || {},
+    last_seen_at: Math.floor(Date.now() / 1000),
+  };
+  if (game.state.seat_names) {
+    game.state.seat_names[targetColor] = restoredName;
+  }
+  game.state.bot_colors = game.state.bot_colors.filter((c) => c !== targetColor);
+  recomputeScoresAndPlayableActions(game);
+  saveGamesMap(map);
+  return localGetState(gameId, "latest");
 }
 
 export function localGetMctsAnalysis(gameId: string): {

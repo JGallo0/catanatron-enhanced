@@ -9,10 +9,12 @@ import {
   getSavedAccount,
   listActiveRooms,
   logoutAccount,
+  saveGameRoomCode,
   type AuthConfig,
   type PlayerAccount,
   type PlayerEntry,
 } from "../utils/apiClient";
+import { saveGameSeat } from "./RoomLobbyPage";
 import type { Color, RoomState } from "../utils/api.types";
 import {
   AVATAR_FRAME_OPTIONS,
@@ -335,6 +337,11 @@ export default function HomePage() {
         }}
         onOpenMatch={(gameId: string, myColor: Color | null) => {
           setOpenLobbyOpen(false);
+          saveGameSeat(gameId, myColor);
+          const matchedRoom = activeRooms.find((r) => r.game_id === gameId);
+          if (matchedRoom?.room_code) {
+            saveGameRoomCode(gameId, matchedRoom.room_code);
+          }
           const q = myColor ? `?seat=${myColor}` : "";
           navigate(`/games/${gameId}${q}`);
         }}

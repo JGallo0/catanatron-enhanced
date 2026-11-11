@@ -161,16 +161,33 @@ export function resolveBotDisplayName(
   return pickBotNameDeterministic(seatIdx, used);
 }
 
+export function isTakenOverSeat(
+  gameState: Pick<GameState, "taken_over_colors" | "seat_takeover" | "seat_names">,
+  color: Color
+): boolean {
+  if ((gameState.taken_over_colors || []).includes(color)) return true;
+  if (gameState.seat_takeover?.[color]?.taken_over) return true;
+  const raw = gameState.seat_names?.[color]?.trim();
+  return Boolean(raw && raw.endsWith(" (Bot)"));
+}
+
 export function resolvePlayerDisplayName(
-  gameState: Pick<GameState, "colors" | "bot_colors" | "seat_names">,
+  gameState: Pick<
+    GameState,
+    "colors" | "bot_colors" | "seat_names" | "taken_over_colors" | "seat_takeover"
+  >,
   color: Color,
   fallbackColorLabel: string
 ): string {
   const isBot = (gameState.bot_colors || []).includes(color);
+  const raw = gameState.seat_names?.[color]?.trim();
+  if (isBot && isTakenOverSeat(gameState, color)) {
+    const orig = gameState.seat_takeover?.[color]?.original_display_name;
+    return raw || (orig ? `${orig} (Bot)` : `${fallbackColorLabel} (Bot)`);
+  }
   if (isBot) {
     return resolveBotDisplayName(gameState, color);
   }
-  const raw = gameState.seat_names?.[color]?.trim();
   if (raw && !LEGACY_COLOR_NAME_RE.test(raw)) {
     return raw;
   }
@@ -180,9 +197,11 @@ export function resolvePlayerDisplayName(
 export function resolveSeatAvatarProps(options: {
   color: Color;
   isBot: boolean;
+  isTakenOver?: boolean;
   seatIndex: number;
   seatName: string;
   seatAvatar?: SeatAvatarMeta | null;
+  originalUsername?: string | null;
   isMySeat?: boolean;
   accountAvatar?: Partial<AvatarConfig> | null;
   accountUsername?: string | null;
@@ -195,14 +214,34 @@ export function resolveSeatAvatarProps(options: {
   const {
     color,
     isBot,
+    isTakenOver = false,
     seatIndex,
     seatName,
     seatAvatar,
+    originalUsername,
     isMySeat = false,
     accountAvatar,
     accountUsername,
     guestCustomAvatar,
   } = options;
+
+  if ((isBot || seatAvatar?.seat_kind === "BOT") && isTakenOver) {
+    const metaCfg = sanitizeAvatarConfig(seatAvatar?.avatar_config);
+    const localAccountCfg = isMySeat ? sanitizeAvatarConfig(accountAvatar) : {};
+    const localGuestCfg =
+      isMySeat && !accountUsername ? sanitizeAvatarConfig(guestCustomAvatar) : {};
+    const merged = { ...metaCfg, ...localGuestCfg, ...localAccountCfg };
+    return {
+      config: Object.keys(merged).length > 0 ? merged : undefined,
+      username:
+        originalUsername ||
+        seatAvatar?.username ||
+        accountUsername ||
+        seatName.replace(/ \(Bot\)$/, "") ||
+        color,
+      isCustomUserOrGuest: Object.keys(merged).length > 0,
+    };
+  }
 
   if (isBot || seatAvatar?.seat_kind === "BOT") {
     const botName = isOfficialBotName(seatName)

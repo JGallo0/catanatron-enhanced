@@ -3,6 +3,7 @@ import {
   BOT_AVATAR_PROFILES,
   OFFICIAL_BOT_NAMES,
   isOfficialBotName,
+  isTakenOverSeat,
   pickBotNameDeterministic,
   pickBotNames,
   resolveBotDisplayName,
@@ -85,5 +86,49 @@ describe("botCatalog", () => {
     expect(botResolved.config).toEqual(
       BOT_AVATAR_PROFILES[pickBotNameDeterministic(3)]
     );
+  });
+
+  test("preserves taken-over seat '<Name> (Bot)' label and original user/guest avatar", () => {
+    const takenOverState = makeGameState({
+      colors: ["RED", "BLUE"],
+      bot_colors: ["BLUE"],
+      taken_over_colors: ["BLUE"],
+      seat_names: { RED: "Ana", BLUE: "Beto (Bot)" },
+      seat_avatars: {
+        RED: { seat_kind: "USER", username: "ana", avatar_config: {} },
+        BLUE: {
+          seat_kind: "BOT",
+          username: null,
+          avatar_config: { hat: "explorer", background: "forest", frame: "wood" },
+        },
+      },
+      seat_takeover: {
+        BLUE: {
+          taken_over: true,
+          reason: "DISCONNECTED",
+          original_username: "beto",
+          original_display_name: "Beto",
+        },
+      },
+    });
+
+    expect(isTakenOverSeat(takenOverState, "BLUE")).toBe(true);
+    expect(isTakenOverSeat(takenOverState, "RED")).toBe(false);
+    expect(resolvePlayerDisplayName(takenOverState, "BLUE", "Azul")).toBe(
+      "Beto (Bot)"
+    );
+
+    const avatar = resolveSeatAvatarProps({
+      color: "BLUE",
+      isBot: true,
+      isTakenOver: true,
+      seatIndex: 1,
+      seatName: "Beto (Bot)",
+      seatAvatar: takenOverState.seat_avatars?.BLUE,
+      originalUsername: takenOverState.seat_takeover?.BLUE?.original_username,
+    });
+    expect(avatar.isCustomUserOrGuest).toBe(true);
+    expect(avatar.username).toBe("beto");
+    expect(avatar.config?.hat).toBe("explorer");
   });
 });

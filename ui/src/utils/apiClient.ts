@@ -16,8 +16,10 @@ import type {
   RoomState,
 } from "./api.types";
 import {
+  localAbandonGame,
   localCreateGame,
   localCreateRoom,
+  localGameHeartbeat,
   localGetLeaderboard,
   localGetMatchHistory,
   localGetMctsAnalysis,
@@ -29,6 +31,7 @@ import {
   localLoginOrRegister,
   localLoginUser,
   localPostAction,
+  localReclaimGame,
   localRegisterUser,
   localStartRoomGame,
   localUpdateProfile,
@@ -737,6 +740,51 @@ export async function startRoomGame(
   return localStartRoomGame(roomCode, token);
 }
 
+export function saveGameRoomCode(gameId: string, roomCode?: string | null) {
+  try {
+    if (gameId && roomCode) {
+      localStorage.setItem(`catan_game_room_${gameId}`, roomCode.toUpperCase());
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function getGameRoomCode(gameId: string): string | null {
+  try {
+    return localStorage.getItem(`catan_game_room_${gameId}`);
+  } catch {
+    return null;
+  }
+}
+
+export function getGameSeatToken(
+  gameId: string,
+  explicitRoomCode?: string | null
+): string | null {
+  try {
+    const code = explicitRoomCode?.toUpperCase() || getGameRoomCode(gameId);
+    if (code) {
+      const roomTok = localStorage.getItem(`catan_room_token_${code}`);
+      if (roomTok) return roomTok;
+    }
+    return getSavedAccount()?.auth_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function presenceHeaders(
+  gameId: string,
+  roomCode?: string | null
+): Record<string, string> {
+  const seatTok = getGameSeatToken(gameId, roomCode);
+  return {
+    ...authHeaders(),
+    ...(seatTok ? { "X-Seat-Token": seatTok } : {}),
+  };
+}
+
 let perspective: Color | null = null;
 
 export function setPerspective(color: Color | null) {
@@ -764,6 +812,9 @@ export async function getState(
       typeof response.data === "object" &&
       Array.isArray(response.data.tiles)
     ) {
+      if (response.data.room_code) {
+        saveGameRoomCode(gameId, response.data.room_code);
+      }
       return response.data;
     }
   } catch {
@@ -775,28 +826,98 @@ export async function getState(
 /** action=undefined means bot action */
 export async function postAction(
   gameId: string,
-  action?: GameAction
+  action?: GameAction,
+  options?: { botOnly?: boolean }
 ): Promise<GameState> {
   if (gameId.startsWith("local-")) {
-    return localPostAction(gameId, action);
+    return localPostAction(gameId, action, options);
   }
   try {
+    const params = {
+      ...viewParams(),
+      ...(options?.botOnly ? { bot_only: "1" } : {}),
+    };
     const response = await axios.post<GameState>(
       `${API_URL}/api/games/${gameId}/actions`,
       action,
-      { params: viewParams() }
+      { params, headers: presenceHeaders(gameId) }
     );
     if (
       response.data &&
       typeof response.data === "object" &&
       Array.isArray(response.data.tiles)
     ) {
+      if (response.data.room_code) {
+        saveGameRoomCode(gameId, response.data.room_code);
+      }
       return response.data;
     }
   } catch {
     // Fallback to local engine
   }
-  return localPostAction(gameId, action);
+  return localPostAction(gameId, action, options);
+}
+
+export async function sendGameHeartbeat(
+  gameId: string,
+  color?: Color | null
+): Promise<{
+  ok: boolean;
+  bot_colors: Color[];
+  taken_over_colors: Color[];
+  my_seat_taken_over: boolean;
+}> {
+  if (gameId.startsWith("local-")) {
+    return localGameHeartbeat(gameId, color);
+  }
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/games/${gameId}/heartbeat`,
+      { color: color ?? undefined },
+      { params: viewParams(), headers: presenceHeaders(gameId) }
+    );
+    if (response.data && response.data.ok) {
+      return response.data;
+    }
+  } catch {
+    // Ignore transient errors cleanly
+  }
+  return {
+    ok: false,
+    bot_colors: [],
+    taken_over_colors: [],
+    my_seat_taken_over: false,
+  };
+}
+
+export async function abandonGame(
+  gameId: string,
+  color?: Color | null
+): Promise<GameState> {
+  if (gameId.startsWith("local-")) {
+    return localAbandonGame(gameId, color);
+  }
+  const response = await axios.post<GameState>(
+    `${API_URL}/api/games/${gameId}/abandon`,
+    { color: color ?? undefined },
+    { params: viewParams(), headers: presenceHeaders(gameId) }
+  );
+  return response.data;
+}
+
+export async function reclaimGame(
+  gameId: string,
+  color?: Color | null
+): Promise<GameState> {
+  if (gameId.startsWith("local-")) {
+    return localReclaimGame(gameId, color);
+  }
+  const response = await axios.post<GameState>(
+    `${API_URL}/api/games/${gameId}/reclaim`,
+    { color: color ?? undefined },
+    { params: viewParams(), headers: presenceHeaders(gameId) }
+  );
+  return response.data;
 }
 
 export type MCTSProbabilities = {

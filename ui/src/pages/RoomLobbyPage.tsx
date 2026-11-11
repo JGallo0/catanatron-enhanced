@@ -9,6 +9,7 @@ import {
   getRoom,
   getSavedAccount,
   joinRoom,
+  saveGameRoomCode,
   updateRoom,
   startRoomGame,
   type PlayerAccount,
@@ -115,6 +116,7 @@ export default function RoomLobbyPage() {
       setRoom(data);
       if (data.status === "IN_PROGRESS" && data.game_id) {
         saveGameSeat(data.game_id, data.my_color);
+        saveGameRoomCode(data.game_id, data.room_code);
         const query = data.my_color ? `?seat=${data.my_color}` : "";
         navigate(`/games/${data.game_id}${query}`);
       }
@@ -263,6 +265,7 @@ export default function RoomLobbyPage() {
       setStarting(true);
       const res = await startRoomGame(room.room_code, token);
       saveGameSeat(res.game_id, res.room.my_color);
+      saveGameRoomCode(res.game_id, res.room.room_code || room.room_code);
       const query = res.room.my_color ? `?seat=${res.room.my_color}` : "";
       navigate(`/games/${res.game_id}${query}`);
     } catch (err: any) {

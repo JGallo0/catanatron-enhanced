@@ -213,6 +213,13 @@ export type RoomState = {
   seats: RoomSeat[];
 };
 
+export type SeatTakeoverInfo = {
+  taken_over: boolean;
+  reason: "ABANDONED" | "DISCONNECTED" | string | null;
+  original_username?: string | null;
+  original_display_name?: string | null;
+};
+
 export type GameState = {
   tiles: PlacedTile[];
   adjacent_tiles: Record<string, Tile[]>;
@@ -240,6 +247,8 @@ export type GameState = {
   seat_names?: Partial<Record<Color, string>>;
   seat_avatars?: Partial<Record<Color, SeatAvatarMeta>>;
   room_code?: string;
+  taken_over_colors?: Color[];
+  seat_takeover?: Partial<Record<Color, SeatTakeoverInfo>>;
 
   // Also present, from the state document itself.
   schema_version: number;
