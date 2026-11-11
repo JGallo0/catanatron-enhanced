@@ -1,11 +1,143 @@
+import React from "react";
 import cn from "classnames";
 
 import "./PlayerTopBar.scss";
 import type { Color, GameState } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { playerKey } from "../utils/stateUtils";
+import { HybridIllustration } from "./icons/GameIcons";
 
-function PlayerChip({
+/* -------------------------------------------------------------------------- */
+/* Crisp Catan Universe Style Vector Stat Icons                               */
+/* -------------------------------------------------------------------------- */
+
+export const SwordStatSvg: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width="18"
+    height="18"
+    fill="currentColor"
+    aria-hidden="true"
+    className="cu-icon"
+  >
+    {/* Upright medieval sword */}
+    <path d="M11 2h2v13h-2z" />
+    <polygon points="12,0.5 9.5,3.5 14.5,3.5" />
+    <rect x="6.5" y="14" width="11" height="2" rx="0.5" />
+    <rect x="11" y="16" width="2" height="4.5" rx="0.5" />
+    <circle cx="12" cy="21.5" r="1.5" />
+  </svg>
+);
+
+export const RoadStatSvg: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width="18"
+    height="18"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className="cu-icon"
+  >
+    {/* S-curve road segment matching Catan Universe */}
+    <path d="M7 4 C 7 10, 17 8, 17 14 C 17 18, 12 20, 10 21" />
+    <circle cx="7" cy="4" r="1" fill="currentColor" stroke="none" />
+    <circle cx="10" cy="21" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+export const ResourceStatSvg: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width="18"
+    height="18"
+    fill="currentColor"
+    aria-hidden="true"
+    className="cu-icon"
+  >
+    {/* Playing card outline with center resource seal */}
+    <rect
+      x="5"
+      y="2.5"
+      width="14"
+      height="19"
+      rx="2.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <circle cx="12" cy="12" r="3.2" />
+  </svg>
+);
+
+export const DevCardStatSvg: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width="18"
+    height="18"
+    fill="currentColor"
+    aria-hidden="true"
+    className="cu-icon"
+  >
+    {/* Development card outline with star/bookmark seal */}
+    <rect
+      x="5"
+      y="2.5"
+      width="14"
+      height="19"
+      rx="2.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <polygon points="12,8 13.5,11.5 17,12 14.5,14.5 15,18 12,16.2 9,18 9.5,14.5 7,12 10.5,11.5" />
+  </svg>
+);
+
+export const TrophyStatSvg: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width="20"
+    height="20"
+    fill="currentColor"
+    aria-hidden="true"
+    className="cu-icon cu-icon--trophy"
+  >
+    {/* Championship trophy cup */}
+    <path d="M6 3h12v4.5c0 3.3-2.7 6-6 6s-6-2.7-6-6V3z" />
+    <path
+      d="M6 5H3.5C2.7 5 2 5.7 2 6.5c0 2.2 1.8 4 4 4.3V5zM18 5h2.5c.8 0 1.5.7 1.5 1.5 0 2.2-1.8 4-4 4.3V5z"
+      fillOpacity="0.85"
+    />
+    <rect x="10.5" y="13.5" width="3" height="4" />
+    <rect x="7" y="17.5" width="10" height="3" rx="1" />
+  </svg>
+);
+
+const TurnSpinSvg: React.FC = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 17.5-5.5L21.5 8M22 12.5a10 10 0 0 1-17.5 5.5L2.5 16" />
+  </svg>
+);
+
+/* -------------------------------------------------------------------------- */
+/* Individual Player Card                                                     */
+/* -------------------------------------------------------------------------- */
+
+function PlayerCard({
   gameState,
   color,
 }: {
@@ -20,80 +152,131 @@ function PlayerChip({
   const isWinner = gameState.winning_color === color;
   const name = gameState.seat_names?.[color] || meta.label;
 
-  const vps = ps[`${key}_ACTUAL_VICTORY_POINTS`] ?? ps[`${key}_VICTORY_POINTS`];
+  const vps = ps[`${key}_ACTUAL_VICTORY_POINTS`] ?? ps[`${key}_VICTORY_POINTS`] ?? 0;
   const resources = ps[`${key}_NUM_RESOURCES_IN_HAND`] ?? 0;
   const devCards = ps[`${key}_NUM_DEVELOPMENT_CARDS_IN_HAND`] ?? 0;
   const knights = ps[`${key}_PLAYED_KNIGHT`] ?? 0;
-  const road = ps[`${key}_LONGEST_ROAD_LENGTH`] ?? 0;
+  const roadLength = ps[`${key}_LONGEST_ROAD_LENGTH`] ?? 0;
   const hasArmy = Boolean(ps[`${key}_HAS_ARMY`]);
   const hasRoad = Boolean(ps[`${key}_HAS_ROAD`]);
-  const settlements = Math.max(0, 5 - (ps[`${key}_SETTLEMENTS_AVAILABLE`] ?? 5));
-  const cities = Math.max(0, 4 - (ps[`${key}_CITIES_AVAILABLE`] ?? 4));
-  const roads = Math.max(0, 15 - (ps[`${key}_ROADS_AVAILABLE`] ?? 15));
+
+  const settlementsLeft = ps[`${key}_SETTLEMENTS_AVAILABLE`] ?? 5;
+  const citiesLeft = ps[`${key}_CITIES_AVAILABLE`] ?? 4;
+  const roadsLeft = ps[`${key}_ROADS_AVAILABLE`] ?? 15;
+  const builtSettlements = Math.max(0, 5 - settlementsLeft);
+  const builtCities = Math.max(0, 4 - citiesLeft);
+  const builtRoads = Math.max(0, 15 - roadsLeft);
+
+  const avatarSrc = `/assets/illustrations/avatars/${color.toLowerCase()}.webp`;
 
   return (
     <div
-      className={cn("ptb-chip", color, {
-        "ptb-chip--active": isActive,
-        "ptb-chip--winner": isWinner,
+      className={cn("cu-player-card", color, {
+        "cu-player-card--active": isActive,
+        "cu-player-card--winner": isWinner,
       })}
       style={
         {
-          "--ptb-color": meta.primary,
-          "--ptb-secondary": meta.secondary,
-          "--ptb-glow": meta.glow,
+          "--cu-color": meta.primary,
+          "--cu-secondary": meta.secondary,
+          "--cu-glow": meta.glow,
         } as React.CSSProperties
       }
-      title={`${name} — ${isBot ? "Bot" : "Humano"} • ${settlements} aldeias, ${cities} cidades, ${roads} estradas`}
+      title={`${name} (${isBot ? "Bot" : "Humano"}) • Peças: ${builtSettlements}/5 Aldeias, ${builtCities}/4 Cidades, ${builtRoads}/15 Estradas`}
     >
-      <div className="ptb-chip__avatar">
-        <span aria-hidden="true">{isBot ? "🤖" : "🧑"}</span>
-        {isActive && <span className="ptb-chip__turn-ring" />}
-      </div>
-
-      <div className="ptb-chip__body">
-        <div className="ptb-chip__name">{name}</div>
-        <div className="ptb-chip__stats">
-          <span title="Cartas de recurso na mão">
-            🂠 <b>{resources}</b>
-          </span>
-          <span title="Cartas de desenvolvimento na mão">
-            🃏 <b>{devCards}</b>
-          </span>
-          <span
-            className={cn({ "ptb-chip__award": hasArmy })}
-            title={hasArmy ? "Maior Exército (+2 PV)" : "Cavaleiros jogados"}
+      {/* LEFT HALF: Player Portrait & Name on Solid Color */}
+      <div className="cu-player-card__portrait-col">
+        {isActive && (
+          <div
+            className="cu-player-card__turn-badge"
+            title="Jogador Ativo — É a vez deste jogador!"
           >
-            ⚔️ <b>{knights}</b>
-          </span>
-          <span
-            className={cn({ "ptb-chip__award": hasRoad })}
-            title={hasRoad ? "Maior Estrada (+2 PV)" : "Maior sequência de estrada"}
-          >
-            🛤️ <b>{road}</b>
-          </span>
+            <TurnSpinSvg />
+          </div>
+        )}
+        <div className="cu-player-card__name" title={name}>
+          {name}
         </div>
-        <div className="ptb-chip__pieces" aria-hidden="true">
-          <span>🏠 {settlements}/5</span>
-          <span>🏰 {cities}/4</span>
-          <span>▬ {roads}/15</span>
+        <div className="cu-player-card__avatar-wrap">
+          <HybridIllustration
+            src={avatarSrc}
+            alt={name}
+            fallback={
+              <div className="cu-player-card__avatar-fallback">
+                {isBot ? "🤖" : "🧑"}
+              </div>
+            }
+          />
         </div>
       </div>
 
-      <div className="ptb-chip__vp" title="Victory Points">
-        <b>{vps}</b>
-        <span aria-hidden="true">🏆</span>
+      {/* RIGHT HALF: Crisp 2x3 Stat Grid on Dark Slate */}
+      <div className="cu-player-card__stats-col">
+        {/* Row 1: Knights & Longest Road */}
+        <div className="cu-stat-row">
+          <div
+            className={cn("cu-stat", { "cu-stat--awarded": hasArmy })}
+            title={hasArmy ? "Maior Exército (+2 PV)" : "Cavaleiros Jogados"}
+          >
+            <span className="cu-stat__num">{knights}</span>
+            <SwordStatSvg />
+          </div>
+          <div
+            className={cn("cu-stat", { "cu-stat--awarded": hasRoad })}
+            title={hasRoad ? "Maior Estrada (+2 PV)" : "Sequência de Estrada"}
+          >
+            <span className="cu-stat__num">{roadLength}</span>
+            <RoadStatSvg />
+          </div>
+        </div>
+
+        {/* Row 2: Resources & Dev Cards */}
+        <div className="cu-stat-row">
+          <div
+            className={cn("cu-stat", { "cu-stat--danger": resources > 7 })}
+            title={
+              resources > 7
+                ? `Atenção: ${resources} cartas! Perderá metade se rolar 7.`
+                : "Cartas de Recurso na mão"
+            }
+          >
+            <span className="cu-stat__num">{resources}</span>
+            <ResourceStatSvg />
+          </div>
+          <div
+            className="cu-stat"
+            title="Cartas de Desenvolvimento na mão"
+          >
+            <span className="cu-stat__num">{devCards}</span>
+            <DevCardStatSvg />
+          </div>
+        </div>
+
+        {/* Row 3: Victory Points (Highlighted in Player Color) */}
+        <div className="cu-stat-row cu-stat-row--vp">
+          <div
+            className="cu-stat cu-stat--vp"
+            title="Victory Points"
+          >
+            <span className="cu-stat__num cu-stat__num--vp">{vps}</span>
+            <TrophyStatSvg />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Main Bar Component                                                         */
+/* -------------------------------------------------------------------------- */
+
 export default function PlayerTopBar({ gameState }: { gameState: GameState }) {
   return (
-    <nav className="player-top-bar" aria-label="Jogadores">
+    <header className="cu-player-top-bar" aria-label="Jogadores">
       {gameState.colors.map((color) => (
-        <PlayerChip key={color} gameState={gameState} color={color} />
+        <PlayerCard key={color} gameState={gameState} color={color} />
       ))}
-    </nav>
+    </header>
   );
 }

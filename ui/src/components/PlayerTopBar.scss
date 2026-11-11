@@ -1,150 +1,240 @@
-.player-top-bar {
+.cu-player-top-bar {
   position: relative;
   z-index: 24;
   display: flex;
   justify-content: center;
-  gap: 8px;
-  padding: 0 12px 6px;
+  align-items: stretch;
+  gap: 6px;
+  padding: 4px 10px 4px;
+  flex-shrink: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  flex-shrink: 0;
 
   &::-webkit-scrollbar {
     display: none;
   }
 }
 
-.ptb-chip {
+.cu-player-card {
   position: relative;
   display: flex;
-  align-items: stretch;
-  flex: 0 1 270px;
-  min-width: 215px;
-  height: 78px;
-  border-radius: 12px;
+  flex: 1 1 0;
+  max-width: 275px;
+  min-width: 195px;
+  height: 98px;
+  border-radius: 4px;
   overflow: hidden;
-  background: linear-gradient(180deg, #1c2a3f 0%, #0f1a2b 100%);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-  opacity: 0.82;
-  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+  background: #0f141f;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  opacity: 0.88;
+  transition: opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+
+  &:hover {
+    opacity: 1;
+  }
 
   &--active {
     opacity: 1;
-    transform: translateY(2px) scale(1.03);
-    border-color: var(--ptb-color);
+    border: 2.5px solid var(--cu-color);
     box-shadow:
-      0 0 0 1px var(--ptb-color),
-      0 0 18px var(--ptb-glow),
-      0 8px 20px rgba(0, 0, 0, 0.55);
+      0 0 0 1px rgba(0, 0, 0, 0.9),
+      0 0 18px var(--cu-glow),
+      0 8px 20px rgba(0, 0, 0, 0.65);
+    transform: translateY(1px);
+    z-index: 3;
   }
 
   &--winner {
-    border-color: #facc15;
-    box-shadow: 0 0 22px rgba(250, 204, 21, 0.7);
+    border: 2.5px solid #facc15;
+    box-shadow: 0 0 24px rgba(250, 204, 21, 0.8);
   }
 
-  &__avatar {
+  /* ------------------------------------------------------------------------ */
+  /* Left Half: Player Portrait & Name                                        */
+  /* ------------------------------------------------------------------------ */
+
+  &__portrait-col {
     position: relative;
-    width: 64px;
+    width: 90px;
     flex-shrink: 0;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    background: linear-gradient(
-      160deg,
-      var(--ptb-color) 0%,
-      var(--ptb-secondary, var(--ptb-color)) 100%
-    );
-    box-shadow: inset -6px 0 10px rgba(0, 0, 0, 0.25);
-  }
-
-  &__turn-ring {
-    position: absolute;
-    inset: 4px;
-    border-radius: 10px;
-    border: 2px solid rgba(255, 255, 255, 0.85);
-    animation: ptb-pulse 1.4s ease-in-out infinite;
-  }
-
-  &__body {
-    flex: 1;
-    min-width: 0;
-    padding: 6px 8px;
-    display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 3px;
+    background: var(--cu-color);
+    box-shadow: inset -4px 0 8px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
   }
 
   &__name {
-    font-family: "Cinzel", "Outfit", serif;
+    padding: 2px 4px;
+    text-align: center;
+    font-size: 0.82rem;
     font-weight: 700;
-    font-size: 0.88rem;
-    color: #f8fafc;
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.8);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.15) 100%);
+    z-index: 2;
+    letter-spacing: 0.02em;
   }
 
-  &__stats {
+  &__turn-badge {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 3px;
     display: flex;
-    gap: 7px;
-    font-size: 0.74rem;
-    color: #cbd5e1;
-
-    b {
-      color: #f8fafc;
-    }
-  }
-
-  &__award {
-    color: #fde047;
-    text-shadow: 0 0 6px rgba(250, 204, 21, 0.7);
-
-    b {
-      color: #fde047;
-    }
-  }
-
-  &__pieces {
-    display: flex;
-    gap: 7px;
-    font-size: 0.64rem;
-    color: #94a3b8;
-    white-space: nowrap;
-  }
-
-  &__vp {
-    width: 50px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(2, 6, 23, 0.55);
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    z-index: 4;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 
-    b {
-      font-size: 1.55rem;
-      line-height: 1;
-      color: var(--ptb-color);
-      text-shadow: 0 0 8px var(--ptb-glow);
+    svg {
+      animation: cu-spin 3.5s linear infinite;
+    }
+  }
+
+  &__avatar-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 15%;
+      display: block;
+    }
+  }
+
+  &__avatar-fallback {
+    font-size: 2.2rem;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Right Half: Clean 2x3 Stat Grid                                          */
+  /* ------------------------------------------------------------------------ */
+
+  &__stats-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: #111827;
+    border-left: 1px solid rgba(0, 0, 0, 0.85);
+  }
+
+  .cu-stat-row {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+
+    &:last-child {
+      border-bottom: none;
     }
 
-    span {
-      font-size: 0.95rem;
+    &--vp {
+      justify-content: flex-start;
+      padding-left: 16px;
+      background: rgba(0, 0, 0, 0.25);
+    }
+  }
+
+  .cu-stat {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #f1f5f9;
+
+    &__num {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    .cu-icon {
+      color: #cbd5e1;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+    }
+
+    /* Warning when hand has > 7 cards */
+    &--danger {
+      .cu-stat__num {
+        color: #ef4444;
+        border: 1.5px solid #ef4444;
+        border-radius: 4px;
+        padding: 0 4px;
+        background: rgba(239, 68, 68, 0.2);
+        animation: cu-pulse-danger 1.5s infinite;
+      }
+    }
+
+    /* Longest Road or Largest Army Award */
+    &--awarded {
+      .cu-icon {
+        color: #facc15;
+        filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.8));
+      }
+      .cu-stat__num {
+        color: #fef08a;
+      }
+    }
+
+    /* Victory Points Row */
+    &--vp {
+      gap: 7px;
+
+      .cu-stat__num--vp {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: var(--cu-color);
+        text-shadow: 0 0 10px var(--cu-glow);
+      }
+
+      .cu-icon--trophy {
+        width: 20px;
+        height: 20px;
+        color: var(--cu-color);
+        filter: drop-shadow(0 0 6px var(--cu-glow));
+      }
     }
   }
 }
 
-@keyframes ptb-pulse {
-  0%,
-  100% {
-    opacity: 0.25;
+@keyframes cu-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cu-pulse-danger {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
   }
   50% {
-    opacity: 0.9;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
   }
 }
