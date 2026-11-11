@@ -141,7 +141,14 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       (async () => {
         setIsBotThinking(true);
         const start = new Date();
-        const gameState = await postAction(gameId);
+        let gameState;
+        try {
+          gameState = await postAction(gameId);
+        } catch {
+          // Never leave the UI stuck on "IA pensando"
+          setIsBotThinking(false);
+          return;
+        }
         const requestTime = new Date().valueOf() - start.valueOf();
         setTimeout(() => {
           setIsBotThinking(false);
@@ -149,7 +156,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           if (getHumanColor(gameState, state.perspective)) {
             dispatchSnackbar(enqueueSnackbar, closeSnackbar, gameState);
           }
-        }, ROBOT_THINKING_TIME - requestTime);
+        }, Math.max(0, ROBOT_THINKING_TIME - requestTime));
       })();
     }
   }, [

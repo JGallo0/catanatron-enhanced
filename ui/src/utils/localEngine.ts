@@ -430,16 +430,39 @@ function loadGamesMap(): Record<string, StoredLocalGame> {
   }
 }
 
+// Number of most recent state snapshots kept per game. Each snapshot is a full
+// board state (tens of KB); keeping all of them blew past the ~5 MB
+// localStorage quota around turn ~55, which silently stopped saving and froze
+// the bots. Older entries become `null` (indices are preserved).
+const MAX_PERSISTED_SNAPSHOTS = 8;
+
+function compactGame(game: StoredLocalGame, keep: number) {
+  const cut = game.history.length - keep;
+  for (let i = 0; i < cut; i++) {
+    game.history[i] = null as unknown as GameState;
+  }
+}
+
 function saveGamesMap(map: Record<string, StoredLocalGame>) {
-  try {
-    // Keep last 8 games to stay well within localStorage quota
-    const keys = Object.keys(map);
-    if (keys.length > 8) {
-      delete map[keys[0]];
+  const keys = Object.keys(map);
+  while (keys.length > 8) {
+    delete map[keys.shift() as string];
+  }
+  for (const k of keys) {
+    compactGame(map[k], MAX_PERSISTED_SNAPSHOTS);
+  }
+  // Retry with progressively less data instead of failing silently.
+  for (const keep of [MAX_PERSISTED_SNAPSHOTS, 2, 0]) {
+    try {
+      localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(map));
+      return;
+    } catch {
+      for (const k of keys) compactGame(map[k], keep);
+      // Last resort: drop the oldest games, never the current one.
+      if (keep === 0 && keys.length > 1) {
+        delete map[keys[0]];
+      }
     }
-    localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    // ignore storage errors
   }
 }
 
