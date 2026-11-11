@@ -79,9 +79,9 @@ export default function Board({
   robberCoordinates,
 }: BoardProps) {
   // Exact available viewport after accounting for LeftDrawer (300px on desktop) and top/bottom HUD bars
-  const leftSidebarWidth = isMobile ? 0 : 300;
+  const leftSidebarWidth = 0;
   const canvasWidth = Math.max(320, width - leftSidebarWidth);
-  const canvasHeight = Math.max(320, height - (isMobile ? 185 : 175));
+  const canvasHeight = Math.max(320, height - (isMobile ? 280 : 265));
 
   const center: [number, number] = [canvasWidth / 2, canvasHeight / 2];
   const size = computeDefaultSize(canvasWidth - 24, canvasHeight - 24);

@@ -1,15 +1,12 @@
-import React, { useCallback, useContext } from "react";
+import { useCallback, useContext } from "react";
 import cn from "classnames";
 import SwipeableDrawer from "@mui/material/SwipeableDrawer";
-import Drawer from "@mui/material/Drawer";
 import Button from "@mui/material/Button";
 
-import Hidden from "./Hidden";
-import PlayerStateBox from "./PlayerStateBox";
 import { humanizeActionRecordPt } from "../utils/promptUtils";
 import { store } from "../store";
 import ACTIONS from "../actions";
-import { getHumanColor, playerKey } from "../utils/stateUtils";
+import { getHumanColor } from "../utils/stateUtils";
 import { type GameActionRecord, type GameState } from "../utils/api.types";
 import { isTabOrShift, type InteractionEvent } from "../utils/events";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
@@ -78,24 +75,6 @@ function PerspectiveToggle({ gameState }: { gameState: GameState }) {
 }
 
 function DrawerContent({ gameState }: { gameState: GameState }) {
-  const playerSections = gameState.colors.map((color) => {
-    const key = playerKey(gameState, color);
-    const isCurrentTurn = gameState.current_color === color;
-    const isBot = gameState.bot_colors.includes(color);
-    return (
-      <React.Fragment key={color}>
-        <PlayerStateBox
-          playerState={gameState.player_state}
-          playerKey={key}
-          color={color}
-          isCurrentTurn={isCurrentTurn}
-          isBot={isBot}
-          customName={gameState.seat_names?.[color]}
-        />
-      </React.Fragment>
-    );
-  });
-
   return (
     <div className="left-drawer__container">
       <div className="left-drawer__top-bar">
@@ -109,8 +88,6 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
         </div>
         <PerspectiveToggle gameState={gameState} />
       </div>
-
-      <div className="left-drawer__players-list">{playerSections}</div>
 
       <div className="left-drawer__log-header">
         <span>📜 Histórico de Jogadas</span>
@@ -175,29 +152,16 @@ export default function LeftDrawer() {
   );
 
   return (
-    <>
-      <Hidden breakpoint={{ size: "md", direction: "up" }} implementation="js">
-        <SwipeableDrawer
-          className="left-drawer"
-          anchor="left"
-          open={state.isLeftDrawerOpen}
-          onClose={closeLeftDrawer}
-          onOpen={openLeftDrawer}
-          disableBackdropTransition={!iOS}
-          disableDiscovery={iOS}
-          onKeyDown={closeLeftDrawer}
-        >
-          <DrawerContent gameState={state.gameState as GameState} />
-        </SwipeableDrawer>
-      </Hidden>
-      <Hidden
-        breakpoint={{ size: "sm", direction: "down" }}
-        implementation="css"
-      >
-        <Drawer className="left-drawer" anchor="left" variant="permanent" open>
-          <DrawerContent gameState={state.gameState as GameState} />
-        </Drawer>
-      </Hidden>
-    </>
+    <SwipeableDrawer
+      className="left-drawer"
+      anchor="left"
+      open={state.isLeftDrawerOpen}
+      onClose={closeLeftDrawer}
+      onOpen={openLeftDrawer}
+      disableBackdropTransition={!iOS}
+      disableDiscovery={iOS}
+    >
+      <DrawerContent gameState={state.gameState as GameState} />
+    </SwipeableDrawer>
   );
 }

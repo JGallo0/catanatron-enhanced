@@ -11,6 +11,7 @@ import ActionsToolbar from "./ActionsToolbar";
 import "./GameScreen.scss";
 import LeftDrawer from "../components/LeftDrawer";
 import RightDrawer from "../components/RightDrawer";
+import PlayerTopBar from "../components/PlayerTopBar";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import {
@@ -233,6 +234,19 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             className="game-top-hud__mcts-btn"
             onClick={() =>
               dispatch({
+                type: ACTIONS.SET_LEFT_DRAWER_OPENED,
+                data: !state.isLeftDrawerOpen,
+              })
+            }
+            title="Abrir Histórico de Jogadas"
+          >
+            📜 Histórico
+          </button>
+          <button
+            type="button"
+            className="game-top-hud__mcts-btn"
+            onClick={() =>
+              dispatch({
                 type: ACTIONS.SET_RIGHT_DRAWER_OPENED,
                 data: !state.isRightDrawerOpen,
               })
@@ -243,6 +257,8 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           </button>
         </div>
       </header>
+
+      <PlayerTopBar gameState={state.gameState} />
 
       <ZoomableBoard replayMode={replayMode} />
       <ActionsToolbar isBotThinking={isBotThinking} replayMode={replayMode} />

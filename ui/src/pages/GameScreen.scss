@@ -85,6 +85,7 @@ main {
     rgba(6, 13, 24, 0.35) 85%,
     transparent 100%
   );
+  flex-shrink: 0;
 
   &__left {
     display: flex;
@@ -240,17 +241,6 @@ main {
     &:hover {
       background: rgba(59, 130, 246, 0.3);
       color: #fef08a;
-    }
-  }
-}
-
-// Medium & Large screens - Left drawer permanent, ocean canvas occupies the rest centered
-@media (min-width: variables.$md-breakpoint) {
-  main {
-    padding-left: 300px;
-    padding-right: 0;
-    .board-container {
-      margin-right: 0;
     }
   }
 }
