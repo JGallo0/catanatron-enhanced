@@ -39,12 +39,12 @@ Este documento consolida **todo o histórico, arquitetura, decisões de design e
   - [`RobberVictimModal.tsx`](ui/src/components/RobberVictimModal.tsx): Modal para escolher de qual jogador roubar ao mover o Ladrão.
   - [`RightDrawer.tsx`](ui/src/components/RightDrawer.tsx): Gaveta recolhível de análise de IA MCTS (aberta pelo botão `📊 Chances (IA)` no topo).
 - **Lobby, Contas e Motor Local Fallback:**
-  - [`HomePage.tsx`](ui/src/pages/HomePage.tsx) & [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx): Tela inicial e sala de espera multiplayer (`pt-BR`) com login rápido (usuário + PIN), criação de sala privada com link compartilhável (`/lobbies/:roomId`), adição de Bots (`RANDOM`, `WEIGHTED_RANDOM`, `VICTORY_POINT`, `AB_2`, `AB_4`) e partida rápida.
+  - [`HomePage.tsx`](ui/src/pages/HomePage.tsx) & [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx): Tela inicial em palco panorâmico **A2** (`lobby_hero.webp` descoberto ao centro, cabeçalho de 3 colunas com avatar/`#rank` e doca inferior com 5 modos), apoiada pela suíte modular de diálogos em `ui/src/components/home/` ([`AuthModal.tsx`](ui/src/components/home/AuthModal.tsx), [`MatchSetupModal.tsx`](ui/src/components/home/MatchSetupModal.tsx), [`OpenLobbyModal.tsx`](ui/src/components/home/OpenLobbyModal.tsx)), além da sala de espera multiplayer (`/rooms/:roomCode`) com link compartilhável, adição de Bots (`RANDOM`, `WEIGHTED_RANDOM`, `VICTORY_POINT`, `AB_2`, `AB_4`) e partida rápida.
   - [`ui/src/utils/apiClient.ts`](ui/src/utils/apiClient.ts) & [`ui/src/utils/localEngine.ts`](ui/src/utils/localEngine.ts): Cliente de API com fallback automático (`localEngine.ts`) que executa toda a lógica de Catan, salas, contas e Bots diretamente no navegador caso o backend serverless da Vercel sofra *cold start* ou perda de memória efêmera entre funções.
 
 ### Backend (`api/` e `catanatron/`) — Flask + Vercel Python Serverless
 - **[`vercel.json`](vercel.json) & [`api/index.py`](api/index.py):** Entrada Serverless Python (`3.12` via `.python-version`) na Vercel que roteia `/api/*` para o Flask (`catanatron.web`).
-- **[`catanatron/catanatron/web/api.py`](catanatron/catanatron/web/api.py) & [`models.py`](catanatron/catanatron/web/models.py):** Endpoints REST para jogos (`/api/games`), salas (`/api/rooms`), autenticação (`/api/auth/login`, `/api/auth/me`) e análise MCTS.
+- **[`catanatron/catanatron/web/api.py`](catanatron/catanatron/web/api.py) & [`models.py`](catanatron/catanatron/web/models.py):** Endpoints REST para jogos (`/api/games`), salas (`/api/rooms`), autenticação/perfil (`/api/auth/register`, `/api/auth/login`, `/api/auth/google`, `/api/auth/me`, `/api/auth/profile`) com exposição de `leaderboard_rank` no ranking global, histórico de partidas e análise MCTS.
 
 ---
 
@@ -178,6 +178,15 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
   - **Studio de Perfil & Propagação Universal:**
     - Modal [`AvatarStudioModal.tsx`](ui/src/components/AvatarStudioModal.tsx) acessível pela Home e pela Sala Multiplayer com edição de apelido e pré-visualização ao vivo.
     - Propagação em lote zero-N+1 via `_load_avatars_by_username`, `serialize_room` e `_enrich_view_with_seats`, exibindo o avatar SVG em `HomePage`, `RoomLobbyPage`, `LeaderboardModal` e `PlayerTopBar` (para usuários `USER`, preservando os retratos clássicos `.webp` para Bots e convidados).
+- **Bloco 3 Concluído: Redesign da Tela Inicial (Palco A2) & Lobby Aberto Modular:**
+  - **Palco Panorâmico A2 (`HomePage.tsx` & `HomePage.scss`):**
+    - Remoção do card central sólido que encobria `lobby_hero.webp`, preservando o miolo da ilha 100% descoberto sobre o mar e degradês suaves apenas nas bordas.
+    - Cabeçalho simétrico em 3 colunas: cartão do jogador à esquerda (`PlayerAvatar` clicável e moldura atual), título monumental `RULE THE ISLE` centralizado no céu e placa à direita com posição oficial `#rank` no Ranking (`leaderboard_rank` exposto em `models.py` + `localEngine.ts`) e estatísticas.
+    - Doca inferior flutuante com os 5 botões dedicados: *Partida Rápida (Solo/IA)*, *Criar Sala Online*, *Salas Abertas*, *Ranking & Histórico* e *Personalizar Avatar*.
+  - **Modais Modulares (`ui/src/components/home/`):**
+    - `AuthModal.tsx`: login, criação de conta e Google Sign-In em diálogo dedicado (com transição automática para o Studio de Avatar quando acionado deslogado).
+    - `MatchSetupModal.tsx`: configuração compartilhada para partidas Solo vs IA e criação de Salas Online com código/link compartilhável.
+    - `OpenLobbyModal.tsx`: navegador do Lobby Aberto com entrada rápida por código (`#K7M4P9`), filtros (*Todas*, *Com Vagas*, *Minhas*) e exibição dos `<PlayerAvatar />` nos assentos humanos.
 
 ---
 
@@ -195,11 +204,8 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 
 ---
 
-## 7. Próximos Passos (Bloco 3)
+## 7. Próximos Passos
 
 1. ~~**Bloco 2 — Customização de Avatar e Perfil**~~ *(Concluído)*
-2. **Bloco 3 — Redesign da Tela Inicial e Lobby Aberto:**
-   - Remoção do card sólido central que encobre a arte de fundo (`lobby_hero.webp`).
-   - Apresentação do avatar do jogador no lobby com seus dados e ranking.
-   - Botões de ação bem posicionados e dedicados para cada modo: *Partida Rápida (Solo/IA)*, *Criar Sala Online*, *Salas Abertas*, *Ranking & Histórico* e *Personalizar Avatar*.
+2. ~~**Bloco 3 — Redesign da Tela Inicial e Lobby Aberto**~~ *(Concluído)*
 3. **Substituir os 4 Avatares Padrão:** Gerar retratos 100% originais via Nano Banana Pro em `ui/public/assets/illustrations/avatars/{red,orange,white,blue}.webp`.
