@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -198,4 +198,60 @@ test("renders custom guest SVG PlayerAvatar on GUEST seat when configured", asyn
   const avatars = screen.getAllByTestId("player-avatar");
   expect(avatars).toHaveLength(2);
   localStorage.clear();
+});
+
+test("enables Trocar post-roll without maritime 4:1 cards and opens TradeOfferDecisionDialog on DECIDE_TRADE", async () => {
+  const postRollState = makeGameState({
+    current_color: "BLUE",
+    current_prompt: "PLAY_TURN",
+    seat_names: { RED: "Creitu", BLUE: "João" },
+    player_state: {
+      ...baseState.player_state,
+      P0_NUM_RESOURCES_IN_HAND: 1,
+      P1_HAS_ROLLED: true,
+      P1_WOOD_IN_HAND: 1,
+    },
+    current_playable_actions: [["BLUE", "END_TURN", null]],
+  });
+  vi.mocked(getState).mockResolvedValue(postRollState);
+
+  renderGameScreen();
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  const tradeBtn = screen.getByRole("button", { name: /Trocar/i });
+  expect(tradeBtn).toBeEnabled();
+
+  fireEvent.click(tradeBtn);
+  expect(
+    await screen.findByRole("tab", { name: /Entre Jogadores/i })
+  ).toBeInTheDocument();
+
+  cleanup();
+
+  const decideState = makeGameState({
+    current_color: "BLUE",
+    current_turn_index: 0,
+    current_prompt: "DECIDE_TRADE",
+    is_resolving_trade: true,
+    current_trade: [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+    seat_names: { RED: "Creitu", BLUE: "João" },
+    player_state: {
+      ...baseState.player_state,
+      P1_WHEAT_IN_HAND: 1,
+    },
+    current_playable_actions: [
+      ["BLUE", "REJECT_TRADE", [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]],
+      ["BLUE", "ACCEPT_TRADE", [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]],
+    ],
+  });
+  vi.mocked(getState).mockResolvedValue(decideState);
+
+  renderGameScreen();
+
+  expect(
+    await screen.findByText(/Proposta de Troca Recebida/i)
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: /Aceitar Troca/i })
+  ).toBeEnabled();
 });

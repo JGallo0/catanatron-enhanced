@@ -35,6 +35,7 @@ import ResourceCards from "../components/ResourceCards";
 import ResourceSelector from "../components/ResourceSelector";
 import DiscardPlannerDialog from "../components/DiscardPlannerDialog";
 import TradeModal from "../components/TradeModal";
+import TradeOfferDecisionDialog from "../components/TradeOfferDecisionDialog";
 import {
   CitySvgPiece,
   DiceFaceSvg,
@@ -95,6 +96,7 @@ export default function ActionsToolbar({
   const [resourceSelectorOpen, setResourceSelectorOpen] = useState(false);
   const [discardPlannerOpen, setDiscardPlannerOpen] = useState(false);
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
+  const [tradeDecisionMinimized, setTradeDecisionMinimized] = useState(false);
   const [costsModalOpen, setCostsModalOpen] = useState(false);
   const { isSubmitting, submitDiscardBatch } = useDiscardBatchSubmission();
 
@@ -140,8 +142,14 @@ export default function ActionsToolbar({
     !gameState.player_state[`${activeKey}_HAS_ROLLED`];
   const isDiscard = gameState.current_prompt === "DISCARD";
   const isMoveRobber = gameState.current_prompt === "MOVE_ROBBER";
+  const isDecideTrade = gameState.current_prompt === "DECIDE_TRADE";
+  const isDecideAcceptees = gameState.current_prompt === "DECIDE_ACCEPTEES";
   const isPlayingDevCard =
     isPlayingMonopoly || isPlayingYearOfPlenty || isRoadBuilding;
+
+  useEffect(() => {
+    setTradeDecisionMinimized(false);
+  }, [gameState.state_index, gameState.current_prompt]);
 
   const playableDevCardTypes = useMemo(
     () =>
@@ -313,8 +321,37 @@ export default function ActionsToolbar({
   const latestDice = useMemo(() => getLatestRollPair(gameState), [gameState]);
   const diceSum = latestDice ? latestDice[0] + latestDice[1] : null;
 
+  const hasRolled = Boolean(gameState.player_state[`${activeKey}_HAS_ROLLED`]);
+  const canOfferDomesticTrade =
+    isInteractiveTurn &&
+    !gameState.is_initial_build_phase &&
+    !isPlayingDevCard &&
+    !gameState.is_resolving_trade &&
+    gameState.current_prompt === "PLAY_TURN" &&
+    hasRolled &&
+    gameState.colors.length >= 2 &&
+    myResourceTotal > 0;
+
   // Primary CTA orb state
   const ctaConfig = useMemo(() => {
+    if (isDecideTrade) {
+      return {
+        label: "RESPONDER",
+        shortSub: "Proposta",
+        variant: "gold",
+        icon: <AccountBalanceIcon />,
+        onClick: () => setTradeDecisionMinimized(false),
+      };
+    }
+    if (isDecideAcceptees) {
+      return {
+        label: "CONFIRMAR",
+        shortSub: "Fechar Troca",
+        variant: "emerald",
+        icon: <AccountBalanceIcon />,
+        onClick: () => setTradeDecisionMinimized(false),
+      };
+    }
     if (isDiscard) {
       return {
         label: "DESCARTAR",
@@ -359,6 +396,8 @@ export default function ActionsToolbar({
       onClick: () => executeGameAction([humanColor, "END_TURN", null]),
     };
   }, [
+    isDecideTrade,
+    isDecideAcceptees,
     isDiscard,
     isMoveRobber,
     isPlayingYearOfPlenty,
@@ -497,7 +536,12 @@ export default function ActionsToolbar({
 
               <div className="cu-tactical-strip">
                 <Button
-                  disabled={tradeActions.length === 0 || isPlayingDevCard}
+                  disabled={
+                    (tradeActions.length === 0 && !canOfferDomesticTrade) ||
+                    isPlayingDevCard ||
+                    isDecideTrade ||
+                    isDecideAcceptees
+                  }
                   variant="contained"
                   color="secondary"
                   className="cu-tactical-btn"
@@ -616,7 +660,22 @@ export default function ActionsToolbar({
         tradeActions={tradeActions}
         playerState={gameState.player_state}
         playerKey={activeKey}
+        playerColor={humanColor ?? gameState.current_color}
+        gameState={gameState}
+        canOfferDomesticTrade={canOfferDomesticTrade}
         onExecuteTrade={executeGameAction}
+      />
+
+      <TradeOfferDecisionDialog
+        open={
+          isInteractiveTurn &&
+          (isDecideTrade || isDecideAcceptees) &&
+          !tradeDecisionMinimized
+        }
+        onMinimize={() => setTradeDecisionMinimized(true)}
+        gameState={gameState}
+        humanColor={humanColor ?? gameState.current_color}
+        onExecuteAction={executeGameAction}
       />
 
       <Dialog

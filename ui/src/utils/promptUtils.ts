@@ -8,14 +8,34 @@ import type {
   PlayYearOfPlentyAction,
   MoveRobberAction,
   ResourceCard,
-   GameState,
+  Color,
+  GameState,
 } from "./api.types";
 import { PLAYER_COLOR_META, RESOURCE_META } from "../config/assetRegistry";
 import { resolvePlayerDisplayName } from "../config/botCatalog";
 
+const TRADE_RESOURCE_ORDER: ResourceCard[] = [
+  "WOOD",
+  "BRICK",
+  "SHEEP",
+  "WHEAT",
+  "ORE",
+];
+
 function resPt(resource?: ResourceCard | null): string {
   if (!resource) return "";
   return RESOURCE_META[resource]?.label || resource;
+}
+
+export function formatTradeBundlePt(bundle: number[] = []): string {
+  const parts: string[] = [];
+  TRADE_RESOURCE_ORDER.forEach((res, idx) => {
+    const qty = Number(bundle[idx] || 0);
+    if (qty > 0) {
+      parts.push(`${qty}× ${resPt(res)}`);
+    }
+  });
+  return parts.join(" + ") || "nada";
 }
 
 export function humanizeTradeActionPt(action: MaritimeTradeAction): string {
@@ -101,6 +121,30 @@ export function humanizeActionRecordPt(
       const label = humanizeTradeActionPt(action as MaritimeTradeAction);
       return `${player} trocou ${label}`;
     }
+    case "OFFER_TRADE": {
+      const val = (action[2] as number[]) || [];
+      const giveStr = formatTradeBundlePt(val.slice(0, 5));
+      const askStr = formatTradeBundlePt(val.slice(5, 10));
+      return `${player} propôs troca: ${giveStr} por ${askStr}`;
+    }
+    case "ACCEPT_TRADE":
+      return `${player} aceitou a proposta de troca`;
+    case "REJECT_TRADE":
+      return `${player} recusou a proposta de troca`;
+    case "CONFIRM_TRADE": {
+      const val = (action[2] as [...number[], Color]) || [];
+      const giveStr = formatTradeBundlePt(val.slice(0, 5) as number[]);
+      const askStr = formatTradeBundlePt(val.slice(5, 10) as number[]);
+      const partnerColor = val[10] as Color;
+      const partnerName = resolvePlayerDisplayName(
+        gameState,
+        partnerColor,
+        PLAYER_COLOR_META[partnerColor]?.label || String(partnerColor)
+      );
+      return `${player} fechou troca com ${partnerName} (${giveStr} ↔ ${askStr})`;
+    }
+    case "CANCEL_TRADE":
+      return `${player} cancelou a proposta de troca`;
     case "END_TURN":
       return `${player} passou a vez`;
     default:
@@ -181,6 +225,16 @@ export function humanizeActionRecord(
       const label = humanizeTradeAction(action as MaritimeTradeAction);
       return `${player} TRADED ${label}`;
     }
+    case "OFFER_TRADE":
+      return `${player} OFFERED TRADE`;
+    case "ACCEPT_TRADE":
+      return `${player} ACCEPTED TRADE`;
+    case "REJECT_TRADE":
+      return `${player} REJECTED TRADE`;
+    case "CONFIRM_TRADE":
+      return `${player} CONFIRMED TRADE`;
+    case "CANCEL_TRADE":
+      return `${player} CANCELED TRADE`;
     case "END_TURN":
       return `${player} ENDED TURN`;
     default:

@@ -8,6 +8,21 @@ export type DevelopmentCard =
 export type Color = "RED" | "BLUE" | "ORANGE" | "WHITE";
 export type TileCoordinate = [number, number, number];
 
+export type TradeOfferTuple = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
+export type ActiveTradeTuple = [...TradeOfferTuple, number];
+export type ConfirmTradeTuple = [...TradeOfferTuple, Color];
+
 export type GameActionRecord =
   | [RollGameAction, [number, number]]
   | [DiscardGameAction, ResourceCard]
@@ -21,6 +36,11 @@ export type GameActionRecord =
   | [PlayMonopolyAction, null]
   | [PlayYearOfPlentyAction, null]
   | [MaritimeTradeAction, null]
+  | [OfferTradeAction, null]
+  | [AcceptTradeAction, null]
+  | [RejectTradeAction, null]
+  | [ConfirmTradeAction, null]
+  | [CancelTradeAction, null]
   | [EndTurnAction, null];
 
 export type RollGameAction = [Color, "ROLL", null];
@@ -47,6 +67,23 @@ export type MaritimeTradeAction = [
   "MARITIME_TRADE",
   (ResourceCard | null)[],
 ];
+export type OfferTradeAction = [Color, "OFFER_TRADE", TradeOfferTuple];
+export type AcceptTradeAction = [
+  Color,
+  "ACCEPT_TRADE",
+  ActiveTradeTuple | TradeOfferTuple | number[],
+];
+export type RejectTradeAction = [
+  Color,
+  "REJECT_TRADE",
+  ActiveTradeTuple | TradeOfferTuple | number[],
+];
+export type ConfirmTradeAction = [
+  Color,
+  "CONFIRM_TRADE",
+  ConfirmTradeTuple | [...number[], Color],
+];
+export type CancelTradeAction = [Color, "CANCEL_TRADE", null];
 export type EndTurnAction = [Color, "END_TURN", null];
 
 export type GameAction =
@@ -62,6 +99,11 @@ export type GameAction =
   | PlayYearOfPlentyAction
   | MoveRobberAction
   | MaritimeTradeAction
+  | OfferTradeAction
+  | AcceptTradeAction
+  | RejectTradeAction
+  | ConfirmTradeAction
+  | CancelTradeAction
   | EndTurnAction;
 
 export type PlayerState = any;
@@ -187,6 +229,10 @@ export type GameState = {
   edges: GameEdge[];
   current_playable_actions: GameAction[];
   is_initial_build_phase: boolean;
+  is_road_building?: boolean;
+  is_resolving_trade?: boolean;
+  current_trade?: number[];
+  acceptees?: boolean[];
   longest_roads_by_player: Partial<Record<Color, number>>;
   edgeActions?: GameAction[];
   nodeActions?: GameAction[];

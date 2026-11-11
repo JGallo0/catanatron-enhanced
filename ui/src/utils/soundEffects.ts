@@ -126,6 +126,9 @@ export function playActionRecordSound(record?: GameActionRecord) {
       break;
     case "BUY_DEVELOPMENT_CARD":
     case "MARITIME_TRADE":
+    case "OFFER_TRADE":
+    case "ACCEPT_TRADE":
+    case "CONFIRM_TRADE":
     case "PLAY_YEAR_OF_PLENTY":
     case "PLAY_MONOPOLY":
       playCardSound();

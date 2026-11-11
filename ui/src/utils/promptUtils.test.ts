@@ -5,6 +5,7 @@ import {
   findTileById,
   findTileByCoordinate,
   humanizeActionRecord,
+  humanizeActionRecordPt,
   humanizeTradeAction,
 } from "./promptUtils";
 import type { GameState, GameAction, GameActionRecord } from "./api.types";
@@ -346,5 +347,47 @@ describe("humanizeTradeAction", () => {
       ["BRICK", null, null, null, "ORE"],
     ];
     expect(humanizeTradeAction(action)).toBe("1 BRICK => ORE");
+  });
+});
+
+describe("humanizeActionRecordPt domestic trade", () => {
+  const gs = {
+    bot_colors: ["RED"],
+    colors: ["RED", "BLUE"],
+    seat_names: { RED: "Creitu", BLUE: "João" },
+  } as unknown as GameState;
+
+  test("formats OFFER, ACCEPT, REJECT, CONFIRM and CANCEL trade records in Portuguese", () => {
+    expect(
+      humanizeActionRecordPt(gs, [
+        ["BLUE", "OFFER_TRADE", [1, 0, 0, 0, 0, 0, 0, 0, 1, 0]],
+        null,
+      ])
+    ).toBe("João propôs troca: 1× Madeira por 1× Trigo");
+
+    expect(
+      humanizeActionRecordPt(gs, [
+        ["RED", "ACCEPT_TRADE", [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1]],
+        null,
+      ])
+    ).toBe("Creitu aceitou a proposta de troca");
+
+    expect(
+      humanizeActionRecordPt(gs, [
+        ["RED", "REJECT_TRADE", [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1]],
+        null,
+      ])
+    ).toBe("Creitu recusou a proposta de troca");
+
+    expect(
+      humanizeActionRecordPt(gs, [
+        ["BLUE", "CONFIRM_TRADE", [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, "RED"]],
+        null,
+      ])
+    ).toBe("João fechou troca com Creitu (1× Madeira ↔ 1× Trigo)");
+
+    expect(
+      humanizeActionRecordPt(gs, [["BLUE", "CANCEL_TRADE", null], null])
+    ).toBe("João cancelou a proposta de troca");
   });
 });

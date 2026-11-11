@@ -68,6 +68,10 @@ function describePromptBanner(
       return `🥷 Ladrão Ativo — ${activeLabel}: Clique em um hexágono iluminado para mover o Ladrão`;
     case "DISCARD":
       return `⚠️ Sete nos Dados — ${activeLabel}: Descarte ${gameState.current_discard_count} carta(s)`;
+    case "DECIDE_TRADE":
+      return `🤝 Negociação — ${activeLabel}: Avalie a proposta de troca`;
+    case "DECIDE_ACCEPTEES":
+      return `⚖️ Negociação — ${activeLabel}: Escolha com quem fechar a troca`;
     case "PLAY_TURN":
       return `Vez de ${activeLabel} — Role os dados, negocie ou construa`;
     default:

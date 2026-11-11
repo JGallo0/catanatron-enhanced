@@ -37,6 +37,16 @@ function actionIcon(record: GameActionRecord): string {
       return "🥷";
     case "MARITIME_TRADE":
       return "⚓";
+    case "OFFER_TRADE":
+      return "🤝";
+    case "ACCEPT_TRADE":
+      return "✅";
+    case "REJECT_TRADE":
+      return "❌";
+    case "CONFIRM_TRADE":
+      return "⚖️";
+    case "CANCEL_TRADE":
+      return "🚫";
     case "DISCARD_RESOURCE":
       return "🗑️";
     case "END_TURN":

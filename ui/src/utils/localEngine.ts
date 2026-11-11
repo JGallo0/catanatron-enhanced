@@ -1,7 +1,9 @@
 import type {
   AccountStats,
+  ActiveTradeTuple,
   AvatarConfig,
   Color,
+  ConfirmTradeAction,
   DevelopmentCard,
   Direction,
   GameAction,
@@ -17,6 +19,7 @@ import type {
   SeatAvatarMeta,
   Tile,
   TileCoordinate,
+  TradeOfferTuple,
 } from "./api.types";
 import type { MapTemplate, MCTSProbabilities, PlayerAccount } from "./apiClient";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
@@ -810,6 +813,48 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
     return;
   }
 
+  if (state.current_prompt === "DECIDE_TRADE") {
+    const trade = (
+      state.current_trade && state.current_trade.length >= 10
+        ? state.current_trade
+        : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, state.current_turn_index]
+    ) as ActiveTradeTuple;
+    const asked = trade.slice(5, 10);
+    const actions: GameAction[] = [[color, "REJECT_TRADE", trade]];
+    const canAfford = RESOURCES.every(
+      (res, idx) => (ps[`${k}_${res}_IN_HAND`] ?? 0) >= (asked[idx] ?? 0)
+    );
+    if (canAfford) {
+      actions.push([color, "ACCEPT_TRADE", trade]);
+    }
+    state.current_playable_actions = actions;
+    return;
+  }
+
+  if (state.current_prompt === "DECIDE_ACCEPTEES") {
+    const baseTrade = (
+      state.current_trade && state.current_trade.length >= 10
+        ? state.current_trade.slice(0, 10)
+        : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ) as TradeOfferTuple;
+    const asked = baseTrade.slice(5, 10);
+    const actions: GameAction[] = [[color, "CANCEL_TRADE", null]];
+    const acceptees = state.acceptees || [];
+    state.colors.forEach((otherColor, idx) => {
+      if (acceptees[idx] && otherColor !== color) {
+        const ok = pKey(state, otherColor);
+        const partnerStillCanAfford = RESOURCES.every(
+          (res, rIdx) => (ps[`${ok}_${res}_IN_HAND`] ?? 0) >= (asked[rIdx] ?? 0)
+        );
+        if (partnerStillCanAfford) {
+          actions.push([color, "CONFIRM_TRADE", [...baseTrade, otherColor]]);
+        }
+      }
+    });
+    state.current_playable_actions = actions;
+    return;
+  }
+
   // Normal PLAY_TURN
   state.current_prompt = "PLAY_TURN";
   if (!ps[`${k}_HAS_ROLLED`]) {
@@ -939,6 +984,137 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
   }
 
   state.current_playable_actions = actions;
+}
+
+function resetLocalTradingState(state: GameState) {
+  state.is_resolving_trade = false;
+  state.current_trade = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  state.acceptees = state.colors.map(() => false);
+}
+
+function isValidLocalTradeOffer(
+  state: GameState,
+  color: Color,
+  value: unknown
+): value is TradeOfferTuple {
+  if (
+    state.is_initial_build_phase ||
+    state.is_resolving_trade ||
+    state.colors.length < 2
+  ) {
+    return false;
+  }
+  if (state.current_color !== color || state.current_prompt !== "PLAY_TURN") {
+    return false;
+  }
+  const k = pKey(state, color);
+  if (!state.player_state[`${k}_HAS_ROLLED`]) {
+    return false;
+  }
+  if (!Array.isArray(value) || value.length !== 10) {
+    return false;
+  }
+  for (const amt of value) {
+    if (typeof amt !== "number" || !Number.isInteger(amt) || amt < 0) {
+      return false;
+    }
+  }
+  const offering = value.slice(0, 5);
+  const asking = value.slice(5, 10);
+  const giveSum = offering.reduce((a, b) => a + b, 0);
+  const askSum = asking.reduce((a, b) => a + b, 0);
+  if (giveSum === 0 || askSum === 0) {
+    return false;
+  }
+  for (let i = 0; i < 5; i++) {
+    if (offering[i] > 0 && asking[i] > 0) {
+      return false;
+    }
+    if ((state.player_state[`${k}_${RESOURCES[i]}_IN_HAND`] ?? 0) < offering[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getLocalFreqdeck(state: GameState, color: Color): number[] {
+  const k = pKey(state, color);
+  return RESOURCES.map((r) => state.player_state[`${k}_${r}_IN_HAND`] ?? 0);
+}
+
+function scoreLocalHandUtility(
+  state: GameState,
+  color: Color,
+  hand: number[]
+): number {
+  const k = pKey(state, color);
+  const citiesAvail = state.player_state[`${k}_CITIES_AVAILABLE`] ?? 4;
+  const settlementsAvail = state.player_state[`${k}_SETTLEMENTS_AVAILABLE`] ?? 5;
+  const roadsAvail = state.player_state[`${k}_ROADS_AVAILABLE`] ?? 15;
+  const ownedSettlements = Object.values(state.nodes).filter(
+    (n) => n.color === color && n.building === "SETTLEMENT"
+  ).length;
+  const canUpgradeCity = citiesAvail > 0 && ownedSettlements > 0;
+  const canExpandSettlement = settlementsAvail > 0;
+  const canExpandRoad = roadsAvail > 0;
+  const hasDevDeck = Object.values(state.development_listdeck || {}).some(
+    (c) => Number(c) > 0
+  );
+
+  const distCity = (Math.max(2 - hand[3], 0) + Math.max(3 - hand[4], 0)) / 5.0;
+  const distSettlement =
+    (Math.max(1 - hand[0], 0) +
+      Math.max(1 - hand[1], 0) +
+      Math.max(1 - hand[2], 0) +
+      Math.max(1 - hand[3], 0)) /
+    4.0;
+  const distDev =
+    (Math.max(1 - hand[2], 0) +
+      Math.max(1 - hand[3], 0) +
+      Math.max(1 - hand[4], 0)) /
+    3.0;
+  const distRoad = (Math.max(1 - hand[0], 0) + Math.max(1 - hand[1], 0)) / 2.0;
+
+  const cityWeight = canUpgradeCity ? 8.0 : 1.5;
+  const settlementWeight = canExpandSettlement ? 7.5 : 1.5;
+  const devWeight = hasDevDeck ? 3.5 : 0.5;
+  const roadWeight = canExpandRoad ? 2.5 : 0.5;
+
+  let unlockBonus = 0;
+  if (canUpgradeCity && hand[3] >= 2 && hand[4] >= 3) unlockBonus += 12.0;
+  if (
+    canExpandSettlement &&
+    hand[0] >= 1 &&
+    hand[1] >= 1 &&
+    hand[2] >= 1 &&
+    hand[3] >= 1
+  ) {
+    unlockBonus += 10.0;
+  }
+  if (hasDevDeck && hand[2] >= 1 && hand[3] >= 1 && hand[4] >= 1) {
+    unlockBonus += 4.0;
+  }
+  if (canExpandRoad && hand[0] >= 1 && hand[1] >= 1) {
+    unlockBonus += 2.5;
+  }
+
+  const totalCards = hand.reduce((a, b) => a + b, 0);
+  const discardPenalty = totalCards > (state.game?.discard_limit ?? 7) ? 4.5 : 0;
+  const surplusPenalty = hand.reduce(
+    (acc, count) => acc + Math.max(count - 2, 0) * 0.45,
+    0
+  );
+
+  return (
+    unlockBonus +
+    totalCards * 1.4 -
+    distCity * cityWeight -
+    distSettlement * settlementWeight -
+    distDev * devWeight -
+    distRoad * roadWeight -
+    discardPenalty -
+    surplusPenalty
+  );
 }
 
 function applyActionToGame(game: StoredLocalGame, action: GameAction) {
@@ -1107,6 +1283,94 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
       ps[`${k}_${recv}_IN_HAND`] = (ps[`${k}_${recv}_IN_HAND`] ?? 0) + 1;
     }
     state.action_records.push([action, null]);
+  } else if (actionType === "OFFER_TRADE") {
+    const value = action[2];
+    if (!isValidLocalTradeOffer(state, color, value)) {
+      throw new Error("Proposta de troca inválida para o estado atual.");
+    }
+    state.is_resolving_trade = true;
+    state.current_trade = [...value, state.current_turn_index];
+    state.acceptees = state.colors.map(() => false);
+    const nextIdx = state.colors.findIndex(
+      (_, idx) => idx !== state.current_turn_index
+    );
+    state.current_player_index = nextIdx;
+    state.current_color = state.colors[nextIdx];
+    state.current_prompt = "DECIDE_TRADE";
+    state.action_records.push([action, null]);
+  } else if (actionType === "ACCEPT_TRADE") {
+    const acceptees = [...(state.acceptees || state.colors.map(() => false))];
+    const myIdx = state.colors.indexOf(color);
+    if (myIdx >= 0) {
+      acceptees[myIdx] = true;
+    }
+    state.acceptees = acceptees;
+    const nextIdx = state.colors.findIndex(
+      (_, idx) =>
+        idx !== state.current_turn_index && idx > state.current_player_index
+    );
+    if (nextIdx !== -1) {
+      state.current_player_index = nextIdx;
+      state.current_color = state.colors[nextIdx];
+      state.current_prompt = "DECIDE_TRADE";
+    } else {
+      state.current_player_index = state.current_turn_index;
+      state.current_color = state.colors[state.current_turn_index];
+      state.current_prompt = "DECIDE_ACCEPTEES";
+    }
+    state.action_records.push([action, null]);
+  } else if (actionType === "REJECT_TRADE") {
+    const nextIdx = state.colors.findIndex(
+      (_, idx) =>
+        idx !== state.current_turn_index && idx > state.current_player_index
+    );
+    if (nextIdx !== -1) {
+      state.current_player_index = nextIdx;
+      state.current_color = state.colors[nextIdx];
+      state.current_prompt = "DECIDE_TRADE";
+    } else if ((state.acceptees || []).some(Boolean)) {
+      state.current_player_index = state.current_turn_index;
+      state.current_color = state.colors[state.current_turn_index];
+      state.current_prompt = "DECIDE_ACCEPTEES";
+    } else {
+      resetLocalTradingState(state);
+      state.current_player_index = state.current_turn_index;
+      state.current_color = state.colors[state.current_turn_index];
+      state.current_prompt = "PLAY_TURN";
+    }
+    state.action_records.push([action, null]);
+  } else if (actionType === "CONFIRM_TRADE") {
+    const val = action[2];
+    const offering = val.slice(0, 5) as number[];
+    const asking = val.slice(5, 10) as number[];
+    const partnerColor = val[10] as Color;
+    const partnerKey = pKey(state, partnerColor);
+    const proposerCanPay = RESOURCES.every(
+      (res, idx) => (ps[`${k}_${res}_IN_HAND`] ?? 0) >= (offering[idx] ?? 0)
+    );
+    const partnerCanPay = RESOURCES.every(
+      (res, idx) => (ps[`${partnerKey}_${res}_IN_HAND`] ?? 0) >= (asking[idx] ?? 0)
+    );
+    if (!proposerCanPay || !partnerCanPay) {
+      throw new Error("Recursos insuficientes para confirmar a troca.");
+    }
+    RESOURCES.forEach((res, idx) => {
+      ps[`${k}_${res}_IN_HAND`] =
+        (ps[`${k}_${res}_IN_HAND`] ?? 0) - (offering[idx] ?? 0) + (asking[idx] ?? 0);
+      ps[`${partnerKey}_${res}_IN_HAND`] =
+        (ps[`${partnerKey}_${res}_IN_HAND`] ?? 0) - (asking[idx] ?? 0) + (offering[idx] ?? 0);
+    });
+    resetLocalTradingState(state);
+    state.current_player_index = state.current_turn_index;
+    state.current_color = state.colors[state.current_turn_index];
+    state.current_prompt = "PLAY_TURN";
+    state.action_records.push([action, null]);
+  } else if (actionType === "CANCEL_TRADE") {
+    resetLocalTradingState(state);
+    state.current_player_index = state.current_turn_index;
+    state.current_color = state.colors[state.current_turn_index];
+    state.current_prompt = "PLAY_TURN";
+    state.action_records.push([action, null]);
   } else if (actionType === "END_TURN") {
     ps[`${k}_HAS_ROLLED`] = false;
     const curIdx = state.colors.indexOf(color);
@@ -1162,6 +1426,86 @@ function chooseBotAction(game: StoredLocalGame): GameAction | null {
   const { state } = game;
   const playable = state.current_playable_actions;
   if (playable.length === 0) return null;
+
+  if (state.current_prompt === "DECIDE_TRADE") {
+    const acceptAction = playable.find((a) => a[1] === "ACCEPT_TRADE");
+    const rejectAction = playable.find((a) => a[1] === "REJECT_TRADE");
+    if (!acceptAction) return rejectAction || playable[0];
+    if (!rejectAction) return acceptAction;
+
+    const botColor = state.current_color;
+    const trade = (acceptAction[2] || state.current_trade || []) as number[];
+    const offering = trade.slice(0, 5);
+    const asking = trade.slice(5, 10);
+    const proposerIdx =
+      trade.length > 10 ? Number(trade[10]) : state.current_turn_index;
+    const proposerColor = state.colors[proposerIdx] || state.colors[0];
+
+    const myHand = getLocalFreqdeck(state, botColor);
+    const afterHand = myHand.map(
+      (held, idx) => held + (offering[idx] ?? 0) - (asking[idx] ?? 0)
+    );
+    if (afterHand.some((c) => c < 0)) return rejectAction;
+
+    const beforeScore = scoreLocalHandUtility(state, botColor, myHand);
+    const afterScore = scoreLocalHandUtility(state, botColor, afterHand);
+
+    const pk = pKey(state, proposerColor);
+    const proposerVp = state.player_state[`${pk}_VICTORY_POINTS`] ?? 0;
+    const vpsToWin = state.game?.vps_to_win ?? 10;
+    const leaderPenalty =
+      proposerVp >= vpsToWin - 1 ? 5.5 : proposerVp >= vpsToWin - 2 ? 2.0 : 0.0;
+
+    return afterScore - beforeScore - leaderPenalty >= 0.4
+      ? acceptAction
+      : rejectAction;
+  }
+
+  if (state.current_prompt === "DECIDE_ACCEPTEES") {
+    const cancelAction = playable.find((a) => a[1] === "CANCEL_TRADE");
+    const confirmActions = playable.filter(
+      (a): a is ConfirmTradeAction => a[1] === "CONFIRM_TRADE"
+    );
+    if (confirmActions.length === 0) return cancelAction || playable[0];
+
+    const botColor = state.current_color;
+    const myHand = getLocalFreqdeck(state, botColor);
+    const beforeScore = scoreLocalHandUtility(state, botColor, myHand);
+    const vpsToWin = state.game?.vps_to_win ?? 10;
+
+    let bestAction: ConfirmTradeAction | null = null;
+    let bestCombined = -Infinity;
+    let bestHandDelta = -Infinity;
+
+    for (const act of confirmActions) {
+      const offering = act[2].slice(0, 5) as number[];
+      const asking = act[2].slice(5, 10) as number[];
+      const partnerColor = act[2][10] as Color;
+      const afterHand = myHand.map(
+        (held, idx) => held - (offering[idx] ?? 0) + (asking[idx] ?? 0)
+      );
+      if (afterHand.some((c) => c < 0)) continue;
+
+      const handDelta =
+        scoreLocalHandUtility(state, botColor, afterHand) - beforeScore;
+      const partnerKey = pKey(state, partnerColor);
+      const partnerVp = state.player_state[`${partnerKey}_VICTORY_POINTS`] ?? 0;
+      const partnerPenalty =
+        0.75 * partnerVp + (partnerVp >= vpsToWin - 1 ? 4.0 : 0);
+      const combined = handDelta - partnerPenalty;
+
+      if (combined > bestCombined) {
+        bestCombined = combined;
+        bestHandDelta = handDelta;
+        bestAction = act;
+      }
+    }
+
+    if (!bestAction || (cancelAction && bestHandDelta < -2.0)) {
+      return cancelAction || playable[0];
+    }
+    return bestAction;
+  }
 
   // Priority heuristic for Catanatron AI fallback
   const roll = playable.find((a) => a[1] === "ROLL");
@@ -1375,6 +1719,9 @@ export function localCreateGame(options: {
     edges: built.edges,
     current_playable_actions: [],
     is_initial_build_phase: true,
+    is_resolving_trade: false,
+    current_trade: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    acceptees: colors.map(() => false),
     longest_roads_by_player: {},
     state_index: 0,
     seat_names: { ...metaNames, ...(options.seatNames || {}) },
