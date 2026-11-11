@@ -38,34 +38,45 @@ Este documento consolida **todo o histórico, arquitetura, decisões de design e
   - [`TradeModal.tsx`](ui/src/components/TradeModal.tsx) & [`TradeOfferDecisionDialog.tsx`](ui/src/components/TradeOfferDecisionDialog.tsx): Bancada unificada com abas **🤝 Entre Jogadores** (negociação doméstica em 3 etapas `OFFER_TRADE` → `DECIDE_TRADE` → `DECIDE_ACCEPTEES`) e **⚓ Porto & Banco** (`4:1`, `3:1`, `2:1`).
   - [`ZoomableBoard.tsx`](ui/src/pages/ZoomableBoard.tsx): Inclui seleção de vítima ao mover o Ladrão e suporte *pinch/pan* tátil com `touch-action: none`.
   - [`RightDrawer.tsx`](ui/src/components/RightDrawer.tsx): Gaveta recolhível de análise de IA MCTS (aberta pelo botão `📊 Chances (IA)` no topo).
+  - [`GameScreen.tsx`](ui/src/pages/GameScreen.tsx), [`tabletopPacing.ts`](ui/src/utils/tabletopPacing.ts) & [`DiceRollOverlay.tsx`](ui/src/components/DiceRollOverlay.tsx): Orquestração do ritmo clássico de tabuleiro (`Normal (1x)` / `Rápido (0.5x)`), estágio animado de rolagem 2D6 sincronizado com os dados da barra inferior, highlights `.node--recent`/`.edge--recent`/`.cu-stat--recent`, banner `.action-spotlight-toast` em desktop e mobile, coordenador multiplayer `?bot_only=1`, heartbeat de `10s`, botão **`🚪 Sair (Bot Assume)`** e banner **`↩️ Retomar Meu Assento`**.
 - **Lobby, Contas e Motor Local Fallback:**
   - [`HomePage.tsx`](ui/src/pages/HomePage.tsx) & [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx): Tela inicial em palco panorâmico **A2** (`lobby_hero.webp` descoberto ao centro, cabeçalho de 3 colunas com avatar/`#rank` e doca inferior com 5 modos), apoiada pela suíte modular de diálogos em `ui/src/components/home/` ([`AuthModal.tsx`](ui/src/components/home/AuthModal.tsx), [`MatchSetupModal.tsx`](ui/src/components/home/MatchSetupModal.tsx), [`OpenLobbyModal.tsx`](ui/src/components/home/OpenLobbyModal.tsx)), além da sala de espera multiplayer (`/rooms/:roomCode`) com link compartilhável, adição de Bots (`RANDOM`, `WEIGHTED_RANDOM`, `VICTORY_POINT`, `AB_2`, `AB_4`) e partida rápida.
   - [`ui/src/utils/apiClient.ts`](ui/src/utils/apiClient.ts) & [`ui/src/utils/localEngine.ts`](ui/src/utils/localEngine.ts): Cliente de API com fallback automático (`localEngine.ts`) que executa toda a lógica de Catan, salas, contas e Bots diretamente no navegador caso o backend serverless da Vercel sofra *cold start* ou perda de memória efêmera entre funções.
 
 ### Backend (`api/` e `catanatron/`) — Flask + Vercel Python Serverless
 - **[`vercel.json`](vercel.json) & [`api/index.py`](api/index.py):** Entrada Serverless Python (`3.12` via `.python-version`) na Vercel que roteia `/api/*` para o Flask (`catanatron.web`).
-- **[`catanatron/catanatron/web/api.py`](catanatron/catanatron/web/api.py) & [`models.py`](catanatron/catanatron/web/models.py):** Endpoints REST para jogos (`/api/games`), salas (`/api/rooms`), autenticação/perfil (`/api/auth/register`, `/api/auth/login`, `/api/auth/google`, `/api/auth/me`, `/api/auth/profile`) com exposição de `leaderboard_rank` no ranking global, histórico de partidas e análise MCTS.
+- **[`catanatron/catanatron/web/api.py`](catanatron/catanatron/web/api.py) & [`models.py`](catanatron/catanatron/web/models.py)** *(espelhados identicamente em `api/catanatron/web/` para a Vercel)*: Endpoints REST para jogos (`/api/games`, `/actions?bot_only=1`, `/heartbeat`, `/abandon`, `/reclaim`), salas (`/api/rooms`), autenticação/perfil (`/api/auth/register`, `/api/auth/login`, `/api/auth/google`, `/api/auth/me`, `/api/auth/profile`) com exposição de `leaderboard_rank` no ranking global, histórico de partidas, seeds CSPRNG (`secrets.randbits(63)`), substituição por Bot multiplayer *serverless-safe* (`45s` / saída explícita) e análise MCTS.
 
 ---
 
-## 3. Como Rodar no PC de Casa
+## 3. Como Rodar no PC de Casa e Sincronizar via GitHub / Vercel
 
 ```bash
-# 1. Clonar o repositório
+# 1. Clonar o repositório (primeira vez) ou atualizar no PC de casa
 git clone https://github.com/JGallo0/catanatron-enhanced.git
 cd catanatron-enhanced
+
+# Ou, se já clonado anteriormente:
+git fetch origin
+git checkout main && git pull origin main
+# (Nota: `main` e `layout-topbar` ficam sincronizados no GitHub; a Vercel publica automaticamente o push em `origin/main`)
 
 # 2. Instalar dependências do frontend e rodar servidor de desenvolvimento
 cd ui
 npm install
 npm start
 
-# 3. Rodar testes e build de produção
+# 3. Rodar verificação completa do frontend (typecheck + Vitest + build)
+npx tsc --noEmit
 npx vitest run
 npm run build
+
+# 4. (Opcional) Rodar suíte de testes Python do backend web + regras de troca
+cd ..
+.venv/Scripts/python -m pytest -o addopts="" tests/web tests/test_game.py tests/test_domestic_trade.py tests/test_web_view.py -v
 ```
 
-> **Nota:** Graças ao [`localEngine.ts`](ui/src/utils/localEngine.ts), você pode rodar apenas `cd ui && npm start` no PC de casa sem nem precisar subir o Docker/Flask em Python para testar o visual, o tabuleiro, as cartas e partidas completas contra Bots!
+> **Nota:** Graças ao [`localEngine.ts`](ui/src/utils/localEngine.ts), você pode rodar apenas `cd ui && npm start` no PC de casa sem nem precisar subir o Flask em Python para testar o visual, o tabuleiro, os dados 2D6, as cartas, o ritmo dos bots e partidas completas contra Bots! Se quiser testar salas multiplayer reais localmente contra a API Flask, suba também `.venv/Scripts/python -m flask --app catanatron.web:create_app run --host 127.0.0.1 --port 5001 --no-reload` com `PYTHONPATH=catanatron`.
 
 ---
 
@@ -197,6 +208,21 @@ Os retratos legados `.webp` herdados do Catan Universe foram completamente apose
   - **Otimização Mobile-First (`<= 768px`, `<= 480px` e paisagem `max-height: 520px`):**
     - [`PlayerTopBar.tsx`](ui/src/components/PlayerTopBar.tsx) com faixa compacta horizontal zero-scroll em celulares e modal *tap-to-inspect* com estatísticas completas e peças no tabuleiro.
     - [`Board.tsx`](ui/src/pages/Board.tsx), [`Board.scss`](ui/src/pages/Board.scss), [`GameScreen.scss`](ui/src/pages/GameScreen.scss) e [`ActionsToolbar.scss`](ui/src/pages/ActionsToolbar.scss) com cálculo de altura responsivo, `touch-action: none` para pinch/pan tátil, HUD compacta e alvos `44px+` em todos os controles e modais sem overflow horizontal.
+- **Bloco 5 Concluído: Ritmo Clássico de Tabuleiro, Assunção/Retomada por Bot no Multiplayer e Ordem de Turnos Aleatória:**
+  - **Ritmo de Mesa, Dados 2D6 Animados e Destaques em Desktop/Mobile:**
+    - Controle de velocidade no HUD (`🐢 Normal (1x)` / `⚡ Rápido (0.5x)` persistido em `catan_game_speed_v1` via [`tabletopPacing.ts`](ui/src/utils/tabletopPacing.ts)), desacelerando ações dos Bots conforme o tipo da jogada (`1800ms` para rolagem de dados, `1200ms` construções/compras, `950ms` trocas, `650ms` fim de turno e `400ms` descarte em `1x`, com reação imediata de `250ms` quando há prompt humano pendente).
+    - Novo estágio central [`DiceRollOverlay.tsx`](ui/src/components/DiceRollOverlay.tsx) (`Rolando...` com faces animadas -> `Total X` / `Total 7 — Ladrão!`) sincronizado com `.dice-widget-pill.is-rolling` em [`ActionsToolbar.tsx`](ui/src/pages/ActionsToolbar.tsx).
+    - Halos dourados temporários de `2,2s` para construções e compras recentes (`.node--recent`, `.edge--recent`, `.cu-stat--recent`) e `.action-spotlight-toast` unificado tanto em Desktop (`>=600px`) quanto em Mobile (`<600px`).
+  - **Presença Multiplayer, Assunção por Bot (`45s` / Saída Voluntária) e Retomada do Assento:**
+    - Backend (*serverless-safe* sem threads em background em [`models.py`](catanatron/catanatron/web/models.py) e [`api.py`](catanatron/catanatron/web/api.py) espelhados em `api/catanatron/web/`): `POST /api/games/<id>/heartbeat` (`10s` no cliente), promoção automática preguiçosa após `45s` sem heartbeat exclusivamente em partidas multiplayer com `>= 2` humanos originais (nunca em jogos Solo e nunca no último humano vivo), `POST /api/games/<id>/abandon` (**`🚪 Sair (Bot Assume)`** com diálogo de confirmação) e `POST /api/games/<id>/reclaim` (**`↩️ Retomar Meu Assento`** no banner de [`GameScreen.tsx`](ui/src/pages/GameScreen.tsx)).
+    - Eleição de coordenador único no cliente (`electBotCoordinator`) usando `POST /api/games/<id>/actions?bot_only=1` (safe no-op quando não for mais turno de bot) e `polling` de `700ms` para pares sincronizarem na mesma cadência.
+    - Justiça no Ranking Global: assento assumido por bot que termina a partida sem ser retomado conta como `seat_kind = "BOT"` (`username = null`), exibindo `"<NomeOriginal> (Bot)"` + indicador `"🤖 Bot assumiu"` e preservando o avatar customizado original no lugar de substituir pelo avatar de um bot padrão; paridade local completa em [`localEngine.ts`](ui/src/utils/localEngine.ts).
+  - **Ordem de Turnos e Jogador Inicial Garantidamente Aleatórios:**
+    - Seeds CSPRNG (`secrets.randbits(63)`) quando `seed` não é informado na API Python e embaralhamento Fisher-Yates com `crypto.getRandomValues` em `localCreateGame` preservando o vínculo cor <-> jogador/avatar.
+    - Anúncio da ordem sorteada no início da partida (`state_index === 0`: `"Ordem sorteada: Você inicia a partida!"` / `"Ordem sorteada: <Nome> inicia a partida!"`) e barra [`PlayerTopBar.tsx`](ui/src/components/PlayerTopBar.tsx) renderizada na ordem ativa de turnos sem selos numéricos (`1º`–`4º`).
+  - **Bateria de Testes Verificada (Bloco 5):**
+    - Backend (`.\.venv\Scripts\python.exe -m pytest -o addopts="" tests/web tests/test_game.py tests/test_domestic_trade.py tests/test_web_view.py -v`): **97/97 passando** (`53/53` em `tests/web/`, incluindo `test_takeover_and_turn_order.py` e paridade do espelho Vercel).
+    - Frontend (`npx tsc --noEmit`, `npx vitest run` e `npm run build` em `ui/`): **0 erros TS**, **25 arquivos / 119 testes passando** e build de produção Vite concluído.
 
 ---
 
@@ -219,5 +245,6 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 1. ~~**Bloco 2 — Customização de Avatar e Perfil**~~ *(Concluído)*
 2. ~~**Bloco 3 — Redesign da Tela Inicial e Lobby Aberto**~~ *(Concluído)*
 3. ~~**Bloco 4 — Fix Home/Google OAuth, Bots & Avatares Oficiais, Troca Entre Jogadores e Mobile-First**~~ *(Concluído)*
-4. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.
-5. **Publicação e Monitoramento em Produção:** Conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase e validar partidas multiplayer entre desktop e celular em produção.
+4. ~~**Bloco 5 — Ritmo de Tabuleiro com Dados 2D6 Animados, Assunção/Retomada por Bot Multiplayer e Turnos Aleatórios**~~ *(Concluído e publicado em `main` + `layout-topbar`)*
+5. **Testes Reais Multiplayer + Produção (PC de Casa / Celular):** Conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase, testar partida multiplayer real entre PC e celular na URL da Vercel validando heartbeat/abandono/retomada e rolagem animada 2D6.
+6. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.
