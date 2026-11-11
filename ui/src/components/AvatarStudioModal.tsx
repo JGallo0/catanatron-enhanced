@@ -23,10 +23,13 @@ import {
   AVATAR_PRESETS,
   AVATAR_SKIN_OPTIONS,
   getAvatarItemRequirement,
+  getGuestProfile,
   isAvatarItemUnlocked,
   randomizeUnlockedAvatar,
   resolveAvatarConfig,
+  saveGuestProfile,
   type AvatarOption,
+  type GuestProfile,
 } from "../config/avatarCatalog";
 import PlayerAvatar from "./PlayerAvatar";
 import "./AvatarStudioModal.scss";
@@ -56,30 +59,46 @@ export default function AvatarStudioModal({
   open,
   onClose,
   account,
+  guestProfile,
   onSaved,
+  onGuestSaved,
 }: {
   open: boolean;
   onClose: () => void;
-  account: PlayerAccount;
-  onSaved: (updated: PlayerAccount) => void;
+  account: PlayerAccount | null;
+  guestProfile?: GuestProfile;
+  onSaved?: (updated: PlayerAccount) => void;
+  onGuestSaved?: (saved: GuestProfile) => void;
 }) {
   const [tab, setTab] = useState<StudioTab>("face");
-  const [displayName, setDisplayName] = useState(account.display_name);
+  const initialGuest = account ? null : guestProfile ?? getGuestProfile();
+  const [displayName, setDisplayName] = useState(
+    account ? account.display_name : initialGuest!.display_name
+  );
   const [draftConfig, setDraftConfig] = useState<AvatarConfig>(() =>
-    safeResolveConfig(account.avatar_config, account.username)
+    account
+      ? safeResolveConfig(account.avatar_config, account.username)
+      : safeResolveConfig(initialGuest!.avatar_config, initialGuest!.display_name)
   );
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const wins = account.stats?.wins ?? 0;
-  const winRate = account.stats?.win_rate ?? 0;
+  const isGuest = !account;
+  const wins = account ? account.stats?.wins ?? 0 : 0;
+  const winRate = account ? account.stats?.win_rate ?? 0 : 0;
 
   useEffect(() => {
     if (!open) return;
-    setDisplayName(account.display_name);
-    setDraftConfig(safeResolveConfig(account.avatar_config, account.username));
+    if (account) {
+      setDisplayName(account.display_name);
+      setDraftConfig(safeResolveConfig(account.avatar_config, account.username));
+    } else {
+      const g = guestProfile ?? getGuestProfile();
+      setDisplayName(g.display_name);
+      setDraftConfig(safeResolveConfig(g.avatar_config, g.display_name));
+    }
     setErrorMsg("");
-  }, [open, account]);
+  }, [open, account, guestProfile]);
 
   const setField = <K extends keyof AvatarConfig>(
     field: K,
@@ -153,6 +172,15 @@ export default function AvatarStudioModal({
       setErrorMsg("Informe um apelido na mesa.");
       return;
     }
+    if (!account) {
+      const savedGuest = saveGuestProfile({
+        displayName: cleanName,
+        avatarConfig: draftConfig,
+      });
+      onGuestSaved?.(savedGuest);
+      onClose();
+      return;
+    }
     setSaving(true);
     setErrorMsg("");
     try {
@@ -160,7 +188,7 @@ export default function AvatarStudioModal({
         displayName: cleanName,
         avatarConfig: draftConfig,
       });
-      onSaved(updated);
+      onSaved?.(updated);
       onClose();
     } catch (err: any) {
       setErrorMsg(
@@ -199,14 +227,20 @@ export default function AvatarStudioModal({
         <div className="avatar-studio-preview-col">
           <PlayerAvatar
             config={draftConfig}
-            username={account.username}
+            username={account?.username || displayName || "visitante"}
             size={120}
             showFrameLabel
           />
 
-          <div className="avatar-studio-stats-pill">
-            🏆 {wins} {wins === 1 ? "vitória" : "vitórias"} • {winRate}% aproveitamento
-          </div>
+          {isGuest ? (
+            <div className="avatar-studio-stats-pill avatar-studio-stats-pill--guest">
+              🧭 Visitante • Salvo neste navegador (entre na conta para liberar molduras do ranking)
+            </div>
+          ) : (
+            <div className="avatar-studio-stats-pill">
+              🏆 {wins} {wins === 1 ? "vitória" : "vitórias"} • {winRate}% aproveitamento
+            </div>
+          )}
 
           <div className="avatar-studio-name-field">
             <label htmlFor="studio-display-name">Apelido na Mesa</label>
@@ -323,7 +357,7 @@ export default function AvatarStudioModal({
           disabled={saving}
           onClick={handleSave}
         >
-          {saving ? "Salvando..." : "💾 Salvar Perfil"}
+          {saving ? "Salvando..." : account ? "💾 Salvar Perfil" : "💾 Salvar Avatar"}
         </Button>
       </DialogActions>
     </Dialog>

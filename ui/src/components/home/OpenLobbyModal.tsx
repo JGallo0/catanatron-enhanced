@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { Button, Dialog, DialogContent, DialogTitle } from "@mui/material";
 import { PLAYER_COLOR_META } from "../../config/assetRegistry";
+import {
+  isOfficialBotName,
+  pickBotNameDeterministic,
+  resolveSeatAvatarProps,
+} from "../../config/botCatalog";
 import type { Color, RoomState } from "../../utils/api.types";
 import PlayerAvatar from "../PlayerAvatar";
 import "./OpenLobbyModal.scss";
@@ -190,9 +195,33 @@ export default function OpenLobbyModal({
 
                   <div className="open-lobby-card__bottom">
                     <div className="open-lobby-seats">
-                      {room.seats.map((seat) => {
+                      {room.seats.map((seat, seatIdx) => {
                         const palette = PLAYER_COLOR_META[seat.color];
                         const isOpen = !seat.is_bot && !seat.claimed;
+                        const displayName = seat.is_bot
+                          ? isOfficialBotName(seat.player_name)
+                            ? seat.player_name
+                            : pickBotNameDeterministic(seatIdx)
+                          : seat.player_name;
+                        const avatarProps = !isOpen
+                          ? resolveSeatAvatarProps({
+                              color: seat.color,
+                              isBot: seat.is_bot,
+                              seatIndex: seatIdx,
+                              seatName: displayName,
+                              seatAvatar: {
+                                seat_kind:
+                                  seat.seat_kind ||
+                                  (seat.is_bot
+                                    ? "BOT"
+                                    : seat.username
+                                      ? "USER"
+                                      : "GUEST"),
+                                username: seat.username ?? null,
+                                avatar_config: seat.avatar_config,
+                              },
+                            })
+                          : null;
                         return (
                           <div
                             key={seat.color}
@@ -201,10 +230,10 @@ export default function OpenLobbyModal({
                             }`}
                             style={{ borderColor: palette.primary }}
                           >
-                            {seat.seat_kind === "USER" ? (
+                            {avatarProps ? (
                               <PlayerAvatar
-                                config={seat.avatar_config}
-                                username={seat.username || seat.player_name}
+                                config={avatarProps.config}
+                                username={avatarProps.username}
                                 size={28}
                               />
                             ) : (
@@ -215,11 +244,11 @@ export default function OpenLobbyModal({
                                   color: palette.textOnFill,
                                 }}
                               >
-                                {seat.is_bot ? "🤖" : isOpen ? "➕" : "👤"}
+                                ➕
                               </span>
                             )}
                             <span>
-                              {isOpen ? "Vaga Aberta" : seat.player_name}
+                              {isOpen ? "Vaga Aberta" : displayName}
                             </span>
                           </div>
                         );

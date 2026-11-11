@@ -22,9 +22,18 @@ import type { MapTemplate, MCTSProbabilities, PlayerAccount } from "./apiClient"
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import {
   AVATAR_UNLOCK_REQUIREMENTS,
+  DEFAULT_GUEST_DISPLAY_NAME,
+  filterUnlockedAvatarConfig,
+  getGuestProfile,
   isAvatarItemUnlocked,
   sanitizeAvatarConfig,
 } from "../config/avatarCatalog";
+import {
+  BOT_AVATAR_PROFILES,
+  isOfficialBotName,
+  pickBotNameDeterministic,
+  pickBotNames,
+} from "../config/botCatalog";
 
 const SEAT_COLORS: Color[] = ["RED", "BLUE", "ORANGE", "WHITE"];
 const RESOURCES: ResourceCard[] = ["WOOD", "BRICK", "SHEEP", "WHEAT", "ORE"];
@@ -497,18 +506,46 @@ function buildSeatViewsFromMeta(
   if (!seatMeta) return { seatNames, seatAvatars };
 
   const dir = getLocalUserDirectory();
+  const usedBotNames = new Set<string>();
   for (const [colorKey, meta] of Object.entries(seatMeta)) {
     const color = colorKey as Color;
     if (!meta) continue;
+    if (meta.seat_kind === "BOT") {
+      const candidate = meta.display_name?.trim();
+      const botName =
+        isOfficialBotName(candidate) && !usedBotNames.has(candidate)
+          ? candidate
+          : pickBotNameDeterministic(
+              Math.max(0, SEAT_COLORS.indexOf(color)),
+              usedBotNames
+            );
+      usedBotNames.add(botName);
+      seatNames[color] = botName;
+      const botAvatar = sanitizeAvatarConfig(meta.avatar_config);
+      seatAvatars[color] = {
+        seat_kind: "BOT",
+        username: null,
+        avatar_config:
+          Object.keys(botAvatar).length > 0
+            ? botAvatar
+            : BOT_AVATAR_PROFILES[botName],
+      };
+      continue;
+    }
+
     const uname = meta.seat_kind === "USER" ? meta.username : null;
     const liveUser = uname ? dir[uname] : undefined;
     seatNames[color] = liveUser?.display_name || meta.display_name;
+    const guestOrMetaAvatar =
+      meta.seat_kind === "GUEST"
+        ? filterUnlockedAvatarConfig(meta.avatar_config, 0)
+        : sanitizeAvatarConfig(meta.avatar_config);
     seatAvatars[color] = {
       seat_kind: meta.seat_kind,
       username: uname,
       avatar_config: uname
-        ? liveUser?.avatar_config || sanitizeAvatarConfig(meta.avatar_config)
-        : {},
+        ? liveUser?.avatar_config || guestOrMetaAvatar
+        : guestOrMetaAvatar,
     };
   }
   return { seatNames, seatAvatars };
@@ -1197,6 +1234,7 @@ export function localCreateGame(options: {
   seatNames?: Partial<Record<Color, string>>;
   roomCode?: string;
   seatMeta?: Record<Color, LocalSeatMeta>;
+  hostAvatarConfig?: Partial<AvatarConfig>;
 }): string {
   const built = buildLocalMap(options.mapTemplate);
   const colors = SEAT_COLORS.slice(0, Math.max(2, Math.min(4, options.players.length)));
@@ -1218,7 +1256,17 @@ export function localCreateGame(options: {
     : ({} as Record<Color, LocalSeatMeta>);
 
   if (!options.seatMeta) {
+    const guestProfile = !defaultUser ? getGuestProfile() : null;
+    const resolvedGuestAvatar = !defaultUser
+      ? filterUnlockedAvatarConfig(
+          options.hostAvatarConfig ??
+            (guestProfile?.customized ? guestProfile.avatar_config : undefined),
+          0
+        )
+      : {};
+    const usedBotNames = new Set<string>();
     let userAssigned = false;
+    let guestHostAssigned = false;
     colors.forEach((c, idx) => {
       const pKey = options.players[idx] || "HUMAN";
       if (pKey === "HUMAN") {
@@ -1233,23 +1281,42 @@ export function localCreateGame(options: {
           };
           userAssigned = true;
         } else {
+          const isPrimaryGuest = !defaultUser && !guestHostAssigned;
+          if (isPrimaryGuest) {
+            guestHostAssigned = true;
+          }
+          const guestFallbackName =
+            isPrimaryGuest &&
+            guestProfile?.display_name &&
+            guestProfile.display_name !== DEFAULT_GUEST_DISPLAY_NAME
+              ? guestProfile.display_name
+              : undefined;
           resolvedSeatMeta[c] = {
             color: c,
             seat_kind: "GUEST",
             username: null,
             player_key: "HUMAN",
-            display_name: options.seatNames?.[c] || PLAYER_COLOR_META[c].label,
-            avatar_config: {},
+            display_name:
+              options.seatNames?.[c] ||
+              guestFallbackName ||
+              PLAYER_COLOR_META[c].label,
+            avatar_config: isPrimaryGuest ? resolvedGuestAvatar : {},
           };
         }
       } else {
+        const requestedName = options.seatNames?.[c];
+        const botName =
+          isOfficialBotName(requestedName) && !usedBotNames.has(requestedName)
+            ? requestedName
+            : pickBotNames(1, usedBotNames)[0];
+        usedBotNames.add(botName);
         resolvedSeatMeta[c] = {
           color: c,
           seat_kind: "BOT",
           username: null,
           player_key: pKey,
-          display_name: options.seatNames?.[c] || `Bot (${pKey})`,
-          avatar_config: {},
+          display_name: botName,
+          avatar_config: BOT_AVATAR_PROFILES[botName],
         };
       }
     });
@@ -1375,7 +1442,7 @@ export function localGetState(
   const cloned = JSON.parse(JSON.stringify(rawState)) as GameState;
   if (game.seatMeta) {
     const { seatNames, seatAvatars } = buildSeatViewsFromMeta(game.seatMeta);
-    cloned.seat_names = { ...seatNames, ...(cloned.seat_names || {}) };
+    cloned.seat_names = { ...(cloned.seat_names || {}), ...seatNames };
     cloned.seat_avatars = seatAvatars;
   }
   return cloned;
@@ -1398,7 +1465,7 @@ export function localPostAction(
   const cloned = JSON.parse(JSON.stringify(game.state)) as GameState;
   if (game.seatMeta) {
     const { seatNames, seatAvatars } = buildSeatViewsFromMeta(game.seatMeta);
-    cloned.seat_names = { ...seatNames, ...(cloned.seat_names || {}) };
+    cloned.seat_names = { ...(cloned.seat_names || {}), ...seatNames };
     cloned.seat_avatars = seatAvatars;
   }
   return cloned;
@@ -1488,6 +1555,7 @@ export function localRegisterUser(options: {
   username: string;
   password: string;
   displayName?: string;
+  avatarConfig?: Partial<AvatarConfig>;
 }): PlayerAccount {
   const cleanUser = options.username
     .toLowerCase()
@@ -1502,11 +1570,12 @@ export function localRegisterUser(options: {
     throw new Error("Este usuário já está cadastrado localmente.");
   }
   const display_name = (options.displayName || options.username).trim() || cleanUser;
+  const cleanAvatar = filterUnlockedAvatarConfig(options.avatarConfig, 0);
   users[cleanUser] = {
     username: cleanUser,
     display_name,
     password: options.password,
-    avatar_config: {},
+    avatar_config: cleanAvatar,
   };
   try {
     localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
@@ -1518,7 +1587,7 @@ export function localRegisterUser(options: {
     username: cleanUser,
     display_name,
     auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
-    avatar_config: {},
+    avatar_config: cleanAvatar,
     stats: rankMeta.stats,
     leaderboard_rank: rankMeta.leaderboard_rank,
     is_new: true,
@@ -1800,6 +1869,7 @@ export function localCreateRoom(options: {
   discardLimit: number;
   friendlyRobber: boolean;
   token?: string | null;
+  hostAvatarConfig?: Partial<AvatarConfig>;
 }): { room_code: string; seat_token: string; room: RoomState } {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -1808,7 +1878,16 @@ export function localCreateRoom(options: {
   }
   const hostToken = options.token || "tok_" + Math.random().toString(36).slice(2, 10);
   const savedAcct = getSavedPlayerAccount();
+  const guestProfile = !savedAcct ? getGuestProfile() : null;
+  const guestHostAvatar = !savedAcct
+    ? filterUnlockedAvatarConfig(
+        options.hostAvatarConfig ??
+          (guestProfile?.customized ? guestProfile.avatar_config : undefined),
+        0
+      )
+    : {};
   const seatTokens: Record<string, string | null> = {};
+  const usedBotNames = new Set<string>();
   let hostSeated = false;
 
   const seats = options.players.slice(0, 4).map((pk, idx) => {
@@ -1827,7 +1906,7 @@ export function localCreateRoom(options: {
         username: savedAcct?.username ?? null,
         avatar_config: savedAcct?.username
           ? sanitizeAvatarConfig(savedAcct.avatar_config)
-          : {},
+          : guestHostAvatar,
       };
     } else if (pk === "HUMAN") {
       seatTokens[color] = null;
@@ -1844,16 +1923,18 @@ export function localCreateRoom(options: {
       };
     } else {
       seatTokens[color] = null;
+      const botName = pickBotNames(1, usedBotNames)[0];
+      usedBotNames.add(botName);
       return {
         color,
         player_key: pk,
-        player_name: `🤖 IA (${pk})`,
+        player_name: botName,
         is_bot: true,
         claimed: true,
         is_me: false,
         seat_kind: "BOT" as const,
         username: null,
-        avatar_config: {},
+        avatar_config: BOT_AVATAR_PROFILES[botName],
       };
     }
   });
@@ -1910,21 +1991,43 @@ export function localGetRoom(
 
   let myColor: Color | null = null;
   const dir = getLocalUserDirectory();
-  const seats = stored.seats.map((s) => {
+  const usedBotNames = new Set<string>();
+  const seats = stored.seats.map((s, idx) => {
     const isMe = Boolean(token && stored.seat_tokens[s.color] === token);
     if (isMe) myColor = s.color;
-    const uname = !s.is_bot && s.seat_kind === "USER" ? s.username || null : null;
-    const resolvedKind: "USER" | "GUEST" | "BOT" = s.is_bot
-      ? "BOT"
-      : s.seat_kind || (uname ? "USER" : "GUEST");
+    if (s.is_bot) {
+      const botName =
+        isOfficialBotName(s.player_name) && !usedBotNames.has(s.player_name)
+          ? s.player_name
+          : pickBotNameDeterministic(idx, usedBotNames);
+      usedBotNames.add(botName);
+      const botAvatar = sanitizeAvatarConfig(s.avatar_config);
+      return {
+        ...s,
+        player_name: botName,
+        seat_kind: "BOT" as const,
+        username: null,
+        avatar_config:
+          Object.keys(botAvatar).length > 0
+            ? botAvatar
+            : BOT_AVATAR_PROFILES[botName],
+        claimed: true,
+        is_me: false,
+      };
+    }
+
+    const uname = s.seat_kind === "USER" ? s.username || null : null;
+    const resolvedKind: "USER" | "GUEST" =
+      s.seat_kind === "USER" && uname ? "USER" : "GUEST";
+    const guestAvatar = filterUnlockedAvatarConfig(s.avatar_config, 0);
     return {
       ...s,
       seat_kind: resolvedKind,
       username: uname,
       avatar_config: uname
         ? dir[uname]?.avatar_config || sanitizeAvatarConfig(s.avatar_config)
-        : {},
-      claimed: s.is_bot || Boolean(stored.seat_tokens[s.color]),
+        : guestAvatar,
+      claimed: Boolean(stored.seat_tokens[s.color]),
       is_me: isMe,
     };
   });
@@ -1946,6 +2049,7 @@ export function localJoinRoom(
     playerName: string;
     preferredColor?: Color;
     token?: string | null;
+    avatarConfig?: Partial<AvatarConfig>;
   }
 ): { seat_token: string; seat_color: Color; room: RoomState } {
   const code = roomCode.toUpperCase();
@@ -1955,11 +2059,16 @@ export function localJoinRoom(
   const token =
     options.token || "tok_" + Math.random().toString(36).slice(2, 10);
   const savedAcct = getSavedPlayerAccount();
+  const guestProfile = !savedAcct ? getGuestProfile() : null;
   const seatKind: "USER" | "GUEST" = savedAcct?.username ? "USER" : "GUEST";
   const seatUsername = savedAcct?.username ?? null;
   const seatAvatar = savedAcct?.username
     ? sanitizeAvatarConfig(savedAcct.avatar_config)
-    : {};
+    : filterUnlockedAvatarConfig(
+        options.avatarConfig ??
+          (guestProfile?.customized ? guestProfile.avatar_config : undefined),
+        0
+      );
 
   let targetSeat = options.preferredColor
     ? stored.seats.find((s) => s.color === options.preferredColor)
@@ -2020,22 +2129,29 @@ export function localUpdateRoom(
     const oldByColor = Object.fromEntries(
       stored.seats.map((s) => [s.color, s])
     );
+    const usedBotNames = new Set<string>();
     stored.seats = payload.seats.map((item, idx) => {
       const color = SEAT_COLORS[idx];
       const prev = oldByColor[color];
       const isBot = item.player_key !== "HUMAN";
       if (isBot) {
         stored.seat_tokens[color] = null;
+        const requested = item.player_name?.trim() || (prev?.is_bot ? prev.player_name : "");
+        const botName =
+          isOfficialBotName(requested) && !usedBotNames.has(requested)
+            ? requested
+            : pickBotNames(1, usedBotNames)[0];
+        usedBotNames.add(botName);
         return {
           color,
           player_key: item.player_key,
-          player_name: item.player_name || `🤖 IA (${item.player_key})`,
+          player_name: botName,
           is_bot: true,
           claimed: true,
           is_me: false,
           seat_kind: "BOT" as const,
           username: null,
-          avatar_config: {},
+          avatar_config: BOT_AVATAR_PROFILES[botName],
         };
       }
       const hasClaim = Boolean(stored.seat_tokens[color]);

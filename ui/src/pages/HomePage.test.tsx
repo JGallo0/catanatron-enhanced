@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import HomePage from "./HomePage";
+import { saveGuestProfile } from "../config/avatarCatalog";
 import {
   DEFAULT_PLAYERS,
   fetchCurrentAccount,
@@ -11,7 +12,6 @@ import {
   getPlayers,
   getSavedAccount,
   listActiveRooms,
-  loginAccount,
   logoutAccount,
   type PlayerAccount,
 } from "../utils/apiClient";
@@ -25,13 +25,13 @@ vi.mock("../utils/apiClient", async (importOriginal) => {
     getPlayers: vi.fn(),
     getSavedAccount: vi.fn(),
     listActiveRooms: vi.fn(),
-    loginAccount: vi.fn(),
     logoutAccount: vi.fn(),
   };
 });
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
 });
 
 const loggedAccount: PlayerAccount = {
@@ -46,6 +46,7 @@ const loggedAccount: PlayerAccount = {
 describe("HomePage A2 Stage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     vi.mocked(getSavedAccount).mockReturnValue(null);
     vi.mocked(fetchCurrentAccount).mockResolvedValue(null);
     vi.mocked(getAuthConfig).mockResolvedValue({
@@ -98,9 +99,44 @@ describe("HomePage A2 Stage", () => {
     expect(await screen.findByText(/Explorador da Ilha/i)).toBeInTheDocument();
   }, 15000);
 
-  test("clicking Personalizar Avatar while logged out opens AuthModal then transitions straight to AvatarStudioModal", async () => {
+  test("clicking Personalizar Avatar while logged out opens AvatarStudioModal directly for guests and updates pill", async () => {
     const user = userEvent.setup();
-    vi.mocked(loginAccount).mockResolvedValueOnce(loggedAccount);
+
+    const { container } = render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    );
+
+    expect(container.querySelector("main.home-stage-window")).toBeInTheDocument();
+    expect(screen.getAllByTestId("player-avatar").length).toBeGreaterThanOrEqual(1);
+
+    await user.click(
+      screen.getByRole("button", { name: /Personalizar Avatar/i })
+    );
+    expect(
+      await screen.findByText(/Personalizar Avatar & Perfil/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Visitante • Salvo neste navegador/i)).toBeInTheDocument();
+
+    const nameInput = screen.getByLabelText(/Apelido na Mesa/i);
+    await user.clear(nameInput);
+    await user.type(nameInput, "Capitão Visitante");
+    await user.click(screen.getByRole("button", { name: /Capitão dos Mares/i }));
+    await user.click(screen.getByRole("button", { name: /Salvar Avatar/i }));
+
+    expect(await screen.findByText("Capitão Visitante")).toBeInTheDocument();
+    expect(screen.getByText(/Avatar personalizado \(visitante\)/i)).toBeInTheDocument();
+    const rawSaved = localStorage.getItem("catan_guest_profile_v1");
+    expect(rawSaved).not.toBeNull();
+    expect(JSON.parse(rawSaved!).avatar_config.hat).toBe("captain");
+  }, 15000);
+
+  test("restores custom guest avatar from localStorage when logged out", async () => {
+    saveGuestProfile({
+      displayName: "Navegante Livre",
+      avatarConfig: { hat: "explorer", outfit: "captain", background: "sunset" },
+    });
 
     render(
       <MemoryRouter>
@@ -108,19 +144,7 @@ describe("HomePage A2 Stage", () => {
       </MemoryRouter>
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /Personalizar Avatar/i })
-    );
-    expect(
-      await screen.findByText(/Entre ou crie uma conta para personalizar/i)
-    ).toBeInTheDocument();
-
-    await user.type(screen.getByPlaceholderText(/Usuário/i), "joao");
-    await user.type(screen.getByPlaceholderText(/^Senha$/i), "1234");
-    await user.click(screen.getByRole("button", { name: /^Entrar$/i }));
-
-    expect(
-      await screen.findByText(/Personalizar Avatar & Perfil/i)
-    ).toBeInTheDocument();
-  }, 15000);
+    expect(await screen.findByText("Navegante Livre")).toBeInTheDocument();
+    expect(screen.getByText(/Avatar personalizado \(visitante\)/i)).toBeInTheDocument();
+  });
 });

@@ -125,6 +125,14 @@ export default function AuthModal({
     }
   };
 
+  const envGoogleClientId =
+    ((import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) || "").trim();
+  const resolvedGoogleClientId =
+    (authConfig.google_client_id || envGoogleClientId).trim();
+  const isGoogleReady = Boolean(
+    resolvedGoogleClientId && (authConfig.google_enabled || resolvedGoogleClientId)
+  );
+
   return (
     <Dialog
       open={open}
@@ -229,17 +237,51 @@ export default function AuthModal({
           </Button>
         </div>
 
-        {authConfig.google_enabled && authConfig.google_client_id && (
-          <div className="home-auth-google">
-            <div className="home-auth-divider">
-              <span>ou</span>
-            </div>
+        <div className="home-auth-google">
+          <div className="home-auth-divider">
+            <span>ou</span>
+          </div>
+          {isGoogleReady ? (
             <GoogleSignInButton
-              clientId={authConfig.google_client_id}
+              clientId={resolvedGoogleClientId}
               onCredential={handleGoogleCredential}
             />
-          </div>
-        )}
+          ) : (
+            <div className="home-auth-google-unavailable" role="note">
+              <span
+                className="home-auth-google-unavailable__badge"
+                aria-hidden="true"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path
+                    fill="#EA4335"
+                    d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.4 1 3.4 3.6 1.5 7.4l3.6 2.8C6 7.2 8.7 5 12 5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.1 14.8c-.2-.8-.4-1.6-.4-2.8s.2-2 .4-2.8L1.5 6.4C.5 8.1 0 10 0 12s.5 3.9 1.5 5.6l3.6-2.8z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.3 0-6-2.2-6.9-5.2l-3.6 2.8C3.4 20.4 7.4 23 12 23z"
+                  />
+                </svg>
+              </span>
+              <div className="home-auth-google-unavailable__text">
+                <strong>Entrar com Google</strong>
+                <span>
+                  Indisponível neste servidor: configure{" "}
+                  <code>GOOGLE_CLIENT_ID</code> no <code>.env</code> ou Vercel para
+                  ativar.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

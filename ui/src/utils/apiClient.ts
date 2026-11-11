@@ -1,6 +1,10 @@
 import axios from "axios";
 
 import { API_URL } from "../configuration";
+import {
+  getCustomGuestAvatarPayload,
+  getGuestProfile,
+} from "../config/avatarCatalog";
 import type {
   AccountStats,
   AvatarConfig,
@@ -112,23 +116,44 @@ export function authHeaders(token?: string | null): Record<string, string> {
   return resolved ? { Authorization: `Bearer ${resolved}` } : {};
 }
 
+export function getFallbackGoogleClientId(): string | null {
+  try {
+    const raw = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) || "";
+    const trimmed = raw.trim();
+    return trimmed || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAuthConfig(): Promise<AuthConfig> {
+  const envClientId = getFallbackGoogleClientId();
   try {
     const response = await axios.get<AuthConfig>(`${API_URL}/api/auth/config`);
     if (response.data && typeof response.data.google_enabled === "boolean") {
-      return response.data;
+      const clientId = response.data.google_client_id || envClientId;
+      return {
+        google_enabled:
+          Boolean(clientId) && (response.data.google_enabled || Boolean(envClientId)),
+        google_client_id: clientId,
+      };
     }
   } catch {
-    // Offline fallback: Google OAuth disabled
+    // Offline / dev fallback: use Vite build-time client ID if provided
   }
-  return { google_enabled: false, google_client_id: null };
+  return {
+    google_enabled: Boolean(envClientId),
+    google_client_id: envClientId,
+  };
 }
 
 export async function registerAccount(options: {
   username: string;
   password: string;
   displayName?: string;
+  avatarConfig?: Partial<AvatarConfig>;
 }): Promise<PlayerAccount> {
+  const resolvedAvatar = options.avatarConfig ?? getCustomGuestAvatarPayload();
   try {
     const response = await axios.post<PlayerAccount>(
       `${API_URL}/api/auth/register`,
@@ -136,6 +161,7 @@ export async function registerAccount(options: {
         username: options.username,
         password: options.password,
         display_name: options.displayName,
+        ...(resolvedAvatar ? { avatar_config: resolvedAvatar } : {}),
       }
     );
     if (response.data?.username) {
@@ -147,7 +173,10 @@ export async function registerAccount(options: {
       throw err;
     }
   }
-  const fallback = localRegisterUser(options);
+  const fallback = localRegisterUser({
+    ...options,
+    avatarConfig: resolvedAvatar,
+  });
   saveAccount(fallback);
   return fallback;
 }
@@ -178,9 +207,14 @@ export async function loginAccount(options: {
   return fallback;
 }
 
-export async function loginWithGoogle(credential: string): Promise<PlayerAccount> {
+export async function loginWithGoogle(
+  credential: string,
+  avatarConfig?: Partial<AvatarConfig>
+): Promise<PlayerAccount> {
+  const resolvedAvatar = avatarConfig ?? getCustomGuestAvatarPayload();
   const response = await axios.post<PlayerAccount>(`${API_URL}/api/auth/google`, {
     credential,
+    ...(resolvedAvatar ? { avatar_config: resolvedAvatar } : {}),
   });
   saveAccount(response.data);
   return response.data;
@@ -472,6 +506,14 @@ export async function createGame({
   friendlyRobber,
 }: CreateGameOptions): Promise<string> {
   const acct = getSavedAccount();
+  const guest = !acct ? getGuestProfile() : null;
+  const guestAvatar = !acct ? getCustomGuestAvatarPayload() : undefined;
+  const resolvedHostName =
+    acct?.display_name ||
+    (guest?.customized ||
+    (guest?.display_name && guest.display_name !== "Explorador da Ilha")
+      ? guest?.display_name
+      : undefined);
   try {
     const response = await axios.post(
       API_URL + "/api/games",
@@ -481,7 +523,8 @@ export async function createGame({
         vps_to_win: vpsToWin,
         discard_limit: discardLimit,
         friendly_robber: friendlyRobber,
-        host_name: acct?.display_name,
+        host_name: resolvedHostName,
+        ...(guestAvatar ? { avatar_config: guestAvatar } : {}),
       },
       { headers: authHeaders() }
     );
@@ -497,7 +540,8 @@ export async function createGame({
     vpsToWin,
     discardLimit,
     friendlyRobber,
-    seatNames: acct?.display_name ? { RED: acct.display_name } : undefined,
+    seatNames: resolvedHostName ? { RED: resolvedHostName } : undefined,
+    hostAvatarConfig: guestAvatar,
   });
 }
 
@@ -536,8 +580,9 @@ export async function createRoom(options: {
   friendlyRobber: boolean;
   token?: string | null;
 }): Promise<{ room_code: string; seat_token: string; room: RoomState }> {
-  const resolvedToken =
-    options.token ?? getSavedAccount()?.auth_token ?? undefined;
+  const acct = getSavedAccount();
+  const guestAvatar = !acct ? getCustomGuestAvatarPayload() : undefined;
+  const resolvedToken = options.token ?? acct?.auth_token ?? undefined;
   try {
     const response = await axios.post(
       `${API_URL}/api/rooms`,
@@ -549,6 +594,7 @@ export async function createRoom(options: {
         discard_limit: options.discardLimit,
         friendly_robber: options.friendlyRobber,
         token: resolvedToken,
+        ...(guestAvatar ? { avatar_config: guestAvatar } : {}),
       },
       { headers: authHeaders(resolvedToken) }
     );
@@ -565,6 +611,7 @@ export async function createRoom(options: {
   return localCreateRoom({
     ...options,
     token: resolvedToken,
+    hostAvatarConfig: guestAvatar,
   });
 }
 
@@ -600,7 +647,9 @@ export async function joinRoom(
     token?: string | null;
   }
 ): Promise<{ seat_token: string; seat_color: Color; room: RoomState }> {
-  const resolvedToken = options.token ?? getSavedAccount()?.auth_token;
+  const acct = getSavedAccount();
+  const guestAvatar = !acct ? getCustomGuestAvatarPayload() : undefined;
+  const resolvedToken = options.token ?? acct?.auth_token;
   try {
     const response = await axios.post(
       `${API_URL}/api/rooms/${roomCode}/join`,
@@ -608,6 +657,7 @@ export async function joinRoom(
         player_name: options.playerName,
         preferred_color: options.preferredColor,
         token: resolvedToken,
+        ...(guestAvatar ? { avatar_config: guestAvatar } : {}),
       },
       { headers: authHeaders() }
     );
@@ -621,7 +671,10 @@ export async function joinRoom(
   } catch {
     // Fallback to local room
   }
-  return localJoinRoom(roomCode, options);
+  return localJoinRoom(roomCode, {
+    ...options,
+    avatarConfig: guestAvatar,
+  });
 }
 
 export async function updateRoom(

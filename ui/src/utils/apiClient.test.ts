@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import axios from "axios";
 
+import { saveGuestProfile } from "../config/avatarCatalog";
+import { OFFICIAL_BOT_NAMES } from "../config/botCatalog";
 import {
+  createGame,
   fetchCurrentAccount,
   getLeaderboard,
   getMatchHistory,
@@ -12,6 +15,7 @@ import {
 } from "./apiClient";
 import {
   localCreateGame,
+  localCreateRoom,
   localGetLeaderboard,
   localGetMatchHistory,
   localGetState,
@@ -287,5 +291,64 @@ describe("local match history and leaderboard calculations", () => {
       win_rate: 100,
     });
     expect(getSavedAccount()?.leaderboard_rank).toBe(1);
+  });
+
+  test("assigns unique official bot names (never color/legacy names) and preserves guest custom avatar", async () => {
+    saveGuestProfile({
+      displayName: "Marechal",
+      avatarConfig: { hat: "explorer", outfit: "captain", background: "forest" },
+    });
+
+    const gameId = localCreateGame({
+      players: ["HUMAN", "CATANATRON", "F", "MCTS"],
+      mapTemplate: "BASE",
+      vpsToWin: 10,
+      discardLimit: 7,
+      friendlyRobber: true,
+    });
+    const st = localGetState(gameId);
+
+    expect(st.seat_names?.RED).toBe("Marechal");
+    expect(st.seat_avatars?.RED?.seat_kind).toBe("GUEST");
+    expect(st.seat_avatars?.RED?.avatar_config?.hat).toBe("explorer");
+
+    const botNames = [st.seat_names?.BLUE, st.seat_names?.ORANGE, st.seat_names?.WHITE];
+    expect(new Set(botNames).size).toBe(3);
+    for (const botName of botNames) {
+      expect((OFFICIAL_BOT_NAMES as readonly string[]).includes(botName!)).toBe(true);
+    }
+
+    const roomRes = localCreateRoom({
+      hostName: "Marechal",
+      players: ["HUMAN", "CATANATRON", "MCTS", "VP"],
+      mapTemplate: "BASE",
+      vpsToWin: 10,
+      discardLimit: 7,
+      friendlyRobber: true,
+    });
+    const roomBots = roomRes.room.seats.filter((s) => s.is_bot).map((s) => s.player_name);
+    expect(new Set(roomBots).size).toBe(3);
+    for (const botName of roomBots) {
+      expect((OFFICIAL_BOT_NAMES as readonly string[]).includes(botName)).toBe(true);
+    }
+
+    const postSpy = vi.spyOn(axios, "post").mockResolvedValueOnce({
+      data: { game_id: "srv-guest-1" },
+    });
+    await createGame({
+      players: ["HUMAN", "CATANATRON"],
+      mapTemplate: "BASE",
+      vpsToWin: 10,
+      discardLimit: 7,
+      friendlyRobber: true,
+    });
+    expect(postSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/api/games"),
+      expect.objectContaining({
+        host_name: "Marechal",
+        avatar_config: expect.objectContaining({ hat: "explorer" }),
+      }),
+      expect.any(Object)
+    );
   });
 });

@@ -48,7 +48,7 @@ const sampleRooms: RoomState[] = [
       {
         color: "ORANGE",
         player_key: "CATANATRON",
-        player_name: "🤖 Mestre IA",
+        player_name: "Creitu",
         is_bot: true,
         claimed: true,
         is_me: false,
@@ -164,13 +164,24 @@ describe("OpenLobbyModal", () => {
         },
         seats: [
           {
-            color: "WHITE",
+            color: "BLUE",
             player_key: "CATANATRON",
-            player_name: "Bot Branco",
+            player_name: "Felire",
             is_bot: true,
             claimed: true,
             is_me: false,
             seat_kind: "BOT",
+            username: null,
+            avatar_config: {},
+          },
+          {
+            color: "WHITE",
+            player_key: "HUMAN",
+            player_name: "Aguardando Amigo...",
+            is_bot: false,
+            claimed: false,
+            is_me: false,
+            seat_kind: "GUEST",
             username: null,
             avatar_config: {},
           },
@@ -190,10 +201,14 @@ describe("OpenLobbyModal", () => {
       />
     );
 
-    // Seat icon uses palette.textOnFill for high contrast on light fills (e.g. WHITE -> #0F172A)
-    const botLabel = screen.getByText("Bot Branco");
-    const seatChip = botLabel.closest(".open-lobby-seat-chip");
-    const seatIcon = seatChip?.querySelector(".open-lobby-seat-icon");
+    expect(screen.getByText("Creitu")).toBeInTheDocument();
+    expect(screen.getByText("Felire")).toBeInTheDocument();
+    // Open seat icon uses palette.textOnFill for high contrast on light fills (e.g. WHITE -> #0F172A)
+    const openLabels = screen.getAllByText("Vaga Aberta");
+    const whiteOpenChip = openLabels[openLabels.length - 1].closest(
+      ".open-lobby-seat-chip"
+    );
+    const seatIcon = whiteOpenChip?.querySelector(".open-lobby-seat-icon");
     expect(seatIcon).toHaveStyle({
       background: "#F8FAFC",
       color: "#0F172A",

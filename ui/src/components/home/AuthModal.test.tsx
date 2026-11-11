@@ -55,6 +55,10 @@ describe("AuthModal", () => {
       screen.getByText(/Entre ou crie uma conta grátis para personalizar seu avatar\./i)
     ).toBeInTheDocument();
 
+    // Mesmo sem GOOGLE_CLIENT_ID configurado, a seção do Google fica visível com explicação clara
+    expect(screen.getByText(/^Entrar com Google$/i)).toBeInTheDocument();
+    expect(screen.getByText(/GOOGLE_CLIENT_ID/i)).toBeInTheDocument();
+
     // Tentar enviar sem usuário mostra validação
     await user.click(screen.getByRole("button", { name: /^Entrar$/i }));
     expect(screen.getByText(/Informe seu nome de usuário\./i)).toBeInTheDocument();

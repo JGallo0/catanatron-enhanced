@@ -16,9 +16,15 @@ import {
 } from "../utils/apiClient";
 import type { Color, RoomState } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getGuestProfile, type GuestProfile } from "../config/avatarCatalog";
+import {
+  isOfficialBotName,
+  pickBotNameDeterministic,
+  pickBotNames,
+  resolveSeatAvatarProps,
+} from "../config/botCatalog";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
-import { HybridIllustration } from "../components/icons/GameIcons";
 
 import "./RoomLobbyPage.scss";
 
@@ -69,14 +75,21 @@ export default function RoomLobbyPage() {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [availablePlayers, setAvailablePlayers] =
     useState<PlayerEntry[]>(DEFAULT_PLAYERS);
-  const [playerName, setPlayerName] = useState(
-    () => localStorage.getItem("catan_player_name") || "Jogador"
-  );
+  const [playerName, setPlayerName] = useState(() => {
+    const saved = getSavedAccount();
+    if (saved?.display_name) return saved.display_name;
+    const guest = getGuestProfile();
+    if (guest.customized && guest.display_name) return guest.display_name;
+    return localStorage.getItem("catan_player_name") || "Jogador";
+  });
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
   const [account, setAccount] = useState<PlayerAccount | null>(() =>
     getSavedAccount()
+  );
+  const [guestProfile, setGuestProfile] = useState<GuestProfile>(() =>
+    getGuestProfile()
   );
   const [avatarStudioOpen, setAvatarStudioOpen] = useState(false);
 
@@ -163,6 +176,12 @@ export default function RoomLobbyPage() {
 
   const handleSeatTypeChange = async (index: number, newPlayerKey: string) => {
     if (!room) return;
+    const usedBotNames = new Set(
+      room.seats
+        .filter((_, idx) => idx !== index)
+        .map((s) => s.player_name)
+        .filter((n) => isOfficialBotName(n))
+    );
     const nextSeats = room.seats.map((s, idx) => {
       if (idx !== index) {
         return {
@@ -171,16 +190,20 @@ export default function RoomLobbyPage() {
           player_name: s.player_name,
         };
       }
-      const botEntry = availablePlayers.find((p) => p.key === newPlayerKey);
+      if (newPlayerKey === "HUMAN") {
+        return {
+          color: s.color,
+          player_key: "HUMAN",
+          player_name: s.is_me ? playerName : "Aguardando Amigo...",
+        };
+      }
+      const keptName = isOfficialBotName(s.player_name) && !usedBotNames.has(s.player_name)
+        ? s.player_name
+        : pickBotNames(1, usedBotNames)[0];
       return {
         color: s.color,
         player_key: newPlayerKey,
-        player_name:
-          newPlayerKey === "HUMAN"
-            ? s.is_me
-              ? playerName
-              : "Aguardando Amigo..."
-            : `🤖 ${botEntry?.name || newPlayerKey}`,
+        player_name: keptName,
       };
     });
     const updated = await updateRoom(room.room_code, {
@@ -193,6 +216,12 @@ export default function RoomLobbyPage() {
   const handleAddSeat = async () => {
     if (!room || room.seats.length >= 4) return;
     const nextColor = SEAT_COLORS[room.seats.length];
+    const usedBotNames = new Set(
+      room.seats
+        .map((s) => s.player_name)
+        .filter((n) => isOfficialBotName(n))
+    );
+    const nextBotName = pickBotNames(1, usedBotNames)[0];
     const nextSeats = [
       ...room.seats.map((s) => ({
         color: s.color,
@@ -202,7 +231,7 @@ export default function RoomLobbyPage() {
       {
         color: nextColor,
         player_key: "CATANATRON",
-        player_name: "🤖 Mestre da Ilha (AlphaBeta)",
+        player_name: nextBotName,
       },
     ];
     const updated = await updateRoom(room.room_code, {
@@ -307,16 +336,14 @@ export default function RoomLobbyPage() {
                   ? `Atualizar Nome (${PLAYER_COLOR_META[room.my_color].label})`
                   : "🪑 Ocupar Vaga Humana"}
               </Button>
-              {account && (
-                <Button
-                  variant="outlined"
-                  size="small"
-                  className="identity-avatar-btn"
-                  onClick={() => setAvatarStudioOpen(true)}
-                >
-                  🎨 Editar Meu Avatar
-                </Button>
-              )}
+              <Button
+                variant="outlined"
+                size="small"
+                className="identity-avatar-btn"
+                onClick={() => setAvatarStudioOpen(true)}
+              >
+                🎨 Editar Meu Avatar
+              </Button>
             </div>
 
             {/* Seats List */}
@@ -324,7 +351,7 @@ export default function RoomLobbyPage() {
               <div className="lobby-seats-header">
                 <span>Assentos da Partida ({room.seats.length}/4)</span>
                 <small>
-                  Misture amigos humanos (via link) e bots de IA (AlphaBeta, MCTS, etc.)
+                  Misture amigos humanos (via link) e bots de estratégia na ilha
                 </small>
               </div>
 
@@ -333,6 +360,36 @@ export default function RoomLobbyPage() {
                   const palette = PLAYER_COLOR_META[seat.color];
                   const isOpenHuman =
                     seat.player_key === "HUMAN" && !seat.claimed;
+                  const displaySeatName = seat.is_bot
+                    ? isOfficialBotName(seat.player_name)
+                      ? seat.player_name
+                      : pickBotNameDeterministic(idx)
+                    : seat.player_name;
+                  const resolvedAvatar = !isOpenHuman
+                    ? resolveSeatAvatarProps({
+                        color: seat.color,
+                        isBot: seat.is_bot,
+                        seatIndex: idx,
+                        seatName: displaySeatName,
+                        seatAvatar: {
+                          seat_kind:
+                            seat.seat_kind ||
+                            (seat.is_bot
+                              ? "BOT"
+                              : seat.username
+                                ? "USER"
+                                : "GUEST"),
+                          username: seat.username ?? null,
+                          avatar_config: seat.avatar_config,
+                        },
+                        isMySeat: seat.is_me,
+                        accountAvatar: account?.avatar_config,
+                        accountUsername: account?.username,
+                        guestCustomAvatar: guestProfile.customized
+                          ? guestProfile.avatar_config
+                          : undefined,
+                      })
+                    : null;
 
                   return (
                     <div
@@ -343,40 +400,32 @@ export default function RoomLobbyPage() {
                       }}
                     >
                       <div className="lobby-seat-row__color">
-                        {seat.seat_kind === "USER" ? (
+                        {resolvedAvatar ? (
                           <PlayerAvatar
-                            config={seat.avatar_config}
-                            username={seat.username || seat.player_name}
+                            config={resolvedAvatar.config}
+                            username={resolvedAvatar.username}
                             size={42}
                           />
                         ) : (
                           <span
-                            className="lobby-seat-row__classic-wrap"
-                            style={{ borderColor: palette.primary }}
+                            className="lobby-seat-row__open-badge"
+                            style={{
+                              borderColor: palette.primary,
+                              background: palette.primary,
+                              color: palette.textOnFill,
+                            }}
                           >
-                            <HybridIllustration
-                              src={`/assets/illustrations/avatars/${seat.color.toLowerCase()}.webp`}
-                              alt={seat.player_name}
-                              fallback={
-                                <span
-                                  className="lobby-seat-row__dot"
-                                  style={{
-                                    background: palette.primary,
-                                    boxShadow: `0 0 8px ${palette.glow}`,
-                                  }}
-                                />
-                              }
-                            />
+                            ➕
                           </span>
                         )}
                         <div>
                           <strong>{palette.label}</strong>
                           <small>
                             {seat.is_me
-                              ? `★ Seu Assento (${seat.player_name})`
+                              ? `★ Seu Assento (${displaySeatName})`
                               : isOpenHuman
                                 ? "🔓 Vaga Aberta"
-                                : seat.player_name}
+                                : displaySeatName}
                           </small>
                         </div>
                       </div>
@@ -397,7 +446,7 @@ export default function RoomLobbyPage() {
                             .filter((p) => p.is_bot)
                             .map((bot) => (
                               <MenuItem key={bot.key} value={bot.key}>
-                                🤖 Bot: {bot.name}
+                                {bot.name}
                               </MenuItem>
                             ))}
                         </Select>
@@ -466,33 +515,51 @@ export default function RoomLobbyPage() {
         )}
       </div>
 
-      {account && (
-        <AvatarStudioModal
-          open={avatarStudioOpen}
-          onClose={() => setAvatarStudioOpen(false)}
-          account={account}
-          onSaved={async (updated) => {
-            setAccount(updated);
-            setPlayerName(updated.display_name);
-            localStorage.setItem("catan_player_name", updated.display_name);
-            if (room?.my_color && roomCode) {
-              try {
-                const res = await joinRoom(roomCode, {
-                  playerName: updated.display_name,
-                  preferredColor: room.my_color,
-                  token: getStoredToken(roomCode),
-                });
-                saveStoredToken(roomCode, res.seat_token);
-                setRoom(res.room);
-                return;
-              } catch {
-                // fallback to polling refresh
-              }
+      <AvatarStudioModal
+        open={avatarStudioOpen}
+        onClose={() => setAvatarStudioOpen(false)}
+        account={account}
+        guestProfile={guestProfile}
+        onSaved={async (updated) => {
+          setAccount(updated);
+          setPlayerName(updated.display_name);
+          localStorage.setItem("catan_player_name", updated.display_name);
+          if (room?.my_color && roomCode) {
+            try {
+              const res = await joinRoom(roomCode, {
+                playerName: updated.display_name,
+                preferredColor: room.my_color,
+                token: getStoredToken(roomCode),
+              });
+              saveStoredToken(roomCode, res.seat_token);
+              setRoom(res.room);
+              return;
+            } catch {
+              // fallback to polling refresh
             }
-            fetchRoomState();
-          }}
-        />
-      )}
+          }
+          fetchRoomState();
+        }}
+        onGuestSaved={async (saved) => {
+          setGuestProfile(saved);
+          setPlayerName(saved.display_name);
+          if (room?.my_color && roomCode) {
+            try {
+              const res = await joinRoom(roomCode, {
+                playerName: saved.display_name,
+                preferredColor: room.my_color,
+                token: getStoredToken(roomCode),
+              });
+              saveStoredToken(roomCode, res.seat_token);
+              setRoom(res.room);
+              return;
+            } catch {
+              // fallback to polling refresh
+            }
+          }
+          fetchRoomState();
+        }}
+      />
     </div>
   );
 }

@@ -149,9 +149,9 @@ test("loads a historical state without advancing bots in replay mode", async () 
   ).not.toBeInTheDocument();
 });
 
-test("renders custom SVG PlayerAvatar for registered USER seats while keeping classic portraits for bots", async () => {
+test("renders original SVG PlayerAvatar for all seats (USER and BOT) with official bot names", async () => {
   const mixedState = makeGameState({
-    seat_names: { RED: "Bot", BLUE: "João" },
+    seat_names: { RED: "Creitu", BLUE: "João" },
     seat_avatars: {
       RED: { seat_kind: "BOT", username: null, avatar_config: {} },
       BLUE: {
@@ -166,14 +166,24 @@ test("renders custom SVG PlayerAvatar for registered USER seats while keeping cl
   renderGameScreen();
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
-  const customAvatars = screen.getAllByTestId("player-avatar");
-  expect(customAvatars).toHaveLength(1);
-  expect(customAvatars[0]).toHaveAttribute("data-frame", "gold");
+  expect(screen.getByText("Creitu")).toBeInTheDocument();
+  expect(screen.getByText("João")).toBeInTheDocument();
+  const avatars = screen.getAllByTestId("player-avatar");
+  expect(avatars).toHaveLength(2);
+  expect(avatars[1]).toHaveAttribute("data-frame", "gold");
 });
 
-test("keeps classic portraits for GUEST seats instead of rendering PlayerAvatar", async () => {
+test("renders custom guest SVG PlayerAvatar on GUEST seat when configured", async () => {
+  localStorage.setItem(
+    "catan_guest_profile_v1",
+    JSON.stringify({
+      display_name: "Navegante",
+      customized: true,
+      avatar_config: { hat: "explorer", background: "sunset", frame: "wood" },
+    })
+  );
   const guestState = makeGameState({
-    seat_names: { RED: "Bot", BLUE: "Convidado" },
+    seat_names: { RED: "Felire", BLUE: "Navegante" },
     seat_avatars: {
       RED: { seat_kind: "BOT", username: null, avatar_config: {} },
       BLUE: { seat_kind: "GUEST", username: null, avatar_config: {} },
@@ -184,5 +194,8 @@ test("keeps classic portraits for GUEST seats instead of rendering PlayerAvatar"
   renderGameScreen();
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
-  expect(screen.queryByTestId("player-avatar")).not.toBeInTheDocument();
+  expect(screen.getByText("Felire")).toBeInTheDocument();
+  const avatars = screen.getAllByTestId("player-avatar");
+  expect(avatars).toHaveLength(2);
+  localStorage.clear();
 });

@@ -1,9 +1,18 @@
-import React from "react";
+import React, { useContext } from "react";
 import cn from "classnames";
 
 import "./PlayerTopBar.scss";
 import type { Color, GameState } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import {
+  getGuestProfile,
+  getSavedAccountAvatarSummary,
+} from "../config/avatarCatalog";
+import {
+  resolvePlayerDisplayName,
+  resolveSeatAvatarProps,
+} from "../config/botCatalog";
+import { store } from "../store";
 import { playerKey } from "../utils/stateUtils";
 import { HybridIllustration } from "./icons/GameIcons";
 import PlayerAvatar from "./PlayerAvatar";
@@ -163,13 +172,15 @@ function PlayerCard({
   gameState: GameState;
   color: Color;
 }) {
+  const { state } = useContext(store);
   const key = playerKey(gameState, color);
   const ps = gameState.player_state;
   const meta = PLAYER_COLOR_META[color];
   const isBot = gameState.bot_colors.includes(color);
   const isActive = gameState.current_color === color;
   const isWinner = gameState.winning_color === color;
-  const name = gameState.seat_names?.[color] || meta.label;
+  const name = resolvePlayerDisplayName(gameState, color, meta.label);
+  const seatIndex = Math.max(0, gameState.colors.indexOf(color));
 
   const vps = ps[`${key}_ACTUAL_VICTORY_POINTS`] ?? ps[`${key}_VICTORY_POINTS`] ?? 0;
   const resources = ps[`${key}_NUM_RESOURCES_IN_HAND`] ?? 0;
@@ -186,9 +197,33 @@ function PlayerCard({
   const builtCities = Math.max(0, 4 - citiesLeft);
   const builtRoads = Math.max(0, 15 - roadsLeft);
 
-  const avatarSrc = `/assets/illustrations/avatars/${color.toLowerCase()}.webp`;
   const seatAvatar = gameState.seat_avatars?.[color];
-  const isRegisteredUserSeat = seatAvatar?.seat_kind === "USER";
+  const savedAcct = getSavedAccountAvatarSummary();
+  const guestProfile = !savedAcct ? getGuestProfile() : null;
+  const humanColors = gameState.colors.filter(
+    (c) => !gameState.bot_colors.includes(c)
+  );
+  const isMySeat =
+    !isBot &&
+    (state.perspective !== null
+      ? state.perspective === color
+      : savedAcct
+        ? seatAvatar?.seat_kind === "USER" &&
+          seatAvatar.username === savedAcct.username
+        : humanColors.length === 1);
+  const resolvedAvatar = resolveSeatAvatarProps({
+    color,
+    isBot,
+    seatIndex,
+    seatName: name,
+    seatAvatar,
+    isMySeat,
+    accountAvatar: savedAcct?.avatar_config,
+    accountUsername: savedAcct?.username,
+    guestCustomAvatar: guestProfile?.customized
+      ? guestProfile.avatar_config
+      : undefined,
+  });
 
   return (
     <div
@@ -203,7 +238,7 @@ function PlayerCard({
           "--cu-glow": meta.glow,
         } as React.CSSProperties
       }
-      title={`${name} (${isBot ? "Bot" : "Humano"}) • Peças: ${builtSettlements}/5 Aldeias, ${builtCities}/4 Cidades, ${builtRoads}/15 Estradas`}
+      title={`${name} • Peças: ${builtSettlements}/5 Aldeias, ${builtCities}/4 Cidades, ${builtRoads}/15 Estradas`}
     >
       {/* LEFT HALF: Player Portrait & Name on Solid Color */}
       <div className="cu-player-card__portrait-col">
@@ -222,27 +257,15 @@ function PlayerCard({
         </div>
         <div
           className={cn("cu-player-card__avatar-wrap", {
-            "cu-player-card__avatar-wrap--custom": isRegisteredUserSeat,
+            "cu-player-card__avatar-wrap--custom": resolvedAvatar.isCustomUserOrGuest,
           })}
         >
-          {seatAvatar?.seat_kind === "USER" ? (
-            <PlayerAvatar
-              config={seatAvatar.avatar_config}
-              username={seatAvatar.username || name}
-              size={58}
-              className="cu-player-card__custom-avatar"
-            />
-          ) : (
-            <HybridIllustration
-              src={avatarSrc}
-              alt={name}
-              fallback={
-                <div className="cu-player-card__avatar-fallback">
-                  {isBot ? "🤖" : "🧑"}
-                </div>
-              }
-            />
-          )}
+          <PlayerAvatar
+            config={resolvedAvatar.config}
+            username={resolvedAvatar.username}
+            size={58}
+            className="cu-player-card__custom-avatar"
+          />
         </div>
       </div>
 

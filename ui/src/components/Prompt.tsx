@@ -3,6 +3,7 @@ import { isPlayersTurn } from "../utils/stateUtils";
 import { type GameState } from "../utils/api.types";
 import { store } from "../store";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { resolvePlayerDisplayName } from "../config/botCatalog";
 
 import "./Prompt.scss";
 
@@ -39,17 +40,21 @@ export default function Prompt({
   isBotThinking: boolean;
 }) {
   const { state } = useContext(store);
-  const activeName =
-    gameState.seat_names?.[gameState.current_color] ||
-    PLAYER_COLOR_META[gameState.current_color].label;
+  const activeName = resolvePlayerDisplayName(
+    gameState,
+    gameState.current_color,
+    PLAYER_COLOR_META[gameState.current_color].label
+  );
 
   let prompt = "";
   if (isBotThinking) {
-    prompt = `🤖 IA (${activeName}) pensando...`;
+    prompt = `🧭 ${activeName} pensando...`;
   } else if (gameState.winning_color) {
-    const winnerName =
-      gameState.seat_names?.[gameState.winning_color] ||
-      PLAYER_COLOR_META[gameState.winning_color].label;
+    const winnerName = resolvePlayerDisplayName(
+      gameState,
+      gameState.winning_color,
+      PLAYER_COLOR_META[gameState.winning_color].label
+    );
     prompt = `🏆 Fim de Jogo! Vitória de ${winnerName}!`;
   } else if (isPlayersTurn(gameState, state.perspective)) {
     prompt = humanizePrompt(gameState.current_prompt);

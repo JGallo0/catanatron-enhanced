@@ -13,6 +13,7 @@ vi.mock("../utils/apiClient", () => ({
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
 });
 
 const baseAccount: PlayerAccount = {
@@ -169,6 +170,46 @@ describe("AvatarStudioModal", () => {
 
     await user.click(screen.getByRole("tab", { name: /Molduras/i }));
     expect(screen.getByRole("button", { name: /Imperial da Ilha/i })).toBeEnabled();
+  }, 15000);
+
+  test("supports guest customization directly in localStorage without backend login", async () => {
+    const user = userEvent.setup();
+    const onGuestSaved = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <AvatarStudioModal
+        open={true}
+        onClose={onClose}
+        account={null}
+        onGuestSaved={onGuestSaved}
+      />
+    );
+
+    expect(
+      screen.getByText(/Visitante • Salvo neste navegador/i)
+    ).toBeInTheDocument();
+    const nameInput = screen.getByLabelText(/Apelido na Mesa/i);
+    await user.clear(nameInput);
+    await user.type(nameInput, "Viajante da Ilha");
+    await user.click(screen.getByRole("button", { name: /Guardiã da Floresta/i }));
+    await user.click(screen.getByRole("button", { name: /Salvar Avatar/i }));
+
+    expect(updateProfile).not.toHaveBeenCalled();
+    expect(onGuestSaved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        display_name: "Viajante da Ilha",
+        customized: true,
+        avatar_config: expect.objectContaining({
+          hat: "explorer",
+          outfit: "settler",
+          frame: "wood",
+        }),
+      })
+    );
+    expect(onClose).toHaveBeenCalledTimes(1);
+    const savedRaw = localStorage.getItem("catan_guest_profile_v1");
+    expect(savedRaw).toContain("Viajante da Ilha");
   }, 15000);
 });
 

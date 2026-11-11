@@ -16,7 +16,9 @@ import {
 import type { Color, RoomState } from "../utils/api.types";
 import {
   AVATAR_FRAME_OPTIONS,
+  getGuestProfile,
   resolveAvatarConfig,
+  type GuestProfile,
 } from "../config/avatarCatalog";
 import LeaderboardModal from "../components/LeaderboardModal";
 import PlayerAvatar from "../components/PlayerAvatar";
@@ -34,6 +36,9 @@ export default function HomePage() {
   const [account, setAccount] = useState<PlayerAccount | null>(() =>
     getSavedAccount()
   );
+  const [guestProfile, setGuestProfile] = useState<GuestProfile>(() =>
+    getGuestProfile()
+  );
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     google_enabled: false,
     google_client_id: null,
@@ -48,12 +53,11 @@ export default function HomePage() {
   const [authPromptBanner, setAuthPromptBanner] = useState<string | undefined>(
     undefined
   );
-  const [pendingAvatarStudioAfterAuth, setPendingAvatarStudioAfterAuth] =
-    useState(false);
 
   const [hostName, setHostName] = useState(
     () =>
       getSavedAccount()?.display_name ||
+      getGuestProfile().display_name ||
       localStorage.getItem("catan_player_name") ||
       "Anfitrião"
   );
@@ -97,27 +101,21 @@ export default function HomePage() {
 
   const handleLogout = async () => {
     setAvatarStudioOpen(false);
-    setPendingAvatarStudioAfterAuth(false);
     await logoutAccount();
     setAccount(null);
+    const gp = getGuestProfile();
+    setGuestProfile(gp);
+    setHostName(gp.display_name);
     refreshRooms();
   };
 
-  const handleOpenAuth = (banner?: string, openStudioAfter = false) => {
+  const handleOpenAuth = (banner?: string) => {
     setAuthPromptBanner(banner);
-    setPendingAvatarStudioAfterAuth(openStudioAfter);
     setAuthModalOpen(true);
   };
 
   const handleOpenAvatarStudio = () => {
-    if (account) {
-      setAvatarStudioOpen(true);
-      return;
-    }
-    handleOpenAuth(
-      "Entre ou crie uma conta para personalizar e salvar seu avatar na ilha.",
-      true
-    );
+    setAvatarStudioOpen(true);
   };
 
   const resolvedFrame = account
@@ -154,12 +152,27 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="home-identity-pill home-identity-pill--guest">
-              <div className="home-identity-pill__guest-icon" aria-hidden="true">
-                🧭
-              </div>
+              <button
+                type="button"
+                className="home-identity-pill__avatar-btn"
+                onClick={handleOpenAvatarStudio}
+                title="Personalizar avatar de visitante"
+              >
+                <PlayerAvatar
+                  config={
+                    guestProfile.customized ? guestProfile.avatar_config : undefined
+                  }
+                  username={guestProfile.display_name}
+                  size={56}
+                />
+              </button>
               <div className="home-identity-pill__meta">
-                <strong>Explorador da Ilha</strong>
-                <small>Modo visitante</small>
+                <strong>{guestProfile.display_name}</strong>
+                <small>
+                  {guestProfile.customized
+                    ? "Avatar personalizado (visitante)"
+                    : "Modo visitante"}
+                </small>
                 <button
                   type="button"
                   className="home-identity-pill__inline-link"
@@ -286,20 +299,13 @@ export default function HomePage() {
 
       <AuthModal
         open={authModalOpen}
-        onClose={() => {
-          setAuthModalOpen(false);
-          setPendingAvatarStudioAfterAuth(false);
-        }}
+        onClose={() => setAuthModalOpen(false)}
         authConfig={authConfig}
         promptBanner={authPromptBanner}
         onAuthenticated={(logged) => {
           setAccount(logged);
           setHostName(logged.display_name);
           refreshRooms();
-          if (pendingAvatarStudioAfterAuth) {
-            setPendingAvatarStudioAfterAuth(false);
-            setAvatarStudioOpen(true);
-          }
         }}
       />
 
@@ -345,27 +351,30 @@ export default function HomePage() {
         currentUsername={account?.username}
       />
 
-      {account && (
-        <AvatarStudioModal
-          open={avatarStudioOpen}
-          onClose={() => setAvatarStudioOpen(false)}
-          account={account}
-          onSaved={(updated) => {
-            setAccount((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    ...updated,
-                    leaderboard_rank:
-                      updated.leaderboard_rank ?? prev.leaderboard_rank ?? null,
-                  }
-                : updated
-            );
-            setHostName(updated.display_name);
-            refreshRooms();
-          }}
-        />
-      )}
+      <AvatarStudioModal
+        open={avatarStudioOpen}
+        onClose={() => setAvatarStudioOpen(false)}
+        account={account}
+        guestProfile={guestProfile}
+        onSaved={(updated) => {
+          setAccount((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ...updated,
+                  leaderboard_rank:
+                    updated.leaderboard_rank ?? prev.leaderboard_rank ?? null,
+                }
+              : updated
+          );
+          setHostName(updated.display_name);
+          refreshRooms();
+        }}
+        onGuestSaved={(saved) => {
+          setGuestProfile(saved);
+          setHostName(saved.display_name);
+        }}
+      />
     </div>
   );
 }

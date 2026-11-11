@@ -124,6 +124,60 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  width: 100%;
+
+  .google-signin-slot {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    min-height: 44px;
+  }
+}
+
+.home-auth-google-unavailable,
+.home-auth-google-error {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  line-height: 1.4;
+
+  code {
+    color: #fde047;
+    font-size: 0.74rem;
+  }
+}
+
+.home-auth-google-unavailable__badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.home-auth-google-unavailable__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  strong {
+    color: #f8fafc;
+    font-size: 0.82rem;
+  }
+
+  span {
+    color: #94a3b8;
+  }
 }
 
 .home-auth-divider {

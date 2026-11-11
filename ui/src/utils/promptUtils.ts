@@ -11,6 +11,7 @@ import type {
    GameState,
 } from "./api.types";
 import { PLAYER_COLOR_META, RESOURCE_META } from "../config/assetRegistry";
+import { resolvePlayerDisplayName } from "../config/botCatalog";
 
 function resPt(resource?: ResourceCard | null): string {
   if (!resource) return "";
@@ -30,13 +31,10 @@ export function humanizeActionRecordPt(
   gameState: GameState,
   actionRecord: GameActionRecord
 ): string {
-  const botColors = gameState.bot_colors || [];
   const action = actionRecord[0];
   const color = action[0];
   const colorLabel = PLAYER_COLOR_META[color]?.label || color;
-  const customName = gameState.seat_names?.[color];
-  const player =
-    customName || (botColors.includes(color) ? `IA (${colorLabel})` : colorLabel);
+  const player = resolvePlayerDisplayName(gameState, color, colorLabel);
 
   switch (action[1]) {
     case "ROLL": {

@@ -46,7 +46,7 @@ function ReplayScreen() {
 
   if (!state.gameState) {
     return (
-      <main>
+      <main className="catan-replay-screen">
         <GridLoader
           className="loader"
           color="#000000"
@@ -57,7 +57,7 @@ function ReplayScreen() {
   }
 
   return (
-    <main>
+    <main className="catan-replay-screen">
       <h1 className="logo">Rule the Isle</h1>
       <ZoomableBoard replayMode={true} />
       <LeftDrawer />

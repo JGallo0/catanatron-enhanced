@@ -26,6 +26,7 @@ import { dispatchSnackbar } from "../components/Snackbar";
 import { getHumanColor } from "../utils/stateUtils";
 import AnalysisBox from "../components/AnalysisBox";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { resolvePlayerDisplayName } from "../config/botCatalog";
 import type { Color, GameState } from "../utils/api.types";
 import { getSavedGameSeat } from "./RoomLobbyPage";
 import {
@@ -43,16 +44,20 @@ function describePromptBanner(
   isBotThinking: boolean
 ): string {
   if (gameState.winning_color) {
-    const winName =
-      gameState.seat_names?.[gameState.winning_color] ||
-      PLAYER_COLOR_META[gameState.winning_color].label;
+    const winName = resolvePlayerDisplayName(
+      gameState,
+      gameState.winning_color,
+      PLAYER_COLOR_META[gameState.winning_color].label
+    );
     return `🏆 Vitória de ${winName}!`;
   }
-  const activeLabel =
-    gameState.seat_names?.[gameState.current_color] ||
-    PLAYER_COLOR_META[gameState.current_color].label;
+  const activeLabel = resolvePlayerDisplayName(
+    gameState,
+    gameState.current_color,
+    PLAYER_COLOR_META[gameState.current_color].label
+  );
   if (isBotThinking) {
-    return `🤖 IA (${activeLabel}) está calculando a melhor jogada...`;
+    return `🧭 ${activeLabel} está calculando a melhor jogada...`;
   }
   switch (gameState.current_prompt) {
     case "BUILD_INITIAL_SETTLEMENT":
@@ -211,7 +216,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
   if (!state.gameState) {
     return (
-      <main>
+      <main className="catan-game-screen">
         <GridLoader className="loader" color="#FACC15" size={80} />
       </main>
     );

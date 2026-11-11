@@ -66,7 +66,7 @@
   }
 
   &.WHITE &__portrait-col {
-    background: #1b6535; // Fundo verde floresta idêntico ao Catan Universe para Mia
+    background: linear-gradient(180deg, #475569 0%, #334155 100%);
   }
 
   &__name-bar {
@@ -115,11 +115,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-
-    &--custom {
-      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.35), rgba(2, 6, 23, 0.65));
-      padding: 4px;
-    }
+    background: radial-gradient(circle at center, rgba(15, 23, 42, 0.35), rgba(2, 6, 23, 0.72));
+    padding: 3px;
 
     img {
       width: 100%;

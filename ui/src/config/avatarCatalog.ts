@@ -178,8 +178,8 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
       skin: "warm",
       eyes: "sharp",
       hair: "short",
-      hairColor: "brown",
-      beard: "full",
+      hairColor: "navy",
+      beard: "goatee",
       hat: "captain",
       outfit: "captain",
       outfitColor: "royal",
@@ -188,8 +188,8 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
   },
   {
-    id: "north_explorer",
-    label: "Exploradora do Norte",
+    id: "isle_botanist",
+    label: "Guardiã da Floresta",
     config: {
       skin: "fair",
       eyes: "cheerful",
@@ -204,14 +204,14 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
   },
   {
-    id: "hill_knight",
-    label: "Cavaleiro da Colina",
+    id: "forge_sentinel",
+    label: "Sentinela da Serra",
     config: {
       skin: "tan",
       eyes: "sharp",
       hair: "short",
-      hairColor: "black",
-      beard: "goatee",
+      hairColor: "silver",
+      beard: "full",
       hat: "helm",
       outfit: "armor",
       outfitColor: "slate",
@@ -220,13 +220,13 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
   },
   {
-    id: "wheat_merchant",
-    label: "Mercador de Trigo",
+    id: "amber_broker",
+    label: "Mercador do Porto",
     config: {
       skin: "warm",
-      eyes: "cheerful",
+      eyes: "wise",
       hair: "wavy",
-      hairColor: "blonde",
+      hairColor: "brown",
       beard: "mustache",
       hat: "none",
       outfit: "merchant",
@@ -236,15 +236,15 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
   },
   {
-    id: "mountain_artificer",
-    label: "Artífice das Montanhas",
+    id: "crimson_mason",
+    label: "Mestre Construtora",
     config: {
       skin: "brown",
-      eyes: "wise",
-      hair: "short",
-      hairColor: "silver",
-      beard: "goatee",
-      hat: "none",
+      eyes: "calm",
+      hair: "long",
+      hairColor: "black",
+      beard: "none",
+      hat: "bandana",
       outfit: "settler",
       outfitColor: "crimson",
       background: "crimson",
@@ -252,16 +252,16 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
   },
   {
-    id: "sun_navigator",
-    label: "Navegadora do Sol",
+    id: "sunset_cartographer",
+    label: "Cartógrafo do Poente",
     config: {
       skin: "deep",
-      eyes: "calm",
-      hair: "bun",
-      hairColor: "black",
-      beard: "none",
-      hat: "bandana",
-      outfit: "settler",
+      eyes: "cheerful",
+      hair: "curly",
+      hairColor: "blonde",
+      beard: "goatee",
+      hat: "none",
+      outfit: "merchant",
       outfitColor: "royal",
       background: "sunset",
       frame: "wood",
@@ -357,4 +357,115 @@ export function randomizeUnlockedAvatar(wins = 0): AvatarConfig {
     background: unlockedPick("background", AVATAR_BACKGROUND_OPTIONS),
     frame: unlockedPick("frame", AVATAR_FRAME_OPTIONS),
   };
+}
+
+export const GUEST_PROFILE_STORAGE_KEY = "catan_guest_profile_v1";
+export const DEFAULT_GUEST_DISPLAY_NAME = "Explorador da Ilha";
+
+export type GuestProfile = {
+  display_name: string;
+  avatar_config: Partial<AvatarConfig>;
+  customized: boolean;
+};
+
+export function filterUnlockedAvatarConfig(
+  raw?: Partial<AvatarConfig> | Record<string, unknown> | null,
+  wins = 0
+): Partial<AvatarConfig> {
+  const clean = sanitizeAvatarConfig(raw);
+  const unlocked: Partial<AvatarConfig> = {};
+  for (const field of Object.keys(clean) as Array<keyof AvatarConfig>) {
+    const val = clean[field];
+    if (val && isAvatarItemUnlocked(field, val, wins)) {
+      (unlocked as Record<string, string>)[field] = val;
+    }
+  }
+  return unlocked;
+}
+
+export function getGuestProfile(): GuestProfile {
+  try {
+    const raw = localStorage.getItem(GUEST_PROFILE_STORAGE_KEY);
+    const fallbackName =
+      localStorage.getItem("catan_player_name")?.trim() ||
+      DEFAULT_GUEST_DISPLAY_NAME;
+    if (!raw) {
+      return {
+        display_name: fallbackName,
+        avatar_config: {},
+        customized: false,
+      };
+    }
+    const parsed = JSON.parse(raw) as Partial<GuestProfile>;
+    const cleanAvatar = filterUnlockedAvatarConfig(parsed?.avatar_config, 0);
+    const cleanName =
+      (parsed?.display_name || fallbackName).trim().slice(0, 32) ||
+      DEFAULT_GUEST_DISPLAY_NAME;
+    return {
+      display_name: cleanName,
+      avatar_config: cleanAvatar,
+      customized: Boolean(parsed?.customized && Object.keys(cleanAvatar).length > 0),
+    };
+  } catch {
+    return {
+      display_name: DEFAULT_GUEST_DISPLAY_NAME,
+      avatar_config: {},
+      customized: false,
+    };
+  }
+}
+
+export function saveGuestProfile(options: {
+  displayName?: string;
+  avatarConfig: Partial<AvatarConfig>;
+}): GuestProfile {
+  const cleanName =
+    (options.displayName || DEFAULT_GUEST_DISPLAY_NAME).trim().slice(0, 32) ||
+    DEFAULT_GUEST_DISPLAY_NAME;
+  const fullUnlocked = resolveAvatarConfig(
+    filterUnlockedAvatarConfig(options.avatarConfig, 0),
+    cleanName
+  );
+  const cleanAvatar = filterUnlockedAvatarConfig(fullUnlocked, 0);
+  const profile: GuestProfile = {
+    display_name: cleanName,
+    avatar_config: cleanAvatar,
+    customized: true,
+  };
+  try {
+    localStorage.setItem(GUEST_PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    localStorage.setItem("catan_player_name", cleanName);
+  } catch {
+    // ignore storage limits
+  }
+  return profile;
+}
+
+export function getCustomGuestAvatarPayload(): Partial<AvatarConfig> | undefined {
+  const guest = getGuestProfile();
+  if (!guest.customized || Object.keys(guest.avatar_config).length === 0) {
+    return undefined;
+  }
+  return guest.avatar_config;
+}
+
+export function getSavedAccountAvatarSummary(): {
+  username: string;
+  avatar_config?: Partial<AvatarConfig>;
+} | null {
+  try {
+    const raw = localStorage.getItem("catan_player_account");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      username?: string;
+      avatar_config?: Partial<AvatarConfig>;
+    };
+    if (!parsed?.username) return null;
+    return {
+      username: parsed.username,
+      avatar_config: parsed.avatar_config,
+    };
+  } catch {
+    return null;
+  }
 }

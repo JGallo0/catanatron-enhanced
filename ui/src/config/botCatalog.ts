@@ -1,0 +1,250 @@
+import type { AvatarConfig, Color, GameState, SeatAvatarMeta } from "../utils/api.types";
+import { sanitizeAvatarConfig } from "./avatarCatalog";
+
+export const OFFICIAL_BOT_NAMES = [
+  "Creitu",
+  "Felire",
+  "Guiri",
+  "Jaó",
+  "Angeleri",
+] as const;
+
+export type OfficialBotName = (typeof OFFICIAL_BOT_NAMES)[number];
+
+export const BOT_AVATAR_PROFILES: Record<OfficialBotName, AvatarConfig> = {
+  Creitu: {
+    skin: "warm",
+    eyes: "sharp",
+    hair: "short",
+    hairColor: "navy",
+    beard: "goatee",
+    hat: "captain",
+    outfit: "captain",
+    outfitColor: "royal",
+    background: "ocean",
+    frame: "bronze",
+  },
+  Felire: {
+    skin: "fair",
+    eyes: "cheerful",
+    hair: "wavy",
+    hairColor: "red",
+    beard: "none",
+    hat: "explorer",
+    outfit: "settler",
+    outfitColor: "emerald",
+    background: "forest",
+    frame: "bronze",
+  },
+  Guiri: {
+    skin: "tan",
+    eyes: "wise",
+    hair: "curly",
+    hairColor: "brown",
+    beard: "mustache",
+    hat: "bandana",
+    outfit: "merchant",
+    outfitColor: "amber",
+    background: "sunset",
+    frame: "bronze",
+  },
+  Jaó: {
+    skin: "brown",
+    eyes: "sharp",
+    hair: "short",
+    hairColor: "silver",
+    beard: "full",
+    hat: "helm",
+    outfit: "armor",
+    outfitColor: "slate",
+    background: "mountain",
+    frame: "silver",
+  },
+  Angeleri: {
+    skin: "porcelain",
+    eyes: "calm",
+    hair: "braids",
+    hairColor: "blonde",
+    beard: "none",
+    hat: "none",
+    outfit: "merchant",
+    outfitColor: "crimson",
+    background: "gold",
+    frame: "silver",
+  },
+};
+
+export function isOfficialBotName(name?: string | null): name is OfficialBotName {
+  if (!name) return false;
+  return (OFFICIAL_BOT_NAMES as readonly string[]).includes(name);
+}
+
+export function pickBotNames(
+  count: number,
+  exclude?: Iterable<string | null | undefined>
+): OfficialBotName[] {
+  const used = new Set<string>();
+  if (exclude) {
+    for (const item of exclude) {
+      if (typeof item === "string" && item) used.add(item);
+    }
+  }
+  const shufflePool = (items: OfficialBotName[]) => {
+    const arr = [...items];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+
+  let available = shufflePool(
+    OFFICIAL_BOT_NAMES.filter((name) => !used.has(name))
+  );
+  const chosen: OfficialBotName[] = [];
+  while (chosen.length < count) {
+    if (available.length === 0) {
+      available = shufflePool([...OFFICIAL_BOT_NAMES]);
+    }
+    const pick = available.shift()!;
+    chosen.push(pick);
+    used.add(pick);
+  }
+  return chosen;
+}
+
+export function pickBotNameDeterministic(
+  seatIndex: number,
+  exclude?: Iterable<string | null | undefined>
+): OfficialBotName {
+  const used = new Set<string>();
+  if (exclude) {
+    for (const item of exclude) {
+      if (typeof item === "string" && item) used.add(item);
+    }
+  }
+  const len = OFFICIAL_BOT_NAMES.length;
+  for (let offset = 0; offset < len; offset++) {
+    const candidate = OFFICIAL_BOT_NAMES[(Math.max(0, seatIndex) + offset) % len];
+    if (!used.has(candidate)) {
+      return candidate;
+    }
+  }
+  return OFFICIAL_BOT_NAMES[Math.max(0, seatIndex) % len];
+}
+
+const LEGACY_COLOR_NAME_RE =
+  /^(bot|ia\s*\(.*\)|mestre da ilha.*|vermelho|azul|laranja|branco|red|blue|orange|white|bot\s+(vermelho|azul|laranja|branco))$/i;
+
+export function resolveBotDisplayName(
+  gameState: Pick<GameState, "colors" | "bot_colors" | "seat_names">,
+  color: Color
+): OfficialBotName {
+  const raw = gameState.seat_names?.[color]?.trim();
+  if (isOfficialBotName(raw)) {
+    return raw;
+  }
+  const colors = gameState.colors || [];
+  const botColors = gameState.bot_colors || [];
+  const used = new Set<string>();
+  for (const c of botColors) {
+    if (c === color) break;
+    const prevRaw = gameState.seat_names?.[c]?.trim();
+    if (isOfficialBotName(prevRaw)) {
+      used.add(prevRaw);
+    } else {
+      const idx = Math.max(0, colors.indexOf(c));
+      used.add(pickBotNameDeterministic(idx, used));
+    }
+  }
+  const seatIdx = Math.max(0, colors.indexOf(color));
+  return pickBotNameDeterministic(seatIdx, used);
+}
+
+export function resolvePlayerDisplayName(
+  gameState: Pick<GameState, "colors" | "bot_colors" | "seat_names">,
+  color: Color,
+  fallbackColorLabel: string
+): string {
+  const isBot = (gameState.bot_colors || []).includes(color);
+  if (isBot) {
+    return resolveBotDisplayName(gameState, color);
+  }
+  const raw = gameState.seat_names?.[color]?.trim();
+  if (raw && !LEGACY_COLOR_NAME_RE.test(raw)) {
+    return raw;
+  }
+  return raw || fallbackColorLabel;
+}
+
+export function resolveSeatAvatarProps(options: {
+  color: Color;
+  isBot: boolean;
+  seatIndex: number;
+  seatName: string;
+  seatAvatar?: SeatAvatarMeta | null;
+  isMySeat?: boolean;
+  accountAvatar?: Partial<AvatarConfig> | null;
+  accountUsername?: string | null;
+  guestCustomAvatar?: Partial<AvatarConfig> | null;
+}): {
+  config?: Partial<AvatarConfig>;
+  username: string;
+  isCustomUserOrGuest: boolean;
+} {
+  const {
+    color,
+    isBot,
+    seatIndex,
+    seatName,
+    seatAvatar,
+    isMySeat = false,
+    accountAvatar,
+    accountUsername,
+    guestCustomAvatar,
+  } = options;
+
+  if (isBot || seatAvatar?.seat_kind === "BOT") {
+    const botName = isOfficialBotName(seatName)
+      ? seatName
+      : pickBotNameDeterministic(seatIndex);
+    const metaCfg = sanitizeAvatarConfig(seatAvatar?.avatar_config);
+    return {
+      config:
+        Object.keys(metaCfg).length > 0
+          ? metaCfg
+          : BOT_AVATAR_PROFILES[botName],
+      username: botName,
+      isCustomUserOrGuest: false,
+    };
+  }
+
+  if (seatAvatar?.seat_kind === "USER") {
+    const metaCfg = sanitizeAvatarConfig(seatAvatar.avatar_config);
+    const localAccountCfg = isMySeat ? sanitizeAvatarConfig(accountAvatar) : {};
+    const merged = { ...metaCfg, ...localAccountCfg };
+    return {
+      config: Object.keys(merged).length > 0 ? merged : undefined,
+      username: seatAvatar.username || accountUsername || seatName || color,
+      isCustomUserOrGuest: true,
+    };
+  }
+
+  const metaGuestCfg = sanitizeAvatarConfig(seatAvatar?.avatar_config);
+  const localGuestCfg =
+    isMySeat && !accountUsername ? sanitizeAvatarConfig(guestCustomAvatar) : {};
+  const mergedGuestCfg = { ...metaGuestCfg, ...localGuestCfg };
+  if (Object.keys(mergedGuestCfg).length > 0) {
+    return {
+      config: mergedGuestCfg,
+      username: seatName || color,
+      isCustomUserOrGuest: true,
+    };
+  }
+
+  return {
+    config: undefined,
+    username: seatName || color,
+    isCustomUserOrGuest: false,
+  };
+}
