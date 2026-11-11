@@ -218,7 +218,7 @@ export default function HomePage() {
   return (
     <div className="home-page">
       <div className="home-page__inner">
-        <h1 className="logo">Catanatron</h1>
+        <h1 className="logo">Rule the Isle</h1>
         {!loading ? (
           <div className="setup-card">
             <p className="setup-note">
@@ -560,6 +560,17 @@ export default function HomePage() {
         ) : (
           <GridLoader className="loader" color="#FACC15" size={60} />
         )}
+        <footer className="home-page__legal-footer">
+          <strong>Rule the Isle</strong> • Versão modificada em português baseada no motor{" "}
+          <a
+            href="https://github.com/bcollazo/catanatron"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Catanatron
+          </a>{" "}
+          (Bryan Collazo) • Licença GNU GPL-3.0
+        </footer>
         <div className="page-end-spacer" aria-hidden="true" />
       </div>
     </div>

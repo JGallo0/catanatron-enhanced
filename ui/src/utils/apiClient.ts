@@ -121,8 +121,8 @@ const PLAYER_PT_NAMES: Record<string, { name: string; description: string }> = {
     description: "Jogador controlado por pessoa na mesa ou via link.",
   },
   CATANATRON: {
-    name: "IA: Catanatron (AlphaBeta Forte)",
-    description: "Bot mais forte do Catanatron com busca Alpha-Beta.",
+    name: "IA: Mestre da Ilha (AlphaBeta Forte)",
+    description: "Bot estratégico mais forte do motor de jogo com busca Alpha-Beta.",
   },
   AB: {
     name: "IA: AlphaBeta Configurável",

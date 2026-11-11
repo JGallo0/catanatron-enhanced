@@ -135,3 +135,13 @@
     }
   }
 }
+
+.left-drawer__footer {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  font-size: 0.67rem;
+  color: rgba(148, 163, 184, 0.72);
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(2, 6, 23, 0.5);
+}

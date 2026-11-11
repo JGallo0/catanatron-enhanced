@@ -123,6 +123,10 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
             );
           })}
       </div>
+
+      <div className="left-drawer__footer">
+        Rule the Isle • Baseado em Catanatron (GPL-3.0)
+      </div>
     </div>
   );
 }

@@ -539,6 +539,29 @@
   margin: 40px auto 0;
 }
 
+.home-page__legal-footer {
+  margin-top: 16px;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: rgba(148, 163, 184, 0.78);
+
+  strong {
+    color: rgba(254, 240, 138, 0.88);
+    font-weight: 700;
+  }
+
+  a {
+    color: rgba(147, 197, 253, 0.88);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
 .home-page .page-end-spacer {
   height: max(32px, calc(env(safe-area-inset-bottom) + 24px));
 }

@@ -1,6 +1,6 @@
-# 🏝️ Catanatron Enhanced — Contexto Cross-Máquina do Projeto
+# 👑 Rule the Isle — Contexto Cross-Máquina do Projeto
 
-Este documento consolida **todo o histórico, arquitetura, decisões de design e guia de ilustrações** do projeto **Catanatron Enhanced** (`https://github.com/JGallo0/catanatron-enhanced`), permitindo continuar o desenvolvimento de qualquer computador (ex.: PC de casa) com contexto 100% preservado.
+Este documento consolida **todo o histórico, arquitetura, decisões de design e guia de ilustrações** do projeto **Rule the Isle** (originalmente iniciado como *Catanatron Enhanced*, `https://github.com/JGallo0/catanatron-enhanced`), permitindo continuar o desenvolvimento de qualquer computador (ex.: PC de casa) com contexto 100% preservado.
 
 ---
 
@@ -149,10 +149,13 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
   - Console horizontal em 3 zonas estilo Steam: construção direta 1-clique (`Estrada`, `Aldeia`, `Cidade`, `Carta Dev`) com estoque restante e destaque de modo ativo + `Trocar`, `Usar Carta` e `Custos`; baralho central com ilustrações nítidas em `.webp` sem película escura + contador `Mão X/7`; e dados 2D6 + **botão circular dourado** (`ROLAR DADOS` / `PASSAR VEZ` / `DESCARTAR` / `ROUBAR`).
 - **Efeitos Sonoros Táteis (`soundEffects.ts`):**
   - Síntese Web Audio API leve (dados, construções, compra de carta/troca, ladrão, fim de turno e vitória) com botão `🔊/🔇` persistente no topo.
+- **Rebrand Oficial para "Rule the Isle" + Avisos GPL-3.0:**
+  - Marca atualizada nas telas e metadados (`index.html`, `manifest.json`, `HomePage.tsx`, `GameScreen.tsx`, `ReplayScreen.tsx`, `RoomLobbyPage.tsx` e `apiClient.ts`), preservando chaves internas (`CATANATRON`, pacotes Python e chaves de `localStorage`) e exibindo créditos ao motor Catanatron (Bryan Collazo) sob licença **GNU GPL-3.0**.
 - **Correção de bots travando no meio do jogo & Typecheck:**
   - Histórico completo de estados desacoplado de gravações síncronas pesadas no `localStorage`, evitando erro de estouro de cota e congelamento de IA, e `npx tsc --noEmit` 100% limpo.
 
 ### Próximos Passos:
-1. **Persistência Multiplayer Online Completa (Banco Externo na Vercel):** Conectar uma instância gratuita do **Neon Postgres** ou **Supabase** na variável `DATABASE_URL` do painel da Vercel para que salas compartilhadas entre diferentes computadores persistam no banco SQL em nuvem.
-2. **Negociação Entre Jogadores no Lobby Online:** UI para enviar/aceitar propostas de troca direta entre amigos humanos conectados na mesma sala.
-3. **Polimento Final Mobile/Tablet:** Revisar responsividade em telas estreitas após validar a doca horizontal no desktop.
+1. **Substituir os 4 Avatares Antes de Lançamento Público/Comercial:** Gerar retratos 100% originais via Nano Banana Pro em `ui/public/assets/illustrations/avatars/{red,orange,white,blue}.webp` no estilo **Rule the Isle** (sem personagens proprietários do *Catan Universe*).
+2. **Persistência Multiplayer Online Completa (Banco Externo na Vercel):** Conectar uma instância gratuita do **Neon Postgres** ou **Supabase** na variável `DATABASE_URL` do painel da Vercel para que salas compartilhadas entre diferentes computadores persistam no banco SQL em nuvem.
+3. **Negociação Entre Jogadores no Lobby Online:** UI para enviar/aceitar propostas de troca direta entre amigos humanos conectados na mesma sala.
+4. **Polimento Final Mobile/Tablet:** Revisar responsividade em telas estreitas após validar a doca horizontal no desktop.

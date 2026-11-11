@@ -1,4 +1,10 @@
-# Catanatron
+# 👑 Rule the Isle
+
+> Versão modificada com identidade própria, interface tabletop moderna em Português Brasileiro (`pt-BR`) e motor fallback no navegador, baseada no projeto open-source [bcollazo/catanatron](https://github.com/bcollazo/catanatron) sob licença **GNU GPL-3.0**.
+
+---
+
+## Upstream Engine: Catanatron
 
 [![Coverage Status](https://coveralls.io/repos/github/bcollazo/catanatron/badge.svg?branch=main)](https://coveralls.io/github/bcollazo/catanatron?branch=main)
 [![Documentation Status](https://readthedocs.org/projects/catanatron/badge/?version=latest)](https://catanatron.readthedocs.io/en/latest/?badge=latest)

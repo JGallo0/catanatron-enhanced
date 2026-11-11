@@ -180,7 +180,7 @@ export default function RoomLobbyPage() {
       {
         color: nextColor,
         player_key: "CATANATRON",
-        player_name: "🤖 Catanatron (AlphaBeta)",
+        player_name: "🤖 Mestre da Ilha (AlphaBeta)",
       },
     ];
     const updated = await updateRoom(room.room_code, {
@@ -292,7 +292,7 @@ export default function RoomLobbyPage() {
               <div className="lobby-seats-header">
                 <span>Assentos da Partida ({room.seats.length}/4)</span>
                 <small>
-                  Misture amigos humanos (via link) e bots de IA (Catanatron AlphaBeta, MCTS, etc.)
+                  Misture amigos humanos (via link) e bots de IA (AlphaBeta, MCTS, etc.)
                 </small>
               </div>
 

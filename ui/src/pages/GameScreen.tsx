@@ -233,7 +233,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           <Link to="/" className="game-top-hud__home-btn" title="Voltar ao Lobby">
             ← Lobby
           </Link>
-          <h1 className="logo">Catanatron</h1>
+          <h1 className="logo">Rule the Isle</h1>
           {state.gameState.room_code && (
             <Link
               to={`/rooms/${state.gameState.room_code}`}
