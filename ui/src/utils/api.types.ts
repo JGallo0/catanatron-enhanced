@@ -188,3 +188,47 @@ const DIRECTIONS = [
 ] as const;
 
 export type Direction = (typeof DIRECTIONS)[number];
+
+export type AccountStats = {
+  wins: number;
+  losses: number;
+  games_played: number;
+  win_rate: number;
+};
+
+export type LeaderboardEntry = {
+  rank: number;
+  username: string;
+  display_name: string;
+  avatar_config?: Record<string, unknown>;
+  wins: number;
+  losses: number;
+  games_played: number;
+  win_rate: number;
+};
+
+export type MatchParticipant = {
+  color: Color;
+  seat_kind: "USER" | "GUEST" | "BOT";
+  username: string | null;
+  player_key: string;
+  display_name: string;
+  victory_points: number;
+  is_winner: boolean;
+};
+
+export type MatchRecord = {
+  game_id: string;
+  room_code?: string | null;
+  mode: "SOLO" | "MULTIPLAYER";
+  map_template: string;
+  vps_to_win: number;
+  num_turns: number;
+  winning_color: Color;
+  winner_name: string;
+  winner_username: string | null;
+  winner_is_bot: boolean;
+  finished_at: number;
+  participants: MatchParticipant[];
+};
+

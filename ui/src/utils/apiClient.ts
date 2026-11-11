@@ -1,17 +1,30 @@
 import axios from "axios";
 
 import { API_URL } from "../configuration";
-import type { Color, GameAction, GameState, RoomState } from "./api.types";
+import type {
+  AccountStats,
+  Color,
+  GameAction,
+  GameState,
+  LeaderboardEntry,
+  MatchRecord,
+  RoomState,
+} from "./api.types";
 import {
   localCreateGame,
   localCreateRoom,
+  localGetLeaderboard,
+  localGetMatchHistory,
   localGetMctsAnalysis,
   localGetRoom,
   localGetState,
   localJoinRoom,
   localListActiveRooms,
   localLoginOrRegister,
+  localLoginUser,
   localPostAction,
+  localRecordCompletedMatch,
+  localRegisterUser,
   localStartRoomGame,
   localUpdateRoom,
 } from "./localEngine";
@@ -40,7 +53,15 @@ export type PlayerAccount = {
   username: string;
   display_name: string;
   auth_token: string;
+  has_google?: boolean;
+  avatar_config?: Record<string, unknown>;
+  stats?: AccountStats;
   is_new?: boolean;
+};
+
+export type AuthConfig = {
+  google_enabled: boolean;
+  google_client_id: string | null;
 };
 
 export type MapTemplate = "BASE" | "MINI" | "TOURNAMENT";
@@ -81,6 +102,183 @@ export function clearSavedAccount() {
   } catch {
     // ignore storage errors
   }
+}
+
+export function authHeaders(token?: string | null): Record<string, string> {
+  const resolved = token ?? getSavedAccount()?.auth_token;
+  return resolved ? { Authorization: `Bearer ${resolved}` } : {};
+}
+
+export async function getAuthConfig(): Promise<AuthConfig> {
+  try {
+    const response = await axios.get<AuthConfig>(`${API_URL}/api/auth/config`);
+    if (response.data && typeof response.data.google_enabled === "boolean") {
+      return response.data;
+    }
+  } catch {
+    // Offline fallback: Google OAuth disabled
+  }
+  return { google_enabled: false, google_client_id: null };
+}
+
+export async function registerAccount(options: {
+  username: string;
+  password: string;
+  displayName?: string;
+}): Promise<PlayerAccount> {
+  try {
+    const response = await axios.post<PlayerAccount>(
+      `${API_URL}/api/auth/register`,
+      {
+        username: options.username,
+        password: options.password,
+        display_name: options.displayName,
+      }
+    );
+    if (response.data?.username) {
+      saveAccount(response.data);
+      return response.data;
+    }
+  } catch (err: any) {
+    if (err?.response && err.response.status >= 400 && err.response.status < 500) {
+      throw err;
+    }
+  }
+  const fallback = localRegisterUser(options);
+  saveAccount(fallback);
+  return fallback;
+}
+
+export async function loginAccount(options: {
+  username: string;
+  password: string;
+}): Promise<PlayerAccount> {
+  try {
+    const response = await axios.post<PlayerAccount>(
+      `${API_URL}/api/auth/login`,
+      {
+        username: options.username,
+        password: options.password,
+      }
+    );
+    if (response.data?.username) {
+      saveAccount(response.data);
+      return response.data;
+    }
+  } catch (err: any) {
+    if (err?.response && err.response.status >= 400 && err.response.status < 500) {
+      throw err;
+    }
+  }
+  const fallback = localLoginUser(options);
+  saveAccount(fallback);
+  return fallback;
+}
+
+export async function loginWithGoogle(credential: string): Promise<PlayerAccount> {
+  const response = await axios.post<PlayerAccount>(`${API_URL}/api/auth/google`, {
+    credential,
+  });
+  saveAccount(response.data);
+  return response.data;
+}
+
+export async function fetchCurrentAccount(): Promise<PlayerAccount | null> {
+  const saved = getSavedAccount();
+  if (!saved?.auth_token) return null;
+  try {
+    const response = await axios.get<PlayerAccount>(`${API_URL}/api/auth/me`, {
+      headers: authHeaders(saved.auth_token),
+    });
+    if (response.data?.username) {
+      const merged: PlayerAccount = {
+        ...saved,
+        ...response.data,
+        auth_token: saved.auth_token,
+      };
+      saveAccount(merged);
+      return merged;
+    }
+  } catch (err: any) {
+    if (err?.response?.status === 401) {
+      clearSavedAccount();
+      return null;
+    }
+  }
+  return saved;
+}
+
+export async function logoutAccount(): Promise<void> {
+  const saved = getSavedAccount();
+  clearSavedAccount();
+  if (!saved?.auth_token) return;
+  try {
+    await axios.post(
+      `${API_URL}/api/auth/logout`,
+      {},
+      { headers: authHeaders(saved.auth_token) }
+    );
+  } catch {
+    // Ignore network failures on logout
+  }
+}
+
+export async function updateProfile(payload: {
+  displayName?: string;
+  avatarConfig?: Record<string, unknown>;
+}): Promise<PlayerAccount> {
+  const saved = getSavedAccount();
+  if (!saved?.auth_token) throw new Error("Não autenticado");
+  const response = await axios.patch<PlayerAccount>(
+    `${API_URL}/api/auth/profile`,
+    {
+      display_name: payload.displayName,
+      avatar_config: payload.avatarConfig,
+    },
+    { headers: authHeaders(saved.auth_token) }
+  );
+  const updated: PlayerAccount = {
+    ...saved,
+    ...response.data,
+    auth_token: saved.auth_token,
+  };
+  saveAccount(updated);
+  return updated;
+}
+
+export async function getLeaderboard(): Promise<{
+  leaderboard: LeaderboardEntry[];
+  is_offline_fallback: boolean;
+}> {
+  try {
+    const response = await axios.get<{ leaderboard: LeaderboardEntry[] }>(
+      `${API_URL}/api/leaderboard`
+    );
+    if (response.data && Array.isArray(response.data.leaderboard)) {
+      return { leaderboard: response.data.leaderboard, is_offline_fallback: false };
+    }
+  } catch {
+    // Offline fallback
+  }
+  return { leaderboard: localGetLeaderboard(), is_offline_fallback: true };
+}
+
+export async function getMatchHistory(username?: string): Promise<{
+  matches: MatchRecord[];
+  is_offline_fallback: boolean;
+}> {
+  try {
+    const response = await axios.get<{ matches: MatchRecord[] }>(
+      `${API_URL}/api/matches`,
+      { params: username ? { username } : {} }
+    );
+    if (response.data && Array.isArray(response.data.matches)) {
+      return { matches: response.data.matches, is_offline_fallback: false };
+    }
+  } catch {
+    // Offline fallback
+  }
+  return { matches: localGetMatchHistory(username), is_offline_fallback: true };
 }
 
 export async function loginOrRegisterAccount(options: {
@@ -245,14 +443,20 @@ export async function createGame({
   discardLimit,
   friendlyRobber,
 }: CreateGameOptions): Promise<string> {
+  const acct = getSavedAccount();
   try {
-    const response = await axios.post(API_URL + "/api/games", {
-      players,
-      map_template: mapTemplate,
-      vps_to_win: vpsToWin,
-      discard_limit: discardLimit,
-      friendly_robber: friendlyRobber,
-    });
+    const response = await axios.post(
+      API_URL + "/api/games",
+      {
+        players,
+        map_template: mapTemplate,
+        vps_to_win: vpsToWin,
+        discard_limit: discardLimit,
+        friendly_robber: friendlyRobber,
+        host_name: acct?.display_name,
+      },
+      { headers: authHeaders() }
+    );
     if (response.data && typeof response.data.game_id === "string") {
       return response.data.game_id;
     }
@@ -265,6 +469,7 @@ export async function createGame({
     vpsToWin,
     discardLimit,
     friendlyRobber,
+    seatNames: acct?.display_name ? { RED: acct.display_name } : undefined,
   });
 }
 
@@ -306,15 +511,19 @@ export async function createRoom(options: {
   const resolvedToken =
     options.token ?? getSavedAccount()?.auth_token ?? undefined;
   try {
-    const response = await axios.post(`${API_URL}/api/rooms`, {
-      host_name: options.hostName,
-      players: options.players,
-      map_template: options.mapTemplate,
-      vps_to_win: options.vpsToWin,
-      discard_limit: options.discardLimit,
-      friendly_robber: options.friendlyRobber,
-      token: resolvedToken,
-    });
+    const response = await axios.post(
+      `${API_URL}/api/rooms`,
+      {
+        host_name: options.hostName,
+        players: options.players,
+        map_template: options.mapTemplate,
+        vps_to_win: options.vpsToWin,
+        discard_limit: options.discardLimit,
+        friendly_robber: options.friendlyRobber,
+        token: resolvedToken,
+      },
+      { headers: authHeaders(resolvedToken) }
+    );
     if (
       response.data &&
       typeof response.data.room_code === "string" &&
@@ -363,12 +572,17 @@ export async function joinRoom(
     token?: string | null;
   }
 ): Promise<{ seat_token: string; seat_color: Color; room: RoomState }> {
+  const resolvedToken = options.token ?? getSavedAccount()?.auth_token;
   try {
-    const response = await axios.post(`${API_URL}/api/rooms/${roomCode}/join`, {
-      player_name: options.playerName,
-      preferred_color: options.preferredColor,
-      token: options.token,
-    });
+    const response = await axios.post(
+      `${API_URL}/api/rooms/${roomCode}/join`,
+      {
+        player_name: options.playerName,
+        preferred_color: options.preferredColor,
+        token: resolvedToken,
+      },
+      { headers: authHeaders(resolvedToken) }
+    );
     if (
       response.data &&
       typeof response.data === "object" &&
@@ -399,10 +613,12 @@ export async function updateRoom(
     }>;
   }
 ): Promise<RoomState> {
+  const resolvedToken = payload.token ?? getSavedAccount()?.auth_token;
   try {
     const response = await axios.patch<RoomState>(
       `${API_URL}/api/rooms/${roomCode}`,
-      payload
+      payload,
+      { headers: authHeaders(resolvedToken) }
     );
     if (
       response.data &&

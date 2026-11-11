@@ -1,4 +1,5 @@
 import type {
+  AccountStats,
   Color,
   DevelopmentCard,
   Direction,
@@ -6,6 +7,9 @@ import type {
   GameEdge,
   GameNode,
   GameState,
+  LeaderboardEntry,
+  MatchParticipant,
+  MatchRecord,
   PlacedTile,
   ResourceCard,
   RoomState,
@@ -408,6 +412,14 @@ function buildLocalMap(template: MapTemplate): BuiltMap {
   };
 }
 
+export type LocalSeatMeta = {
+  color: Color;
+  seat_kind: "USER" | "GUEST" | "BOT";
+  username: string | null;
+  player_key: string;
+  display_name: string;
+};
+
 type StoredLocalGame = {
   state: GameState;
   nodeNeighbors: Record<number, number[]>;
@@ -415,6 +427,7 @@ type StoredLocalGame = {
   initialQueue: Array<{ color: Color; type: "SETTLEMENT" | "ROAD"; secondRound: boolean }>;
   lastInitialSettlementNode: number | null;
   history: GameState[];
+  seatMeta?: Record<Color, LocalSeatMeta>;
 };
 
 const GAMES_STORAGE_KEY = "catan_local_games_v1";
@@ -990,6 +1003,41 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
   state.state_index = state.action_records.length;
   recomputeScoresAndPlayableActions(game);
   game.history.push(JSON.parse(JSON.stringify(state)));
+
+  if (state.winning_color) {
+    const winnerColor = state.winning_color;
+    const meta = game.seatMeta || {};
+    const participants: MatchParticipant[] = state.colors.map((c) => {
+      const pIndexKey = pKey(state, c);
+      const vps = state.player_state[`${pIndexKey}_ACTUAL_VICTORY_POINTS`] ?? 0;
+      const m = meta[c];
+      const isWinner = c === winnerColor;
+      return {
+        color: c,
+        seat_kind: m?.seat_kind ?? (state.bot_colors.includes(c) ? "BOT" : "GUEST"),
+        username: m?.username ?? null,
+        player_key: m?.player_key ?? (state.bot_colors.includes(c) ? "CATANATRON" : "HUMAN"),
+        display_name: m?.display_name ?? state.seat_names?.[c] ?? c,
+        victory_points: vps,
+        is_winner: isWinner,
+      };
+    });
+    const winnerPart = participants.find((p) => p.color === winnerColor);
+    const winnerIsBot = winnerPart?.seat_kind === "BOT";
+    localRecordCompletedMatch({
+      game_id: state.game.id,
+      room_code: state.room_code || null,
+      mode: state.room_code ? "MULTIPLAYER" : "SOLO",
+      map_template: "BASE",
+      vps_to_win: state.game.vps_to_win,
+      num_turns: state.num_turns,
+      winning_color: winnerColor,
+      winner_name: winnerPart?.display_name || winnerColor,
+      winner_username: winnerPart?.seat_kind === "USER" ? winnerPart.username : null,
+      winner_is_bot: winnerIsBot,
+      participants,
+    });
+  }
 }
 
 function chooseBotAction(game: StoredLocalGame): GameAction | null {
@@ -1067,12 +1115,65 @@ export function localCreateGame(options: {
   friendlyRobber: boolean;
   seatNames?: Partial<Record<Color, string>>;
   roomCode?: string;
+  seatMeta?: Record<Color, LocalSeatMeta>;
 }): string {
   const built = buildLocalMap(options.mapTemplate);
   const colors = SEAT_COLORS.slice(0, Math.max(2, Math.min(4, options.players.length)));
   const botColors = colors.filter((_, idx) => options.players[idx] !== "HUMAN");
   const gameId =
     "local-" + Math.random().toString(36).substring(2, 10);
+
+  let defaultUser: { username: string; display_name: string } | null = null;
+  try {
+    const rawAcct = localStorage.getItem("catan_player_account");
+    if (rawAcct) {
+      const parsed = JSON.parse(rawAcct);
+      if (parsed?.username) {
+        defaultUser = { username: parsed.username, display_name: parsed.display_name || parsed.username };
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const resolvedSeatMeta: Record<Color, LocalSeatMeta> = options.seatMeta
+    ? { ...options.seatMeta }
+    : ({} as Record<Color, LocalSeatMeta>);
+
+  if (!options.seatMeta) {
+    let userAssigned = false;
+    colors.forEach((c, idx) => {
+      const pKey = options.players[idx] || "HUMAN";
+      if (pKey === "HUMAN") {
+        if (defaultUser && !userAssigned) {
+          resolvedSeatMeta[c] = {
+            color: c,
+            seat_kind: "USER",
+            username: defaultUser.username,
+            player_key: "HUMAN",
+            display_name: options.seatNames?.[c] || defaultUser.display_name,
+          };
+          userAssigned = true;
+        } else {
+          resolvedSeatMeta[c] = {
+            color: c,
+            seat_kind: "GUEST",
+            username: null,
+            player_key: "HUMAN",
+            display_name: options.seatNames?.[c] || PLAYER_COLOR_META[c].label,
+          };
+        }
+      } else {
+        resolvedSeatMeta[c] = {
+          color: c,
+          seat_kind: "BOT",
+          username: null,
+          player_key: pKey,
+          display_name: options.seatNames?.[c] || `Bot (${pKey})`,
+        };
+      }
+    });
+  }
 
   const playerState: Record<string, any> = {};
   colors.forEach((_, idx) => {
@@ -1150,6 +1251,7 @@ export function localCreateGame(options: {
     initialQueue,
     lastInitialSettlementNode: null,
     history: [JSON.parse(JSON.stringify(state))],
+    seatMeta: resolvedSeatMeta,
   };
 
   recomputeScoresAndPlayableActions(stored);
@@ -1233,6 +1335,165 @@ export function localGetMctsAnalysis(gameId: string): {
 }
 
 // ===== Local Account & Room Manager Fallback =====
+const LOCAL_USERS_KEY = "rule_isle_local_users_v1";
+const LOCAL_MATCHES_KEY = "rule_isle_local_matches_v1";
+
+type LocalUserRecord = {
+  username: string;
+  display_name: string;
+  password: string;
+};
+
+function loadLocalUsers(): Record<string, LocalUserRecord> {
+  try {
+    const raw = localStorage.getItem(LOCAL_USERS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function localRegisterUser(options: {
+  username: string;
+  password: string;
+  displayName?: string;
+}): PlayerAccount {
+  const cleanUser = options.username
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 24);
+  if (cleanUser.length < 2) {
+    throw new Error("Usuário deve ter pelo menos 2 caracteres.");
+  }
+  const users = loadLocalUsers();
+  if (users[cleanUser]) {
+    throw new Error("Este usuário já está cadastrado localmente.");
+  }
+  const display_name = (options.displayName || options.username).trim() || cleanUser;
+  users[cleanUser] = { username: cleanUser, display_name, password: options.password };
+  try {
+    localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+  } catch {
+    // ignore
+  }
+  return {
+    username: cleanUser,
+    display_name,
+    auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
+    is_new: true,
+  };
+}
+
+export function localLoginUser(options: {
+  username: string;
+  password: string;
+}): PlayerAccount {
+  const cleanUser = options.username
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 24);
+  const users = loadLocalUsers();
+  const existing = users[cleanUser];
+  if (!existing || existing.password !== options.password) {
+    throw new Error("Usuário ou senha incorretos.");
+  }
+  return {
+    username: existing.username,
+    display_name: existing.display_name,
+    auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
+    is_new: false,
+  };
+}
+
+export function localRecordCompletedMatch(
+  input: Omit<MatchRecord, "finished_at"> & { finished_at?: number }
+): MatchRecord {
+  const matches = localGetMatchHistory();
+  const existing = matches.find((m) => m.game_id === input.game_id);
+  if (existing) return existing;
+
+  const entry: MatchRecord = {
+    ...input,
+    finished_at: input.finished_at ?? Math.floor(Date.now() / 1000),
+  };
+  const next = [entry, ...matches].slice(0, 100);
+  try {
+    localStorage.setItem(LOCAL_MATCHES_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage limits
+  }
+  return entry;
+}
+
+export function localGetMatchHistory(username?: string): MatchRecord[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_MATCHES_KEY);
+    const list: MatchRecord[] = raw ? JSON.parse(raw) : [];
+    const filtered = username
+      ? list.filter((m) =>
+          m.participants.some(
+            (p) => p.seat_kind === "USER" && p.username === username.toLowerCase().trim()
+          )
+        )
+      : list;
+    return filtered.sort((a, b) => b.finished_at - a.finished_at);
+  } catch {
+    return [];
+  }
+}
+
+export function localGetLeaderboard(
+  extraUsers?: Array<{ username: string; display_name: string }>
+): LeaderboardEntry[] {
+  const usersMap: Record<string, { username: string; display_name: string }> = {};
+  for (const [k, u] of Object.entries(loadLocalUsers())) {
+    usersMap[k] = { username: u.username, display_name: u.display_name };
+  }
+  for (const u of extraUsers || []) {
+    usersMap[u.username] = u;
+  }
+
+  const counts: Record<string, { wins: number; games: number }> = {};
+  for (const match of localGetMatchHistory()) {
+    for (const p of match.participants) {
+      if (p.seat_kind !== "USER" || !p.username) continue;
+      if (!usersMap[p.username]) {
+        usersMap[p.username] = { username: p.username, display_name: p.display_name };
+      }
+      const bucket = counts[p.username] || { wins: 0, games: 0 };
+      bucket.games += 1;
+      if (p.is_winner) bucket.wins += 1;
+      counts[p.username] = bucket;
+    }
+  }
+
+  const rows: LeaderboardEntry[] = Object.values(usersMap).map((u) => {
+    const { wins, games } = counts[u.username] || { wins: 0, games: 0 };
+    const losses = Math.max(0, games - wins);
+    const win_rate = games > 0 ? Math.round((wins / games) * 1000) / 10 : 0.0;
+    return {
+      rank: 0,
+      username: u.username,
+      display_name: u.display_name,
+      wins,
+      losses,
+      games_played: games,
+      win_rate,
+    };
+  });
+
+  rows.sort(
+    (a, b) =>
+      b.wins - a.wins ||
+      b.win_rate - a.win_rate ||
+      b.games_played - a.games_played ||
+      a.username.localeCompare(b.username)
+  );
+  return rows.map((row, idx) => ({ ...row, rank: idx + 1 }));
+}
+
 export function localLoginOrRegister(options: {
   username: string;
   pin: string;
