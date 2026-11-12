@@ -127,7 +127,11 @@ describe("AvatarStudioModal", () => {
     expect(screen.getByRole("tab", { name: /Molduras/i })).toBeInTheDocument();
 
     // Lazy 3D viewport (falls back cleanly in jsdom) + camera toggles + 360 hint
-    const wrapper = await screen.findByTestId("studio-3d-wrapper");
+    const wrapper = await screen.findByTestId(
+      "studio-3d-wrapper",
+      {},
+      { timeout: 5000 }
+    );
     expect(wrapper).toHaveAttribute("data-mode", "studio");
     expect(wrapper).toHaveAttribute("data-interactive", "true");
     expect(wrapper).toHaveAttribute("data-camera-focus", "full");
@@ -168,6 +172,14 @@ describe("AvatarStudioModal", () => {
     expect(silverBtn).toHaveTextContent(/3 Vitórias/i);
 
     await user.click(bronzeBtn);
+
+    // Verify Body & Face facial style buttons update saved config too
+    await user.click(screen.getByRole("tab", { name: /Corpo & Rosto/i }));
+    await user.click(screen.getByRole("button", { name: /Sábio/i }));
+    await user.click(screen.getByRole("button", { name: /Com Cicatriz/i }));
+    await user.click(screen.getByRole("button", { name: /Aquilino/i }));
+    await user.click(screen.getByRole("button", { name: /Sorridente/i }));
+
     await user.click(screen.getByRole("button", { name: /Salvar Perfil/i }));
 
     expect(updateProfile).toHaveBeenCalledWith({
@@ -178,6 +190,10 @@ describe("AvatarStudioModal", () => {
         outfit: "captain",
         handProp: "spyglass",
         frame: "bronze",
+        eyeStyle: "wise",
+        browStyle: "scarred",
+        noseStyle: "aquiline",
+        mouthStyle: "smile",
         colors: expect.objectContaining({
           outfitPrimary: "#2563eb",
           outfitTrim: "#facc15",

@@ -59,7 +59,9 @@ export const AVATAR_SLOT_TO_SOCKET: Array<{
 export type AvatarRigInstance = {
   root: THREE.Group;
   sockets: Record<AvatarSocketName, THREE.Group>;
+  faceSlot: THREE.Group;
   auraSlot: THREE.Group;
+  bodyScale: [number, number, number];
 };
 
 type AuraParticleMeta = {
@@ -164,11 +166,15 @@ export function createAvatarRig(): AvatarRigInstance {
     }
   );
 
+  const faceSlot = new THREE.Group();
+  faceSlot.name = "socket_face";
+  sockets.socket_head.add(faceSlot);
+
   const auraSlot = new THREE.Group();
   auraSlot.name = "socket_aura";
   root.add(auraSlot);
 
-  return { root, sockets, auraSlot };
+  return { root, sockets, faceSlot, auraSlot, bodyScale: [1, 1, 1] };
 }
 
 export function createStudioLights(): THREE.Group {
@@ -199,6 +205,478 @@ export function createStudioLights(): THREE.Group {
   lights.add(rim);
 
   return lights;
+}
+
+function makeFaceMesh(
+  name: string,
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  pos: readonly [number, number, number] = [0, 0, 0],
+  rot: readonly [number, number, number] = [0, 0, 0],
+  scale: readonly [number, number, number] = [1, 1, 1]
+): THREE.Mesh {
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = name;
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  mesh.rotation.set(rot[0], rot[1], rot[2]);
+  mesh.scale.set(scale[0], scale[1], scale[2]);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function makeFaceTube(
+  name: string,
+  pts: ReadonlyArray<readonly [number, number, number]>,
+  radius: number,
+  material: THREE.Material
+): THREE.Mesh {
+  const curve = new THREE.CatmullRomCurve3(
+    pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    false
+  );
+  const geo = new THREE.TubeGeometry(curve, 12, radius, 8, false);
+  return makeFaceMesh(name, geo, material);
+}
+
+export function createFacialFeaturesGroup(
+  config: ResolvedAvatarConfig
+): THREE.Group {
+  const group = new THREE.Group();
+  group.name = "facial_features";
+
+  const skinMat = new THREE.MeshStandardMaterial({
+    name: "mat_skin",
+    color: 0xe4b287,
+    roughness: 0.58,
+    metalness: 0.02,
+  });
+  const hairMat = new THREE.MeshStandardMaterial({
+    name: "mat_hair",
+    color: 0x432316,
+    roughness: 0.72,
+    metalness: 0.04,
+  });
+  const eyeMat = new THREE.MeshStandardMaterial({
+    name: "mat_eyes",
+    color: 0x0284c7,
+    roughness: 0.25,
+    metalness: 0.05,
+  });
+  const scleraMat = new THREE.MeshStandardMaterial({
+    name: "mat_sclera",
+    color: 0xf8fafc,
+    roughness: 0.25,
+    metalness: 0.0,
+  });
+  const pupilMat = new THREE.MeshStandardMaterial({
+    name: "mat_pupil",
+    color: 0x0f172a,
+    roughness: 0.2,
+    metalness: 0.05,
+  });
+  const lashesMat = new THREE.MeshStandardMaterial({
+    name: "mat_lashes",
+    color: 0x1e1b18,
+    roughness: 0.6,
+    metalness: 0.02,
+  });
+  const lipsMat = new THREE.MeshStandardMaterial({
+    name: "mat_lips",
+    color: 0xa84b44,
+    roughness: 0.55,
+    metalness: 0.02,
+  });
+  const scarMat = new THREE.MeshStandardMaterial({
+    name: "mat_scar",
+    color: 0x993b36,
+    roughness: 0.62,
+    metalness: 0.02,
+  });
+  const metalMat = new THREE.MeshStandardMaterial({
+    name: "mat_metal",
+    color: 0xfacc15,
+    roughness: 0.26,
+    metalness: 0.86,
+  });
+
+  // 1. Eyes & Expression (6 distinct 3D styles)
+  const eyeStyle = config.eyeStyle ?? "calm";
+  const isFierce = eyeStyle === "fierce";
+  const isNoble = eyeStyle === "noble";
+  const isWise = eyeStyle === "wise";
+  const isCheerful = eyeStyle === "cheerful";
+  const isSharp = eyeStyle === "sharp";
+
+  for (const side of [-1, 1] as const) {
+    const ex = side * 0.037;
+    const ey = isCheerful ? 0.138 : 0.136;
+    const ez = 0.097;
+    const scleraScale: [number, number, number] = isFierce
+      ? [1.18, 0.72, 0.75]
+      : isSharp
+        ? [1.16, 0.68, 0.75]
+        : isNoble
+          ? [1.14, 0.96, 0.75]
+          : isCheerful
+            ? [1.15, 0.82, 0.75]
+            : [1.1, 0.9, 0.75];
+    const rotZ = isFierce ? side * 0.24 : isSharp ? side * 0.16 : isNoble ? side * 0.08 : 0;
+
+    group.add(
+      makeFaceMesh(
+        `eye_sclera_${side}`,
+        new THREE.SphereGeometry(0.0175, 14, 12),
+        scleraMat,
+        [ex, ey, ez],
+        [0, 0, rotZ],
+        scleraScale
+      )
+    );
+    group.add(
+      makeFaceMesh(
+        `eye_iris_${side}`,
+        new THREE.SphereGeometry(isFierce ? 0.0098 : 0.0112, 14, 12),
+        eyeMat,
+        [ex, ey + (isNoble ? 0.001 : 0), ez + 0.0092],
+        [0, 0, 0],
+        [1, 1, 0.55]
+      )
+    );
+    group.add(
+      makeFaceMesh(
+        `eye_pupil_${side}`,
+        new THREE.SphereGeometry(0.0058, 10, 10),
+        pupilMat,
+        [ex, ey + (isNoble ? 0.001 : 0), ez + 0.014],
+        [0, 0, 0],
+        [1, 1, 0.45]
+      )
+    );
+
+    // Sculpted upper eyelid / lash accent
+    const lidY = isFierce ? ey + 0.007 : isSharp ? ey + 0.005 : ey + 0.010;
+    const lidCurvePts: Array<[number, number, number]> = isCheerful
+      ? [
+          [ex - side * 0.017, ey + 0.004, ez + 0.011],
+          [ex, ey + 0.014, ez + 0.016],
+          [ex + side * 0.017, ey + 0.004, ez + 0.009],
+        ]
+      : [
+          [ex - side * 0.017, lidY + (isFierce ? 0.004 : 0), ez + 0.010],
+          [ex, lidY + (isNoble ? 0.005 : 0.002), ez + 0.016],
+          [ex + side * 0.017, lidY - (isFierce ? 0.006 : 0.001), ez + 0.009],
+        ];
+    group.add(
+      makeFaceTube(
+        `eye_lid_${side}`,
+        lidCurvePts,
+        isNoble ? 0.0032 : 0.0035,
+        isNoble ? metalMat : lashesMat
+      )
+    );
+  }
+
+  // Wise golden spectacles
+  if (isWise) {
+    for (const side of [-1, 1] as const) {
+      group.add(
+        makeFaceMesh(
+          `glasses_rim_${side}`,
+          new THREE.TorusGeometry(0.023, 0.0028, 8, 22),
+          metalMat,
+          [side * 0.037, 0.136, 0.118],
+          [0, side * 0.14, 0]
+        )
+      );
+      group.add(
+        makeFaceTube(
+          `glasses_arm_${side}`,
+          [
+            [side * 0.06, 0.138, 0.114],
+            [side * 0.098, 0.132, 0.058],
+            [side * 0.104, 0.125, -0.005],
+          ],
+          0.0022,
+          metalMat
+        )
+      );
+    }
+    group.add(
+      makeFaceTube(
+        "glasses_bridge",
+        [
+          [-0.015, 0.138, 0.119],
+          [0, 0.142, 0.124],
+          [0.015, 0.138, 0.119],
+        ],
+        0.0024,
+        metalMat
+      )
+    );
+  }
+
+  // Strategist golden monocle
+  if (isSharp) {
+    group.add(
+      makeFaceMesh(
+        "strategist_monocle",
+        new THREE.TorusGeometry(0.0235, 0.0032, 8, 22),
+        metalMat,
+        [0.037, 0.136, 0.119],
+        [0, 0.14, 0]
+      )
+    );
+    group.add(
+      makeFaceTube(
+        "monocle_chain",
+        [
+          [0.059, 0.128, 0.113],
+          [0.075, 0.092, 0.098],
+          [0.070, 0.048, 0.076],
+        ],
+        0.0018,
+        metalMat
+      )
+    );
+  }
+
+  // 2. Eyebrows (4 distinct 3D styles)
+  const browStyle = config.browStyle ?? "calm";
+  for (const side of [-1, 1] as const) {
+    const browRadius =
+      browStyle === "thick" ? 0.0085 : browStyle === "scarred" ? 0.0068 : 0.0052;
+    const pts: Array<[number, number, number]> =
+      browStyle === "arched"
+        ? [
+            [side * 0.016, 0.162, 0.106],
+            [side * 0.038, 0.179, 0.105],
+            [side * 0.061, 0.164, 0.094],
+          ]
+        : browStyle === "thick"
+          ? [
+              [side * 0.014, 0.164, 0.107],
+              [side * 0.038, 0.166, 0.108],
+              [side * 0.062, 0.164, 0.096],
+            ]
+          : browStyle === "scarred"
+            ? [
+                [side * 0.014, 0.160, 0.106],
+                [side * 0.038, 0.166, 0.107],
+                [side * 0.060, 0.169, 0.095],
+              ]
+            : [
+                [side * 0.017, 0.163, 0.105],
+                [side * 0.038, 0.168, 0.105],
+                [side * 0.058, 0.162, 0.094],
+              ];
+    group.add(makeFaceTube(`brow_${side}`, pts, browRadius, hairMat));
+  }
+
+  if (browStyle === "scarred") {
+    group.add(
+      makeFaceTube(
+        "brow_scar_slash",
+        [
+          [-0.048, 0.184, 0.103],
+          [-0.041, 0.150, 0.114],
+          [-0.032, 0.106, 0.107],
+        ],
+        0.0038,
+        scarMat
+      )
+    );
+  }
+
+  // 3. Nose (4 distinct 3D styles)
+  const noseStyle = config.noseStyle ?? "straight";
+  if (noseStyle === "aquiline") {
+    group.add(
+      makeFaceTube(
+        "nose_aquiline_bridge",
+        [
+          [0, 0.140, 0.106],
+          [0, 0.120, 0.127],
+          [0, 0.098, 0.120],
+        ],
+        0.0115,
+        skinMat
+      )
+    );
+    group.add(
+      makeFaceMesh(
+        "nose_aquiline_tip",
+        new THREE.SphereGeometry(0.013, 12, 10),
+        skinMat,
+        [0, 0.098, 0.122],
+        [0, 0, 0],
+        [0.95, 0.9, 1.15]
+      )
+    );
+  } else if (noseStyle === "broad") {
+    group.add(
+      makeFaceMesh(
+        "nose_broad_bridge",
+        new THREE.CapsuleGeometry(0.014, 0.025, 6, 10),
+        skinMat,
+        [0, 0.118, 0.106],
+        [0.32, 0, 0],
+        [1.35, 1.0, 1.0]
+      )
+    );
+    group.add(
+      makeFaceMesh(
+        "nose_broad_tip",
+        new THREE.SphereGeometry(0.016, 12, 10),
+        skinMat,
+        [0, 0.103, 0.117],
+        [0, 0, 0],
+        [1.55, 0.85, 1.05]
+      )
+    );
+  } else if (noseStyle === "button") {
+    group.add(
+      makeFaceMesh(
+        "nose_button_bridge",
+        new THREE.CapsuleGeometry(0.0085, 0.016, 6, 10),
+        skinMat,
+        [0, 0.122, 0.105],
+        [0.36, 0, 0]
+      )
+    );
+    group.add(
+      makeFaceMesh(
+        "nose_button_tip",
+        new THREE.SphereGeometry(0.0135, 12, 10),
+        skinMat,
+        [0, 0.111, 0.116],
+        [0, 0, 0],
+        [1.0, 0.85, 0.95]
+      )
+    );
+  } else {
+    group.add(
+      makeFaceMesh(
+        "nose_straight_bridge",
+        new THREE.CapsuleGeometry(0.0115, 0.028, 6, 10),
+        skinMat,
+        [0, 0.118, 0.106],
+        [0.3, 0, 0]
+      )
+    );
+    group.add(
+      makeFaceMesh(
+        "nose_straight_tip",
+        new THREE.SphereGeometry(0.0135, 12, 10),
+        skinMat,
+        [0, 0.103, 0.116],
+        [0, 0, 0],
+        [1.08, 0.85, 0.98]
+      )
+    );
+  }
+
+  // 4. Mouth & Expression (4 distinct 3D styles)
+  const mouthStyle = config.mouthStyle ?? "confident";
+  if (mouthStyle === "smile") {
+    group.add(
+      makeFaceTube(
+        "mouth_smile_curve",
+        [
+          [-0.028, 0.072, 0.098],
+          [-0.012, 0.060, 0.106],
+          [0.012, 0.060, 0.106],
+          [0.028, 0.072, 0.098],
+        ],
+        0.0052,
+        lipsMat
+      )
+    );
+    group.add(
+      makeFaceMesh(
+        "mouth_smile_teeth",
+        new THREE.SphereGeometry(0.016, 12, 10),
+        scleraMat,
+        [0, 0.066, 0.103],
+        [0, 0, 0],
+        [1.35, 0.42, 0.45]
+      )
+    );
+  } else if (mouthStyle === "serious") {
+    group.add(
+      makeFaceTube(
+        "mouth_serious_line",
+        [
+          [-0.022, 0.061, 0.100],
+          [0, 0.065, 0.106],
+          [0.022, 0.061, 0.100],
+        ],
+        0.005,
+        lipsMat
+      )
+    );
+  } else if (mouthStyle === "smirk") {
+    group.add(
+      makeFaceTube(
+        "mouth_smirk_line",
+        [
+          [-0.020, 0.062, 0.100],
+          [0.002, 0.063, 0.106],
+          [0.026, 0.075, 0.099],
+        ],
+        0.005,
+        lipsMat
+      )
+    );
+  } else {
+    group.add(
+      makeFaceTube(
+        "mouth_confident_line",
+        [
+          [-0.022, 0.067, 0.099],
+          [0, 0.062, 0.106],
+          [0.022, 0.067, 0.099],
+        ],
+        0.0048,
+        lipsMat
+      )
+    );
+  }
+
+  return group;
+}
+
+export function getBodyScaleForType(
+  bodyType: ResolvedAvatarConfig["bodyType"]
+): [number, number, number] {
+  if (bodyType === "sturdy") return [1.13, 1.0, 1.10];
+  if (bodyType === "slender") return [0.87, 1.0, 0.89];
+  return [1.0, 1.0, 1.0];
+}
+
+export function updateAvatarFacialFeatures(
+  rig: AvatarRigInstance,
+  config: ResolvedAvatarConfig
+): void {
+  clearGroupChildren(rig.faceSlot);
+  const faceGroup = createFacialFeaturesGroup(config);
+  rig.faceSlot.add(faceGroup);
+  applyAvatarMaterials(rig.faceSlot, config.colors);
+}
+
+export function updateAvatarBodyProportions(
+  rig: AvatarRigInstance,
+  bodyType: ResolvedAvatarConfig["bodyType"]
+): void {
+  const [sx, sy, sz] = getBodyScaleForType(bodyType);
+  rig.bodyScale = [sx, sy, sz];
+  rig.sockets.socket_torso.scale.set(sx, sy, sz);
+  rig.sockets.socket_legs.scale.set(sx, sy, sz);
+  rig.sockets.socket_cape.scale.set(sx, sy, sz);
+  rig.sockets.socket_hand_r.position.x = AVATAR_SOCKET_OFFSETS.socket_hand_r[0] * sx;
+  rig.sockets.socket_shoulder_l.position.x =
+    AVATAR_SOCKET_OFFSETS.socket_shoulder_l[0] * sx;
+  rig.sockets.socket_back.position.z = AVATAR_SOCKET_OFFSETS.socket_back[2] * sz;
 }
 
 const AURA_PALETTES: Record<
@@ -375,6 +853,17 @@ export async function populateAvatarRig(
   }
 
   for (const socketGroup of Object.values(rig.sockets)) {
+    if (socketGroup === rig.sockets.socket_head) {
+      // Keep faceSlot mounted inside socket_head while clearing loaded GLB parts
+      for (let i = socketGroup.children.length - 1; i >= 0; i--) {
+        const child = socketGroup.children[i];
+        if (child !== rig.faceSlot) {
+          socketGroup.remove(child);
+          disposeObjectTree(child);
+        }
+      }
+      continue;
+    }
     clearGroupChildren(socketGroup);
   }
 
@@ -383,6 +872,9 @@ export async function populateAvatarRig(
     loaded.partGroup.name = `${loaded.slot}_${loaded.partGroup.name || "part"}`;
     rig.sockets[loaded.socket].add(loaded.partGroup);
   }
+
+  updateAvatarBodyProportions(rig, config.bodyType);
+  updateAvatarFacialFeatures(rig, config);
 
   clearGroupChildren(rig.auraSlot);
   const auraEffect = createAuraEffect(config.aura);
@@ -409,13 +901,14 @@ export function updateAvatarAnimation(
   const breath = Math.sin(elapsedSeconds * 1.8);
   const gentleSway = Math.sin(elapsedSeconds * 0.85);
 
-  // Subtle torso breathing while boots/pedestal remain grounded at Y=0
+  // Subtle torso breathing while preserving bodyType silhouette and grounded boots/pedestal
+  const [bsx, bsy, bsz] = rig.bodyScale;
   rig.sockets.socket_torso.scale.set(
-    1 - breath * 0.0025,
-    1 + breath * 0.0055,
-    1 - breath * 0.0025
+    bsx * (1 - breath * 0.0025),
+    bsy * (1 + breath * 0.0055),
+    bsz * (1 - breath * 0.0025)
   );
-  rig.sockets.socket_cape.scale.y = 1 + breath * 0.004;
+  rig.sockets.socket_cape.scale.set(bsx, bsy * (1 + breath * 0.004), bsz);
 
   const headBase = AVATAR_SOCKET_OFFSETS.socket_head;
   rig.sockets.socket_head.position.set(
@@ -431,7 +924,7 @@ export function updateAvatarAnimation(
 
   const handBase = AVATAR_SOCKET_OFFSETS.socket_hand_r;
   rig.sockets.socket_hand_r.position.set(
-    handBase[0],
+    handBase[0] * bsx,
     handBase[1] + Math.sin(elapsedSeconds * 1.8 - 0.35) * 0.006,
     handBase[2]
   );
@@ -441,12 +934,12 @@ export function updateAvatarAnimation(
   rig.sockets.socket_back.position.set(
     backBase[0],
     backBase[1] + breath * 0.005,
-    backBase[2]
+    backBase[2] * bsz
   );
 
   const shoulderBase = AVATAR_SOCKET_OFFSETS.socket_shoulder_l;
   rig.sockets.socket_shoulder_l.position.set(
-    shoulderBase[0],
+    shoulderBase[0] * bsx,
     shoulderBase[1] + Math.sin(elapsedSeconds * 2.5 + 0.7) * 0.011,
     shoulderBase[2]
   );

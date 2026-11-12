@@ -1,4 +1,9 @@
 .avatar-studio-paper {
+  height: min(90dvh, 840px) !important;
+  max-height: 92dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
   background: linear-gradient(180deg, #0b1326 0%, #0f172a 100%) !important;
   color: #f8fafc !important;
   border: 1.5px solid rgba(250, 204, 21, 0.38) !important;
@@ -9,6 +14,7 @@
 }
 
 .avatar-studio-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -28,32 +34,100 @@
 
 .avatar-studio-body {
   position: relative;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: 356px minmax(0, 1fr);
   gap: 20px;
-  padding: 18px 22px !important;
+  padding: 16px 22px !important;
 }
 
 .avatar-studio-preview-col {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 11px;
-  padding: 14px;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 12px;
   border-radius: 14px;
   background: rgba(2, 6, 23, 0.62);
   border: 1px solid rgba(250, 204, 21, 0.16);
 }
 
+.avatar-studio-preview-pinned {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.avatar-studio-sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .avatar-studio-stage {
   position: relative;
   width: 100%;
-  height: 310px;
+  height: clamp(210px, 34dvh, 285px);
   border-radius: 12px;
   overflow: hidden;
-  border: 1.5px solid rgba(250, 204, 21, 0.34);
+  border: 2px solid rgba(250, 204, 21, 0.34);
   background: radial-gradient(circle at 50% 35%, #162a4f 0%, #070d1b 100%);
   box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.6);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  .avatar-3d-canvas--studio {
+    min-height: 0;
+  }
+
+  &--frame-wood {
+    border-color: rgba(146, 93, 48, 0.85);
+  }
+
+  &--frame-bronze {
+    border-color: rgba(217, 119, 54, 0.9);
+    box-shadow:
+      inset 0 0 28px rgba(0, 0, 0, 0.6),
+      0 0 14px rgba(217, 119, 54, 0.28);
+  }
+
+  &--frame-silver {
+    border-color: rgba(226, 232, 240, 0.92);
+    box-shadow:
+      inset 0 0 28px rgba(0, 0, 0, 0.6),
+      0 0 16px rgba(203, 213, 225, 0.34);
+  }
+
+  &--frame-gold {
+    border-color: rgba(250, 204, 21, 0.95);
+    box-shadow:
+      inset 0 0 28px rgba(0, 0, 0, 0.6),
+      0 0 18px rgba(250, 204, 21, 0.38);
+  }
+
+  &--frame-imperial {
+    border-color: rgba(16, 185, 129, 0.95);
+    box-shadow:
+      inset 0 0 28px rgba(0, 0, 0, 0.6),
+      0 0 20px rgba(16, 185, 129, 0.42);
+  }
+
+  &--frame-vip_dragon {
+    border-color: rgba(245, 158, 11, 0.98);
+    box-shadow:
+      inset 0 0 28px rgba(127, 29, 29, 0.35),
+      0 0 22px rgba(245, 158, 11, 0.5);
+  }
 
   &__fallback {
     width: 100%;
@@ -356,11 +430,15 @@
 .avatar-studio-controls-col {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .avatar-studio-tabs {
+  flex: 0 0 auto;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   min-height: 40px !important;
 
@@ -383,6 +461,7 @@
 }
 
 .avatar-studio-filter-bar {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
@@ -418,6 +497,11 @@
 }
 
 .avatar-studio-sections {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  padding-bottom: 8px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -718,6 +802,7 @@
     margin: 10px !important;
     width: calc(100vw - 20px) !important;
     max-width: calc(100vw - 20px) !important;
+    height: auto !important;
     max-height: 92dvh !important;
   }
 
@@ -727,13 +812,31 @@
   }
 
   .avatar-studio-body {
+    overflow-y: auto !important;
     grid-template-columns: 1fr;
     padding: 12px 14px !important;
     gap: 14px;
   }
 
+  .avatar-studio-preview-col,
+  .avatar-studio-sidebar-scroll,
+  .avatar-studio-controls-col,
+  .avatar-studio-sections {
+    height: auto;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .avatar-studio-preview-pinned {
+    position: sticky;
+    top: -12px;
+    z-index: 15;
+    padding: 8px 0;
+    background: #0b1326;
+  }
+
   .avatar-studio-stage {
-    height: 250px;
+    height: 220px;
   }
 
   .avatar-options-grid {

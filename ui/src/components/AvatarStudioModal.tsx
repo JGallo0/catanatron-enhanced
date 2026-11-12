@@ -528,98 +528,103 @@ export default function AvatarStudioModal({
       </DialogTitle>
 
       <DialogContent className="avatar-studio-body">
-        {/* Coluna Esquerda: Palco 3D, Câmera, Cores Livres, Apelido e Arquétipos */}
+        {/* Coluna Esquerda: Palco 3D Fixo + Barra Lateral Rolável */}
         <div className="avatar-studio-preview-col">
-          <div className="avatar-studio-stage">
-            <Suspense
-              fallback={
-                <div className="avatar-studio-stage__fallback">
-                  <PlayerAvatar
-                    config={draftConfig}
-                    username={effectiveUsername}
-                    size={136}
-                  />
-                </div>
-              }
-            >
-              <Avatar3DCanvas
-                ref={avatar3dRef}
-                config={draftConfig}
-                mode="studio"
-                cameraFocus={cameraFocus}
-                interactive={true}
-                username={effectiveUsername}
-              />
-            </Suspense>
-
-            <div className="avatar-studio-stage__overlay-bottom">
-              <div className="avatar-studio-camera-toggles">
-                <button
-                  type="button"
-                  aria-pressed={cameraFocus === "full"}
-                  className={`avatar-camera-btn ${
-                    cameraFocus === "full" ? "active" : ""
-                  }`}
-                  onClick={() => setCameraFocus("full")}
-                >
-                  {t("Corpo Inteiro", "Full Body")}
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={cameraFocus === "portrait"}
-                  className={`avatar-camera-btn ${
-                    cameraFocus === "portrait" ? "active" : ""
-                  }`}
-                  onClick={() => setCameraFocus("portrait")}
-                >
-                  {t("Rosto", "Portrait")}
-                </button>
-              </div>
-              <span className="avatar-studio-stage__hint">
-                ↻ {t("Arraste para girar 360°", "Drag to rotate 360°")}
-              </span>
-            </div>
-          </div>
-
-          <div className="avatar-studio-frame-pill">
-            🏆 {getFrameLabel(draftConfig.frame, language)}
-          </div>
-
-          {lockedItems.length > 0 && (
+          <div className="avatar-studio-preview-pinned">
             <div
-              className="avatar-studio-tryon-banner"
-              role="status"
-              data-testid="tryon-mode-banner"
+              className={`avatar-studio-stage avatar-studio-stage--frame-${draftConfig.frame}`}
             >
-              <div className="avatar-studio-tryon-banner__title">
-                {t(
-                  `🧪 Modo Provador — testando ${lockedItems.length} item(ns) bloqueado(s)`,
-                  `🧪 Try-On Mode — testing ${lockedItems.length} locked item(s)`
-                )}
-              </div>
-              <div className="avatar-studio-tryon-banner__tags">
-                {vipTryOnCount > 0 && (
-                  <span className="tryon-chip tryon-chip--vip">
-                    👑 VIP ({vipTryOnCount})
-                  </span>
-                )}
-                {earnableTryOnItems.map((item) => (
-                  <span
-                    key={`${item.slot}:${item.id}`}
-                    className="tryon-chip tryon-chip--wins"
+              <Suspense
+                fallback={
+                  <div className="avatar-studio-stage__fallback">
+                    <PlayerAvatar
+                      config={draftConfig}
+                      username={effectiveUsername}
+                      size={136}
+                    />
+                  </div>
+                }
+              >
+                <Avatar3DCanvas
+                  ref={avatar3dRef}
+                  config={draftConfig}
+                  mode="studio"
+                  cameraFocus={cameraFocus}
+                  interactive={true}
+                  username={effectiveUsername}
+                />
+              </Suspense>
+
+              <div className="avatar-studio-stage__overlay-bottom">
+                <div className="avatar-studio-camera-toggles">
+                  <button
+                    type="button"
+                    aria-pressed={cameraFocus === "full"}
+                    className={`avatar-camera-btn ${
+                      cameraFocus === "full" ? "active" : ""
+                    }`}
+                    onClick={() => setCameraFocus("full")}
                   >
-                    🏆 {item.required_wins}{" "}
-                    {t(
-                      item.required_wins === 1 ? "Vitória" : "Vitórias",
-                      item.required_wins === 1 ? "Win" : "Wins"
-                    )}
-                  </span>
-                ))}
+                    {t("Corpo Inteiro", "Full Body")}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={cameraFocus === "portrait"}
+                    className={`avatar-camera-btn ${
+                      cameraFocus === "portrait" ? "active" : ""
+                    }`}
+                    onClick={() => setCameraFocus("portrait")}
+                  >
+                    {t("Rosto", "Portrait")}
+                  </button>
+                </div>
+                <span className="avatar-studio-stage__hint">
+                  ↻ {t("Arraste para girar 360°", "Drag to rotate 360°")}
+                </span>
               </div>
             </div>
-          )}
 
-          {/* Cores Livres */}
+            <div className="avatar-studio-frame-pill">
+              🏆 {getFrameLabel(draftConfig.frame, language)}
+            </div>
+
+            {lockedItems.length > 0 && (
+              <div
+                className="avatar-studio-tryon-banner"
+                role="status"
+                data-testid="tryon-mode-banner"
+              >
+                <div className="avatar-studio-tryon-banner__title">
+                  {t(
+                    `🧪 Modo Provador — testando ${lockedItems.length} item(ns) bloqueado(s)`,
+                    `🧪 Try-On Mode — testing ${lockedItems.length} locked item(s)`
+                  )}
+                </div>
+                <div className="avatar-studio-tryon-banner__tags">
+                  {vipTryOnCount > 0 && (
+                    <span className="tryon-chip tryon-chip--vip">
+                      👑 VIP ({vipTryOnCount})
+                    </span>
+                  )}
+                  {earnableTryOnItems.map((item) => (
+                    <span
+                      key={`${item.slot}:${item.id}`}
+                      className="tryon-chip tryon-chip--wins"
+                    >
+                      🏆 {item.required_wins}{" "}
+                      {t(
+                        item.required_wins === 1 ? "Vitória" : "Vitórias",
+                        item.required_wins === 1 ? "Win" : "Wins"
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="avatar-studio-sidebar-scroll">
+            {/* Cores Livres */}
           <div className="avatar-studio-colors-panel">
             <span className="avatar-studio-section-eyebrow">
               🎨 {t("Cores Livres", "Custom Colors")}
@@ -755,6 +760,7 @@ export default function AvatarStudioModal({
                 </button>
               ))}
             </div>
+          </div>
           </div>
         </div>
 

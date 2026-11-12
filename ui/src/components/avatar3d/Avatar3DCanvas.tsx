@@ -28,6 +28,8 @@ import {
   getResolvedModelAssignments,
   populateAvatarRig,
   updateAvatarAnimation,
+  updateAvatarBodyProportions,
+  updateAvatarFacialFeatures,
   type AvatarRigInstance,
 } from "./sceneComposer";
 import "./Avatar3DCanvas.scss";
@@ -57,8 +59,8 @@ const CAMERA_PRESETS = {
   },
   portrait: {
     fov: 32,
-    position: [0.14, 1.61, 0.86] as const,
-    target: [0, 1.56, 0] as const,
+    position: [0.11, 1.61, 0.86] as const,
+    target: [0, 1.59, 0] as const,
   },
 };
 
@@ -146,6 +148,7 @@ export const Avatar3DCanvas = forwardRef<
   onReadyRef.current = onReady;
 
   const lastModelKeyRef = useRef<string>("");
+  const lastFaceKeyRef = useRef<string>("");
   const lastAuraRef = useRef<string>("");
   const hasSignaledReadyRef = useRef<boolean>(false);
 
@@ -156,6 +159,8 @@ export const Avatar3DCanvas = forwardRef<
         .join("|"),
     [resolved]
   );
+
+  const faceSignature = `${resolved.eyeStyle}|${resolved.browStyle}|${resolved.noseStyle}|${resolved.mouthStyle}|${resolved.bodyType}`;
 
   useImperativeHandle(
     ref,
@@ -305,6 +310,7 @@ export const Avatar3DCanvas = forwardRef<
     controlsRef.current = controls;
     rigRef.current = rig;
     lastModelKeyRef.current = "";
+    lastFaceKeyRef.current = "";
     lastAuraRef.current = "";
     hasSignaledReadyRef.current = false;
 
@@ -375,9 +381,15 @@ export const Avatar3DCanvas = forwardRef<
 
     const controller = new AbortController();
     const modelsChanged = lastModelKeyRef.current !== modelSignature;
+    const faceChanged = lastFaceKeyRef.current !== faceSignature;
     const auraChanged = lastAuraRef.current !== resolved.aura;
 
     if (!modelsChanged) {
+      if (faceChanged) {
+        updateAvatarBodyProportions(rig, resolved.bodyType);
+        updateAvatarFacialFeatures(rig, resolved);
+        lastFaceKeyRef.current = faceSignature;
+      }
       if (auraChanged) {
         clearGroupChildren(rig.auraSlot);
         const auraEffect = createAuraEffect(resolved.aura);
@@ -398,6 +410,7 @@ export const Avatar3DCanvas = forwardRef<
     }
 
     lastModelKeyRef.current = modelSignature;
+    lastFaceKeyRef.current = faceSignature;
     lastAuraRef.current = resolved.aura;
 
     populateAvatarRig(rig, resolved, { signal: controller.signal }).then(() => {
@@ -414,7 +427,7 @@ export const Avatar3DCanvas = forwardRef<
     return () => {
       controller.abort();
     };
-  }, [webglFailed, resolved, modelSignature]);
+  }, [webglFailed, resolved, modelSignature, faceSignature]);
 
   const computedFallbackSize =
     fallbackSize ?? (mode === "card" ? 84 : mode === "hero" ? 136 : 160);

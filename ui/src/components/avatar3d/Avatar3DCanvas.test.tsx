@@ -9,8 +9,11 @@ import Avatar3DCanvas, {
 import {
   clearAvatarGltfCache,
   composeAvatarScene,
+  createFacialFeaturesGroup,
   disposeObjectTree,
   updateAvatarAnimation,
+  updateAvatarBodyProportions,
+  updateAvatarFacialFeatures,
 } from "./sceneComposer";
 import { resolveAvatarConfig } from "../../config/avatarCatalog";
 
@@ -437,5 +440,114 @@ describe("Avatar3DCanvas", () => {
     // Disposal should dispose aura geometries/cloned materials without crashing
     expect(() => disposeObjectTree(rigA.root)).not.toThrow();
     expect(() => disposeObjectTree(rigB.root)).not.toThrow();
+  });
+
+  test("renders distinct 3D facial geometry for eyeStyle, browStyle, noseStyle, mouthStyle and scales bodyType without extra GLB fetches", async () => {
+    HTMLCanvasElement.prototype.getContext = vi.fn((type: string) => {
+      if (type === "webgl2" || type === "webgl") return {} as RenderingContext;
+      return null;
+    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+
+    const baseCfg = resolveAvatarConfig({
+      version: 2,
+      bodyType: "athletic",
+      headShape: "square",
+      eyeStyle: "calm",
+      browStyle: "calm",
+      noseStyle: "straight",
+      mouthStyle: "confident",
+      outfit: "captain",
+      backProp: "explorer_pack",
+    });
+
+    const rig = await composeAvatarScene(baseCfg);
+    expect(rig.sockets.socket_head.children).toContain(rig.faceSlot);
+    expect(rig.faceSlot.getObjectByName("eye_sclera_1")).toBeDefined();
+    expect(rig.faceSlot.getObjectByName("nose_straight_bridge")).toBeDefined();
+    expect(rig.faceSlot.getObjectByName("mouth_confident_line")).toBeDefined();
+    expect(rig.faceSlot.getObjectByName("glasses_rim_1")).toBeUndefined();
+    expect(rig.faceSlot.getObjectByName("brow_scar_slash")).toBeUndefined();
+
+    // Test every facial variant produces its expected named 3D meshes
+    const wiseGroup = createFacialFeaturesGroup({
+      ...baseCfg,
+      eyeStyle: "wise",
+      browStyle: "scarred",
+      noseStyle: "aquiline",
+      mouthStyle: "smile",
+    });
+    expect(wiseGroup.getObjectByName("glasses_rim_1")).toBeDefined();
+    expect(wiseGroup.getObjectByName("glasses_bridge")).toBeDefined();
+    expect(wiseGroup.getObjectByName("brow_scar_slash")).toBeDefined();
+    expect(wiseGroup.getObjectByName("nose_aquiline_bridge")).toBeDefined();
+    expect(wiseGroup.getObjectByName("mouth_smile_teeth")).toBeDefined();
+
+    const sharpGroup = createFacialFeaturesGroup({
+      ...baseCfg,
+      eyeStyle: "sharp",
+      browStyle: "arched",
+      noseStyle: "broad",
+      mouthStyle: "smirk",
+    });
+    expect(sharpGroup.getObjectByName("strategist_monocle")).toBeDefined();
+    expect(sharpGroup.getObjectByName("monocle_chain")).toBeDefined();
+    expect(sharpGroup.getObjectByName("nose_broad_tip")).toBeDefined();
+    expect(sharpGroup.getObjectByName("mouth_smirk_line")).toBeDefined();
+
+    const buttonGroup = createFacialFeaturesGroup({
+      ...baseCfg,
+      eyeStyle: "fierce",
+      browStyle: "thick",
+      noseStyle: "button",
+      mouthStyle: "serious",
+    });
+    expect(buttonGroup.getObjectByName("nose_button_tip")).toBeDefined();
+    expect(buttonGroup.getObjectByName("mouth_serious_line")).toBeDefined();
+
+    // Update facial features & body proportions on existing rig
+    updateAvatarFacialFeatures(rig, {
+      ...baseCfg,
+      eyeStyle: "wise",
+      browStyle: "scarred",
+    });
+    expect(rig.faceSlot.getObjectByName("glasses_rim_1")).toBeDefined();
+    expect(rig.faceSlot.getObjectByName("brow_scar_slash")).toBeDefined();
+
+    updateAvatarBodyProportions(rig, "sturdy");
+    expect(rig.bodyScale[0]).toBeGreaterThan(1.05);
+    expect(rig.sockets.socket_torso.scale.x).toBeCloseTo(rig.bodyScale[0]);
+    expect(rig.sockets.socket_hand_r.position.x).toBeLessThan(-0.38);
+
+    updateAvatarBodyProportions(rig, "slender");
+    expect(rig.bodyScale[0]).toBeLessThan(0.95);
+    expect(rig.sockets.socket_hand_r.position.x).toBeGreaterThan(-0.34);
+
+    // Rerendering Avatar3DCanvas when only face slots change triggers 0 additional GLB fetches
+    const { rerender } = render(<Avatar3DCanvas config={baseCfg} mode="studio" />);
+    await waitFor(() => {
+      expect(mockLoadAsync).toHaveBeenCalled();
+    });
+    const fetchCountAfterInit = mockLoadAsync.mock.calls.length;
+    const renderCountBeforeFaceEdit =
+      mockRendererInstances[0].render.mock.calls.length;
+
+    rerender(
+      <Avatar3DCanvas
+        config={{
+          ...baseCfg,
+          eyeStyle: "wise",
+          browStyle: "scarred",
+          noseStyle: "aquiline",
+          mouthStyle: "smile",
+        }}
+        mode="studio"
+      />
+    );
+
+    expect(mockLoadAsync.mock.calls.length).toBe(fetchCountAfterInit);
+    expect(mockRendererInstances[0].render.mock.calls.length).toBeGreaterThan(
+      renderCountBeforeFaceEdit
+    );
+    expect(() => disposeObjectTree(rig.root)).not.toThrow();
   });
 });

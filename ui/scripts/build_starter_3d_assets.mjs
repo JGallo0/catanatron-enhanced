@@ -595,67 +595,20 @@ function buildHead(variant) {
     );
   }
 
-  // Sculpted nose
+  // Internal facial rig anchors (sceneComposer renders modular eyeStyle/browStyle/noseStyle/mouthStyle on top)
   addMesh(
     root,
-    "nose_bridge",
-    new THREE.CapsuleGeometry(0.012, 0.028, 6, 10),
-    mats.skin,
-    [0, 0.118, 0.098],
-    [0.32, 0, 0]
+    "eye_socket_anchor",
+    new THREE.SphereGeometry(0.012, 8, 6),
+    mats.eyes,
+    [0, 0.136, 0.0]
   );
   addMesh(
     root,
-    "nose_tip",
-    new THREE.SphereGeometry(0.014, 12, 10),
-    mats.skin,
-    [0, 0.103, 0.107],
-    [0, 0, 0],
-    [1.1, 0.85, 0.95]
-  );
-
-  // Eyes (sclera + colored iris + pupil)
-  for (const side of [-1, 1]) {
-    const ex = side * 0.038;
-    const ey = 0.136;
-    const ez = 0.088;
-    addMesh(root, `eye_sclera_${side}`, new THREE.SphereGeometry(0.017, 14, 12), mats.sclera, [ex, ey, ez], [0, 0, 0], [1.1, 0.92, 0.7]);
-    addMesh(root, `eye_iris_${side}`, new THREE.SphereGeometry(0.0105, 14, 12), mats.eyes, [ex, ey, ez + 0.0085], [0, 0, 0], [1, 1, 0.55]);
-    addMesh(root, `eye_pupil_${side}`, new THREE.SphereGeometry(0.0055, 10, 10), mats.pupil, [ex, ey, ez + 0.013], [0, 0, 0], [1, 1, 0.45]);
-
-    // Sculpted arched eyebrow
-    addMesh(
-      root,
-      `brow_${side}`,
-      makeTube(
-        [
-          [side * 0.016, 0.162, 0.094],
-          [side * 0.038, 0.169, 0.098],
-          [side * 0.058, 0.161, 0.088],
-        ],
-        0.0055,
-        10,
-        8
-      ),
-      mats.hair
-    );
-  }
-
-  // Stylized mouth smile curve
-  addMesh(
-    root,
-    "mouth_ridge",
-    makeTube(
-      [
-        [-0.022, 0.066, 0.094],
-        [0, 0.062, 0.099],
-        [0.022, 0.066, 0.094],
-      ],
-      0.0045,
-      10,
-      8
-    ),
-    mats.secondary
+    "brow_socket_anchor",
+    new THREE.SphereGeometry(0.012, 8, 6),
+    mats.hair,
+    [0, 0.16, 0.0]
   );
 
   return root;
