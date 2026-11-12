@@ -45,7 +45,7 @@ from catanatron.models.map import (
     get_nodes_and_edges,
 )
 from catanatron.models.player import Color
-from catanatron.state import PLAYER_INITIAL_STATE, State
+from catanatron.state import PLAYER_INITIAL_STATE, VALID_DICE_MODES, State
 from catanatron.state_functions import get_longest_road_length
 
 #: Bumped whenever the document shape changes incompatibly.
@@ -231,6 +231,7 @@ def state_to_json(game: Game):
             "vps_to_win": game.vps_to_win,
             "discard_limit": s.discard_limit,
             "friendly_robber": s.friendly_robber,
+            "dice_mode": getattr(s, "dice_mode", "random"),
         },
         "map": map_to_json(s.board.map),
         "board": board_to_json(s.board),
@@ -242,6 +243,7 @@ def state_to_json(game: Game):
         },
         "resource_freqdeck": list(s.resource_freqdeck),
         "development_listdeck": list(s.development_listdeck),  # HIDDEN INFO
+        "dice_deck": [list(pair) for pair in getattr(s, "dice_deck", [])],  # HIDDEN INFO
         "random_state": _plain(s.random.getstate()),  # HIDDEN INFO
         "action_records": [action_record_to_json(r) for r in s.action_records],
         "num_turns": s.num_turns,
@@ -298,6 +300,13 @@ def state_from_json(doc, players) -> Game:
     s.players = [by_color[c] for c in s.colors]  # seating order preserved
     s.discard_limit = doc["game"]["discard_limit"]
     s.friendly_robber = doc["game"]["friendly_robber"]
+    dice_mode = doc["game"].get("dice_mode", "random")
+    if dice_mode not in VALID_DICE_MODES:
+        raise ValueError(f"unsupported dice_mode {dice_mode!r}")
+    s.dice_mode = dice_mode
+    s.dice_deck = [
+        (int(pair[0]), int(pair[1])) for pair in (doc.get("dice_deck") or [])
+    ]
     s.board = board_from_json(doc["board"], catan_map)
     s.player_state = dict(doc["player_state"])
     s.resource_freqdeck = list(doc["resource_freqdeck"])
@@ -334,6 +343,7 @@ def state_from_json(doc, players) -> Game:
     game.seed = doc["game"]["seed"]
     game.vps_to_win = doc["game"]["vps_to_win"]
     game.friendly_robber = s.friendly_robber
+    game.dice_mode = s.dice_mode
     game.random = s.random
     game.state = s
     game.playable_actions = generate_playable_actions(s)
@@ -367,7 +377,12 @@ def client_view(doc, perspective=None):
     view["development_listdeck"] = dict(
         sorted(Counter(doc["development_listdeck"]).items())
     )
+    raw_dice_deck = view.pop("dice_deck", None)
     view["game"] = {k: v for k, v in doc["game"].items() if k != "seed"}
+    if view["game"].get("dice_mode") == "balanced":
+        view["dice_deck_remaining"] = (
+            len(raw_dice_deck) if isinstance(raw_dice_deck, list) else 0
+        )
     view.pop("random_state", None)
     if perspective is None:
         return view

@@ -36,10 +36,11 @@ import ResourceSelector from "../components/ResourceSelector";
 import DiscardPlannerDialog from "../components/DiscardPlannerDialog";
 import TradeModal from "../components/TradeModal";
 import TradeOfferDecisionDialog from "../components/TradeOfferDecisionDialog";
+import Dice3D from "../components/Dice3D";
 import {
   CitySvgPiece,
-  DiceFaceSvg,
   ResourceIcon,
+  RoadSvgPiece,
   SettlementSvgPiece,
 } from "../components/icons/GameIcons";
 import {
@@ -86,10 +87,12 @@ export default function ActionsToolbar({
   isBotThinking,
   replayMode,
   isRollingDice = false,
+  onSendChatMessage,
 }: {
   isBotThinking: boolean;
   replayMode: boolean;
   isRollingDice?: boolean;
+  onSendChatMessage?: (body: string) => Promise<void> | void;
 }) {
   const { gameId } = useParams();
   const { state, dispatch } = useContext(store);
@@ -100,18 +103,7 @@ export default function ActionsToolbar({
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [tradeDecisionMinimized, setTradeDecisionMinimized] = useState(false);
   const [costsModalOpen, setCostsModalOpen] = useState(false);
-  const [pillSpinFaces, setPillSpinFaces] = useState<[number, number]>([1, 6]);
   const { isSubmitting, submitDiscardBatch } = useDiscardBatchSubmission();
-
-  useEffect(() => {
-    if (!isRollingDice) return;
-    let step = 0;
-    const iv = setInterval(() => {
-      step += 1;
-      setPillSpinFaces([((step * 3) % 6) + 1, ((step * 5 + 2) % 6) + 1]);
-    }, 90);
-    return () => clearInterval(iv);
-  }, [isRollingDice]);
 
   const {
     gameState,
@@ -288,6 +280,37 @@ export default function ActionsToolbar({
   const buyDevCard = useCallback(async () => {
     await executeGameAction([humanColor, "BUY_DEVELOPMENT_CARD", null]);
   }, [humanColor, executeGameAction]);
+
+  const playableDevCallbacks = useMemo(() => {
+    if (!isInteractiveTurn || isPlayingDevCard) return undefined;
+    const map: Partial<
+      Record<
+        "KNIGHT" | "MONOPOLY" | "YEAR_OF_PLENTY" | "ROAD_BUILDING",
+        () => void
+      >
+    > = {};
+    if (playableDevCardTypes.has("PLAY_KNIGHT_CARD")) {
+      map.KNIGHT = playKnightCard;
+    }
+    if (playableDevCardTypes.has("PLAY_MONOPOLY")) {
+      map.MONOPOLY = () => dispatch({ type: ACTIONS.SET_IS_PLAYING_MONOPOLY });
+    }
+    if (playableDevCardTypes.has("PLAY_YEAR_OF_PLENTY")) {
+      map.YEAR_OF_PLENTY = () =>
+        dispatch({ type: ACTIONS.SET_IS_PLAYING_YEAR_OF_PLENTY });
+    }
+    if (playableDevCardTypes.has("PLAY_ROAD_BUILDING")) {
+      map.ROAD_BUILDING = playRoadBuilding;
+    }
+    return map;
+  }, [
+    isInteractiveTurn,
+    isPlayingDevCard,
+    playableDevCardTypes,
+    playKnightCard,
+    playRoadBuilding,
+    dispatch,
+  ]);
 
   const useItems = [
     {
@@ -476,7 +499,13 @@ export default function ActionsToolbar({
                         dispatch({ type: ACTIONS.TOGGLE_BUILDING_ROAD })
                       }
                     >
-                      <span className="cu-build-tile__piece cu-build-tile__piece--road" />
+                      {humanColor ? (
+                        <span className="cu-build-tile__road-svg" aria-hidden="true">
+                          <RoadSvgPiece color={humanColor} />
+                        </span>
+                      ) : (
+                        <span className="cu-build-tile__piece cu-build-tile__piece--road" />
+                      )}
                       <span className="cu-build-tile__name">Estrada</span>
                       <span className="cu-build-tile__stock">{myRoadsLeft}</span>
                     </button>
@@ -496,8 +525,8 @@ export default function ActionsToolbar({
                       }
                     >
                       {humanColor && (
-                        <svg width="20" height="20" viewBox="-22 -24 44 42" aria-hidden="true">
-                          <SettlementSvgPiece color={humanColor} scale={0.9} />
+                        <svg width="22" height="22" viewBox="-24 -30 48 52" aria-hidden="true">
+                          <SettlementSvgPiece color={humanColor} scale={0.95} />
                         </svg>
                       )}
                       <span className="cu-build-tile__name">Aldeia</span>
@@ -519,8 +548,8 @@ export default function ActionsToolbar({
                       }
                     >
                       {humanColor && (
-                        <svg width="20" height="20" viewBox="-22 -24 44 42" aria-hidden="true">
-                          <CitySvgPiece color={humanColor} scale={0.85} />
+                        <svg width="22" height="22" viewBox="-24 -30 48 52" aria-hidden="true">
+                          <CitySvgPiece color={humanColor} scale={0.88} />
                         </svg>
                       )}
                       <span className="cu-build-tile__name">Cidade</span>
@@ -606,6 +635,8 @@ export default function ActionsToolbar({
               playerState={gameState.player_state}
               playerKey={playerKey(gameState, humanColor)}
               showEmptySlots={true}
+              interactiveDevCards={true}
+              playableDevCallbacks={playableDevCallbacks}
             />
             <div
               className={cn("cu-hand-limit-pill", {
@@ -624,8 +655,9 @@ export default function ActionsToolbar({
         {/* RIGHT ZONE: 2D6 Dice + Circular Golden CTA Orb */}
         <div className="cu-console__cta-zone">
           {(isRollingDice || latestDice) && (() => {
-            const shownPillDice = isRollingDice ? pillSpinFaces : latestDice!;
-            const isHotDice = !isRollingDice && (diceSum === 6 || diceSum === 8);
+            const shownPillDice: [number, number] = latestDice ?? [1, 6];
+            const isHotDice =
+              !isRollingDice && (diceSum === 6 || diceSum === 7 || diceSum === 8);
             return (
               <div
                 className={cn("dice-widget-pill", {
@@ -638,15 +670,21 @@ export default function ActionsToolbar({
                 }
               >
                 <div className="dice-widget-pill__faces">
-                  <DiceFaceSvg
+                  <Dice3D
                     value={shownPillDice[0]}
-                    size={26}
+                    rolling={isRollingDice}
                     isHot={isHotDice}
+                    size={24}
+                    dieIndex={0}
+                    variant="mini"
                   />
-                  <DiceFaceSvg
+                  <Dice3D
                     value={shownPillDice[1]}
-                    size={26}
+                    rolling={isRollingDice}
                     isHot={isHotDice}
+                    size={24}
+                    dieIndex={1}
+                    variant="mini"
                   />
                 </div>
                 <span className="dice-widget-pill__sum">
@@ -701,6 +739,7 @@ export default function ActionsToolbar({
         gameState={gameState}
         humanColor={humanColor ?? gameState.current_color}
         onExecuteAction={executeGameAction}
+        onSendChatMessage={onSendChatMessage}
       />
 
       <Dialog

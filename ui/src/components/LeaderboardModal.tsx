@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogTitle, Tab, Tabs, Button } from "@mui/mate
 import { getLeaderboard, getMatchHistory } from "../utils/apiClient";
 import type { LeaderboardEntry, MatchRecord } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { formatMapTemplateLabel } from "../config/botCatalog";
 import PlayerAvatar from "./PlayerAvatar";
 import "./LeaderboardModal.scss";
 
@@ -136,7 +137,7 @@ export default function LeaderboardModal({
                     </span>
                     <small>
                       {m.mode === "MULTIPLAYER" ? "Multiplayer" : "Solo vs IA"} • Mapa{" "}
-                      {m.map_template} • {m.num_turns} turnos
+                      {formatMapTemplateLabel(m.map_template)} • {m.num_turns} turnos
                     </small>
                   </div>
                   <div className="match-history-card__seats">

@@ -41,19 +41,44 @@
   background: transparent;
 }
 
-.board__island-glow {
+.board__seascape-underlay {
   position: absolute;
   transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(253, 230, 138, 0.22) 0%,
-    rgba(14, 165, 233, 0.28) 42%,
-    rgba(2, 132, 199, 0.12) 65%,
-    rgba(15, 23, 42, 0) 80%
-  );
   pointer-events: none;
   z-index: 0;
+  filter: drop-shadow(0 0 42px rgba(20, 184, 166, 0.22));
+}
+
+.board__surf-ring {
+  transform-origin: 300px 300px;
+
+  &--inner {
+    animation: board-surf-breathe 11s ease-in-out infinite alternate;
+  }
+
+  &--outer {
+    animation: board-surf-drift 16s linear infinite;
+  }
+}
+
+@keyframes board-surf-breathe {
+  0% {
+    transform: scale(0.985) rotate(-2deg);
+    opacity: 0.68;
+  }
+  100% {
+    transform: scale(1.015) rotate(2deg);
+    opacity: 0.96;
+  }
+}
+
+@keyframes board-surf-drift {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 // ===== Robber Pawn
@@ -96,19 +121,30 @@
 
 .road {
   position: absolute;
-  width: 82%;
-  height: 11px;
-  border-radius: 5px;
-  border: 2px solid #ffffff;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 84%;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none;
+  transition: transform 0.2s ease, filter 0.2s ease;
+
+  .road-piece__svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+  }
 }
 
 @media screen and (min-width: variables.$sm-breakpoint) {
   .edge {
-    height: 16px;
+    height: 17px;
   }
   .road {
-    height: 12px;
+    height: 16px;
   }
 }
 
@@ -163,9 +199,9 @@
 .edge--recent {
   z-index: 14;
   .road {
-    box-shadow:
-      0 0 0 2px #fef08a,
-      0 0 16px rgba(250, 204, 21, 0.95) !important;
+    filter:
+      drop-shadow(0 0 7px #fef08a)
+      drop-shadow(0 0 15px rgba(250, 204, 21, 0.95)) !important;
     animation: recent-piece-flash 0.55s ease-in-out 3;
   }
 }
@@ -249,5 +285,116 @@
   .edge .pulse {
     width: 84%;
     height: 112%;
+  }
+}
+
+.node--pending {
+  z-index: 20;
+
+  .pulse:after {
+    background: radial-gradient(
+      circle,
+      #34d399 0%,
+      #059669 75%,
+      #064e3b 100%
+    );
+    border-color: #fef08a;
+    transform: scale(1.22);
+    box-shadow:
+      0 0 0 3px rgba(6, 78, 59, 0.9),
+      0 0 22px rgba(52, 211, 153, 0.98);
+  }
+}
+
+.edge--pending {
+  z-index: 19;
+
+  .pulse:after {
+    background: linear-gradient(90deg, #34d399 0%, #10b981 100%);
+    border-color: #fef08a;
+    transform: scale(1.18);
+    box-shadow:
+      0 0 0 2.5px rgba(6, 78, 59, 0.9),
+      0 0 20px rgba(52, 211, 153, 0.98);
+  }
+}
+
+.placement-confirm-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 98px;
+  transform: translateX(-50%);
+  z-index: 39;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(52, 211, 153, 0.72);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.72),
+    0 0 20px rgba(16, 185, 129, 0.25);
+
+  &__label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #ecfdf5;
+    white-space: nowrap;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.placement-confirm-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.14s ease, filter 0.14s ease;
+
+  &--confirm {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-color: #a7f3d0;
+    color: #ffffff;
+
+    &:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+  }
+
+  &--cancel {
+    background: rgba(51, 65, 85, 0.9);
+    border-color: rgba(148, 163, 184, 0.45);
+    color: #e2e8f0;
+
+    &:hover {
+      background: rgba(127, 29, 29, 0.85);
+      border-color: rgba(248, 113, 113, 0.65);
+      color: #fee2e2;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .placement-confirm-bar {
+    bottom: 122px;
+    max-width: 94vw;
+    padding: 6px 10px;
+    gap: 8px;
+
+    &__label {
+      font-size: 0.73rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   }
 }

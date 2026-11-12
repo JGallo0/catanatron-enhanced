@@ -245,6 +245,70 @@
   flex-shrink: 0;
 }
 
+.open-lobby-error {
+  padding: 9px 13px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.open-lobby-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.open-lobby-close-room-btn {
+  border-color: rgba(248, 113, 113, 0.5) !important;
+  color: #fca5a5 !important;
+  font-weight: 700 !important;
+  border-radius: 9px !important;
+  text-transform: none !important;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.14) !important;
+    border-color: #f87171 !important;
+  }
+}
+
+.open-lobby-leave-room-btn {
+  border-color: rgba(148, 163, 184, 0.45) !important;
+  color: #cbd5e1 !important;
+  font-weight: 700 !important;
+  border-radius: 9px !important;
+  text-transform: none !important;
+}
+
+.open-lobby-confirm-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.open-lobby-confirm-btn {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 7px !important;
+  text-transform: none !important;
+}
+
+.open-lobby-cancel-close-btn {
+  color: #cbd5e1 !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  min-width: auto !important;
+}
+
 @media (max-width: 600px) {
   .open-lobby-paper {
     margin: 10px !important;
@@ -271,6 +335,10 @@
   .open-lobby-code-btn,
   .open-lobby-filter-pill,
   .open-lobby-join-btn,
+  .open-lobby-close-room-btn,
+  .open-lobby-confirm-btn,
+  .open-lobby-cancel-close-btn,
+  .open-lobby-leave-room-btn,
   .open-lobby-create-btn {
     min-height: 42px;
   }

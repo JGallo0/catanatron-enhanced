@@ -28,6 +28,7 @@
 .room-lobby-header {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 14px;
 }
 
@@ -44,6 +45,9 @@
 }
 
 .room-lobby-title-group {
+  flex: 1;
+  min-width: 200px;
+
   h1 {
     margin: 0;
     font-family: "Cinzel", "Outfit", serif;
@@ -55,6 +59,59 @@
     font-size: 0.84rem;
     color: #94a3b8;
   }
+}
+
+.room-lobby-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.room-lobby-close-btn {
+  border-color: rgba(248, 113, 113, 0.5) !important;
+  color: #fca5a5 !important;
+  font-weight: 700 !important;
+  border-radius: 10px !important;
+  text-transform: none !important;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.14) !important;
+    border-color: #f87171 !important;
+  }
+}
+
+.room-lobby-leave-btn {
+  border-color: rgba(148, 163, 184, 0.45) !important;
+  color: #cbd5e1 !important;
+  font-weight: 700 !important;
+  border-radius: 10px !important;
+  text-transform: none !important;
+}
+
+.room-lobby-confirm-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.room-lobby-confirm-btn {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 7px !important;
+  text-transform: none !important;
+}
+
+.room-lobby-cancel-btn {
+  color: #cbd5e1 !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  min-width: auto !important;
 }
 
 .room-lobby-error {
@@ -273,6 +330,130 @@
   border-radius: 12px !important;
 }
 
+.lobby-difficulty-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
+    span {
+      font-weight: 700;
+      font-size: 0.86rem;
+      color: #f8fafc;
+    }
+
+    strong {
+      font-size: 0.86rem;
+      color: #fde047;
+    }
+  }
+
+  &__options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+.lobby-difficulty-btn {
+  background: rgba(15, 23, 42, 0.8) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  min-height: 40px;
+  text-transform: none !important;
+
+  &.selected {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+    border-color: #fbbf24 !important;
+    color: #ffffff !important;
+  }
+}
+
+.lobby-dice-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
+    span {
+      font-weight: 700;
+      font-size: 0.86rem;
+      color: #f8fafc;
+    }
+
+    strong {
+      font-size: 0.86rem;
+      color: #38bdf8;
+    }
+  }
+
+  &__options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+.lobby-inline-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lobby-help-btn {
+  padding: 0 !important;
+  color: rgba(255, 255, 255, 0.56) !important;
+}
+
+.lobby-dice-btn {
+  background: rgba(15, 23, 42, 0.8) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  font-size: 0.8rem !important;
+  min-height: 40px;
+  text-transform: none !important;
+
+  &.selected {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+    border-color: #38bdf8 !important;
+    color: #ffffff !important;
+  }
+}
+
+.lobby-select-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lobby-option-hint {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
 .lobby-rules-summary {
   display: flex;
   flex-wrap: wrap;
@@ -338,7 +519,11 @@
   .remove-seat-btn,
   .invite-copy-btn,
   .identity-save-btn,
-  .identity-avatar-btn {
+  .identity-avatar-btn,
+  .room-lobby-close-btn,
+  .room-lobby-leave-btn,
+  .room-lobby-confirm-btn,
+  .room-lobby-cancel-btn {
     min-height: 42px;
   }
 
@@ -353,5 +538,9 @@
   .invite-link-box {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .lobby-dice-bar__options {
+    grid-template-columns: 1fr;
   }
 }

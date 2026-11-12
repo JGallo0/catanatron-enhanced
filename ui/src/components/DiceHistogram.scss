@@ -1,0 +1,130 @@
+.dice-histogram {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 4px;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+
+    h3 {
+      margin: 0;
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #fde047;
+    }
+  }
+
+  &__count {
+    display: block;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+
+  &__mode-pill {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: #cbd5e1;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+
+    &.is-balanced {
+      background: rgba(217, 119, 6, 0.2);
+      border-color: rgba(250, 204, 21, 0.55);
+      color: #fde047;
+    }
+  }
+
+  &__bars {
+    display: grid;
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    gap: 4px;
+    align-items: end;
+    padding-top: 6px;
+  }
+
+  &__col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+
+    &.is-hot .dice-histogram__fill {
+      background: linear-gradient(180deg, #f87171 0%, #dc2626 100%);
+    }
+
+    &.is-hot .dice-histogram__label {
+      color: #fca5a5;
+    }
+
+    &.is-seven .dice-histogram__fill {
+      background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+    }
+
+    &.is-seven .dice-histogram__label {
+      color: #fde047;
+    }
+
+    &.is-last .dice-histogram__label {
+      background: rgba(250, 204, 21, 0.25);
+      border-radius: 4px;
+      padding: 0 3px;
+    }
+  }
+
+  &__val {
+    height: 14px;
+    font-size: 0.64rem;
+    font-weight: 800;
+    color: #e2e8f0;
+    line-height: 14px;
+  }
+
+  &__track {
+    position: relative;
+    width: 100%;
+    height: 76px;
+    border-radius: 5px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+  }
+
+  &__fill {
+    width: 100%;
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+    transition: height 0.25s ease;
+    border-radius: 3px 3px 0 0;
+  }
+
+  &__expected-tick {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1.5px dashed rgba(253, 224, 71, 0.65);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  &__label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #cbd5e1;
+  }
+
+  &__legend {
+    margin: 2px 0 0;
+    font-size: 0.67rem;
+    color: #94a3b8;
+    line-height: 1.3;
+  }
+}

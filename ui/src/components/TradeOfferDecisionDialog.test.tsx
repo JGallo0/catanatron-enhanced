@@ -153,4 +153,54 @@ describe("TradeOfferDecisionDialog", () => {
       expect(onExecuteAction).toHaveBeenCalledWith(cancelAct);
     });
   });
+
+  test("opens Contrapropor editor, sends counter-offer summary to chat, and emits REJECT_TRADE", async () => {
+    const onExecuteAction = vi.fn().mockResolvedValue(undefined);
+    const onSendChatMessage = vi.fn().mockResolvedValue(undefined);
+    const tradeTuple = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0];
+
+    const state = makeGameState({
+      current_color: "BLUE",
+      current_turn_index: 0,
+      current_prompt: "DECIDE_TRADE",
+      is_resolving_trade: true,
+      current_trade: tradeTuple,
+      seat_names: { RED: "Creitu", BLUE: "João" },
+      player_state: {
+        ...makeGameState().player_state,
+        P1_SHEEP_IN_HAND: 2,
+      },
+      current_playable_actions: [["BLUE", "REJECT_TRADE", tradeTuple]],
+    });
+
+    render(
+      <ThemeProvider theme={theme}>
+        <TradeOfferDecisionDialog
+          open={true}
+          onMinimize={vi.fn()}
+          gameState={state}
+          humanColor="BLUE"
+          onExecuteAction={onExecuteAction}
+          onSendChatMessage={onSendChatMessage}
+        />
+      </ThemeProvider>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Contrapropor/i }));
+    expect(screen.getByText(/Sugerir Contraproposta/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Aumentar oferta de Lã"));
+    fireEvent.click(screen.getByRole("button", { name: /Enviar Contraproposta/i }));
+
+    await waitFor(() => {
+      expect(onSendChatMessage).toHaveBeenCalledWith(
+        expect.stringMatching(/Contraproposta para Creitu:.*1[×x] Lã.*1[×x] Madeira/i)
+      );
+      expect(onExecuteAction).toHaveBeenCalledWith([
+        "BLUE",
+        "REJECT_TRADE",
+        tradeTuple,
+      ]);
+    });
+  });
 });

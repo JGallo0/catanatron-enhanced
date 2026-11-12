@@ -65,7 +65,9 @@ def _score_hand_utility(state, color, hand: Sequence[int]) -> float:
         unlock_bonus += 2.5
 
     total_cards = sum(hand)
-    discard_penalty = 4.5 if total_cards > state.discard_limit else 0.0
+    discard_limit = max(1, int(getattr(state, "discard_limit", 7)))
+    excess = max(0, total_cards - discard_limit)
+    discard_penalty = (4.5 + excess * 2.5) if excess > 0 else 0.0
     surplus_penalty = sum(max(count - 2, 0) * 0.45 for count in hand)
 
     return (

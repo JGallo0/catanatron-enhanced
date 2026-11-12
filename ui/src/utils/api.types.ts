@@ -198,6 +198,9 @@ export type RoomSeat = {
   avatar_config?: Partial<AvatarConfig> | null;
 };
 
+export type BotDifficulty = "easy" | "medium" | "hard";
+export type DiceMode = "random" | "balanced";
+
 export type RoomState = {
   room_code: string;
   status: "WAITING" | "IN_PROGRESS";
@@ -209,6 +212,9 @@ export type RoomState = {
     vps_to_win: number;
     discard_limit: number;
     friendly_robber: boolean;
+    bot_difficulty?: BotDifficulty;
+    dice_mode?: DiceMode;
+    created_at?: number;
   };
   seats: RoomSeat[];
 };
@@ -257,7 +263,9 @@ export type GameState = {
     vps_to_win: number;
     discard_limit: number;
     friendly_robber: boolean;
+    dice_mode?: DiceMode;
   };
+  dice_deck_remaining?: number;
   num_turns: number;
   current_player_index: number;
   current_turn_index: number;
@@ -319,5 +327,17 @@ export type MatchRecord = {
   winner_is_bot: boolean;
   finished_at: number;
   participants: MatchParticipant[];
+};
+
+export type GameMessageKind = "CHAT" | "TAUNT";
+
+export type GameMessage = {
+  id: number;
+  game_id: string;
+  color: Color;
+  sender_name: string;
+  kind: GameMessageKind;
+  body: string;
+  created_at: number;
 };
 

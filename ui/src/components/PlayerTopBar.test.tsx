@@ -168,4 +168,106 @@ describe("PlayerTopBar", () => {
     ).map((el) => el.textContent);
     expect(cardNames).toEqual(["Ana", "Creitu", "Felire", "Guiri"]);
   });
+
+  test("applies dynamic game.discard_limit threshold for resource danger badge and inspector warning", () => {
+    const highLimitState = makeGameState({
+      colors: ["RED", "BLUE"],
+      bot_colors: ["BLUE"],
+      seat_names: { RED: "Ana", BLUE: "Jaó" },
+      game: {
+        id: "game-123",
+        vps_to_win: 10,
+        discard_limit: 10,
+        friendly_robber: false,
+      },
+      player_state: {
+        ...makeGameState().player_state,
+        P1_NUM_RESOURCES_IN_HAND: 8,
+      },
+    });
+
+    const { container, rerender } = render(
+      <StateProvider>
+        <PlayerTopBar gameState={highLimitState} />
+      </StateProvider>
+    );
+    expect(container.querySelectorAll(".cu-stat--danger")).toHaveLength(0);
+
+    const lowLimitState = makeGameState({
+      ...highLimitState,
+      game: {
+        id: "game-123",
+        vps_to_win: 10,
+        discard_limit: 5,
+        friendly_robber: false,
+      },
+    });
+    rerender(
+      <StateProvider>
+        <PlayerTopBar gameState={lowLimitState} />
+      </StateProvider>
+    );
+    expect(container.querySelectorAll(".cu-stat--danger")).toHaveLength(1);
+    expect(
+      screen.getByTitle(/Atenção: 8\/5 cartas! Perderá metade se rolar 7\./)
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Inspecionar Jaó/i }));
+    expect(document.querySelectorAll(".cu-inspect-stat-box--warn")).toHaveLength(1);
+  });
+
+  test("renders heraldic star beside road/army icons for current leader and moves the star dynamically when surpassed", () => {
+    const base = makeGameState({
+      colors: ["RED", "BLUE"],
+      bot_colors: ["BLUE"],
+      seat_names: { RED: "Ana", BLUE: "Creitu" },
+      player_state: {
+        ...makeGameState().player_state,
+        P0_LONGEST_ROAD_LENGTH: 5,
+        P0_HAS_ROAD: true,
+        P0_PLAYED_KNIGHT: 3,
+        P0_HAS_ARMY: true,
+        P1_LONGEST_ROAD_LENGTH: 4,
+        P1_HAS_ROAD: false,
+        P1_PLAYED_KNIGHT: 2,
+        P1_HAS_ARMY: false,
+      },
+    });
+
+    const { container, rerender } = render(
+      <StateProvider>
+        <PlayerTopBar gameState={base} />
+      </StateProvider>
+    );
+
+    const cards = () => container.querySelectorAll(".cu-player-card");
+    expect(cards()[0].querySelector('[data-testid="award-star-road"]')).toBeTruthy();
+    expect(cards()[0].querySelector('[data-testid="award-star-army"]')).toBeTruthy();
+    expect(cards()[1].querySelector('[data-testid="award-star-road"]')).toBeNull();
+    expect(cards()[1].querySelector('[data-testid="award-star-army"]')).toBeNull();
+
+    const overtaken = makeGameState({
+      ...base,
+      player_state: {
+        ...base.player_state,
+        P0_HAS_ROAD: false,
+        P0_HAS_ARMY: false,
+        P1_LONGEST_ROAD_LENGTH: 6,
+        P1_HAS_ROAD: true,
+        P1_PLAYED_KNIGHT: 4,
+        P1_HAS_ARMY: true,
+      },
+    });
+
+    rerender(
+      <StateProvider>
+        <PlayerTopBar gameState={overtaken} />
+      </StateProvider>
+    );
+
+    expect(cards()[0].querySelector('[data-testid="award-star-road"]')).toBeNull();
+    expect(cards()[0].querySelector('[data-testid="award-star-army"]')).toBeNull();
+    expect(cards()[1].querySelector('[data-testid="award-star-road"]')).toBeTruthy();
+    expect(cards()[1].querySelector('[data-testid="award-star-army"]')).toBeTruthy();
+  });
 });

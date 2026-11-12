@@ -108,6 +108,25 @@ export function playVictorySound() {
   playTone(783.99, 0.45, "sine", 0.11, 0.36);
 }
 
+export function playChatSound() {
+  playTone(587.33, 0.06, "sine", 0.045, 0);
+  playTone(783.99, 0.08, "sine", 0.045, 0.05);
+}
+
+export function playTauntSound(tone?: string) {
+  if (tone === "anger") {
+    playTone(146.83, 0.14, "sawtooth", 0.05, 0);
+    playTone(130.81, 0.18, "sawtooth", 0.05, 0.11);
+  } else if (tone === "rally" || tone === "crown") {
+    playTone(392.0, 0.09, "triangle", 0.06, 0);
+    playTone(493.88, 0.09, "triangle", 0.06, 0.08);
+    playTone(587.33, 0.16, "triangle", 0.07, 0.16);
+  } else {
+    playTone(523.25, 0.07, "sine", 0.05, 0);
+    playTone(659.25, 0.11, "sine", 0.05, 0.06);
+  }
+}
+
 export function playActionRecordSound(record?: GameActionRecord) {
   if (!record || !record[0]) return;
   const actionType = record[0][1];

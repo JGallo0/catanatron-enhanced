@@ -1,7 +1,11 @@
-import { render, screen } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, test, vi } from "vitest";
 
 import ResourceCards from "./ResourceCards";
+
+afterEach(() => {
+  cleanup();
+});
 
 const OWN_HAND = {
   P0_WOOD_IN_HAND: 2,
@@ -57,4 +61,33 @@ test("draws nothing for an empty hand", () => {
   );
 
   expect(container.querySelectorAll(".card")).toHaveLength(0);
+});
+
+test("supports interactive dev cards with playable action, Nova (Próx. turno) lock, and +1 PV badge", () => {
+  const onPlayKnight = vi.fn();
+  render(
+    <ResourceCards
+      playerState={{
+        ...OWN_HAND,
+        P0_KNIGHT_IN_HAND: 1,
+        P0_MONOPOLY_IN_HAND: 1,
+        P0_MONOPOLY_BOUGHT_THIS_TURN: 1,
+        P0_VICTORY_POINT_IN_HAND: 1,
+      }}
+      playerKey="P0"
+      showEmptySlots={true}
+      interactiveDevCards={true}
+      playableDevCallbacks={{ KNIGHT: onPlayKnight }}
+    />
+  );
+
+  expect(screen.getByText("+1 PV")).toBeInTheDocument();
+  expect(screen.getByText("Nova (Próx. turno)")).toBeInTheDocument();
+
+  const knightBtn = screen.getByRole("button", { name: /Cavaleiro.*Clique para jogar/i });
+  fireEvent.click(knightBtn);
+
+  const playBtn = screen.getByRole("button", { name: /Jogar Carta/i });
+  fireEvent.click(playBtn);
+  expect(onPlayKnight).toHaveBeenCalledTimes(1);
 });

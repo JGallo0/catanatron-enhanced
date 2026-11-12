@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@mui/material";
 import {
   DEFAULT_PLAYERS,
+  closeRoom,
   fetchCurrentAccount,
   getAuthConfig,
   getPlayers,
   getSavedAccount,
+  leaveRoom,
   listActiveRooms,
   logoutAccount,
   saveGameRoomCode,
@@ -25,6 +27,7 @@ import {
 import LeaderboardModal from "../components/LeaderboardModal";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
+import AlmanacModal from "../components/AlmanacModal";
 import AuthModal from "../components/home/AuthModal";
 import MatchSetupModal, {
   type MatchSetupMode,
@@ -51,6 +54,7 @@ export default function HomePage() {
   const [openLobbyOpen, setOpenLobbyOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [avatarStudioOpen, setAvatarStudioOpen] = useState(false);
+  const [almanacOpen, setAlmanacOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authPromptBanner, setAuthPromptBanner] = useState<string | undefined>(
     undefined
@@ -71,6 +75,36 @@ export default function HomePage() {
       .then(setActiveRooms)
       .catch(() => {});
   }, [account?.auth_token]);
+
+  const handleCloseRoom = useCallback(
+    async (roomCode: string) => {
+      try {
+        await closeRoom(roomCode);
+      } catch (err: any) {
+        if (err?.response?.status !== 404) {
+          throw err;
+        }
+      }
+      const clean = roomCode.trim().toUpperCase();
+      setActiveRooms((prev) => prev.filter((r) => r.room_code !== clean));
+      refreshRooms();
+    },
+    [refreshRooms]
+  );
+
+  const handleLeaveRoom = useCallback(
+    async (roomCode: string) => {
+      try {
+        await leaveRoom(roomCode);
+      } catch (err: any) {
+        if (err?.response?.status !== 404) {
+          throw err;
+        }
+      }
+      refreshRooms();
+    },
+    [refreshRooms]
+  );
 
   useEffect(() => {
     getPlayers()
@@ -284,6 +318,13 @@ export default function HomePage() {
           >
             🎨 Personalizar Avatar
           </Button>
+          <Button
+            variant="outlined"
+            className="home-dock-btn home-dock-btn--almanac"
+            onClick={() => setAlmanacOpen(true)}
+          >
+            📖 Almanaque
+          </Button>
         </nav>
 
         <footer className="home-page__legal-footer">
@@ -350,6 +391,8 @@ export default function HomePage() {
           setSetupMode("room");
         }}
         onRefresh={refreshRooms}
+        onCloseRoom={handleCloseRoom}
+        onLeaveRoom={handleLeaveRoom}
       />
 
       <LeaderboardModal
@@ -381,6 +424,11 @@ export default function HomePage() {
           setGuestProfile(saved);
           setHostName(saved.display_name);
         }}
+      />
+
+      <AlmanacModal
+        open={almanacOpen}
+        onClose={() => setAlmanacOpen(false)}
       />
     </div>
   );

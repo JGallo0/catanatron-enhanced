@@ -5,10 +5,12 @@ import { type Color, type PlayerState } from "../utils/api.types";
 import ResourceCards from "./ResourceCards";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import {
+  AwardStarSvg,
   CitySvgPiece,
-  HybridIllustration,
+  RoadSvgPiece,
   SettlementSvgPiece,
 } from "./icons/GameIcons";
+import { RoadStatSvg, SwordStatSvg } from "./PlayerTopBar";
 
 export default function PlayerStateBox({
   playerState,
@@ -98,7 +100,7 @@ export default function PlayerStateBox({
           <svg
             width="24"
             height="24"
-            viewBox="-22 -24 44 42"
+            viewBox="-24 -30 48 52"
             aria-hidden="true"
           >
             <SettlementSvgPiece color={color} scale={1.0} />
@@ -116,10 +118,10 @@ export default function PlayerStateBox({
           <svg
             width="24"
             height="24"
-            viewBox="-22 -24 44 42"
+            viewBox="-24 -30 48 52"
             aria-hidden="true"
           >
-            <CitySvgPiece color={color} scale={1.0} />
+            <CitySvgPiece color={color} scale={0.96} />
           </svg>
           <div className="player-piece-badge__text">
             <strong>{builtCities}/4</strong>
@@ -131,13 +133,9 @@ export default function PlayerStateBox({
           className="player-piece-badge"
           title={`Estradas construídas: ${builtRoads} (Restam ${roadsLeft} no estoque)`}
         >
-          <span
-            className="player-piece-badge__road-icon"
-            style={{
-              background: `linear-gradient(90deg, ${colorMeta.secondary}, ${colorMeta.primary})`,
-              borderColor: colorMeta.dark,
-            }}
-          />
+          <span className="player-piece-badge__road-svg" aria-hidden="true">
+            <RoadSvgPiece color={color} />
+          </span>
           <div className="player-piece-badge__text">
             <strong>{builtRoads}/15</strong>
             <small>Estradas</small>
@@ -157,15 +155,16 @@ export default function PlayerStateBox({
               : "Knights Played"
           }
         >
-          <span className="score-pill__medallion">
-            <HybridIllustration
-              src="/assets/illustrations/ui/largest_army.webp"
-              alt="Maior Exército"
-              fallback={<span aria-hidden="true">⚔️</span>}
-            />
-          </span>
+          <SwordStatSvg />
           <span>{knightsPlayed}</span>
-          <small>{hasArmy ? "Maior Exército ★" : "Cavaleiros"}</small>
+          {hasArmy && (
+            <AwardStarSvg
+              size={13}
+              className="score-pill__star"
+              label="Maior Exército"
+            />
+          )}
+          <small>{hasArmy ? "Maior Exército" : "Cavaleiros"}</small>
         </div>
 
         <div
@@ -177,15 +176,16 @@ export default function PlayerStateBox({
             hasRoad ? "Longest Road — Maior Estrada (+2 PV)" : "Longest Road"
           }
         >
-          <span className="score-pill__medallion">
-            <HybridIllustration
-              src="/assets/illustrations/ui/longest_road.webp"
-              alt="Maior Estrada"
-              fallback={<span aria-hidden="true">📏</span>}
-            />
-          </span>
+          <RoadStatSvg />
           <span>{longestRoad}</span>
-          <small>{hasRoad ? "Maior Estrada ★" : "Seq. Estrada"}</small>
+          {hasRoad && (
+            <AwardStarSvg
+              size={13}
+              className="score-pill__star"
+              label="Maior Estrada"
+            />
+          )}
+          <small>{hasRoad ? "Maior Estrada" : "Seq. Estrada"}</small>
         </div>
       </div>
     </div>

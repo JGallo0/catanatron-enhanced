@@ -16,18 +16,26 @@ import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import {
   createGame,
   createRoom,
+  type BotDifficulty,
+  type DiceMode,
   type MapTemplate,
   type PlayerAccount,
   type PlayerEntry,
-  type PlayerKey,
 } from "../../utils/apiClient";
+import {
+  BOT_AVATAR_PROFILES,
+  BOT_DIFFICULTY_OPTIONS,
+  formatBotDifficultyLabel,
+  formatMapTemplateLabel,
+  MAP_TEMPLATE_OPTIONS,
+  OFFICIAL_BOT_NAMES,
+  OPEN_SEAT_LABEL,
+  playerKeyForDifficulty,
+  type OfficialBotName,
+} from "../../config/botCatalog";
+import PlayerAvatar from "../PlayerAvatar";
+import MapTemplatePreview from "./MapTemplatePreview";
 import "./MatchSetupModal.scss";
-
-const MAP_TEMPLATES: Array<{ value: MapTemplate; label: string }> = [
-  { value: "BASE", label: "PADRÃO (BASE)" },
-  { value: "MINI", label: "MINI (RÁPIDO)" },
-  { value: "TOURNAMENT", label: "TORNEIO" },
-];
 
 const PLAYER_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"] as const;
 const COLOR_LABELS_PT: Record<(typeof PLAYER_COLORS)[number], string> = {
@@ -42,37 +50,50 @@ export type MatchSetupMode = "solo" | "room" | null;
 export type MatchSetupModalProps = {
   mode: MatchSetupMode;
   onClose: () => void;
-  availablePlayers: PlayerEntry[];
+  availablePlayers?: PlayerEntry[];
   defaultHostName: string;
   account: PlayerAccount | null;
   onGameCreated: (gameId: string) => void;
   onRoomCreated: (roomCode: string) => void;
 };
 
-function defaultPlayersForMode(mode: MatchSetupMode): PlayerKey[] {
+type SeatSelection = "HOST" | "OPEN" | `BOT:${OfficialBotName}`;
+
+function defaultSeatsForMode(mode: MatchSetupMode): SeatSelection[] {
   return mode === "room"
-    ? ["HUMAN", "HUMAN", "CATANATRON", "CATANATRON"]
-    : ["HUMAN", "CATANATRON", "CATANATRON", "CATANATRON"];
+    ? ["HOST", "OPEN", "BOT:Creitu", "BOT:Felire"]
+    : ["HOST", "BOT:Creitu", "BOT:Felire", "BOT:Guiri"];
+}
+
+function nextUnusedBot(seats: SeatSelection[], excludeIdx = -1): OfficialBotName {
+  const used = new Set<string>();
+  seats.forEach((s, idx) => {
+    if (idx !== excludeIdx && s.startsWith("BOT:")) {
+      used.add(s.slice(4));
+    }
+  });
+  return OFFICIAL_BOT_NAMES.find((name) => !used.has(name)) ?? OFFICIAL_BOT_NAMES[0];
 }
 
 export default function MatchSetupModal({
   mode,
   onClose,
-  availablePlayers,
   defaultHostName,
   account,
   onGameCreated,
   onRoomCreated,
 }: MatchSetupModalProps) {
   const [mapTemplate, setMapTemplate] = useState<MapTemplate>("BASE");
+  const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>("medium");
+  const [diceMode, setDiceMode] = useState<DiceMode>("random");
   const [vpsToWin, setVpsToWin] = useState(10);
   const [discardLimit, setDiscardLimit] = useState(7);
   const [friendlyRobber, setFriendlyRobber] = useState(true);
   const [hostName, setHostName] = useState(
     () => account?.display_name || defaultHostName || "Anfitrião"
   );
-  const [players, setPlayers] = useState<PlayerKey[]>(() =>
-    defaultPlayersForMode(mode)
+  const [seats, setSeats] = useState<SeatSelection[]>(() =>
+    defaultSeatsForMode(mode)
   );
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -81,7 +102,9 @@ export default function MatchSetupModal({
     if (!mode) return;
     setErrorMsg("");
     setSubmitting(false);
-    setPlayers(defaultPlayersForMode(mode));
+    setSeats(defaultSeatsForMode(mode));
+    setBotDifficulty("medium");
+    setDiceMode("random");
   }, [mode]);
 
   useEffect(() => {
@@ -89,26 +112,75 @@ export default function MatchSetupModal({
     setHostName(account?.display_name || defaultHostName || "Anfitrião");
   }, [mode, account?.display_name, defaultHostName]);
 
-  const handlePlayerChange = (index: number, value: PlayerKey) => {
-    setPlayers((current) =>
-      current.map((player, playerIndex) =>
-        playerIndex === index ? value : player
-      )
-    );
+  const cleanHostLabel =
+    hostName.trim() || account?.display_name || defaultHostName || "Anfitrião";
+
+  const handleSeatChange = (index: number, value: SeatSelection) => {
+    setSeats((current) => {
+      const currentSeat = current[index];
+      if (value === currentSeat) return current;
+
+      if (value === "HOST") {
+        const oldHostIdx = current.indexOf("HOST");
+        return current.map((s, idx) => {
+          if (idx === index) return "HOST";
+          if (idx === oldHostIdx) {
+            if (currentSeat.startsWith("BOT:")) return currentSeat;
+            return mode === "room"
+              ? "OPEN"
+              : (`BOT:${nextUnusedBot(current, idx)}` as SeatSelection);
+          }
+          return s;
+        });
+      }
+
+      if (currentSeat === "HOST") {
+        if (mode === "room" && value === "OPEN") {
+          const openIdx = current.findIndex((s, idx) => idx !== index && s === "OPEN");
+          if (openIdx >= 0) {
+            return current.map((s, idx) =>
+              idx === index ? "OPEN" : idx === openIdx ? "HOST" : s
+            );
+          }
+          return current;
+        }
+        const fallbackHostIdx = current.findIndex(
+          (s, idx) => idx !== index && s === "OPEN"
+        );
+        if (fallbackHostIdx < 0) {
+          return current;
+        }
+        return current.map((s, idx) => {
+          if (idx === index) return value;
+          if (idx === fallbackHostIdx) return "HOST";
+          return s;
+        });
+      }
+
+      if (value.startsWith("BOT:")) {
+        const dupIdx = current.findIndex((s, idx) => idx !== index && s === value);
+        if (dupIdx >= 0) {
+          return current;
+        }
+      }
+
+      return current.map((s, idx) => (idx === index ? value : s));
+    });
   };
 
   const handleAddPlayer = () => {
-    setPlayers((current) =>
-      current.length >= 4 ? current : [...current, "CATANATRON"]
-    );
+    setSeats((current) => {
+      if (current.length >= 4) return current;
+      const bot = nextUnusedBot(current);
+      return [...current, `BOT:${bot}`];
+    });
   };
 
   const handleRemovePlayer = (index: number) => {
-    setPlayers((current) =>
-      current.length <= 2
-        ? current
-        : current.filter((_, playerIndex) => playerIndex !== index)
-    );
+    setSeats((current) => {
+      if (current.length <= 2 || current[index] === "HOST") return current;
+      return current.filter((_, seatIndex) => seatIndex !== index);
+    });
   };
 
   const handleSubmit = async () => {
@@ -116,32 +188,64 @@ export default function MatchSetupModal({
     setSubmitting(true);
     setErrorMsg("");
     try {
+      const cleanName =
+        hostName.trim() || account?.display_name || defaultHostName || "Anfitrião";
+      const botKey = playerKeyForDifficulty(botDifficulty);
+
       if (mode === "solo") {
+        const hostIdx = Math.max(0, seats.indexOf("HOST"));
+        const players = seats.map((s) =>
+          s === "HOST" || s === "OPEN" ? "HUMAN" : botKey
+        );
+        const seatNamesList = seats.map((s) =>
+          s.startsWith("BOT:") ? s.slice(4) : cleanName
+        );
         const gameId = await createGame({
           players,
           mapTemplate,
           vpsToWin,
           discardLimit,
           friendlyRobber,
+          diceMode,
+          seatNamesList,
+          hostName: cleanName,
+          hostSeatIndex: hostIdx,
         });
         onGameCreated(gameId);
       } else {
-        const cleanName =
-          hostName.trim() || account?.display_name || "Anfitrião";
         localStorage.setItem("catan_player_name", cleanName);
-        const humanSeats = players.filter((p) => p === "HUMAN").length;
-        const roomPlayers =
-          humanSeats >= 2
-            ? players
-            : ["HUMAN", "HUMAN", ...players.slice(2)];
+        const roomSeats = seats.map((s) => {
+          if (s === "HOST") {
+            return {
+              player_key: "HUMAN",
+              player_name: cleanName,
+              is_host: true,
+            };
+          }
+          if (s === "OPEN") {
+            return {
+              player_key: "HUMAN",
+              player_name: OPEN_SEAT_LABEL,
+              is_host: false,
+            };
+          }
+          return {
+            player_key: botKey,
+            player_name: s.slice(4),
+            is_host: false,
+          };
+        });
 
         const res = await createRoom({
           hostName: cleanName,
-          players: roomPlayers,
+          players: roomSeats.map((s) => s.player_key),
+          seats: roomSeats,
+          botDifficulty,
           mapTemplate,
           vpsToWin,
           discardLimit,
           friendlyRobber,
+          diceMode,
           token: account?.auth_token,
         });
         localStorage.setItem(
@@ -162,8 +266,8 @@ export default function MatchSetupModal({
     }
   };
 
-  const selectedTemplateLabel =
-    MAP_TEMPLATES.find((t) => t.value === mapTemplate)?.label || mapTemplate;
+  const selectedTemplateLabel = formatMapTemplateLabel(mapTemplate);
+  const selectedDifficultyLabel = formatBotDifficultyLabel(botDifficulty);
   const isRoom = mode === "room";
 
   return (
@@ -207,14 +311,31 @@ export default function MatchSetupModal({
 
         <div className="match-setup-group">
           <div className="match-setup-group__header">
-            <span>Modelo do Mapa</span>
+            <span className="match-setup-inline-title">
+              Modelo do Mapa
+              <Tooltip
+                title="Padrão sorteia terrenos e portos a cada partida; Mini usa apenas 7 terrenos para jogos rápidos; Torneio mantém o tabuleiro oficial fixo."
+                arrow
+                enterTouchDelay={0}
+                leaveTouchDelay={3000}
+              >
+                <IconButton
+                  size="small"
+                  className="match-setup-help-btn"
+                  aria-label="Ajuda sobre Modelo do Mapa"
+                >
+                  <HelpOutlineRoundedIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+            </span>
             <strong>{selectedTemplateLabel}</strong>
           </div>
           <div className="match-setup-templates">
-            {MAP_TEMPLATES.map(({ value, label }) => (
+            {MAP_TEMPLATE_OPTIONS.map(({ value, label }) => (
               <Button
                 key={value}
                 variant="contained"
+                aria-pressed={mapTemplate === value}
                 onClick={() => setMapTemplate(value)}
                 className={`match-setup-choice-btn ${
                   mapTemplate === value ? "selected" : ""
@@ -224,6 +345,7 @@ export default function MatchSetupModal({
               </Button>
             ))}
           </div>
+          <MapTemplatePreview template={mapTemplate} />
         </div>
 
         <div className="match-setup-sliders-row">
@@ -245,7 +367,23 @@ export default function MatchSetupModal({
 
           <div className="match-setup-compact-box">
             <div className="match-setup-group__header">
-              <span>Limite de Cartas (Ladrão)</span>
+              <span className="match-setup-inline-title">
+                Limite de Cartas (Ladrão)
+                <Tooltip
+                  title="Ao sair 7 nos dados, jogadores com mais cartas que este limite descartam metade (arredondado para baixo)."
+                  arrow
+                  enterTouchDelay={0}
+                  leaveTouchDelay={3000}
+                >
+                  <IconButton
+                    size="small"
+                    className="match-setup-help-btn"
+                    aria-label="Ajuda sobre Limite de Cartas (Ladrão)"
+                  >
+                    <HelpOutlineRoundedIcon fontSize="inherit" />
+                  </IconButton>
+                </Tooltip>
+              </span>
               <strong>{discardLimit}</strong>
             </div>
             <Slider
@@ -290,51 +428,191 @@ export default function MatchSetupModal({
 
         <div className="match-setup-group">
           <div className="match-setup-group__header">
+            <span className="match-setup-inline-title">
+              Modo dos Dados
+              <Tooltip
+                title="Padrão usa 2 dados clássicos (2d6). Equilibrados usa um baralho de 36 pares embaralhados, reembaralhando ao restarem 5 cartas."
+                arrow
+                enterTouchDelay={0}
+                leaveTouchDelay={3000}
+              >
+                <IconButton
+                  size="small"
+                  className="match-setup-help-btn"
+                  aria-label="Ajuda sobre Modo dos Dados"
+                >
+                  <HelpOutlineRoundedIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+            </span>
+            <strong>
+              {diceMode === "balanced"
+                ? "Equilibrados (Baralho 36)"
+                : "Padrão (2d6)"}
+            </strong>
+          </div>
+          <div
+            className="match-setup-dice-options"
+            role="group"
+            aria-label="Modo dos Dados"
+          >
+            <Button
+              variant="contained"
+              aria-pressed={diceMode === "random"}
+              onClick={() => setDiceMode("random")}
+              className={`match-setup-choice-btn match-setup-dice-btn ${
+                diceMode === "random" ? "selected" : ""
+              }`}
+            >
+              🎲 Padrão (2d6)
+            </Button>
+            <Button
+              variant="contained"
+              aria-pressed={diceMode === "balanced"}
+              onClick={() => setDiceMode("balanced")}
+              className={`match-setup-choice-btn match-setup-dice-btn ${
+                diceMode === "balanced" ? "selected" : ""
+              }`}
+            >
+              🎴 Equilibrados (Baralho 36)
+            </Button>
+          </div>
+        </div>
+
+        <div className="match-setup-group">
+          <div className="match-setup-group__header">
+            <span className="match-setup-inline-title">
+              Dificuldade dos Bots
+              <Tooltip
+                title="Define o nível estratégico de todos os bots da mesa: Fácil, Moderado ou Difícil."
+                arrow
+                enterTouchDelay={0}
+                leaveTouchDelay={3000}
+              >
+                <IconButton
+                  size="small"
+                  className="match-setup-help-btn"
+                  aria-label="Ajuda sobre Dificuldade dos Bots"
+                >
+                  <HelpOutlineRoundedIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+            </span>
+            <strong>{selectedDifficultyLabel}</strong>
+          </div>
+          <div
+            className="match-setup-templates"
+            role="group"
+            aria-label="Dificuldade dos Bots"
+          >
+            {BOT_DIFFICULTY_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                variant="contained"
+                aria-pressed={botDifficulty === opt.value}
+                onClick={() => setBotDifficulty(opt.value)}
+                title={opt.description}
+                className={`match-setup-choice-btn match-setup-diff-btn ${
+                  botDifficulty === opt.value ? "selected" : ""
+                }`}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="match-setup-group">
+          <div className="match-setup-group__header">
             <span>Jogadores na Mesa</span>
-            <strong>{players.length}/4</strong>
+            <strong>{seats.length}/4</strong>
           </div>
           <div className="match-setup-players">
-            {players.map((player, index) => (
-              <div className="match-setup-player-row" key={`${player}-${index}`}>
-                <div className="match-setup-player-meta">
-                  <span>Jogador {index + 1}</span>
-                  <span
-                    className={`match-setup-color-chip ${PLAYER_COLORS[
-                      index
-                    ].toLowerCase()}`}
+            {seats.map((seat, index) => {
+              const colorKey = PLAYER_COLORS[index];
+              const isHostSeat = seat === "HOST";
+              const canRemove = seats.length > 2 && !isHostSeat;
+              const displaySeatValue =
+                !isRoom && seat === "OPEN"
+                  ? (`BOT:${nextUnusedBot(seats, index)}` as SeatSelection)
+                  : seat;
+              return (
+                <div className="match-setup-player-row" key={`${colorKey}-${index}`}>
+                  <div className="match-setup-player-meta">
+                    <span>Jogador {index + 1}</span>
+                    <span
+                      className={`match-setup-color-chip ${colorKey.toLowerCase()}`}
+                    >
+                      {COLOR_LABELS_PT[colorKey]}
+                    </span>
+                  </div>
+                  <Select
+                    size="small"
+                    fullWidth
+                    SelectDisplayProps={{
+                      "aria-label": `Jogador ${index + 1}`,
+                    }}
+                    value={displaySeatValue}
+                    onChange={(event) =>
+                      handleSeatChange(index, event.target.value as SeatSelection)
+                    }
                   >
-                    {COLOR_LABELS_PT[PLAYER_COLORS[index]]}
-                  </span>
-                </div>
-                <Select
-                  size="small"
-                  fullWidth
-                  value={player}
-                  onChange={(event) =>
-                    handlePlayerChange(index, event.target.value as PlayerKey)
-                  }
-                >
-                  {availablePlayers.map((option) => (
-                    <MenuItem key={option.key} value={option.key}>
-                      {option.is_bot ? `🤖 ${option.name}` : `👤 ${option.name}`}
+                    <MenuItem value="HOST">
+                      <span className="match-setup-select-option">
+                        <span>👤 {cleanHostLabel} (Você)</span>
+                      </span>
                     </MenuItem>
-                  ))}
-                </Select>
-                <Button
-                  variant="text"
-                  className="match-setup-remove-btn"
-                  disabled={players.length <= 2}
-                  onClick={() => handleRemovePlayer(index)}
-                >
-                  Remover
-                </Button>
-              </div>
-            ))}
+                    {isRoom && (
+                      <MenuItem value="OPEN">
+                        <span className="match-setup-select-option">
+                          <span>🪑 {OPEN_SEAT_LABEL}</span>
+                        </span>
+                      </MenuItem>
+                    )}
+                    {OFFICIAL_BOT_NAMES.map((botName) => {
+                      const botVal = `BOT:${botName}` as SeatSelection;
+                      const takenElsewhere = seats.some(
+                        (other, otherIdx) => otherIdx !== index && other === botVal
+                      );
+                      return (
+                        <MenuItem
+                          key={botVal}
+                          value={botVal}
+                          disabled={takenElsewhere}
+                        >
+                          <span className="match-setup-select-option">
+                            <PlayerAvatar
+                              config={BOT_AVATAR_PROFILES[botName]}
+                              username={botName}
+                              size={22}
+                            />
+                            <span>{botName}</span>
+                            {takenElsewhere && (
+                              <span className="match-setup-option-hint">
+                                (na mesa)
+                              </span>
+                            )}
+                          </span>
+                        </MenuItem>
+                      );
+                    })}
+                  </Select>
+                  <Button
+                    variant="text"
+                    className="match-setup-remove-btn"
+                    disabled={!canRemove}
+                    onClick={() => handleRemovePlayer(index)}
+                  >
+                    Remover
+                  </Button>
+                </div>
+              );
+            })}
           </div>
           <Button
             variant="outlined"
             className="match-setup-add-btn"
-            disabled={players.length >= 4}
+            disabled={seats.length >= 4}
             onClick={handleAddPlayer}
           >
             + Adicionar Jogador

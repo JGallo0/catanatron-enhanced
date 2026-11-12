@@ -3,35 +3,84 @@
   top: 52%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 42;
+  z-index: 46;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
+  gap: 10px;
+  min-width: 244px;
+  padding: 14px 24px 13px;
   border-radius: 18px;
-  background: radial-gradient(circle at top, rgba(30, 41, 59, 0.94), rgba(9, 13, 22, 0.96));
-  border: 2px solid #facc15;
+  /* Carved walnut/mahogany wooden frame trimmed in brass */
+  background:
+    radial-gradient(circle at 50% 0%, rgba(250, 204, 21, 0.14), transparent 62%),
+    linear-gradient(175deg, #4a2613 0%, #2a1308 58%, #180b04 100%);
+  border: 2.5px solid var(--roller-color, #d97706);
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.72),
-    0 0 24px rgba(250, 204, 21, 0.25);
-  backdrop-filter: blur(10px);
-  animation: tabletop-dice-enter 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    0 22px 48px rgba(0, 0, 0, 0.82),
+    0 0 0 2px rgba(217, 119, 6, 0.45),
+    inset 0 1px 0 rgba(254, 240, 138, 0.32),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  animation: tabletop-dice-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+
+  &.is-hot {
+    box-shadow:
+      0 22px 48px rgba(0, 0, 0, 0.85),
+      0 0 0 2px #facc15,
+      0 0 32px rgba(250, 204, 21, 0.45),
+      inset 0 1px 0 rgba(254, 240, 138, 0.45);
+  }
 
   &.is-seven {
+    background:
+      radial-gradient(circle at 50% 20%, rgba(220, 38, 38, 0.24), transparent 65%),
+      linear-gradient(175deg, #451212 0%, #240909 60%, #140404 100%);
     box-shadow:
-      0 18px 40px rgba(0, 0, 0, 0.78),
-      0 0 28px rgba(239, 68, 68, 0.45);
+      0 22px 48px rgba(0, 0, 0, 0.86),
+      0 0 0 2px #ef4444,
+      0 0 36px rgba(239, 68, 68, 0.55),
+      inset 0 1px 0 rgba(254, 202, 202, 0.3);
+  }
+
+  &__rivet {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fef08a, #b45309);
+    border: 1px solid #451a03;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+
+    &--tl {
+      top: 7px;
+      left: 7px;
+    }
+    &--tr {
+      top: 7px;
+      right: 7px;
+    }
+    &--bl {
+      bottom: 7px;
+      left: 7px;
+    }
+    &--br {
+      bottom: 7px;
+      right: 7px;
+    }
   }
 
   &__header {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: #e2e8f0;
+    gap: 7px;
+    font-family: "Cinzel", "Outfit", serif;
+    font-size: 0.84rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #fef3c7;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
   }
 
   &__dot {
@@ -39,31 +88,111 @@
     height: 9px;
     border-radius: 50%;
     flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+  }
+
+  &__tray {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 30px 18px;
+    border-radius: 14px;
+    background: radial-gradient(circle at 50% 42%, #1e4d3a 0%, #0f2c22 72%, #071913 100%);
+    border: 1.5px solid rgba(217, 119, 6, 0.55);
+    box-shadow:
+      inset 0 6px 14px rgba(0, 0, 0, 0.72),
+      inset 0 0 0 1px rgba(254, 240, 138, 0.14);
+    overflow: visible;
+  }
+
+  &.is-seven &__tray {
+    background: radial-gradient(circle at 50% 42%, #5b1818 0%, #310b0b 75%, #1c0505 100%);
+    border-color: rgba(248, 113, 113, 0.55);
+  }
+
+  &__felt-ring {
+    position: absolute;
+    inset: 4px;
+    border-radius: 10px;
+    border: 1px dashed rgba(253, 230, 138, 0.25);
+    pointer-events: none;
+  }
+
+  &.is-settled &__felt-ring {
+    animation: dice-tray-shockwave 0.45s ease-out;
   }
 
   &__faces {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 28px;
+    overflow: visible;
   }
 
-  &.is-rolling &__die {
+  &__die-slot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+  }
+
+  &__die {
     display: inline-flex;
-    animation: dice-tumble 0.26s ease-in-out infinite alternate;
+    filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.65));
+  }
+
+  &__shadow {
+    width: 44px;
+    height: 10px;
+    margin-top: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.74) 0%, transparent 72%);
+  }
+
+  &.is-rolling &__die--first {
+    animation: dice-arc-left 0.56s ease-in-out infinite;
   }
 
   &.is-rolling &__die--second {
-    animation-direction: alternate-reverse;
+    animation: dice-arc-right 0.62s ease-in-out infinite;
   }
 
-  &.is-settled &__die {
-    display: inline-flex;
-    animation: dice-land 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  &.is-rolling &__shadow {
+    animation: dice-shadow-pulse 0.56s ease-in-out infinite;
+  }
+
+  &.is-rolling &__shadow--second {
+    animation-duration: 0.62s;
+  }
+
+  &.is-settled &__die--first {
+    animation: dice-settle-drop 0.44s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  &.is-settled &__die--second {
+    animation: dice-settle-drop 0.48s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   &__footer {
-    font-size: 0.85rem;
+    font-family: "Cinzel", "Outfit", serif;
+    font-size: 0.94rem;
+    font-weight: 800;
     color: #fde047;
+    letter-spacing: 0.04em;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+  }
+
+  &__status-rolling {
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fef3c7;
     letter-spacing: 0.02em;
   }
 
@@ -75,7 +204,7 @@
 @keyframes tabletop-dice-enter {
   from {
     opacity: 0;
-    transform: translate(-50%, -44%) scale(0.86);
+    transform: translate(-50%, -42%) scale(0.84);
   }
   to {
     opacity: 1;
@@ -83,20 +212,77 @@
   }
 }
 
-@keyframes dice-tumble {
-  0% {
-    transform: rotate(-14deg) translateY(-3px) scale(1.06);
-  }
+@keyframes dice-arc-left {
+  0%,
   100% {
-    transform: rotate(14deg) translateY(3px) scale(0.96);
+    transform: translate3d(-4px, 1px, 0) scale(0.98);
+  }
+  45% {
+    transform: translate3d(3px, -11px, 0) scale(1.08);
+  }
+  75% {
+    transform: translate3d(-2px, 3px, 0) scale(0.96);
   }
 }
 
-@keyframes dice-land {
-  from {
-    transform: scale(1.18);
+@keyframes dice-arc-right {
+  0%,
+  100% {
+    transform: translate3d(4px, 0, 0) scale(1);
   }
-  to {
+  50% {
+    transform: translate3d(-3px, -12px, 0) scale(1.1);
+  }
+  80% {
+    transform: translate3d(2px, 2px, 0) scale(0.96);
+  }
+}
+
+@keyframes dice-shadow-pulse {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.72;
+  }
+  45% {
+    transform: scale(0.62);
+    opacity: 0.34;
+  }
+  75% {
+    transform: scale(1.06);
+    opacity: 0.86;
+  }
+}
+
+@keyframes dice-settle-drop {
+  0% {
+    transform: translateY(-9px) scale(1.1);
+  }
+  65% {
+    transform: translateY(2px) scale(0.96);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dice-tray-shockwave {
+  0% {
+    border-color: rgba(250, 204, 21, 0.95);
+    transform: scale(0.94);
+  }
+  100% {
+    border-color: rgba(253, 230, 138, 0.25);
     transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabletop-dice-stage.is-rolling .tabletop-dice-stage__die--first,
+  .tabletop-dice-stage.is-rolling .tabletop-dice-stage__die--second,
+  .tabletop-dice-stage.is-rolling .tabletop-dice-stage__shadow,
+  .tabletop-dice-stage.is-settled .tabletop-dice-stage__die--first,
+  .tabletop-dice-stage.is-settled .tabletop-dice-stage__die--second {
+    animation: none;
   }
 }

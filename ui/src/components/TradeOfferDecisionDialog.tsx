@@ -1,11 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-} from "@mui/material";
+import { Button } from "@mui/material";
 import type {
   AcceptTradeAction,
   Color,
@@ -20,6 +14,7 @@ import {
   resolvePlayerDisplayName,
   resolveSeatAvatarProps,
 } from "../config/botCatalog";
+import { formatTradeBundlePt } from "../utils/promptUtils";
 import { playerKey } from "../utils/stateUtils";
 import PlayerAvatar from "./PlayerAvatar";
 import { ResourceIcon } from "./icons/GameIcons";
@@ -39,6 +34,7 @@ type TradeOfferDecisionDialogProps = {
   gameState: GameState;
   humanColor: Color;
   onExecuteAction: (action: GameAction) => Promise<void> | void;
+  onSendChatMessage?: (body: string) => Promise<void> | void;
 };
 
 export default function TradeOfferDecisionDialog({
@@ -47,11 +43,16 @@ export default function TradeOfferDecisionDialog({
   gameState,
   humanColor,
   onExecuteAction,
+  onSendChatMessage,
 }: TradeOfferDecisionDialogProps) {
   const [submitting, setSubmitting] = useState(false);
+  const [counterOpen, setCounterOpen] = useState(false);
+  const [counterOffer, setCounterOffer] = useState<number[]>([0, 0, 0, 0, 0]);
+  const [counterAsk, setCounterAsk] = useState<number[]>([0, 0, 0, 0, 0]);
 
   useEffect(() => {
     setSubmitting(false);
+    setCounterOpen(false);
   }, [gameState.state_index, gameState.current_prompt, open]);
 
   const prompt = gameState.current_prompt;
@@ -146,7 +147,7 @@ export default function TradeOfferDecisionDialog({
     }
   };
 
-  if (!isDecideTrade && !isDecideAcceptees) {
+  if (!open || (!isDecideTrade && !isDecideAcceptees)) {
     return null;
   }
 
@@ -157,37 +158,117 @@ export default function TradeOfferDecisionDialog({
       )
     : [];
 
+  const openCounterEditor = () => {
+    const initialOffer = RESOURCE_ORDER.map((res, idx) => {
+      const held = Number(gameState.player_state?.[`${myKey}_${res}_IN_HAND`] || 0);
+      return Math.min(held, Math.max(0, Number(asking[idx] || 0)));
+    });
+    const initialAsk = RESOURCE_ORDER.map((_, idx) =>
+      Math.max(0, Number(offering[idx] || 0))
+    );
+    setCounterOffer(initialOffer);
+    setCounterAsk(initialAsk);
+    setCounterOpen(true);
+  };
+
+  const adjustCounterOffer = (idx: number, delta: number) => {
+    const res = RESOURCE_ORDER[idx];
+    const held = Number(gameState.player_state?.[`${myKey}_${res}_IN_HAND`] || 0);
+    setCounterOffer((prev) => {
+      const next = [...prev];
+      next[idx] = Math.max(0, Math.min(held, prev[idx] + delta));
+      return next;
+    });
+    if (delta > 0) {
+      setCounterAsk((prev) => {
+        if (prev[idx] === 0) return prev;
+        const next = [...prev];
+        next[idx] = 0;
+        return next;
+      });
+    }
+  };
+
+  const adjustCounterAsk = (idx: number, delta: number) => {
+    setCounterAsk((prev) => {
+      const next = [...prev];
+      next[idx] = Math.max(0, Math.min(9, prev[idx] + delta));
+      return next;
+    });
+    if (delta > 0) {
+      setCounterOffer((prev) => {
+        if (prev[idx] === 0) return prev;
+        const next = [...prev];
+        next[idx] = 0;
+        return next;
+      });
+    }
+  };
+
+  const totalCounterOffer = counterOffer.reduce((a, b) => a + b, 0);
+  const totalCounterAsk = counterAsk.reduce((a, b) => a + b, 0);
+  const counterOverlap = counterOffer.some(
+    (qty, idx) => qty > 0 && counterAsk[idx] > 0
+  );
+  const canSendCounter =
+    totalCounterOffer > 0 && totalCounterAsk > 0 && !counterOverlap;
+
+  const handleConfirmCounter = async () => {
+    if (submitting || !canSendCounter) return;
+    setSubmitting(true);
+    try {
+      const offerText = formatTradeBundlePt(counterOffer);
+      const askText = formatTradeBundlePt(counterAsk);
+      const chatText = `⚖️ Contraproposta para ${proposerName}: ofereço ${offerText} em troca de ${askText}.`;
+      try {
+        await onSendChatMessage?.(chatText);
+      } catch {
+        // Non-fatal if chat fails; rejection still unlocks the turn
+      }
+      await onExecuteAction(
+        rejectAction ?? [
+          humanColor,
+          "REJECT_TRADE",
+          rawTrade as RejectTradeAction[2],
+        ]
+      );
+      setCounterOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <Dialog
-      open={open}
-      onClose={submitting ? undefined : onMinimize}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        className: "catan-modal-paper trade-decision-paper",
-      }}
+    <aside
+      className="trade-decision-panel"
+      role="dialog"
+      aria-label={
+        isDecideTrade
+          ? "Proposta de Troca Recebida"
+          : "Respostas à sua Proposta"
+      }
     >
-      <DialogTitle className="catan-modal-title">
-        <span>
+      <header className="trade-decision-panel__header">
+        <div className="trade-decision-panel__title">
           {isDecideTrade
             ? "🤝 Proposta de Troca Recebida"
             : "⚖️ Respostas à sua Proposta"}
-        </span>
-        <small className="catan-modal-subtitle">
+        </div>
+        <small className="trade-decision-panel__subtitle">
           {isDecideTrade
             ? `${proposerName} propôs uma negociação com você`
             : "Escolha com qual jogador deseja concluir a troca"}
         </small>
-      </DialogTitle>
+      </header>
 
-      <DialogContent className="catan-modal-content">
+      <div className="trade-decision-panel__body">
         {isDecideTrade ? (
           <>
             <div className="trade-decision-proposer">
               <PlayerAvatar
                 config={proposerAvatar.config}
                 username={proposerAvatar.username}
-                size={42}
+                size={40}
               />
               <div className="trade-decision-proposer__info">
                 <strong>{proposerName}</strong>
@@ -244,6 +325,112 @@ export default function TradeOfferDecisionDialog({
             {!acceptAction && (
               <div className="trade-decision-shortage" role="status">
                 Você não possui todas as cartas pedidas nesta proposta.
+              </div>
+            )}
+
+            {counterOpen && (
+              <div
+                className="trade-counter-box"
+                role="region"
+                aria-label="Editar contraproposta"
+              >
+                <div className="trade-counter-box__head">
+                  <strong>⚖️ Sugerir Contraproposta</strong>
+                  <span>Envia no chat e recusa a atual</span>
+                </div>
+
+                <div className="trade-counter-section">
+                  <span className="trade-counter-section__label">
+                    Você oferece:
+                  </span>
+                  <div className="trade-counter-row">
+                    {RESOURCE_ORDER.map((res, idx) => {
+                      const held = Number(
+                        gameState.player_state?.[`${myKey}_${res}_IN_HAND`] || 0
+                      );
+                      const qty = counterOffer[idx];
+                      return (
+                        <div key={`co-${res}`} className="trade-counter-cell">
+                          <ResourceIcon resource={res} size={16} />
+                          <div className="trade-counter-cell__stepper">
+                            <button
+                              type="button"
+                              aria-label={`Diminuir oferta de ${RESOURCE_META[res].label}`}
+                              disabled={qty <= 0 || submitting}
+                              onClick={() => adjustCounterOffer(idx, -1)}
+                            >
+                              −
+                            </button>
+                            <span>{qty}</span>
+                            <button
+                              type="button"
+                              aria-label={`Aumentar oferta de ${RESOURCE_META[res].label}`}
+                              disabled={qty >= held || submitting}
+                              onClick={() => adjustCounterOffer(idx, 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="trade-counter-section">
+                  <span className="trade-counter-section__label">
+                    Você pede:
+                  </span>
+                  <div className="trade-counter-row">
+                    {RESOURCE_ORDER.map((res, idx) => {
+                      const qty = counterAsk[idx];
+                      return (
+                        <div key={`ca-${res}`} className="trade-counter-cell">
+                          <ResourceIcon resource={res} size={16} />
+                          <div className="trade-counter-cell__stepper">
+                            <button
+                              type="button"
+                              aria-label={`Diminuir pedido de ${RESOURCE_META[res].label}`}
+                              disabled={qty <= 0 || submitting}
+                              onClick={() => adjustCounterAsk(idx, -1)}
+                            >
+                              −
+                            </button>
+                            <span>{qty}</span>
+                            <button
+                              type="button"
+                              aria-label={`Aumentar pedido de ${RESOURCE_META[res].label}`}
+                              disabled={qty >= 9 || submitting}
+                              onClick={() => adjustCounterAsk(idx, 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="trade-counter-box__footer">
+                  <Button
+                    size="small"
+                    disabled={submitting}
+                    onClick={() => setCounterOpen(false)}
+                    className="catan-btn-secondary"
+                  >
+                    Voltar
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    disabled={submitting || !canSendCounter}
+                    onClick={handleConfirmCounter}
+                    className="catan-btn-primary"
+                  >
+                    Enviar Contraproposta
+                  </Button>
+                </div>
               </div>
             )}
           </>
@@ -345,10 +532,11 @@ export default function TradeOfferDecisionDialog({
             )}
           </>
         )}
-      </DialogContent>
+      </div>
 
-      <DialogActions className="catan-modal-actions trade-decision-actions">
+      <footer className="trade-decision-panel__actions trade-decision-actions">
         <Button
+          size="small"
           onClick={onMinimize}
           disabled={submitting}
           className="catan-btn-secondary"
@@ -358,7 +546,19 @@ export default function TradeOfferDecisionDialog({
 
         {isDecideTrade ? (
           <>
+            {!counterOpen && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="warning"
+                disabled={submitting}
+                onClick={openCounterEditor}
+              >
+                ⚖️ Contrapropor
+              </Button>
+            )}
             <Button
+              size="small"
               variant="outlined"
               color="error"
               disabled={submitting}
@@ -375,6 +575,7 @@ export default function TradeOfferDecisionDialog({
               ❌ Recusar
             </Button>
             <Button
+              size="small"
               variant="contained"
               disabled={submitting || !acceptAction}
               onClick={() => acceptAction && runAction(acceptAction)}
@@ -385,6 +586,7 @@ export default function TradeOfferDecisionDialog({
           </>
         ) : (
           <Button
+            size="small"
             variant="outlined"
             color="error"
             disabled={submitting}
@@ -395,7 +597,7 @@ export default function TradeOfferDecisionDialog({
             🚫 Cancelar Troca
           </Button>
         )}
-      </DialogActions>
-    </Dialog>
+      </footer>
+    </aside>
   );
 }

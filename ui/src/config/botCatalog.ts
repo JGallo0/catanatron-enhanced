@@ -1,5 +1,99 @@
-import type { AvatarConfig, Color, GameState, SeatAvatarMeta } from "../utils/api.types";
+import type {
+  AvatarConfig,
+  BotDifficulty,
+  Color,
+  GameState,
+  SeatAvatarMeta,
+} from "../utils/api.types";
 import { sanitizeAvatarConfig } from "./avatarCatalog";
+
+export const OPEN_SEAT_LABEL = "Assento livre" as const;
+
+const LEGACY_OPEN_SEAT_PLACEHOLDERS = new Set([
+  "Assento livre",
+  "Aguardando Amigo...",
+  "Vaga Aberta",
+  "Vaga para Amigo",
+  "",
+]);
+
+export function isOpenSeatPlaceholderName(name?: string | null): boolean {
+  return LEGACY_OPEN_SEAT_PLACEHOLDERS.has((name ?? "").trim());
+}
+
+export const BOT_DIFFICULTY_OPTIONS: ReadonlyArray<{
+  value: BotDifficulty;
+  label: string;
+  description: string;
+  playerKey: "W" | "F" | "CATANATRON";
+}> = [
+  {
+    value: "easy",
+    label: "Fácil",
+    description: "Jogadas mais leves e ocasionais",
+    playerKey: "W",
+  },
+  {
+    value: "medium",
+    label: "Moderado",
+    description: "Estratégia equilibrada em ritmo rápido",
+    playerKey: "F",
+  },
+  {
+    value: "hard",
+    label: "Difícil",
+    description: "Estratégia avançada com planejamento de jogadas",
+    playerKey: "CATANATRON",
+  },
+];
+
+export function normalizeBotDifficulty(raw: unknown): BotDifficulty | null {
+  if (typeof raw !== "string") return null;
+  const clean = raw.trim().toLowerCase();
+  if (clean === "easy" || clean === "medium" || clean === "hard") {
+    return clean;
+  }
+  return null;
+}
+
+export function playerKeyForDifficulty(
+  difficulty?: BotDifficulty | null
+): "W" | "F" | "CATANATRON" {
+  if (difficulty === "easy") return "W";
+  if (difficulty === "hard") return "CATANATRON";
+  return "F";
+}
+
+export function difficultyFromPlayerKey(playerKey?: string | null): BotDifficulty {
+  const key = (playerKey ?? "").split(":")[0].trim().toUpperCase();
+  if (key === "W" || key === "WEIGHTED_RANDOM" || key === "R" || key === "RANDOM") {
+    return "easy";
+  }
+  if (key === "CATANATRON" || key === "AB" || key === "SAB") {
+    return "hard";
+  }
+  return "medium";
+}
+
+export function formatBotDifficultyLabel(difficulty?: BotDifficulty | null): string {
+  const found = BOT_DIFFICULTY_OPTIONS.find((d) => d.value === difficulty);
+  return found ? found.label : "Moderado";
+}
+
+export const MAP_TEMPLATE_OPTIONS: ReadonlyArray<{
+  value: "BASE" | "MINI" | "TOURNAMENT";
+  label: string;
+}> = [
+  { value: "BASE", label: "Padrão (Mapa aleatório)" },
+  { value: "MINI", label: "Mini" },
+  { value: "TOURNAMENT", label: "Torneio (Mapa fixo)" },
+];
+
+export function formatMapTemplateLabel(template?: string | null): string {
+  const clean = (template ?? "").trim().toUpperCase();
+  const match = MAP_TEMPLATE_OPTIONS.find((opt) => opt.value === clean);
+  return match ? match.label : clean || "Padrão (Mapa aleatório)";
+}
 
 export const OFFICIAL_BOT_NAMES = [
   "Creitu",
@@ -77,6 +171,22 @@ export const BOT_AVATAR_PROFILES: Record<OfficialBotName, AvatarConfig> = {
 export function isOfficialBotName(name?: string | null): name is OfficialBotName {
   if (!name) return false;
   return (OFFICIAL_BOT_NAMES as readonly string[]).includes(name);
+}
+
+export function prescanRequestedBotNames(
+  entries: Array<{ isBot: boolean; requestedName?: string | null }>
+): { explicitByIndex: Map<number, OfficialBotName>; usedNames: Set<OfficialBotName> } {
+  const explicitByIndex = new Map<number, OfficialBotName>();
+  const usedNames = new Set<OfficialBotName>();
+  entries.forEach((entry, idx) => {
+    if (!entry.isBot) return;
+    const clean = (entry.requestedName ?? "").trim();
+    if (isOfficialBotName(clean) && !usedNames.has(clean)) {
+      explicitByIndex.set(idx, clean);
+      usedNames.add(clean);
+    }
+  });
+  return { explicitByIndex, usedNames };
 }
 
 export function pickBotNames(

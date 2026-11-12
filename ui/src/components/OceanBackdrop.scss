@@ -1,0 +1,110 @@
+.ocean-panorama-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: #041526;
+
+  &__svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  &__art {
+    position: absolute;
+    top: 46px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 46px);
+    object-fit: cover;
+    object-position: center top;
+    filter: brightness(0.84) saturate(1.06) contrast(1.03);
+    -webkit-mask-image: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.28) 0%,
+      rgba(0, 0, 0, 0.92) 8%,
+      #000000 16%,
+      #000000 100%
+    );
+    mask-image: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.28) 0%,
+      rgba(0, 0, 0, 0.92) 8%,
+      #000000 16%,
+      #000000 100%
+    );
+    user-select: none;
+    pointer-events: none;
+  }
+
+  &__fx {
+    position: absolute;
+    top: 46px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 46px);
+    display: block;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+
+  &__vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        ellipse at 50% 52%,
+        rgba(3, 18, 34, 0.14) 0%,
+        rgba(3, 18, 34, 0.24) 55%,
+        rgba(1, 8, 17, 0.56) 100%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(4, 10, 22, 0.62) 0%,
+        transparent 16%,
+        transparent 82%,
+        rgba(2, 8, 18, 0.58) 100%
+      );
+  }
+
+  &__swells {
+    animation: ocean-swell-drift 15s ease-in-out infinite alternate;
+    transform-origin: 50% 60%;
+  }
+
+  &__glints {
+    animation: ocean-glint-shimmer 5.5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes ocean-swell-drift {
+  0% {
+    transform: translate3d(-12px, -3px, 0);
+  }
+  100% {
+    transform: translate3d(12px, 4px, 0);
+  }
+}
+
+@keyframes ocean-glint-shimmer {
+  0% {
+    opacity: 0.55;
+    transform: scaleX(0.96);
+  }
+  100% {
+    opacity: 0.95;
+    transform: scaleX(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocean-panorama-backdrop__swells,
+  .ocean-panorama-backdrop__glints {
+    animation: none;
+  }
+}

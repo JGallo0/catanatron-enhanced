@@ -42,6 +42,17 @@ for dev_card in DEVELOPMENT_CARDS:
     PLAYER_INITIAL_STATE[f"{dev_card}_IN_HAND"] = 0
     PLAYER_INITIAL_STATE[f"PLAYED_{dev_card}"] = 0
 
+VALID_DICE_MODES = ("random", "balanced")
+BALANCED_DICE_RESHUFFLE_THRESHOLD = 5
+
+
+def build_balanced_dice_deck(rng=None) -> List[Tuple[int, int]]:
+    """Builds a shuffled 36-card deck containing every ordered (d1, d2) pair."""
+    rng = rng if rng is not None else random
+    deck = [(d1, d2) for d1 in range(1, 7) for d2 in range(1, 7)]
+    rng.shuffle(deck)
+    return deck
+
 
 class State:
     """Collection of variables representing state
@@ -94,9 +105,20 @@ class State:
         number_placement: NumberPlacement = "official_spiral",
         initialize=True,
         rng=None,
+        dice_mode: str = "random",
     ):
         if initialize:
+            if dice_mode not in VALID_DICE_MODES:
+                raise ValueError(
+                    f"dice_mode must be one of {VALID_DICE_MODES}, got {dice_mode!r}"
+                )
             self.random = rng if rng is not None else random.Random()
+            self.dice_mode = dice_mode
+            self.dice_deck: List[Tuple[int, int]] = (
+                build_balanced_dice_deck(self.random)
+                if dice_mode == "balanced"
+                else []
+            )
             self.players = self.random.sample(players, len(players))
             self.colors = tuple([player.color for player in self.players])
             self.board = Board(
@@ -168,6 +190,8 @@ class State:
         state_copy.players = self.players
         state_copy.discard_limit = self.discard_limit  # immutable
         state_copy.friendly_robber = self.friendly_robber  # immutable
+        state_copy.dice_mode = getattr(self, "dice_mode", "random")  # immutable
+        state_copy.dice_deck = list(getattr(self, "dice_deck", []))
 
         state_copy.board = self.board.copy()
 

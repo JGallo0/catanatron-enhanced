@@ -30,7 +30,11 @@ from catanatron.models.decks import (
 from catanatron.models.actions import (
     road_building_possibilities,
 )
-from catanatron.state import State
+from catanatron.state import (
+    BALANCED_DICE_RESHUFFLE_THRESHOLD,
+    State,
+    build_balanced_dice_deck,
+)
 from catanatron.state_functions import (
     build_city,
     build_road,
@@ -269,9 +273,12 @@ def apply_roll(state: State, action: Action, action_record=None):
     key = player_key(state, action.color)
     state.player_state[f"{key}_HAS_ROLLED"] = True
 
-    dices = (
-        action_record.result if action_record is not None else roll_dice(state.random)
-    )
+    if action_record is not None:
+        dices = action_record.result
+    elif getattr(state, "dice_mode", "random") == "balanced":
+        dices = draw_balanced_dice(state)
+    else:
+        dices = roll_dice(state.random)
     number = dices[0] + dices[1]
     action = Action(action.color, action.action_type, dices)
 
@@ -534,6 +541,20 @@ def apply_cancel_trade(state: State, action: Action):
 
 
 # ===== Helper Functions =====
+def draw_balanced_dice(state: State):
+    """Draws the next (d1, d2) pair from the 36-card balanced dice deck.
+
+    Rebuilds and shuffles a fresh 36-card deck when <= 5 cards remain to prevent card counting.
+    """
+    if (
+        not getattr(state, "dice_deck", None)
+        or len(state.dice_deck) <= BALANCED_DICE_RESHUFFLE_THRESHOLD
+    ):
+        state.dice_deck = build_balanced_dice_deck(state.random)
+    d1, d2 = state.dice_deck.pop()
+    return (int(d1), int(d2))
+
+
 def roll_dice(rng=None):
     """Yields two random numbers
 

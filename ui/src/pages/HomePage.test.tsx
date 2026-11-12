@@ -147,4 +147,21 @@ describe("HomePage A2 Stage", () => {
     expect(await screen.findByText("Navegante Livre")).toBeInTheDocument();
     expect(screen.getByText(/Avatar personalizado \(visitante\)/i)).toBeInTheDocument();
   });
+
+  test("opens AlmanacModal from the Home dock button", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    );
+
+    const almanacBtn = screen.getByRole("button", { name: /Almanaque/i });
+    await user.click(almanacBtn);
+
+    expect(
+      await screen.findByText(/Almanaque & Regras — Rule the Isle/i)
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Fechar almanaque/i }));
+  }, 15000);
 });

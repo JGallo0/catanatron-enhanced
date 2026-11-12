@@ -3,15 +3,151 @@
   z-index: 24;
   display: flex;
   justify-content: center;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 6px;
   padding: 4px 10px 4px;
   flex-shrink: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  overflow: visible;
+}
 
-  &::-webkit-scrollbar {
-    display: none;
+.cu-player-seat-slot {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  max-width: 310px;
+  min-width: 220px;
+
+  &__fx {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 36;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: max-content;
+    max-width: 290px;
+  }
+}
+
+.cu-discard-drop-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.cu-discard-card-drop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: linear-gradient(175deg, rgba(69, 10, 10, 0.94) 0%, rgba(15, 23, 42, 0.96) 100%);
+  border: 1.5px solid #ef4444;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.72),
+    0 0 12px rgba(239, 68, 68, 0.35);
+  color: #fecaca;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+  animation: cu-discard-tumble 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+
+  &__label {
+    letter-spacing: 0.01em;
+  }
+}
+
+.cu-float-yield-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(6, 78, 59, 0.92);
+  border: 1.5px solid #4ade80;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.65);
+  color: #dcfce7;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+  animation: cu-yield-rise 2.2s ease-out forwards;
+}
+
+.cu-float-vp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #facc15 0%, #ea580c 100%);
+  border: 1px solid #fef08a;
+  box-shadow: 0 6px 16px rgba(250, 204, 21, 0.45);
+  color: #0f172a;
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+  animation: cu-yield-rise 2.4s ease-out forwards;
+}
+
+.cu-portrait-taunt-bubble {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 12px;
+  z-index: 38;
+  pointer-events: none;
+  padding: 4px 10px;
+  border-radius: 10px 10px 10px 3px;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1.5px solid #facc15;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.75);
+  color: #fef3c7;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: cu-taunt-bubble-pop 2.6s ease forwards;
+}
+
+.cu-portrait-taunt-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.28) 0%, transparent 72%);
+  animation: cu-taunt-portrait-pulse 0.65s ease-in-out 3;
+
+  &__emoji {
+    font-size: 2rem;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.85));
+    animation: cu-taunt-emoji-bounce 0.55s ease-in-out infinite alternate;
+  }
+
+  &--furioso_ladrao {
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.42) 0%, transparent 72%);
+    animation: cu-taunt-shake 0.36s ease-in-out 4;
+  }
+
+  &--boa_guerra,
+  &--ouro {
+    background: radial-gradient(circle, rgba(250, 204, 21, 0.46) 0%, rgba(234, 88, 12, 0.16) 55%, transparent 76%);
+  }
+
+  &--pensando,
+  &--olho_vivo {
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.32) 0%, transparent 74%);
+  }
+
+  &--brinde,
+  &--negocio,
+  &--saudacao {
+    background: radial-gradient(circle, rgba(52, 211, 153, 0.32) 0%, transparent 74%);
   }
 }
 
@@ -19,8 +155,7 @@
   position: relative;
   display: flex;
   flex: 1 1 0;
-  max-width: 310px;
-  min-width: 220px;
+  width: 100%;
   height: 104px;
   border-radius: 4px;
   overflow: hidden;
@@ -119,20 +254,43 @@
   }
 
   &__turn-badge {
-    width: 16px;
-    height: 16px;
+    min-width: 28px;
+    height: 18px;
+    padding: 0 3px;
+    gap: 2px;
     flex-shrink: 0;
     background: rgba(0, 0, 0, 0.85);
-    border-radius: 3px;
+    border-radius: 4px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: #ffffff;
+    font-size: 0.68rem;
     border: 1px solid rgba(255, 255, 255, 0.35);
 
     svg {
+      width: 11px;
+      height: 11px;
       animation: cu-spin 3s linear infinite;
     }
+  }
+
+  &__trade-sack {
+    position: absolute;
+    bottom: 3px;
+    right: 3px;
+    z-index: 4;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(248, 250, 252, 0.95);
+    border: 1.5px solid #f59e0b;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.76rem;
+    animation: cu-star-pop 0.25s ease;
   }
 
   &__name {
@@ -247,17 +405,17 @@
       filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
     }
 
-    &__medallion {
-      width: 20px;
-      height: 20px;
+    &__icon-wrap {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      overflow: hidden;
-      border: 1px solid #facc15;
-      box-shadow: 0 0 8px rgba(250, 204, 21, 0.85);
+      gap: 3px;
       flex-shrink: 0;
+    }
+
+    .cu-award-star {
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.92));
+      animation: cu-star-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     /* Warning when hand has > 7 cards */
@@ -342,6 +500,104 @@
   }
   50% {
     transform: scale(1.16);
+  }
+}
+
+@keyframes cu-star-pop {
+  0% {
+    transform: scale(0.4) rotate(-25deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes cu-discard-tumble {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.78) rotate(-4deg);
+  }
+  14% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.06) rotate(2deg);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(10px) scale(1) rotate(-2deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.86) rotate(5deg);
+  }
+}
+
+@keyframes cu-yield-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.82);
+  }
+  16% {
+    opacity: 1;
+    transform: translateY(0) scale(1.04);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.92);
+  }
+}
+
+@keyframes cu-taunt-bubble-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.85);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  84% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.92);
+  }
+}
+
+@keyframes cu-taunt-portrait-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes cu-taunt-emoji-bounce {
+  from {
+    transform: translateY(2px) scale(0.94) rotate(-5deg);
+  }
+  to {
+    transform: translateY(-3px) scale(1.08) rotate(5deg);
+  }
+}
+
+@keyframes cu-taunt-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px) rotate(-2deg);
+  }
+  75% {
+    transform: translateX(3px) rotate(2deg);
   }
 }
 
@@ -541,6 +797,112 @@
 }
 
 /* -------------------------------------------------------------------------- */
+/* Tablet / Split-Window Compact Horizontal Cards (769px..980px)              */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 980px) {
+  .cu-player-top-bar {
+    padding: 4px 6px;
+    gap: 5px;
+    overflow: visible;
+  }
+
+  .cu-player-seat-slot {
+    min-width: 0;
+    max-width: none;
+  }
+
+  .cu-player-card {
+    height: 88px;
+
+    &__portrait-col {
+      width: 72px;
+    }
+
+    &__custom-avatar .player-avatar__frame {
+      width: 48px !important;
+      height: 48px !important;
+      padding: 3px !important;
+    }
+
+    &__name-bar {
+      min-height: 20px;
+      padding: 2px 3px;
+      gap: 3px;
+    }
+
+    &__name {
+      font-size: 0.68rem;
+    }
+
+    &__turn-badge {
+      min-width: 22px;
+      height: 15px;
+      font-size: 0.58rem;
+
+      svg {
+        width: 9px;
+        height: 9px;
+      }
+    }
+
+    .cu-stat-row {
+      padding: 0 5px;
+
+      &--vp {
+        padding: 0 5px;
+        gap: 3px;
+      }
+    }
+
+    .cu-stat {
+      gap: 3px;
+
+      &__num {
+        font-size: 0.88rem;
+      }
+
+      .cu-icon {
+        width: 15px;
+        height: 15px;
+      }
+
+      .cu-award-star {
+        width: 11px;
+        height: 11px;
+      }
+
+      &--vp {
+        gap: 3px;
+
+        .cu-stat__num--vp {
+          font-size: 0.98rem;
+        }
+
+        .cu-icon--trophy {
+          width: 15px;
+          height: 15px;
+        }
+      }
+    }
+
+    .cu-pieces-mini {
+      gap: 3px;
+    }
+
+    .cu-piece-chip {
+      font-size: 0.6rem;
+      gap: 1px;
+
+      svg {
+        width: 10px;
+        height: 10px;
+      }
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Compact Mobile & Landscape Horizontal Player Strip                         */
 /* -------------------------------------------------------------------------- */
 
@@ -549,6 +911,11 @@
     padding: 3px 6px;
     gap: 4px;
     overflow-x: visible;
+  }
+
+  .cu-player-seat-slot {
+    min-width: 0;
+    max-width: none;
   }
 
   .cu-player-card {
@@ -652,9 +1019,21 @@
     .cu-mobile-award-badges {
       display: inline-flex;
       align-items: center;
-      gap: 1px;
-      font-size: 0.65rem;
+      gap: 4px;
       line-height: 1;
+
+      &__item {
+        display: inline-flex;
+        align-items: center;
+        gap: 1px;
+        color: #facc15;
+      }
+
+      svg.cu-icon {
+        width: 11px;
+        height: 11px;
+        color: #facc15;
+      }
     }
 
     .cu-stat {

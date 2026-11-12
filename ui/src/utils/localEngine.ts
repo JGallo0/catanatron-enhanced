@@ -2,12 +2,16 @@ import type {
   AccountStats,
   ActiveTradeTuple,
   AvatarConfig,
+  BotDifficulty,
   Color,
   ConfirmTradeAction,
   DevelopmentCard,
+  DiceMode,
   Direction,
   GameAction,
   GameEdge,
+  GameMessage,
+  GameMessageKind,
   GameNode,
   GameState,
   LeaderboardEntry,
@@ -34,9 +38,15 @@ import {
 } from "../config/avatarCatalog";
 import {
   BOT_AVATAR_PROFILES,
+  difficultyFromPlayerKey,
   isOfficialBotName,
+  isOpenSeatPlaceholderName,
+  normalizeBotDifficulty,
+  OPEN_SEAT_LABEL,
   pickBotNameDeterministic,
   pickBotNames,
+  playerKeyForDifficulty,
+  prescanRequestedBotNames,
 } from "../config/botCatalog";
 
 const SEAT_COLORS: Color[] = ["RED", "BLUE", "ORANGE", "WHITE"];
@@ -212,6 +222,18 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
+export const BALANCED_DICE_RESHUFFLE_THRESHOLD = 5;
+
+export function buildBalancedDiceDeck(): Array<[number, number]> {
+  const deck: Array<[number, number]> = [];
+  for (let d1 = 1; d1 <= 6; d1++) {
+    for (let d2 = 1; d2 <= 6; d2++) {
+      deck.push([d1, d2]);
+    }
+  }
+  return shuffle(deck);
+}
+
 type InternalTile = {
   coordinate: TileCoordinate;
   tile: Tile;
@@ -229,59 +251,100 @@ type BuiltMap = {
   robberCoordinate: TileCoordinate;
 };
 
+const TOURNAMENT_LAND_LAYOUT: Record<
+  string,
+  { resource: ResourceCard | null; number: number | null }
+> = {
+  "0,0,0": { resource: null, number: null },
+  "1,-1,0": { resource: "ORE", number: 6 },
+  "0,-1,1": { resource: "WOOD", number: 3 },
+  "-1,0,1": { resource: "ORE", number: 11 },
+  "-1,1,0": { resource: "BRICK", number: 9 },
+  "0,1,-1": { resource: "ORE", number: 4 },
+  "1,0,-1": { resource: "WHEAT", number: 5 },
+  "2,-2,0": { resource: "WHEAT", number: 9 },
+  "1,-2,1": { resource: "SHEEP", number: 12 },
+  "0,-2,2": { resource: "BRICK", number: 11 },
+  "-1,-1,2": { resource: "SHEEP", number: 4 },
+  "-2,0,2": { resource: "BRICK", number: 8 },
+  "-2,1,1": { resource: "WHEAT", number: 10 },
+  "-2,2,0": { resource: "WOOD", number: 5 },
+  "-1,2,-1": { resource: "WHEAT", number: 2 },
+  "0,2,-2": { resource: "WOOD", number: 6 },
+  "1,1,-2": { resource: "SHEEP", number: 3 },
+  "2,0,-2": { resource: "SHEEP", number: 8 },
+  "2,-1,-1": { resource: "WOOD", number: 10 },
+};
+
+const TOURNAMENT_PORT_LAYOUT: Record<string, ResourceCard | null> = {
+  "3,-3,0": null,
+  "1,-3,2": "BRICK",
+  "-1,-2,3": "WOOD",
+  "-3,0,3": null,
+  "-3,2,1": "WHEAT",
+  "-2,3,-1": "ORE",
+  "0,3,-3": null,
+  "2,1,-3": "SHEEP",
+  "3,-1,-2": null,
+};
+
 function buildLocalMap(template: MapTemplate): BuiltMap {
   const isMini = template === "MINI";
+  const isTournament = template === "TOURNAMENT";
   const topology = isMini ? MINI_TOPOLOGY : BASE_TOPOLOGY;
 
-  const tileResources = isMini
-    ? shuffle<ResourceCard | null>([
-        "WOOD",
-        null,
-        "BRICK",
-        "SHEEP",
-        "WHEAT",
-        "WHEAT",
-        "ORE",
-      ])
-    : shuffle<ResourceCard | null>([
-        "WOOD",
-        "WOOD",
-        "WOOD",
-        "WOOD",
-        "BRICK",
-        "BRICK",
-        "BRICK",
-        "SHEEP",
-        "SHEEP",
-        "SHEEP",
-        "SHEEP",
-        "WHEAT",
-        "WHEAT",
-        "WHEAT",
-        "WHEAT",
-        "ORE",
-        "ORE",
-        "ORE",
-        null,
-      ]);
+  const tileResources = isTournament
+    ? []
+    : isMini
+      ? shuffle<ResourceCard | null>([
+          "WOOD",
+          null,
+          "BRICK",
+          "SHEEP",
+          "WHEAT",
+          "WHEAT",
+          "ORE",
+        ])
+      : shuffle<ResourceCard | null>([
+          "WOOD",
+          "WOOD",
+          "WOOD",
+          "WOOD",
+          "BRICK",
+          "BRICK",
+          "BRICK",
+          "SHEEP",
+          "SHEEP",
+          "SHEEP",
+          "SHEEP",
+          "WHEAT",
+          "WHEAT",
+          "WHEAT",
+          "WHEAT",
+          "ORE",
+          "ORE",
+          "ORE",
+          null,
+        ]);
 
   const numbers = isMini
     ? shuffle([3, 4, 5, 6, 8, 9, 10])
     : [5, 2, 6, 3, 8, 10, 9, 12, 11, 4, 8, 10, 9, 4, 5, 6, 3, 11];
 
-  const portResources = isMini
-    ? []
-    : shuffle<ResourceCard | null>([
-        "WOOD",
-        "BRICK",
-        "SHEEP",
-        "WHEAT",
-        "ORE",
-        null,
-        null,
-        null,
-        null,
-      ]);
+  const portResources =
+    isMini || isTournament
+      ? []
+      : shuffle<ResourceCard | null>([
+          "WOOD",
+          "BRICK",
+          "SHEEP",
+          "WHEAT",
+          "ORE",
+          null,
+          null,
+          null,
+          null,
+        ]);
 
   const placedByCoord = new Map<string, InternalTile>();
   let nodeAutoinc = 0;
@@ -342,22 +405,41 @@ function buildLocalMap(template: MapTemplate): BuiltMap {
     const finalEdges = edges as Record<EdgeRef, [number, number]>;
 
     let tileObj: Tile;
+    const cKey = coordKey(coordinate);
     if (entry.kind === "LAND") {
-      const res = tileResources.pop() ?? null;
-      if (res === null) {
-        robberCoordinate = coordinate;
-        tileObj = { id: tileAutoinc++, type: "DESERT" };
+      if (isTournament && cKey in TOURNAMENT_LAND_LAYOUT) {
+        const fixed = TOURNAMENT_LAND_LAYOUT[cKey];
+        if (fixed.resource === null || fixed.number === null) {
+          robberCoordinate = coordinate;
+          tileObj = { id: tileAutoinc++, type: "DESERT" };
+        } else {
+          tileObj = {
+            id: tileAutoinc++,
+            type: "RESOURCE_TILE",
+            resource: fixed.resource,
+            number: fixed.number,
+          };
+        }
       } else {
-        const num = numbers[numIdx++ % numbers.length];
-        tileObj = {
-          id: tileAutoinc++,
-          type: "RESOURCE_TILE",
-          resource: res,
-          number: num,
-        };
+        const res = tileResources.pop() ?? null;
+        if (res === null) {
+          robberCoordinate = coordinate;
+          tileObj = { id: tileAutoinc++, type: "DESERT" };
+        } else {
+          const num = numbers[numIdx++ % numbers.length];
+          tileObj = {
+            id: tileAutoinc++,
+            type: "RESOURCE_TILE",
+            resource: res,
+            number: num,
+          };
+        }
       }
     } else if (entry.kind === "PORT") {
-      const portRes = portResources.pop() ?? null;
+      const portRes =
+        isTournament && cKey in TOURNAMENT_PORT_LAYOUT
+          ? TOURNAMENT_PORT_LAYOUT[cKey]
+          : (portResources.pop() ?? null);
       tileObj = {
         id: portAutoinc++,
         type: "PORT",
@@ -470,16 +552,23 @@ export type LocalSeatMeta = {
 
 type StoredLocalGame = {
   state: GameState;
+  mapTemplate?: MapTemplate;
   nodeNeighbors: Record<number, number[]>;
   portNodes: Record<string, number[]>;
   initialQueue: Array<{ color: Color; type: "SETTLEMENT" | "ROAD"; secondRound: boolean }>;
   lastInitialSettlementNode: number | null;
   history: GameState[];
   seatMeta?: Record<Color, LocalSeatMeta>;
+  discardCounts?: number[];
+  isRoadBuilding?: boolean;
+  freeRoadsAvailable?: number;
+  tradesThisTurn?: number;
+  diceDeck?: Array<[number, number]>;
 };
 
 const GAMES_STORAGE_KEY = "catan_local_games_v1";
 const ROOMS_STORAGE_KEY = "catan_local_rooms_v1";
+const CLOSED_ROOMS_STORAGE_KEY = "catan_closed_rooms_v1";
 
 function getSavedPlayerAccount(): PlayerAccount | null {
   try {
@@ -741,7 +830,16 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
   const { state, nodeNeighbors, portNodes, initialQueue } = game;
   const ps = state.player_state;
 
-  // Longest road & largest army
+  // Longest road & largest army: track current holder's live total so a challenger only steals the star when strictly surpassing
+  const roadLengths = {} as Record<Color, number>;
+  for (const c of state.colors) {
+    const k = pKey(state, c);
+    const roadLen = computeLongestRoadForColor(state.edges, state.nodes, c);
+    roadLengths[c] = roadLen;
+    ps[`${k}_LONGEST_ROAD_LENGTH`] = roadLen;
+    state.longest_roads_by_player[c] = roadLen;
+  }
+
   let currentArmyOwner: Color | null = null;
   let maxArmy = 2;
   let currentRoadOwner: Color | null = null;
@@ -750,19 +848,24 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
   for (const c of state.colors) {
     const k = pKey(state, c);
     if (ps[`${k}_HAS_ARMY`]) {
-      currentArmyOwner = c;
-      maxArmy = ps[`${k}_PLAYED_KNIGHT`] ?? 3;
+      const knights = ps[`${k}_PLAYED_KNIGHT`] ?? 0;
+      if (knights >= 3) {
+        currentArmyOwner = c;
+        maxArmy = knights;
+      }
     }
     if (ps[`${k}_HAS_ROAD`]) {
-      currentRoadOwner = c;
+      const len = roadLengths[c] ?? 0;
+      if (len >= 5) {
+        currentRoadOwner = c;
+        maxRoad = len;
+      }
     }
   }
 
   for (const c of state.colors) {
     const k = pKey(state, c);
-    const roadLen = computeLongestRoadForColor(state.edges, state.nodes, c);
-    ps[`${k}_LONGEST_ROAD_LENGTH`] = roadLen;
-    state.longest_roads_by_player[c] = roadLen;
+    const roadLen = roadLengths[c] ?? 0;
     if (roadLen > maxRoad) {
       maxRoad = roadLen;
       currentRoadOwner = c;
@@ -862,11 +965,41 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
   }
 
   state.is_initial_build_phase = false;
+  state.is_road_building = Boolean(
+    game.isRoadBuilding && (game.freeRoadsAvailable ?? 0) > 0
+  );
+
+  if (state.current_prompt === "DISCARD") {
+    const curColor = state.current_color;
+    const ck = pKey(state, curColor);
+    const curIdx = state.colors.indexOf(curColor);
+    const remaining =
+      game.discardCounts && curIdx >= 0
+        ? (game.discardCounts[curIdx] ?? 0)
+        : (state.current_discard_count ?? 0);
+    if (remaining > 0) {
+      state.current_discard_count = remaining;
+      const discardActions: GameAction[] = RESOURCES.filter(
+        (r) => (ps[`${ck}_${r}_IN_HAND`] ?? 0) > 0
+      ).map((r) => [curColor, "DISCARD_RESOURCE", r] as GameAction);
+      if (discardActions.length > 0) {
+        state.current_playable_actions = discardActions;
+        return;
+      }
+    }
+    state.current_player_index = state.current_turn_index;
+    state.current_color = state.colors[state.current_turn_index];
+    state.current_prompt = "MOVE_ROBBER";
+    state.current_discard_count = 0;
+    game.discardCounts = state.colors.map(() => 0);
+  }
+
   const color = state.current_color;
   const k = pKey(state, color);
 
   if (state.current_prompt === "MOVE_ROBBER") {
-    const actions: GameAction[] = [];
+    const allActions: GameAction[] = [];
+    const friendlyActions: GameAction[] = [];
     for (const pt of state.tiles) {
       if (pt.tile.type !== "RESOURCE_TILE" && pt.tile.type !== "DESERT") {
         continue;
@@ -876,26 +1009,39 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
       }
       // Find opponent colors with buildings on this hex
       const victims = new Set<Color>();
+      let blocksLowVpEnemy = false;
       for (const n of Object.values(state.nodes)) {
         if (n.color && n.color !== color) {
           const adj = state.adjacent_tiles[String(n.id)] || [];
           if (adj.some((t) => "id" in t && "id" in pt.tile && t.id === pt.tile.id)) {
             const vk = pKey(state, n.color);
+            const victimVp = ps[`${vk}_ACTUAL_VICTORY_POINTS`] ?? 0;
+            if (victimVp < 3) {
+              blocksLowVpEnemy = true;
+            }
             if ((ps[`${vk}_NUM_RESOURCES_IN_HAND`] ?? 0) > 0) {
               victims.add(n.color);
             }
           }
         }
       }
+      const tileActions: GameAction[] = [];
       if (victims.size === 0) {
-        actions.push([color, "MOVE_ROBBER", [pt.coordinate]]);
+        tileActions.push([color, "MOVE_ROBBER", [pt.coordinate]]);
       } else {
         for (const v of victims) {
-          actions.push([color, "MOVE_ROBBER", [pt.coordinate, v]]);
+          tileActions.push([color, "MOVE_ROBBER", [pt.coordinate, v]]);
         }
       }
+      allActions.push(...tileActions);
+      if (!blocksLowVpEnemy) {
+        friendlyActions.push(...tileActions);
+      }
     }
-    state.current_playable_actions = actions;
+    state.current_playable_actions =
+      state.game?.friendly_robber && friendlyActions.length > 0
+        ? friendlyActions
+        : allActions;
     return;
   }
 
@@ -943,17 +1089,7 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
 
   // Normal PLAY_TURN
   state.current_prompt = "PLAY_TURN";
-  if (!ps[`${k}_HAS_ROLLED`]) {
-    state.current_playable_actions = [[color, "ROLL", null]];
-    return;
-  }
-
-  const actions: GameAction[] = [[color, "END_TURN", null]];
-  const wood = ps[`${k}_WOOD_IN_HAND`] ?? 0;
-  const brick = ps[`${k}_BRICK_IN_HAND`] ?? 0;
-  const sheep = ps[`${k}_SHEEP_IN_HAND`] ?? 0;
-  const wheat = ps[`${k}_WHEAT_IN_HAND`] ?? 0;
-  const ore = ps[`${k}_ORE_IN_HAND`] ?? 0;
+  state.current_discard_count = 0;
 
   // Connected nodes/edges for this player
   const connectedNodes = new Set<number>();
@@ -967,13 +1103,92 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
     if (n.color === color) connectedNodes.add(n.id);
   }
 
-  // BUILD_ROAD
-  if (wood >= 1 && brick >= 1 && (ps[`${k}_ROADS_AVAILABLE`] ?? 0) > 0) {
-    for (const e of state.edges) {
-      if (e.color !== null) continue;
-      if (connectedNodes.has(e.id[0]) || connectedNodes.has(e.id[1])) {
-        actions.push([color, "BUILD_ROAD", e.id]);
+  const openRoadEdges =
+    (ps[`${k}_ROADS_AVAILABLE`] ?? 0) > 0
+      ? state.edges.filter(
+          (e) =>
+            e.color === null &&
+            (connectedNodes.has(e.id[0]) || connectedNodes.has(e.id[1]))
+        )
+      : [];
+
+  if (game.isRoadBuilding && (game.freeRoadsAvailable ?? 0) > 0) {
+    if (openRoadEdges.length > 0) {
+      state.is_road_building = true;
+      state.current_playable_actions = openRoadEdges.map(
+        (e) => [color, "BUILD_ROAD", e.id] as GameAction
+      );
+      return;
+    }
+    game.isRoadBuilding = false;
+    game.freeRoadsAvailable = 0;
+    state.is_road_building = false;
+  }
+
+  const canPlayDevCard = (card: DevelopmentCard) => {
+    if (ps[`${k}_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN`]) return false;
+    const held = ps[`${k}_${card}_IN_HAND`] ?? 0;
+    const boughtThisTurn = ps[`${k}_${card}_BOUGHT_THIS_TURN`] ?? 0;
+    return held - boughtThisTurn > 0;
+  };
+
+  const devActions: GameAction[] = [];
+  if (canPlayDevCard("KNIGHT")) {
+    devActions.push([color, "PLAY_KNIGHT_CARD", null]);
+  }
+  if (canPlayDevCard("ROAD_BUILDING") && openRoadEdges.length > 0) {
+    devActions.push([color, "PLAY_ROAD_BUILDING", null]);
+  }
+  if (canPlayDevCard("MONOPOLY")) {
+    for (const r of RESOURCES) {
+      devActions.push([color, "PLAY_MONOPOLY", r]);
+    }
+  }
+  if (canPlayDevCard("YEAR_OF_PLENTY")) {
+    const bank = state.resource_freqdeck || [19, 19, 19, 19, 19];
+    const yopSeen = new Set<string>();
+    for (let i = 0; i < RESOURCES.length; i++) {
+      for (let j = i; j < RESOURCES.length; j++) {
+        const r1 = RESOURCES[i];
+        const r2 = RESOURCES[j];
+        const b1 = bank[i] ?? 0;
+        const b2 = bank[j] ?? 0;
+        if ((i === j && b1 >= 2) || (i !== j && b1 >= 1 && b2 >= 1)) {
+          const key = `${r1},${r2}`;
+          if (!yopSeen.has(key)) {
+            yopSeen.add(key);
+            devActions.push([color, "PLAY_YEAR_OF_PLENTY", [r1, r2]]);
+          }
+        } else {
+          if (b1 >= 1 && !yopSeen.has(r1)) {
+            yopSeen.add(r1);
+            devActions.push([color, "PLAY_YEAR_OF_PLENTY", [r1]]);
+          }
+          if (b2 >= 1 && !yopSeen.has(r2)) {
+            yopSeen.add(r2);
+            devActions.push([color, "PLAY_YEAR_OF_PLENTY", [r2]]);
+          }
+        }
       }
+    }
+  }
+
+  if (!ps[`${k}_HAS_ROLLED`]) {
+    state.current_playable_actions = [[color, "ROLL", null], ...devActions];
+    return;
+  }
+
+  const actions: GameAction[] = [[color, "END_TURN", null], ...devActions];
+  const wood = ps[`${k}_WOOD_IN_HAND`] ?? 0;
+  const brick = ps[`${k}_BRICK_IN_HAND`] ?? 0;
+  const sheep = ps[`${k}_SHEEP_IN_HAND`] ?? 0;
+  const wheat = ps[`${k}_WHEAT_IN_HAND`] ?? 0;
+  const ore = ps[`${k}_ORE_IN_HAND`] ?? 0;
+
+  // BUILD_ROAD
+  if (wood >= 1 && brick >= 1 && openRoadEdges.length > 0) {
+    for (const e of openRoadEdges) {
+      actions.push([color, "BUILD_ROAD", e.id]);
     }
   }
 
@@ -1007,32 +1222,12 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
   }
 
   // BUY_DEVELOPMENT_CARD
-  if (sheep >= 1 && wheat >= 1 && ore >= 1) {
+  const devCardsRemaining = Object.values(state.development_listdeck || {}).reduce(
+    (sum, count) => sum + Math.max(0, Number(count) || 0),
+    0
+  );
+  if (sheep >= 1 && wheat >= 1 && ore >= 1 && devCardsRemaining > 0) {
     actions.push([color, "BUY_DEVELOPMENT_CARD", null]);
-  }
-
-  // Playable dev cards
-  if ((ps[`${k}_KNIGHT_IN_HAND`] ?? 0) > 0) {
-    actions.push([color, "PLAY_KNIGHT_CARD", null]);
-  }
-  if ((ps[`${k}_ROAD_BUILDING_IN_HAND`] ?? 0) > 0) {
-    actions.push([color, "PLAY_ROAD_BUILDING", null]);
-  }
-  if ((ps[`${k}_MONOPOLY_IN_HAND`] ?? 0) > 0) {
-    for (const r of RESOURCES) {
-      actions.push([color, "PLAY_MONOPOLY", r]);
-    }
-  }
-  if ((ps[`${k}_YEAR_OF_PLENTY_IN_HAND`] ?? 0) > 0) {
-    for (let i = 0; i < RESOURCES.length; i++) {
-      for (let j = i; j < RESOURCES.length; j++) {
-        actions.push([
-          color,
-          "PLAY_YEAR_OF_PLENTY",
-          [RESOURCES[i], RESOURCES[j]],
-        ]);
-      }
-    }
   }
 
   // MARITIME_TRADE (4:1, 3:1 generic port, 2:1 specialized port)
@@ -1044,6 +1239,7 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
   const has3to1Port = (portNodes.ANY || []).some((nid) =>
     ownedNodeIds.has(nid)
   );
+  const bank = state.resource_freqdeck || [19, 19, 19, 19, 19];
 
   for (const giveRes of RESOURCES) {
     const has2to1 = (portNodes[giveRes] || []).some((nid) =>
@@ -1052,8 +1248,10 @@ function recomputeScoresAndPlayableActions(game: StoredLocalGame) {
     const rate = has2to1 ? 2 : has3to1Port ? 3 : 4;
     const count = ps[`${k}_${giveRes}_IN_HAND`] ?? 0;
     if (count >= rate) {
-      for (const recvRes of RESOURCES) {
+      for (let recvIdx = 0; recvIdx < RESOURCES.length; recvIdx++) {
+        const recvRes = RESOURCES[recvIdx];
         if (recvRes === giveRes) continue;
+        if ((bank[recvIdx] ?? 1) <= 0) continue;
         const tuple: (ResourceCard | null)[] = [
           null,
           null,
@@ -1185,7 +1383,9 @@ function scoreLocalHandUtility(
   }
 
   const totalCards = hand.reduce((a, b) => a + b, 0);
-  const discardPenalty = totalCards > (state.game?.discard_limit ?? 7) ? 4.5 : 0;
+  const discardLimit = state.game?.discard_limit ?? 7;
+  const excess = Math.max(0, totalCards - discardLimit);
+  const discardPenalty = excess > 0 ? 4.5 + excess * 2.5 : 0;
   const surplusPenalty = hand.reduce(
     (acc, count) => acc + Math.max(count - 2, 0) * 0.45,
     0
@@ -1201,6 +1401,44 @@ function scoreLocalHandUtility(
     discardPenalty -
     surplusPenalty
   );
+}
+
+function adjustLocalBankResource(
+  state: GameState,
+  resource: ResourceCard,
+  delta: number
+) {
+  if (!Array.isArray(state.resource_freqdeck)) {
+    state.resource_freqdeck = [19, 19, 19, 19, 19];
+  }
+  const idx = RESOURCES.indexOf(resource);
+  if (idx < 0) return;
+  state.resource_freqdeck[idx] = Math.max(
+    0,
+    (state.resource_freqdeck[idx] ?? 0) + delta
+  );
+}
+
+function drawFromDevDeck(
+  deck: Record<string, number>
+): DevelopmentCard | "VICTORY_POINT" | null {
+  const entries = Object.entries(deck || {}).filter(
+    ([, cnt]) => Number(cnt) > 0
+  );
+  const total = entries.reduce((s, [, cnt]) => s + Number(cnt), 0);
+  if (total <= 0) return null;
+  let pick = Math.floor(Math.random() * total);
+  for (const [card, rawCnt] of entries) {
+    const cnt = Number(rawCnt);
+    if (pick < cnt) {
+      deck[card] = cnt - 1;
+      return card as DevelopmentCard | "VICTORY_POINT";
+    }
+    pick -= cnt;
+  }
+  const last = entries[entries.length - 1][0];
+  deck[last] = Math.max(0, Number(deck[last]) - 1);
+  return last as DevelopmentCard | "VICTORY_POINT";
 }
 
 function applyActionToGame(game: StoredLocalGame, action: GameAction) {
@@ -1227,6 +1465,7 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
           if (t.type === "RESOURCE_TILE") {
             ps[`${k}_${t.resource}_IN_HAND`] =
               (ps[`${k}_${t.resource}_IN_HAND`] ?? 0) + 1;
+            adjustLocalBankResource(state, t.resource, -1);
           }
         }
       }
@@ -1235,6 +1474,10 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
       ps[`${k}_BRICK_IN_HAND`]--;
       ps[`${k}_SHEEP_IN_HAND`]--;
       ps[`${k}_WHEAT_IN_HAND`]--;
+      adjustLocalBankResource(state, "WOOD", 1);
+      adjustLocalBankResource(state, "BRICK", 1);
+      adjustLocalBankResource(state, "SHEEP", 1);
+      adjustLocalBankResource(state, "WHEAT", 1);
     }
     state.action_records.push([action, null]);
   } else if (actionType === "BUILD_ROAD") {
@@ -1249,9 +1492,18 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
       if (game.initialQueue.length === 0) {
         state.current_color = state.colors[0];
       }
+    } else if (game.isRoadBuilding && (game.freeRoadsAvailable ?? 0) > 0) {
+      game.freeRoadsAvailable = (game.freeRoadsAvailable ?? 0) - 1;
+      if (game.freeRoadsAvailable <= 0) {
+        game.isRoadBuilding = false;
+        game.freeRoadsAvailable = 0;
+        state.is_road_building = false;
+      }
     } else {
       ps[`${k}_WOOD_IN_HAND`] = Math.max(0, (ps[`${k}_WOOD_IN_HAND`] ?? 0) - 1);
       ps[`${k}_BRICK_IN_HAND`] = Math.max(0, (ps[`${k}_BRICK_IN_HAND`] ?? 0) - 1);
+      adjustLocalBankResource(state, "WOOD", 1);
+      adjustLocalBankResource(state, "BRICK", 1);
     }
     state.action_records.push([action, null]);
   } else if (actionType === "BUILD_CITY") {
@@ -1262,16 +1514,53 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
     }
     ps[`${k}_WHEAT_IN_HAND`] -= 2;
     ps[`${k}_ORE_IN_HAND`] -= 3;
+    adjustLocalBankResource(state, "WHEAT", 2);
+    adjustLocalBankResource(state, "ORE", 3);
     state.action_records.push([action, null]);
   } else if (actionType === "ROLL") {
-    const d1 = Math.floor(Math.random() * 6) + 1;
-    const d2 = Math.floor(Math.random() * 6) + 1;
+    let d1: number;
+    let d2: number;
+    if (state.game?.dice_mode === "balanced") {
+      if (
+        !game.diceDeck ||
+        game.diceDeck.length <= BALANCED_DICE_RESHUFFLE_THRESHOLD
+      ) {
+        game.diceDeck = buildBalancedDiceDeck();
+      }
+      const drawn = game.diceDeck.pop()!;
+      d1 = drawn[0];
+      d2 = drawn[1];
+      state.dice_deck_remaining = game.diceDeck.length;
+    } else {
+      d1 = Math.floor(Math.random() * 6) + 1;
+      d2 = Math.floor(Math.random() * 6) + 1;
+    }
     const sum = d1 + d2;
     ps[`${k}_HAS_ROLLED`] = true;
     state.action_records.push([action, [d1, d2]]);
 
     if (sum === 7) {
-      state.current_prompt = "MOVE_ROBBER";
+      const discardLimit = state.game?.discard_limit ?? 7;
+      const discardCounts = state.colors.map((c) => {
+        const ck = pKey(state, c);
+        const numCards = RESOURCES.reduce(
+          (acc, r) => acc + (ps[`${ck}_${r}_IN_HAND`] ?? 0),
+          0
+        );
+        return numCards > discardLimit ? Math.floor(numCards / 2) : 0;
+      });
+      const firstDiscarderIdx = discardCounts.findIndex((cnt) => cnt > 0);
+      if (firstDiscarderIdx !== -1) {
+        game.discardCounts = discardCounts;
+        state.current_player_index = firstDiscarderIdx;
+        state.current_color = state.colors[firstDiscarderIdx];
+        state.current_prompt = "DISCARD";
+        state.current_discard_count = discardCounts[firstDiscarderIdx];
+      } else {
+        game.discardCounts = state.colors.map(() => 0);
+        state.current_discard_count = 0;
+        state.current_prompt = "MOVE_ROBBER";
+      }
     } else {
       for (const n of Object.values(state.nodes)) {
         if (!n.color || !n.building) continue;
@@ -1286,11 +1575,52 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
             const adj = state.adjacent_tiles[String(n.id)] || [];
             const targetTileId = pt.tile.id;
             if (adj.some((t) => "id" in t && t.id === targetTileId)) {
-              ps[`${nk}_${pt.tile.resource}_IN_HAND`] =
-                (ps[`${nk}_${pt.tile.resource}_IN_HAND`] ?? 0) + qty;
+              const rIdx = RESOURCES.indexOf(pt.tile.resource);
+              const avail = rIdx >= 0 ? (state.resource_freqdeck?.[rIdx] ?? 19) : 19;
+              const paid = Math.min(qty, Math.max(0, avail));
+              if (paid > 0) {
+                ps[`${nk}_${pt.tile.resource}_IN_HAND`] =
+                  (ps[`${nk}_${pt.tile.resource}_IN_HAND`] ?? 0) + paid;
+                adjustLocalBankResource(state, pt.tile.resource, -paid);
+              }
             }
           }
         }
+      }
+    }
+  } else if (actionType === "DISCARD_RESOURCE") {
+    const discarded = action[2] as ResourceCard;
+    const pIdx = state.colors.indexOf(color);
+    const held = ps[`${k}_${discarded}_IN_HAND`] ?? 0;
+    const counts = game.discardCounts || state.colors.map((c) =>
+      c === color ? Math.max(1, state.current_discard_count ?? 1) : 0
+    );
+    const remaining = pIdx >= 0 ? (counts[pIdx] ?? 0) : 0;
+    if (remaining <= 0 || held <= 0) {
+      throw new Error("Descarte inválido para o estado atual.");
+    }
+    ps[`${k}_${discarded}_IN_HAND`] = held - 1;
+    adjustLocalBankResource(state, discarded, 1);
+    counts[pIdx] = remaining - 1;
+    game.discardCounts = counts;
+    state.action_records.push([action, discarded]);
+
+    if (counts[pIdx] > 0) {
+      state.current_discard_count = counts[pIdx];
+      state.current_prompt = "DISCARD";
+    } else {
+      const nextIdx = counts.findIndex((cnt, i) => i > pIdx && cnt > 0);
+      if (nextIdx !== -1) {
+        state.current_player_index = nextIdx;
+        state.current_color = state.colors[nextIdx];
+        state.current_discard_count = counts[nextIdx];
+        state.current_prompt = "DISCARD";
+      } else {
+        state.current_player_index = state.current_turn_index;
+        state.current_color = state.colors[state.current_turn_index];
+        state.current_discard_count = 0;
+        game.discardCounts = state.colors.map(() => 0);
+        state.current_prompt = "MOVE_ROBBER";
       }
     }
   } else if (actionType === "MOVE_ROBBER") {
@@ -1299,11 +1629,13 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
     let stolen: ResourceCard | null = null;
     if (victimColor) {
       const vk = pKey(state, victimColor as Color);
-      const availableRes = RESOURCES.filter(
-        (r) => (ps[`${vk}_${r}_IN_HAND`] ?? 0) > 0
-      );
-      if (availableRes.length > 0) {
-        stolen = availableRes[Math.floor(Math.random() * availableRes.length)];
+      const weightedRes: ResourceCard[] = [];
+      for (const r of RESOURCES) {
+        const cnt = ps[`${vk}_${r}_IN_HAND`] ?? 0;
+        for (let i = 0; i < cnt; i++) weightedRes.push(r);
+      }
+      if (weightedRes.length > 0) {
+        stolen = weightedRes[Math.floor(Math.random() * weightedRes.length)];
         ps[`${vk}_${stolen}_IN_HAND`]--;
         ps[`${k}_${stolen}_IN_HAND`] = (ps[`${k}_${stolen}_IN_HAND`] ?? 0) + 1;
       }
@@ -1311,25 +1643,41 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
     state.current_prompt = "PLAY_TURN";
     state.action_records.push([action, stolen]);
   } else if (actionType === "BUY_DEVELOPMENT_CARD") {
+    if (!state.development_listdeck) {
+      state.development_listdeck = {};
+    }
+    const drawn = drawFromDevDeck(state.development_listdeck);
+    if (!drawn) {
+      throw new Error("Não há mais cartas de desenvolvimento no baralho.");
+    }
     ps[`${k}_SHEEP_IN_HAND`]--;
     ps[`${k}_WHEAT_IN_HAND`]--;
     ps[`${k}_ORE_IN_HAND`]--;
-    const deck: Array<DevelopmentCard | "VICTORY_POINT"> = [
-      "KNIGHT",
-      "KNIGHT",
-      "KNIGHT",
-      "YEAR_OF_PLENTY",
-      "MONOPOLY",
-      "ROAD_BUILDING",
-      "VICTORY_POINT",
-    ];
-    const drawn = deck[Math.floor(Math.random() * deck.length)];
+    adjustLocalBankResource(state, "SHEEP", 1);
+    adjustLocalBankResource(state, "WHEAT", 1);
+    adjustLocalBankResource(state, "ORE", 1);
     ps[`${k}_${drawn}_IN_HAND`] = (ps[`${k}_${drawn}_IN_HAND`] ?? 0) + 1;
+    if (drawn !== "VICTORY_POINT") {
+      ps[`${k}_${drawn}_BOUGHT_THIS_TURN`] =
+        (ps[`${k}_${drawn}_BOUGHT_THIS_TURN`] ?? 0) + 1;
+    }
     state.action_records.push([action, drawn as DevelopmentCard]);
   } else if (actionType === "PLAY_KNIGHT_CARD") {
     ps[`${k}_KNIGHT_IN_HAND`] = Math.max(0, (ps[`${k}_KNIGHT_IN_HAND`] ?? 0) - 1);
     ps[`${k}_PLAYED_KNIGHT`] = (ps[`${k}_PLAYED_KNIGHT`] ?? 0) + 1;
+    ps[`${k}_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN`] = true;
     state.current_prompt = "MOVE_ROBBER";
+    state.action_records.push([action, null]);
+  } else if (actionType === "PLAY_ROAD_BUILDING") {
+    ps[`${k}_ROAD_BUILDING_IN_HAND`] = Math.max(
+      0,
+      (ps[`${k}_ROAD_BUILDING_IN_HAND`] ?? 0) - 1
+    );
+    ps[`${k}_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN`] = true;
+    game.isRoadBuilding = true;
+    game.freeRoadsAvailable = 2;
+    state.is_road_building = true;
+    state.current_prompt = "PLAY_TURN";
     state.action_records.push([action, null]);
   } else if (actionType === "PLAY_MONOPOLY") {
     const targetRes = action[2];
@@ -1337,6 +1685,7 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
       0,
       (ps[`${k}_MONOPOLY_IN_HAND`] ?? 0) - 1
     );
+    ps[`${k}_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN`] = true;
     let totalClaimed = 0;
     for (const c of state.colors) {
       if (c === color) continue;
@@ -1353,8 +1702,10 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
       0,
       (ps[`${k}_YEAR_OF_PLENTY_IN_HAND`] ?? 0) - 1
     );
+    ps[`${k}_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN`] = true;
     for (const r of action[2]) {
       ps[`${k}_${r}_IN_HAND`] = (ps[`${k}_${r}_IN_HAND`] ?? 0) + 1;
+      adjustLocalBankResource(state, r, -1);
     }
     state.action_records.push([action, null]);
   } else if (actionType === "MARITIME_TRADE") {
@@ -1367,7 +1718,10 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
       const giveRes = giveList[0];
       ps[`${k}_${giveRes}_IN_HAND`] -= giveList.length;
       ps[`${k}_${recv}_IN_HAND`] = (ps[`${k}_${recv}_IN_HAND`] ?? 0) + 1;
+      adjustLocalBankResource(state, giveRes, giveList.length);
+      adjustLocalBankResource(state, recv, -1);
     }
+    game.tradesThisTurn = (game.tradesThisTurn ?? 0) + 1;
     state.action_records.push([action, null]);
   } else if (actionType === "OFFER_TRADE") {
     const value = action[2];
@@ -1459,6 +1813,15 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
     state.action_records.push([action, null]);
   } else if (actionType === "END_TURN") {
     ps[`${k}_HAS_ROLLED`] = false;
+    ps[`${k}_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN`] = false;
+    ps[`${k}_KNIGHT_BOUGHT_THIS_TURN`] = 0;
+    ps[`${k}_MONOPOLY_BOUGHT_THIS_TURN`] = 0;
+    ps[`${k}_YEAR_OF_PLENTY_BOUGHT_THIS_TURN`] = 0;
+    ps[`${k}_ROAD_BUILDING_BOUGHT_THIS_TURN`] = 0;
+    game.tradesThisTurn = 0;
+    game.isRoadBuilding = false;
+    game.freeRoadsAvailable = 0;
+    state.is_road_building = false;
     const curIdx = state.colors.indexOf(color);
     const nextIdx = (curIdx + 1) % state.colors.length;
     state.current_color = state.colors[nextIdx];
@@ -1515,7 +1878,7 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
       game_id: state.game.id,
       room_code: state.room_code || null,
       mode: state.room_code || origHumanCount >= 2 ? "MULTIPLAYER" : "SOLO",
-      map_template: "BASE",
+      map_template: game.mapTemplate || "BASE",
       vps_to_win: state.game.vps_to_win,
       num_turns: state.num_turns,
       winning_color: winnerColor,
@@ -1527,10 +1890,196 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
   }
 }
 
+function tilePips(t: Tile): number {
+  if (t.type !== "RESOURCE_TILE") return 0;
+  return Math.max(0, 6 - Math.abs(7 - t.number));
+}
+
+function scoreNodeForBot(
+  state: GameState,
+  portNodes: Record<string, number[]>,
+  color: Color,
+  nodeId: number
+): number {
+  const adj = state.adjacent_tiles[String(nodeId)] || [];
+  let pips = 0;
+  const newResources = new Set<ResourceCard>();
+  const existingResources = new Set<ResourceCard>();
+  for (const n of Object.values(state.nodes)) {
+    if (n.color === color) {
+      for (const t of state.adjacent_tiles[String(n.id)] || []) {
+        if (t.type === "RESOURCE_TILE") existingResources.add(t.resource);
+      }
+    }
+  }
+  const tileResSeen = new Set<ResourceCard>();
+  for (const t of adj) {
+    if (t.type !== "RESOURCE_TILE") continue;
+    pips += tilePips(t);
+    tileResSeen.add(t.resource);
+    if (!existingResources.has(t.resource)) {
+      newResources.add(t.resource);
+    }
+  }
+  let portBonus = 0;
+  if ((portNodes.ANY || []).includes(nodeId)) {
+    portBonus += 1.5;
+  }
+  for (const r of RESOURCES) {
+    if ((portNodes[r] || []).includes(nodeId)) {
+      portBonus += existingResources.has(r) || tileResSeen.has(r) ? 3.0 : 1.0;
+    }
+  }
+  return pips * 2.0 + newResources.size * 2.5 + tileResSeen.size * 1.0 + portBonus;
+}
+
+function scoreRoadEdgeForBot(
+  game: StoredLocalGame,
+  color: Color,
+  edgeId: [number, number]
+): number {
+  const { state, nodeNeighbors, portNodes } = game;
+  let score = 0;
+  const openEndpoints: number[] = [];
+  for (const nid of edgeId) {
+    const node = state.nodes[String(nid)];
+    if (!node) continue;
+    if (node.color === null) {
+      const neighborOccupied = (nodeNeighbors[nid] || []).some(
+        (nbId) => state.nodes[String(nbId)]?.building !== null
+      );
+      if (!neighborOccupied) {
+        score += 4.0 + scoreNodeForBot(state, portNodes, color, nid) * 0.5;
+      } else {
+        openEndpoints.push(nid);
+      }
+    }
+  }
+  for (const ep of openEndpoints) {
+    for (const hop of nodeNeighbors[ep] || []) {
+      const hopNode = state.nodes[String(hop)];
+      if (!hopNode || hopNode.color !== null) continue;
+      const nbOcc = (nodeNeighbors[hop] || []).some(
+        (nb) => state.nodes[String(nb)]?.building !== null
+      );
+      if (!nbOcc) {
+        score = Math.max(
+          score,
+          2.0 + scoreNodeForBot(state, portNodes, color, hop) * 0.35
+        );
+      }
+    }
+  }
+  const prevLen = computeLongestRoadForColor(state.edges, state.nodes, color);
+  const simulatedEdges = state.edges.map((e) =>
+    sameEdge(e.id, edgeId) ? { ...e, color } : e
+  );
+  const nextLen = computeLongestRoadForColor(simulatedEdges, state.nodes, color);
+  if (nextLen > prevLen) {
+    score += nextLen >= 5 ? 6.0 : 2.5;
+  }
+  return score;
+}
+
+function scoreRobberActionForBot(
+  state: GameState,
+  botColor: Color,
+  action: GameAction,
+  difficulty: BotDifficulty = "medium"
+): number {
+  const [coord, victimColor] = action[2] as [TileCoordinate, Color | undefined];
+  const tileEntry = state.tiles.find(
+    (pt) => coordKey(pt.coordinate) === coordKey(coord)
+  );
+  const pips = tileEntry ? tilePips(tileEntry.tile) : 0;
+  const vpsToWin = state.game?.vps_to_win ?? 10;
+  const selfPenalty = difficulty === "hard" ? 120 : 80;
+  let score = 0;
+
+  for (const n of Object.values(state.nodes)) {
+    if (!n.color || !n.building) continue;
+    const adj = state.adjacent_tiles[String(n.id)] || [];
+    const touches =
+      tileEntry &&
+      "id" in tileEntry.tile &&
+      adj.some(
+        (t) =>
+          "id" in t && "id" in tileEntry.tile && t.id === tileEntry.tile.id
+      );
+    if (!touches) continue;
+    const weight = n.building === "CITY" ? 2 : 1;
+    if (n.color === botColor) {
+      score -= selfPenalty * weight * Math.max(1, pips);
+    } else {
+      const ok = pKey(state, n.color);
+      const vp = state.player_state[`${ok}_VICTORY_POINTS`] ?? 0;
+      const threat =
+        difficulty === "hard"
+          ? vp >= vpsToWin - 1
+            ? 4.0
+            : vp >= vpsToWin - 3
+              ? 2.2
+              : 1.0 + vp * 0.35
+          : difficulty === "easy"
+            ? 1.0
+            : vp >= vpsToWin - 2
+              ? 2.5
+              : 1.0 + vp * 0.25;
+      score += (pips * 3.0 + 1.0) * weight * threat;
+    }
+  }
+
+  if (victimColor) {
+    const vk = pKey(state, victimColor as Color);
+    const victimVp = state.player_state[`${vk}_VICTORY_POINTS`] ?? 0;
+    const victimCards = state.player_state[`${vk}_NUM_RESOURCES_IN_HAND`] ?? 0;
+    const discardLimit = state.game?.discard_limit ?? 7;
+    if (victimCards > 0) {
+      const vpFactor = difficulty === "hard" ? 2.4 : difficulty === "easy" ? 0.4 : 1.5;
+      score += 8.0 + Math.min(victimCards, 12) * 1.4 + victimVp * vpFactor;
+      if (victimCards > discardLimit) {
+        score += 8.0;
+      }
+    }
+  }
+  return score;
+}
+
+function getMaritimeTradeDeltaInfo(offer: (ResourceCard | null)[]): {
+  giveIdx: number;
+  rate: number;
+  recvIdx: number;
+} | null {
+  const giveList = offer.slice(0, 4).filter((r): r is ResourceCard => r !== null);
+  const recv = offer[4];
+  if (giveList.length === 0 || !recv) return null;
+  return {
+    giveIdx: RESOURCES.indexOf(giveList[0]),
+    rate: giveList.length,
+    recvIdx: RESOURCES.indexOf(recv),
+  };
+}
+
+function pickFromTopScored<T>(
+  items: T[],
+  scorer: (item: T) => number,
+  topWindow = 1
+): T {
+  const scored = items
+    .map((item) => ({ item, score: scorer(item) }))
+    .sort((a, b) => b.score - a.score);
+  const windowSize = Math.max(1, Math.min(topWindow, scored.length));
+  return scored[Math.floor(Math.random() * windowSize)].item;
+}
+
 function chooseBotAction(game: StoredLocalGame): GameAction | null {
-  const { state } = game;
+  const { state, portNodes } = game;
   const playable = state.current_playable_actions;
   if (playable.length === 0) return null;
+
+  const botDifficulty = difficultyFromPlayerKey(
+    game.seatMeta?.[state.current_color]?.player_key
+  );
 
   if (state.current_prompt === "DECIDE_TRADE") {
     const acceptAction = playable.find((a) => a[1] === "ACCEPT_TRADE");
@@ -1554,14 +2103,28 @@ function chooseBotAction(game: StoredLocalGame): GameAction | null {
 
     const beforeScore = scoreLocalHandUtility(state, botColor, myHand);
     const afterScore = scoreLocalHandUtility(state, botColor, afterHand);
+    const gain = afterScore - beforeScore;
 
     const pk = pKey(state, proposerColor);
     const proposerVp = state.player_state[`${pk}_VICTORY_POINTS`] ?? 0;
     const vpsToWin = state.game?.vps_to_win ?? 10;
+
+    if (botDifficulty === "easy") {
+      return gain >= -0.6 ? acceptAction : rejectAction;
+    }
+
+    if (botDifficulty === "hard") {
+      if (proposerVp >= vpsToWin - 1 && gain < 4.5) return rejectAction;
+      if (proposerVp >= vpsToWin - 2 && gain < 2.2) return rejectAction;
+      const leaderPenalty =
+        proposerVp >= vpsToWin - 2 ? 3.5 : proposerVp >= vpsToWin - 3 ? 1.5 : 0.0;
+      return gain - leaderPenalty >= 0.8 ? acceptAction : rejectAction;
+    }
+
     const leaderPenalty =
       proposerVp >= vpsToWin - 1 ? 5.5 : proposerVp >= vpsToWin - 2 ? 2.0 : 0.0;
 
-    return afterScore - beforeScore - leaderPenalty >= 0.4
+    return gain - leaderPenalty >= 0.4
       ? acceptAction
       : rejectAction;
   }
@@ -1595,8 +2158,9 @@ function chooseBotAction(game: StoredLocalGame): GameAction | null {
         scoreLocalHandUtility(state, botColor, afterHand) - beforeScore;
       const partnerKey = pKey(state, partnerColor);
       const partnerVp = state.player_state[`${partnerKey}_VICTORY_POINTS`] ?? 0;
+      const partnerWeight = botDifficulty === "hard" ? 1.15 : 0.75;
       const partnerPenalty =
-        0.75 * partnerVp + (partnerVp >= vpsToWin - 1 ? 4.0 : 0);
+        partnerWeight * partnerVp + (partnerVp >= vpsToWin - 1 ? 4.0 : 0);
       const combined = handDelta - partnerPenalty;
 
       if (combined > bestCombined) {
@@ -1612,62 +2176,423 @@ function chooseBotAction(game: StoredLocalGame): GameAction | null {
     return bestAction;
   }
 
-  // Priority heuristic for Catanatron AI fallback
-  const roll = playable.find((a) => a[1] === "ROLL");
-  if (roll) return roll;
+  const botColor = state.current_color;
+  const k = pKey(state, botColor);
+  const ps = state.player_state;
 
+  // Smart DISCARD_RESOURCE keeping highest remaining hand utility
+  if (state.current_prompt === "DISCARD") {
+    const myHand = getLocalFreqdeck(state, botColor);
+    let bestDiscard = playable[0];
+    let bestUtility = -Infinity;
+    for (const act of playable) {
+      if (act[1] !== "DISCARD_RESOURCE") continue;
+      const rIdx = RESOURCES.indexOf(act[2]);
+      if (rIdx < 0 || myHand[rIdx] <= 0) continue;
+      const nextHand = [...myHand];
+      nextHand[rIdx] -= 1;
+      const u = scoreLocalHandUtility(state, botColor, nextHand);
+      if (u > bestUtility) {
+        bestUtility = u;
+        bestDiscard = act;
+      }
+    }
+    return bestDiscard;
+  }
+
+  // Initial placement
   if (state.is_initial_build_phase) {
     const settlements = playable.filter((a) => a[1] === "BUILD_SETTLEMENT");
     if (settlements.length > 0) {
-      // Score each node by pip count of adjacent resource tiles
-      let best = settlements[0];
-      let bestScore = -1;
-      for (const act of settlements) {
-        const nid = act[2] as number;
-        const adj = state.adjacent_tiles[String(nid)] || [];
-        const score = adj.reduce((acc, t) => {
-          if (t.type !== "RESOURCE_TILE") return acc;
-          const pips = 6 - Math.abs(7 - t.number);
-          return acc + pips;
-        }, 0);
-        if (score > bestScore) {
-          bestScore = score;
-          best = act;
-        }
-      }
-      return best;
+      return pickFromTopScored(
+        settlements,
+        (act) => scoreNodeForBot(state, portNodes, botColor, act[2] as number),
+        botDifficulty === "easy" ? 4 : 1
+      );
     }
-    return playable[Math.floor(Math.random() * playable.length)];
+    const roads = playable.filter((a) => a[1] === "BUILD_ROAD");
+    if (roads.length > 0) {
+      return pickFromTopScored(
+        roads,
+        (act) => scoreRoadEdgeForBot(game, botColor, act[2] as [number, number]),
+        botDifficulty === "easy" ? 3 : 1
+      );
+    }
+    return playable[0];
   }
 
-  const city = playable.find((a) => a[1] === "BUILD_CITY");
-  if (city) return city;
-
-  const settlement = playable.find((a) => a[1] === "BUILD_SETTLEMENT");
-  if (settlement) return settlement;
-
-  const knight = playable.find((a) => a[1] === "PLAY_KNIGHT_CARD");
-  if (knight) return knight;
-
+  // MOVE_ROBBER (from rolling 7 or playing Knight)
   const moveRobber = playable.filter((a) => a[1] === "MOVE_ROBBER");
   if (moveRobber.length > 0) {
-    const withVictim = moveRobber.filter((a) => a[2][1] !== undefined);
-    return withVictim.length > 0
-      ? withVictim[Math.floor(Math.random() * withVictim.length)]
-      : moveRobber[0];
+    return pickFromTopScored(
+      moveRobber,
+      (act) => scoreRobberActionForBot(state, botColor, act, botDifficulty),
+      botDifficulty === "easy" ? 4 : 1
+    );
   }
 
+  // Pre-roll: unblock our own producing tile via Knight if robbed, otherwise ROLL
+  const roll = playable.find((a) => a[1] === "ROLL");
+  if (roll) {
+    const knight = playable.find((a) => a[1] === "PLAY_KNIGHT_CARD");
+    if (knight && (botDifficulty !== "easy" || Math.random() < 0.5)) {
+      const robberKey = coordKey(state.robber_coordinate);
+      const robbedTile = state.tiles.find(
+        (pt) => coordKey(pt.coordinate) === robberKey
+      );
+      const robberBlocksMe = Object.values(state.nodes).some(
+        (n) =>
+          n.color === botColor &&
+          robbedTile &&
+          "id" in robbedTile.tile &&
+          (state.adjacent_tiles[String(n.id)] || []).some(
+            (t) =>
+              "id" in t &&
+              "id" in robbedTile.tile &&
+              t.id === robbedTile.tile.id
+          )
+      );
+      if (robberBlocksMe) return knight;
+    }
+    return roll;
+  }
+
+  // Road Building free roads in progress
+  if (game.isRoadBuilding && (game.freeRoadsAvailable ?? 0) > 0) {
+    const roads = playable.filter((a) => a[1] === "BUILD_ROAD");
+    if (roads.length > 0) {
+      return pickFromTopScored(
+        roads,
+        (act) => scoreRoadEdgeForBot(game, botColor, act[2] as [number, number]),
+        botDifficulty === "easy" ? 3 : 1
+      );
+    }
+  }
+
+  // Post-roll PLAY_TURN
+  // 1. Direct Cities (+1 VP + double yield)
+  const cities = playable.filter((a) => a[1] === "BUILD_CITY");
+  if (cities.length > 0) {
+    return pickFromTopScored(
+      cities,
+      (act) => scoreNodeForBot(state, portNodes, botColor, act[2] as number),
+      botDifficulty === "easy" ? 2 : 1
+    );
+  }
+
+  // 2. Direct Settlements (+1 VP + new yield)
+  const settlements = playable.filter((a) => a[1] === "BUILD_SETTLEMENT");
+  if (settlements.length > 0) {
+    return pickFromTopScored(
+      settlements,
+      (act) => scoreNodeForBot(state, portNodes, botColor, act[2] as number),
+      botDifficulty === "easy" ? 3 : 1
+    );
+  }
+
+  const myHand = getLocalFreqdeck(state, botColor);
+  const totalCards = myHand.reduce((a, b) => a + b, 0);
+  const discardLimit = state.game?.discard_limit ?? 7;
+  const tradesThisTurn = game.tradesThisTurn ?? 0;
+  const maxTradesPerTurn = 6;
+
+  const citiesAvail = ps[`${k}_CITIES_AVAILABLE`] ?? 4;
+  const settlementsAvail = ps[`${k}_SETTLEMENTS_AVAILABLE`] ?? 5;
+  const roadsAvail = ps[`${k}_ROADS_AVAILABLE`] ?? 15;
+  const ownedSettlements = Object.values(state.nodes).filter(
+    (n) => n.color === botColor && n.building === "SETTLEMENT"
+  ).length;
+  const connectedNodes = new Set<number>();
+  for (const e of state.edges) {
+    if (e.color === botColor) {
+      connectedNodes.add(e.id[0]);
+      connectedNodes.add(e.id[1]);
+    }
+  }
+  const hasBuildableSettlementSpot =
+    settlementsAvail > 0 &&
+    Object.values(state.nodes).some(
+      (n) =>
+        n.building === null &&
+        connectedNodes.has(n.id) &&
+        !(game.nodeNeighbors[n.id] || []).some(
+          (nb) => state.nodes[String(nb)]?.building !== null
+        )
+    );
+  const canUpgradeCity = citiesAvail > 0 && ownedSettlements > 0;
+  const devDeckCount = Object.values(state.development_listdeck || {}).reduce(
+    (s, c) => s + Math.max(0, Number(c) || 0),
+    0
+  );
+
+  const maritimeTrades =
+    tradesThisTurn < maxTradesPerTurn
+      ? playable.filter((a) => a[1] === "MARITIME_TRADE")
+      : [];
+
+  // 3. Can a 1-step Maritime Trade immediately unlock City or Settlement THIS turn?
+  if (maritimeTrades.length > 0 && (botDifficulty !== "easy" || totalCards > discardLimit)) {
+    let bestUnlockTrade: GameAction | null = null;
+    let bestUnlockScore = -Infinity;
+    for (const act of maritimeTrades) {
+      const info = getMaritimeTradeDeltaInfo(act[2] as (ResourceCard | null)[]);
+      if (!info) continue;
+      const afterHand = [...myHand];
+      afterHand[info.giveIdx] -= info.rate;
+      afterHand[info.recvIdx] += 1;
+      const unlocksCity =
+        canUpgradeCity && afterHand[3] >= 2 && afterHand[4] >= 3;
+      const unlocksSettlement =
+        hasBuildableSettlementSpot &&
+        afterHand[0] >= 1 &&
+        afterHand[1] >= 1 &&
+        afterHand[2] >= 1 &&
+        afterHand[3] >= 1;
+      if (unlocksCity || unlocksSettlement) {
+        const score =
+          (unlocksCity ? 100 : 80) +
+          scoreLocalHandUtility(state, botColor, afterHand);
+        if (score > bestUnlockScore) {
+          bestUnlockScore = score;
+          bestUnlockTrade = act;
+        }
+      }
+    }
+    if (bestUnlockTrade) return bestUnlockTrade;
+  }
+
+  // 4. Playable Dev Cards strategically
+  const yopActions = playable.filter((a) => a[1] === "PLAY_YEAR_OF_PLENTY");
+  if (yopActions.length > 0) {
+    const beforeUtility = scoreLocalHandUtility(state, botColor, myHand);
+    let bestYop = yopActions[0];
+    let bestYopScore = -Infinity;
+    let bestYopShouldPlay = false;
+    for (const act of yopActions) {
+      const afterHand = [...myHand];
+      for (const r of act[2] as ResourceCard[]) {
+        afterHand[RESOURCES.indexOf(r)] += 1;
+      }
+      const unlocksCity =
+        canUpgradeCity && afterHand[3] >= 2 && afterHand[4] >= 3;
+      const unlocksSettlement =
+        hasBuildableSettlementSpot &&
+        afterHand[0] >= 1 &&
+        afterHand[1] >= 1 &&
+        afterHand[2] >= 1 &&
+        afterHand[3] >= 1;
+      const unlocksDev =
+        devDeckCount > 0 &&
+        afterHand[2] >= 1 &&
+        afterHand[3] >= 1 &&
+        afterHand[4] >= 1;
+      const unlocksRoad =
+        roadsAvail > 0 && afterHand[0] >= 1 && afterHand[1] >= 1;
+      const afterCount = afterHand.reduce((a, b) => a + b, 0);
+      const utilityDelta =
+        scoreLocalHandUtility(state, botColor, afterHand) - beforeUtility;
+      const score =
+        (unlocksCity ? 60 : unlocksSettlement ? 50 : unlocksDev ? 14 : unlocksRoad ? 8 : 0) +
+        utilityDelta;
+      const shouldPlay =
+        unlocksCity ||
+        unlocksSettlement ||
+        (unlocksDev && afterCount - 3 <= discardLimit) ||
+        (afterCount <= discardLimit && utilityDelta > 0);
+      if (score > bestYopScore) {
+        bestYopScore = score;
+        bestYop = act;
+        bestYopShouldPlay = shouldPlay;
+      }
+    }
+    if (bestYopShouldPlay) {
+      return bestYop;
+    }
+  }
+
+  const roadBuildingAct = playable.find((a) => a[1] === "PLAY_ROAD_BUILDING");
+  if (roadBuildingAct && roadsAvail > 0) {
+    const roadOptions = state.edges.filter(
+      (e) =>
+        e.color === null &&
+        (connectedNodes.has(e.id[0]) || connectedNodes.has(e.id[1]))
+    );
+    const maxRoadVal = roadOptions.reduce(
+      (best, e) => Math.max(best, scoreRoadEdgeForBot(game, botColor, e.id)),
+      0
+    );
+    if (maxRoadVal >= 3 || (ps[`${k}_LONGEST_ROAD_LENGTH`] ?? 0) >= 3) {
+      return roadBuildingAct;
+    }
+  }
+
+  const monopolyActions = playable.filter((a) => a[1] === "PLAY_MONOPOLY");
+  if (monopolyActions.length > 0) {
+    const enemyCardsTotal = state.colors
+      .filter((c) => c !== botColor)
+      .reduce(
+        (acc, c) =>
+          acc + (ps[`${pKey(state, c)}_NUM_RESOURCES_IN_HAND`] ?? 0),
+        0
+      );
+    if (enemyCardsTotal >= (botDifficulty === "hard" ? 2 : 3)) {
+      let bestMono = monopolyActions[0];
+      let bestMonoScore = -Infinity;
+      let bestMonoGain = 0;
+      for (const act of monopolyActions) {
+        const res = act[2] as ResourceCard;
+        let expectedGain = 0;
+        for (const c of state.colors) {
+          if (c === botColor) continue;
+          const ck = pKey(state, c);
+          expectedGain += ps[`${ck}_${res}_IN_HAND`] ?? 0;
+        }
+        const afterHand = [...myHand];
+        afterHand[RESOURCES.indexOf(res)] += expectedGain;
+        const score =
+          expectedGain * 5.0 +
+          scoreLocalHandUtility(state, botColor, afterHand);
+        if (score > bestMonoScore) {
+          bestMonoScore = score;
+          bestMono = act;
+          bestMonoGain = expectedGain;
+        }
+      }
+      if (bestMonoGain >= 2) {
+        return bestMono;
+      }
+    }
+  }
+
+  const knightAct = playable.find((a) => a[1] === "PLAY_KNIGHT_CARD");
+  if (knightAct) {
+    const myKnights = ps[`${k}_PLAYED_KNIGHT`] ?? 0;
+    const maxEnemyKnights = state.colors
+      .filter((c) => c !== botColor)
+      .reduce((m, c) => Math.max(m, ps[`${pKey(state, c)}_PLAYED_KNIGHT`] ?? 0), 0);
+    const robberKey = coordKey(state.robber_coordinate);
+    const robbedTile = state.tiles.find(
+      (pt) => coordKey(pt.coordinate) === robberKey
+    );
+    const robberBlocksMe = Object.values(state.nodes).some(
+      (n) =>
+        n.color === botColor &&
+        robbedTile &&
+        "id" in robbedTile.tile &&
+        (state.adjacent_tiles[String(n.id)] || []).some(
+          (t) =>
+            "id" in t && "id" in robbedTile.tile && t.id === robbedTile.tile.id
+        )
+    );
+    const maxEnemyVp = state.colors
+      .filter((c) => c !== botColor)
+      .reduce(
+        (m, c) => Math.max(m, ps[`${pKey(state, c)}_VICTORY_POINTS`] ?? 0),
+        0
+      );
+    if (
+      robberBlocksMe ||
+      (!ps[`${k}_HAS_ARMY`] && myKnights + 1 >= Math.max(3, maxEnemyKnights + 1)) ||
+      (botDifficulty !== "easy" && maxEnemyVp >= (state.game?.vps_to_win ?? 10) - 3)
+    ) {
+      return knightAct;
+    }
+  }
+
+  // 5. BUY_DEVELOPMENT_CARD (no random skip; save only when 1 card from City/Settlement safely under limit)
   const buyDev = playable.find((a) => a[1] === "BUY_DEVELOPMENT_CARD");
-  if (buyDev && Math.random() < 0.55) return buyDev;
-
-  const road = playable.filter((a) => a[1] === "BUILD_ROAD");
-  if (road.length > 0 && Math.random() < 0.65) {
-    return road[Math.floor(Math.random() * road.length)];
+  if (buyDev) {
+    const closeToCity =
+      canUpgradeCity &&
+      myHand[3] >= 2 &&
+      myHand[4] >= 2 &&
+      totalCards < discardLimit;
+    const closeToSettlement =
+      hasBuildableSettlementSpot &&
+      (myHand[0] >= 1 ? 1 : 0) +
+        (myHand[1] >= 1 ? 1 : 0) +
+        (myHand[2] >= 1 ? 1 : 0) +
+        (myHand[3] >= 1 ? 1 : 0) >=
+        3 &&
+      totalCards < discardLimit;
+    if (totalCards >= discardLimit || (!closeToCity && !closeToSettlement)) {
+      return buyDev;
+    }
   }
 
-  const trade = playable.filter((a) => a[1] === "MARITIME_TRADE");
-  if (trade.length > 0 && Math.random() < 0.35) {
-    return trade[0];
+  // 6. Anti-hoarding MARITIME_TRADE & strategic BUILD_ROAD
+  const roadActions = playable.filter((a) => a[1] === "BUILD_ROAD");
+  let bestRoad: GameAction | null = null;
+  let bestRoadScore = -Infinity;
+  for (const act of roadActions) {
+    const s = scoreRoadEdgeForBot(game, botColor, act[2] as [number, number]);
+    if (s > bestRoadScore) {
+      bestRoadScore = s;
+      bestRoad = act;
+    }
+  }
+
+  if (bestRoad && (totalCards > discardLimit || bestRoadScore >= 2.0)) {
+    return bestRoad;
+  }
+
+  if (maritimeTrades.length > 0) {
+    const beforeUtil = scoreLocalHandUtility(state, botColor, myHand);
+    let bestTrade: GameAction | null = null;
+    let bestTradeScore = -Infinity;
+    let bestTradeDelta = -Infinity;
+    const maxEnemyRoad = state.colors
+      .filter((c) => c !== botColor)
+      .reduce((m, c) => Math.max(m, ps[`${pKey(state, c)}_LONGEST_ROAD_LENGTH`] ?? 0), 0);
+    const myRoadLen = ps[`${k}_LONGEST_ROAD_LENGTH`] ?? 0;
+
+    for (const act of maritimeTrades) {
+      const info = getMaritimeTradeDeltaInfo(act[2] as (ResourceCard | null)[]);
+      if (!info) continue;
+      const afterHand = [...myHand];
+      afterHand[info.giveIdx] -= info.rate;
+      afterHand[info.recvIdx] += 1;
+
+      const afterUtil = scoreLocalHandUtility(state, botColor, afterHand);
+      const delta = afterUtil - beforeUtil;
+      const unlocksDev =
+        devDeckCount > 0 &&
+        afterHand[2] >= 1 &&
+        afterHand[3] >= 1 &&
+        afterHand[4] >= 1;
+      const unlocksRoad =
+        roadsAvail > 0 && afterHand[0] >= 1 && afterHand[1] >= 1;
+      const racesLongestRoad =
+        botDifficulty === "hard" &&
+        unlocksRoad &&
+        !ps[`${k}_HAS_ROAD`] &&
+        myRoadLen + 1 >= Math.max(5, maxEnemyRoad + 1);
+      const tradePriority =
+        delta +
+        (unlocksDev ? 4.0 : 0) +
+        (racesLongestRoad ? 8.0 : unlocksRoad && totalCards > discardLimit ? 1.5 : 0) +
+        (myHand[info.giveIdx] >= info.rate ? myHand[info.giveIdx] * 0.25 : 0);
+
+      if (tradePriority > bestTradeScore) {
+        bestTradeScore = tradePriority;
+        bestTradeDelta = delta + (racesLongestRoad ? 3.0 : 0);
+        bestTrade = act;
+      }
+    }
+
+    // Above discard limit: always trade down so bots never pass turns hoarding 8-19 cards.
+    // Below discard limit: trade when strictly improving utility meaningfully (2:1/3:1 port or heavy surplus).
+    const utilityThreshold = botDifficulty === "easy" ? 2.5 : 1.5;
+    if (
+      bestTrade &&
+      (totalCards > discardLimit || bestTradeDelta >= utilityThreshold)
+    ) {
+      return bestTrade;
+    }
+  }
+
+  if (bestRoad) {
+    return bestRoad;
   }
 
   const endTurn = playable.find((a) => a[1] === "END_TURN");
@@ -1680,7 +2605,11 @@ export function localCreateGame(options: {
   vpsToWin: number;
   discardLimit: number;
   friendlyRobber: boolean;
+  diceMode?: DiceMode;
   seatNames?: Partial<Record<Color, string>>;
+  seatNamesList?: Array<string | null>;
+  hostName?: string;
+  hostSeatIndex?: number;
   roomCode?: string;
   seatMeta?: Record<Color, LocalSeatMeta>;
   hostAvatarConfig?: Partial<AvatarConfig>;
@@ -1719,28 +2648,51 @@ export function localCreateGame(options: {
           0
         )
       : {};
-    const usedBotNames = new Set<string>();
-    let userAssigned = false;
-    let guestHostAssigned = false;
-    rawPairs.forEach(({ color: c, playerKey }) => {
+
+    const requestedNameAt = (idx: number, c: Color): string | undefined => {
+      const fromMap = options.seatNames?.[c];
+      if (typeof fromMap === "string" && fromMap.trim()) return fromMap.trim();
+      const fromList = options.seatNamesList?.[idx];
+      if (typeof fromList === "string" && fromList.trim()) return fromList.trim();
+      return undefined;
+    };
+
+    const { explicitByIndex, usedNames: usedBotNames } = prescanRequestedBotNames(
+      rawPairs.map((pair, idx) => ({
+        isBot: pair.playerKey !== "HUMAN",
+        requestedName: requestedNameAt(idx, pair.color),
+      }))
+    );
+
+    let resolvedHostIdx: number | null =
+      typeof options.hostSeatIndex === "number" &&
+      options.hostSeatIndex >= 0 &&
+      options.hostSeatIndex < rawPairs.length &&
+      rawPairs[options.hostSeatIndex].playerKey === "HUMAN"
+        ? options.hostSeatIndex
+        : null;
+    if (resolvedHostIdx === null) {
+      const firstHumanIdx = rawPairs.findIndex((p) => p.playerKey === "HUMAN");
+      resolvedHostIdx = firstHumanIdx >= 0 ? firstHumanIdx : null;
+    }
+
+    let guestExtraIndex = 1;
+    rawPairs.forEach(({ color: c, playerKey }, idx) => {
       if (playerKey === "HUMAN") {
-        if (defaultUser && !userAssigned) {
+        const reqHuman = requestedNameAt(idx, c);
+        const cleanReqHuman =
+          reqHuman && !isOpenSeatPlaceholderName(reqHuman) ? reqHuman : undefined;
+        if (idx === resolvedHostIdx && defaultUser) {
           resolvedSeatMeta[c] = {
             color: c,
             seat_kind: "USER",
             username: defaultUser.username,
             player_key: "HUMAN",
-            display_name: options.seatNames?.[c] || defaultUser.display_name,
+            display_name: cleanReqHuman || defaultUser.display_name,
             avatar_config: defaultUser.avatar_config,
           };
-          userAssigned = true;
-        } else {
-          const isPrimaryGuest = !defaultUser && !guestHostAssigned;
-          if (isPrimaryGuest) {
-            guestHostAssigned = true;
-          }
+        } else if (idx === resolvedHostIdx) {
           const guestFallbackName =
-            isPrimaryGuest &&
             guestProfile?.display_name &&
             guestProfile.display_name !== DEFAULT_GUEST_DISPLAY_NAME
               ? guestProfile.display_name
@@ -1751,18 +2703,26 @@ export function localCreateGame(options: {
             username: null,
             player_key: "HUMAN",
             display_name:
-              options.seatNames?.[c] ||
+              cleanReqHuman ||
+              options.hostName?.trim() ||
               guestFallbackName ||
               PLAYER_COLOR_META[c].label,
-            avatar_config: isPrimaryGuest ? resolvedGuestAvatar : {},
+            avatar_config: resolvedGuestAvatar,
+          };
+        } else {
+          guestExtraIndex += 1;
+          resolvedSeatMeta[c] = {
+            color: c,
+            seat_kind: "GUEST",
+            username: null,
+            player_key: "HUMAN",
+            display_name: cleanReqHuman || `Convidado ${guestExtraIndex}`,
+            avatar_config: {},
           };
         }
       } else {
-        const requestedName = options.seatNames?.[c];
         const botName =
-          isOfficialBotName(requestedName) && !usedBotNames.has(requestedName)
-            ? requestedName
-            : pickBotNames(1, usedBotNames)[0];
+          explicitByIndex.get(idx) ?? pickBotNames(1, usedBotNames)[0];
         usedBotNames.add(botName);
         resolvedSeatMeta[c] = {
           color: c,
@@ -1830,6 +2790,11 @@ export function localCreateGame(options: {
     playerState[`${k}_HAS_ARMY`] = false;
     playerState[`${k}_HAS_ROAD`] = false;
     playerState[`${k}_HAS_ROLLED`] = false;
+    playerState[`${k}_HAS_PLAYED_DEVELOPMENT_CARD_IN_TURN`] = false;
+    playerState[`${k}_KNIGHT_BOUGHT_THIS_TURN`] = 0;
+    playerState[`${k}_MONOPOLY_BOUGHT_THIS_TURN`] = 0;
+    playerState[`${k}_YEAR_OF_PLENTY_BOUGHT_THIS_TURN`] = 0;
+    playerState[`${k}_ROAD_BUILDING_BOUGHT_THIS_TURN`] = 0;
     playerState[`${k}_SETTLEMENTS_AVAILABLE`] = 5;
     playerState[`${k}_CITIES_AVAILABLE`] = 4;
     playerState[`${k}_ROADS_AVAILABLE`] = 15;
@@ -1844,6 +2809,11 @@ export function localCreateGame(options: {
     initialQueue.push({ color: c, type: "SETTLEMENT", secondRound: true });
     initialQueue.push({ color: c, type: "ROAD", secondRound: true });
   }
+
+  const resolvedDiceMode: DiceMode =
+    options.diceMode === "balanced" ? "balanced" : "random";
+  const diceDeck =
+    resolvedDiceMode === "balanced" ? buildBalancedDiceDeck() : undefined;
 
   const state: GameState = {
     tiles: built.placedTiles,
@@ -1877,22 +2847,36 @@ export function localCreateGame(options: {
       vps_to_win: options.vpsToWin,
       discard_limit: options.discardLimit,
       friendly_robber: options.friendlyRobber,
+      dice_mode: resolvedDiceMode,
     },
+    ...(diceDeck ? { dice_deck_remaining: diceDeck.length } : {}),
     num_turns: 0,
     current_player_index: 0,
     current_turn_index: 0,
     resource_freqdeck: [19, 19, 19, 19, 19],
-    development_listdeck: { KNIGHT: 14, VICTORY_POINT: 5 },
+    development_listdeck: {
+      KNIGHT: 14,
+      YEAR_OF_PLENTY: 2,
+      ROAD_BUILDING: 2,
+      MONOPOLY: 2,
+      VICTORY_POINT: 5,
+    },
   };
 
   const stored: StoredLocalGame = {
     state,
+    mapTemplate: options.mapTemplate,
     nodeNeighbors: built.nodeNeighbors,
     portNodes: built.portNodes,
     initialQueue,
     lastInitialSettlementNode: null,
     history: [JSON.parse(JSON.stringify(state))],
     seatMeta: resolvedSeatMeta,
+    discardCounts: colors.map(() => 0),
+    isRoadBuilding: false,
+    freeRoadsAvailable: 0,
+    tradesThisTurn: 0,
+    ...(diceDeck ? { diceDeck } : {}),
   };
 
   recomputeScoresAndPlayableActions(stored);
@@ -2498,7 +3482,139 @@ export function localLoginOrRegister(options: {
   };
 }
 
-function loadRoomsMap(): Record<string, RoomState & { host_token: string; seat_tokens: Record<string, string | null> }> {
+type StoredLocalRoom = RoomState & {
+  host_token: string;
+  host_username?: string | null;
+  seat_tokens: Record<string, string | null>;
+};
+
+function makeRoomHttpError(status: number, description: string): Error & {
+  response: { status: number; data: { code: number; description: string } };
+} {
+  const err = new Error(description) as Error & {
+    response: { status: number; data: { code: number; description: string } };
+  };
+  err.response = {
+    status,
+    data: { code: status, description },
+  };
+  return err;
+}
+
+function loadClosedRoomCodes(): string[] {
+  try {
+    const raw = localStorage.getItem(CLOSED_ROOMS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((c): c is string => typeof c === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isRoomClosedLocally(roomCode: string): boolean {
+  const clean = roomCode.trim().toUpperCase();
+  return clean ? loadClosedRoomCodes().includes(clean) : false;
+}
+
+function markRoomClosedLocally(roomCode: string) {
+  const clean = roomCode.trim().toUpperCase();
+  if (!clean) return;
+  try {
+    const prev = loadClosedRoomCodes().filter((c) => c !== clean);
+    localStorage.setItem(
+      CLOSED_ROOMS_STORAGE_KEY,
+      JSON.stringify([clean, ...prev].slice(0, 100))
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function unmarkRoomClosedLocally(roomCode: string) {
+  const clean = roomCode.trim().toUpperCase();
+  if (!clean) return;
+  try {
+    const next = loadClosedRoomCodes().filter((c) => c !== clean);
+    localStorage.setItem(CLOSED_ROOMS_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+function getStoredRoomTokenLocal(roomCode: string): string | null {
+  try {
+    return localStorage.getItem(`catan_room_token_${roomCode.trim().toUpperCase()}`);
+  } catch {
+    return null;
+  }
+}
+
+function clearStoredRoomTokenLocal(roomCode: string) {
+  try {
+    localStorage.removeItem(`catan_room_token_${roomCode.trim().toUpperCase()}`);
+  } catch {
+    // ignore
+  }
+}
+
+function resolveCandidateRoomTokens(
+  roomCode: string,
+  explicitToken?: string | null,
+  acct?: PlayerAccount | null
+): string[] {
+  const savedRoomTok = getStoredRoomTokenLocal(roomCode);
+  const cleanExplicit = explicitToken?.trim() || "";
+  const resolvedAcct = acct !== undefined ? acct : getSavedPlayerAccount();
+  const acctTok = resolvedAcct?.auth_token?.trim() || "";
+
+  let rawList: Array<string | null | undefined>;
+  if (!cleanExplicit) {
+    rawList = [savedRoomTok, acctTok];
+  } else if (cleanExplicit === savedRoomTok || cleanExplicit === acctTok) {
+    rawList = [cleanExplicit, savedRoomTok, acctTok];
+  } else {
+    rawList = [cleanExplicit];
+  }
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of rawList) {
+    const clean = t?.trim();
+    if (clean && !seen.has(clean)) {
+      seen.add(clean);
+      out.push(clean);
+    }
+  }
+  return out;
+}
+
+function isLocalRoomHost(
+  stored: StoredLocalRoom,
+  candidateTokens: string[],
+  acct: PlayerAccount | null,
+  usedBrowserIdentity: boolean
+): boolean {
+  if (candidateTokens.includes(stored.host_token)) {
+    return true;
+  }
+  if (!usedBrowserIdentity || !acct?.username) {
+    return false;
+  }
+  if (stored.host_username && stored.host_username === acct.username) {
+    return true;
+  }
+  const hostSeat = stored.seats.find(
+    (s) => stored.seat_tokens?.[s.color] === stored.host_token
+  );
+  return Boolean(
+    hostSeat && hostSeat.seat_kind === "USER" && hostSeat.username === acct.username
+  );
+}
+
+function loadRoomsMap(): Record<string, StoredLocalRoom> {
   try {
     const raw = localStorage.getItem(ROOMS_STORAGE_KEY);
     return raw ? JSON.parse(raw) : {};
@@ -2507,9 +3623,7 @@ function loadRoomsMap(): Record<string, RoomState & { host_token: string; seat_t
   }
 }
 
-function saveRoomsMap(
-  map: Record<string, RoomState & { host_token: string; seat_tokens: Record<string, string | null> }>
-) {
+function saveRoomsMap(map: Record<string, StoredLocalRoom>) {
   try {
     localStorage.setItem(ROOMS_STORAGE_KEY, JSON.stringify(map));
   } catch {
@@ -2517,20 +3631,66 @@ function saveRoomsMap(
   }
 }
 
+export function localRemoveRoomCache(
+  roomCode: string,
+  options?: { markClosed?: boolean }
+) {
+  const code = roomCode.trim().toUpperCase();
+  if (!code) return;
+  const rooms = loadRoomsMap();
+  if (rooms[code]) {
+    const gid = rooms[code].game_id;
+    delete rooms[code];
+    saveRoomsMap(rooms);
+    if (gid) {
+      try {
+        localStorage.removeItem(`catan_game_room_${gid}`);
+      } catch {
+        // ignore
+      }
+    }
+  }
+  clearStoredRoomTokenLocal(code);
+  if (options?.markClosed) {
+    markRoomClosedLocally(code);
+  }
+}
+
 export function localCreateRoom(options: {
   hostName: string;
-  players: string[];
+  players?: string[];
+  seats?: Array<{
+    player_key: string;
+    player_name?: string | null;
+    is_host?: boolean;
+  }>;
+  seatNames?: Partial<Record<Color, string>> | Array<string | null>;
+  botDifficulty?: BotDifficulty;
   mapTemplate: MapTemplate;
   vpsToWin: number;
   discardLimit: number;
   friendlyRobber: boolean;
+  diceMode?: DiceMode;
   token?: string | null;
   hostAvatarConfig?: Partial<AvatarConfig>;
 }): { room_code: string; seat_token: string; room: RoomState } {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const rooms = loadRoomsMap();
+  const closed = new Set(loadClosedRoomCodes());
   let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    let candidate = "";
+    for (let i = 0; i < 6; i++) {
+      candidate += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    if (!rooms[candidate] && !closed.has(candidate)) {
+      code = candidate;
+      break;
+    }
+  }
+  if (!code) {
+    code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    unmarkRoomClosedLocally(code);
   }
   const hostToken = options.token || "tok_" + Math.random().toString(36).slice(2, 10);
   const savedAcct = getSavedPlayerAccount();
@@ -2542,19 +3702,73 @@ export function localCreateRoom(options: {
         0
       )
     : {};
-  const seatTokens: Record<string, string | null> = {};
-  const usedBotNames = new Set<string>();
-  let hostSeated = false;
 
-  const seats = options.players.slice(0, 4).map((pk, idx) => {
+  const normalizedDiff = normalizeBotDifficulty(options.botDifficulty);
+  const defaultBotKey = playerKeyForDifficulty(normalizedDiff ?? "medium");
+
+  const initialSpecs: Array<{
+    player_key: string;
+    player_name: string | null;
+    is_host: boolean;
+  }> = [];
+
+  if (options.seats && options.seats.length >= 2 && options.seats.length <= 4) {
+    for (const item of options.seats) {
+      initialSpecs.push({
+        player_key: item.player_key || "HUMAN",
+        player_name: item.player_name ?? null,
+        is_host: Boolean(item.is_host),
+      });
+    }
+  } else {
+    const rawKeys =
+      options.players && options.players.length >= 2 && options.players.length <= 4
+        ? options.players.slice(0, 4)
+        : ["HUMAN", "HUMAN", defaultBotKey, defaultBotKey];
+    rawKeys.forEach((pk, idx) => {
+      const color = SEAT_COLORS[idx];
+      let reqName: string | null = null;
+      if (Array.isArray(options.seatNames)) {
+        reqName = options.seatNames[idx] ?? null;
+      } else if (options.seatNames && typeof options.seatNames === "object") {
+        reqName = options.seatNames[color] ?? null;
+      }
+      initialSpecs.push({
+        player_key: pk || "HUMAN",
+        player_name: reqName,
+        is_host: false,
+      });
+    });
+  }
+
+  let hostIdx = initialSpecs.findIndex(
+    (sp) => sp.player_key === "HUMAN" && sp.is_host
+  );
+  if (hostIdx < 0) {
+    hostIdx = initialSpecs.findIndex((sp) => sp.player_key === "HUMAN");
+  }
+  if (hostIdx < 0) {
+    hostIdx = 0;
+    initialSpecs[0].player_key = "HUMAN";
+  }
+
+  const { explicitByIndex, usedNames: usedBotNames } = prescanRequestedBotNames(
+    initialSpecs.map((sp) => ({
+      isBot: sp.player_key !== "HUMAN",
+      requestedName: sp.player_name,
+    }))
+  );
+
+  const seatTokens: Record<string, string | null> = {};
+  let firstBotKey: string | null = null;
+  const seats = initialSpecs.map((sp, idx) => {
     const color = SEAT_COLORS[idx];
-    if (pk === "HUMAN" && !hostSeated) {
-      hostSeated = true;
+    if (sp.player_key === "HUMAN" && idx === hostIdx) {
       seatTokens[color] = hostToken;
       return {
         color,
         player_key: "HUMAN",
-        player_name: options.hostName || "Anfitrião",
+        player_name: options.hostName.trim() || "Anfitrião",
         is_bot: false,
         claimed: true,
         is_me: true,
@@ -2564,12 +3778,12 @@ export function localCreateRoom(options: {
           ? sanitizeAvatarConfig(savedAcct.avatar_config)
           : guestHostAvatar,
       };
-    } else if (pk === "HUMAN") {
+    } else if (sp.player_key === "HUMAN") {
       seatTokens[color] = null;
       return {
         color,
         player_key: "HUMAN",
-        player_name: "Aguardando Amigo...",
+        player_name: OPEN_SEAT_LABEL,
         is_bot: false,
         claimed: false,
         is_me: false,
@@ -2578,12 +3792,14 @@ export function localCreateRoom(options: {
         avatar_config: {},
       };
     } else {
+      if (!firstBotKey) firstBotKey = sp.player_key;
       seatTokens[color] = null;
-      const botName = pickBotNames(1, usedBotNames)[0];
+      const botName =
+        explicitByIndex.get(idx) ?? pickBotNames(1, usedBotNames)[0];
       usedBotNames.add(botName);
       return {
         color,
-        player_key: pk,
+        player_key: sp.player_key,
         player_name: botName,
         is_bot: true,
         claimed: true,
@@ -2594,6 +3810,12 @@ export function localCreateRoom(options: {
       };
     }
   });
+
+  const resolvedDifficulty: BotDifficulty =
+    normalizedDiff ??
+    (firstBotKey ? difficultyFromPlayerKey(firstBotKey) : "medium");
+  const resolvedDiceMode: DiceMode =
+    options.diceMode === "balanced" ? "balanced" : "random";
 
   const room: RoomState = {
     room_code: code,
@@ -2606,12 +3828,19 @@ export function localCreateRoom(options: {
       vps_to_win: options.vpsToWin,
       discard_limit: options.discardLimit,
       friendly_robber: options.friendlyRobber,
+      bot_difficulty: resolvedDifficulty,
+      dice_mode: resolvedDiceMode,
+      created_at: Math.floor(Date.now() / 1000),
     },
     seats,
   };
 
-  const rooms = loadRoomsMap();
-  rooms[code] = { ...room, host_token: hostToken, seat_tokens: seatTokens };
+  rooms[code] = {
+    ...room,
+    host_token: hostToken,
+    host_username: savedAcct?.username ?? null,
+    seat_tokens: seatTokens,
+  };
   saveRoomsMap(rooms);
 
   return { room_code: code, seat_token: hostToken, room };
@@ -2621,14 +3850,18 @@ export function localGetRoom(
   roomCode: string,
   token?: string | null
 ): RoomState {
-  const code = roomCode.toUpperCase();
+  const code = roomCode.trim().toUpperCase();
   const rooms = loadRoomsMap();
   let stored = rooms[code];
   if (!stored) {
+    if (isRoomClosedLocally(code)) {
+      throw makeRoomHttpError(404, "Esta sala foi encerrada ou não existe mais.");
+    }
     // Auto-create room if friend opened invite link directly on a new browser without shared DB
     const created = localCreateRoom({
       hostName: "Anfitrião",
-      players: ["HUMAN", "HUMAN", "CATANATRON", "CATANATRON"],
+      players: ["HUMAN", "HUMAN", "F", "F"],
+      botDifficulty: "medium",
       mapTemplate: "BASE",
       vpsToWin: 10,
       discardLimit: 7,
@@ -2645,12 +3878,20 @@ export function localGetRoom(
     saveRoomsMap(freshRooms);
   }
 
+  const savedAcct = getSavedPlayerAccount();
+  const savedRoomTok = getStoredRoomTokenLocal(code);
+  const cleanExplicit = token?.trim() || "";
+  const usedBrowserIdentity =
+    !cleanExplicit ||
+    cleanExplicit === savedRoomTok ||
+    cleanExplicit === savedAcct?.auth_token?.trim();
+  const candidateTokens = resolveCandidateRoomTokens(code, token, savedAcct);
+
   let myColor: Color | null = null;
+  let tokenMatchedColor: Color | null = null;
   const dir = getLocalUserDirectory();
   const usedBotNames = new Set<string>();
   const seats = stored.seats.map((s, idx) => {
-    const isMe = Boolean(token && stored.seat_tokens[s.color] === token);
-    if (isMe) myColor = s.color;
     if (s.is_bot) {
       const botName =
         isOfficialBotName(s.player_name) && !usedBotNames.has(s.player_name)
@@ -2675,28 +3916,164 @@ export function localGetRoom(
     const uname = s.seat_kind === "USER" ? s.username || null : null;
     const resolvedKind: "USER" | "GUEST" =
       s.seat_kind === "USER" && uname ? "USER" : "GUEST";
+    const seatTok = stored.seat_tokens?.[s.color] || null;
+    const matchedByToken = Boolean(seatTok && candidateTokens.includes(seatTok));
+    const matchedByUser = Boolean(
+      usedBrowserIdentity &&
+        savedAcct?.username &&
+        resolvedKind === "USER" &&
+        uname === savedAcct.username
+    );
+    const isMe = matchedByToken || matchedByUser;
+    if (matchedByToken) {
+      tokenMatchedColor = s.color;
+      myColor = s.color;
+    } else if (matchedByUser && tokenMatchedColor === null && myColor === null) {
+      myColor = s.color;
+    }
+
     const guestAvatar = filterUnlockedAvatarConfig(s.avatar_config, 0);
+    const cleanHumanName =
+      !seatTok && isOpenSeatPlaceholderName(s.player_name)
+        ? OPEN_SEAT_LABEL
+        : (s.player_name || OPEN_SEAT_LABEL);
     return {
       ...s,
+      player_name: cleanHumanName,
       seat_kind: resolvedKind,
       username: uname,
       avatar_config: uname
         ? dir[uname]?.avatar_config || sanitizeAvatarConfig(s.avatar_config)
         : guestAvatar,
-      claimed: Boolean(stored.seat_tokens[s.color]),
+      claimed: Boolean(seatTok),
       is_me: isMe,
     };
   });
+
+  const firstBot = stored.seats.find((s) => s.player_key !== "HUMAN");
+  const normalizedDifficulty =
+    normalizeBotDifficulty(stored.config.bot_difficulty) ??
+    (firstBot ? difficultyFromPlayerKey(firstBot.player_key) : "medium");
 
   return {
     room_code: stored.room_code,
     status: stored.status,
     game_id: stored.game_id,
-    is_host: Boolean(token && stored.host_token === token),
+    is_host: isLocalRoomHost(stored, candidateTokens, savedAcct, usedBrowserIdentity),
     my_color: myColor,
-    config: stored.config,
+    config: {
+      ...stored.config,
+      bot_difficulty: normalizedDifficulty,
+      dice_mode: stored.config.dice_mode === "balanced" ? "balanced" : "random",
+    },
     seats,
   };
+}
+
+export function localCloseRoom(
+  roomCode: string,
+  token?: string | null
+): { closed: true; room_code: string; game_id: string | null } {
+  const code = roomCode.trim().toUpperCase();
+  const rooms = loadRoomsMap();
+  const stored = rooms[code];
+  if (!stored) {
+    markRoomClosedLocally(code);
+    clearStoredRoomTokenLocal(code);
+    throw makeRoomHttpError(404, "Sala não encontrada.");
+  }
+
+  const savedAcct = getSavedPlayerAccount();
+  const savedRoomTok = getStoredRoomTokenLocal(code);
+  const cleanExplicit = token?.trim() || "";
+  const usedBrowserIdentity =
+    !cleanExplicit ||
+    cleanExplicit === savedRoomTok ||
+    cleanExplicit === savedAcct?.auth_token?.trim();
+  const candidateTokens = resolveCandidateRoomTokens(code, token, savedAcct);
+
+  if (!isLocalRoomHost(stored, candidateTokens, savedAcct, usedBrowserIdentity)) {
+    throw makeRoomHttpError(403, "Apenas o anfitrião pode encerrar esta sala.");
+  }
+
+  const closedGameId = stored.game_id ?? null;
+  delete rooms[code];
+  saveRoomsMap(rooms);
+  markRoomClosedLocally(code);
+  clearStoredRoomTokenLocal(code);
+  if (closedGameId) {
+    try {
+      localStorage.removeItem(`catan_game_room_${closedGameId}`);
+    } catch {
+      // ignore
+    }
+  }
+  return { closed: true, room_code: code, game_id: closedGameId };
+}
+
+export function localLeaveRoom(
+  roomCode: string,
+  token?: string | null
+): { left: true; room: RoomState } {
+  const code = roomCode.trim().toUpperCase();
+  const rooms = loadRoomsMap();
+  const stored = rooms[code];
+  if (!stored) {
+    throw makeRoomHttpError(404, "Sala não encontrada.");
+  }
+  if (stored.status !== "WAITING") {
+    throw makeRoomHttpError(
+      400,
+      "A partida já foi iniciada. Peça ao anfitrião para encerrar a sala ou use Sair (Bot Assume) na mesa."
+    );
+  }
+
+  const savedAcct = getSavedPlayerAccount();
+  const savedRoomTok = getStoredRoomTokenLocal(code);
+  const cleanExplicit = token?.trim() || "";
+  const usedBrowserIdentity =
+    !cleanExplicit ||
+    cleanExplicit === savedRoomTok ||
+    cleanExplicit === savedAcct?.auth_token?.trim();
+  const candidateTokens = resolveCandidateRoomTokens(code, token, savedAcct);
+
+  if (isLocalRoomHost(stored, candidateTokens, savedAcct, usedBrowserIdentity)) {
+    throw makeRoomHttpError(
+      400,
+      "Você é o anfitrião desta sala. Use Encerrar Sala para fechá-la."
+    );
+  }
+
+  let released = false;
+  for (const s of stored.seats) {
+    if (s.is_bot || s.player_key !== "HUMAN") continue;
+    const seatTok = stored.seat_tokens?.[s.color] || null;
+    const tokMatch = Boolean(seatTok && candidateTokens.includes(seatTok));
+    const userMatch = Boolean(
+      usedBrowserIdentity &&
+        savedAcct?.username &&
+        s.seat_kind === "USER" &&
+        s.username === savedAcct.username
+    );
+    if (tokMatch || userMatch) {
+      stored.seat_tokens[s.color] = null;
+      s.player_name = OPEN_SEAT_LABEL;
+      s.claimed = false;
+      s.is_me = false;
+      s.seat_kind = "GUEST";
+      s.username = null;
+      s.avatar_config = {};
+      released = true;
+    }
+  }
+
+  if (!released) {
+    throw makeRoomHttpError(403, "Você não ocupa nenhum assento nesta sala.");
+  }
+
+  saveRoomsMap(rooms);
+  clearStoredRoomTokenLocal(code);
+  return { left: true, room: localGetRoom(code, null) };
 }
 
 export function localJoinRoom(
@@ -2708,12 +4085,10 @@ export function localJoinRoom(
     avatarConfig?: Partial<AvatarConfig>;
   }
 ): { seat_token: string; seat_color: Color; room: RoomState } {
-  const code = roomCode.toUpperCase();
-  localGetRoom(code, options.token); // ensure exists
+  const code = roomCode.trim().toUpperCase();
+  localGetRoom(code, options.token); // ensure exists and not closed
   const rooms = loadRoomsMap();
   const stored = rooms[code];
-  const token =
-    options.token || "tok_" + Math.random().toString(36).slice(2, 10);
   const savedAcct = getSavedPlayerAccount();
   const guestProfile = !savedAcct ? getGuestProfile() : null;
   const seatKind: "USER" | "GUEST" = savedAcct?.username ? "USER" : "GUEST";
@@ -2726,42 +4101,89 @@ export function localJoinRoom(
         0
       );
 
-  let targetSeat = options.preferredColor
-    ? stored.seats.find((s) => s.color === options.preferredColor)
-    : stored.seats.find(
-        (s) => !s.is_bot && (!stored.seat_tokens[s.color] || stored.seat_tokens[s.color] === token)
-      );
+  const savedRoomTok = getStoredRoomTokenLocal(code);
+  const cleanExplicit = options.token?.trim() || "";
+  const usedBrowserIdentity =
+    !cleanExplicit ||
+    cleanExplicit === savedRoomTok ||
+    cleanExplicit === savedAcct?.auth_token?.trim();
+  const candidateTokens = resolveCandidateRoomTokens(code, options.token, savedAcct);
 
-  if (!targetSeat) {
-    targetSeat = stored.seats[0];
+  let currentSeat = stored.seats.find((s) => {
+    const seatTok = stored.seat_tokens?.[s.color] || null;
+    if (!seatTok) return false;
+    return (
+      (cleanExplicit && seatTok === cleanExplicit) ||
+      candidateTokens.includes(seatTok)
+    );
+  });
+  if (!currentSeat && usedBrowserIdentity && savedAcct?.username) {
+    currentSeat = stored.seats.find(
+      (s) =>
+        s.player_key === "HUMAN" &&
+        s.seat_kind === "USER" &&
+        s.username === savedAcct.username
+    );
   }
 
-  // Clear previous seat of this token
-  for (const s of stored.seats) {
-    if (stored.seat_tokens[s.color] === token && s.color !== targetSeat.color) {
-      stored.seat_tokens[s.color] = null;
-      s.player_name = "Aguardando Amigo...";
-      s.claimed = false;
-      s.seat_kind = "GUEST";
-      s.username = null;
-      s.avatar_config = {};
+  const effectiveToken =
+    cleanExplicit ||
+    (currentSeat ? stored.seat_tokens?.[currentSeat.color] : null) ||
+    "tok_" + Math.random().toString(36).slice(2, 10);
+
+  let targetSeat = currentSeat;
+  if (options.preferredColor) {
+    const requested = stored.seats.find((s) => s.color === options.preferredColor);
+    if (!requested) {
+      throw makeRoomHttpError(400, "Cor inválida");
     }
+    if (requested === currentSeat) {
+      targetSeat = requested;
+    } else if (
+      !requested.is_bot &&
+      requested.player_key === "HUMAN" &&
+      !stored.seat_tokens?.[requested.color]
+    ) {
+      targetSeat = requested;
+    } else {
+      throw makeRoomHttpError(400, "Este assento não está livre.");
+    }
+  } else if (!targetSeat) {
+    targetSeat = stored.seats.find(
+      (s) =>
+        !s.is_bot &&
+        s.player_key === "HUMAN" &&
+        !stored.seat_tokens?.[s.color]
+    );
+    if (!targetSeat) {
+      throw makeRoomHttpError(400, "Não há assentos livres nesta sala");
+    }
+  }
+
+  if (currentSeat && currentSeat !== targetSeat) {
+    stored.seat_tokens[currentSeat.color] = null;
+    currentSeat.player_name = OPEN_SEAT_LABEL;
+    currentSeat.claimed = false;
+    currentSeat.is_me = false;
+    currentSeat.seat_kind = "GUEST";
+    currentSeat.username = null;
+    currentSeat.avatar_config = {};
   }
 
   targetSeat.player_key = "HUMAN";
   targetSeat.is_bot = false;
-  targetSeat.player_name = options.playerName || "Jogador";
+  targetSeat.player_name = options.playerName.trim() || "Jogador";
   targetSeat.claimed = true;
   targetSeat.seat_kind = seatKind;
   targetSeat.username = seatUsername;
   targetSeat.avatar_config = seatAvatar;
-  stored.seat_tokens[targetSeat.color] = token;
+  stored.seat_tokens[targetSeat.color] = effectiveToken;
   saveRoomsMap(rooms);
 
   return {
-    seat_token: token,
+    seat_token: effectiveToken,
     seat_color: targetSeat.color,
-    room: localGetRoom(code, token),
+    room: localGetRoom(code, effectiveToken),
   };
 }
 
@@ -2770,33 +4192,90 @@ export function localUpdateRoom(
   payload: {
     token?: string | null;
     config?: Partial<RoomState["config"]>;
-    seats?: Array<{ color: Color; player_key: string; player_name?: string }>;
+    seats?: Array<{
+      color: Color;
+      source_color?: Color;
+      player_key: string;
+      player_name?: string;
+      release_claim?: boolean;
+    }>;
   }
 ): RoomState {
-  const code = roomCode.toUpperCase();
+  const code = roomCode.trim().toUpperCase();
   localGetRoom(code, payload.token);
   const rooms = loadRoomsMap();
   const stored = rooms[code];
+  if (stored.status !== "WAITING") {
+    throw makeRoomHttpError(400, "A partida já foi iniciada.");
+  }
 
   if (payload.config) {
-    stored.config = { ...stored.config, ...payload.config };
+    const nextConfig = { ...stored.config, ...payload.config };
+    if ("dice_mode" in payload.config) {
+      if (
+        payload.config.dice_mode !== "random" &&
+        payload.config.dice_mode !== "balanced"
+      ) {
+        throw makeRoomHttpError(
+          400,
+          "'dice_mode' deve ser random ou balanced"
+        );
+      }
+      nextConfig.dice_mode = payload.config.dice_mode;
+    }
+    if ("bot_difficulty" in payload.config) {
+      const normDiff = normalizeBotDifficulty(payload.config.bot_difficulty);
+      if (!normDiff) {
+        throw makeRoomHttpError(
+          400,
+          "'bot_difficulty' deve ser easy, medium ou hard"
+        );
+      }
+      nextConfig.bot_difficulty = normDiff;
+      if (!payload.seats) {
+        const targetKey = playerKeyForDifficulty(normDiff);
+        stored.seats = stored.seats.map((s) =>
+          s.player_key !== "HUMAN" ? { ...s, player_key: targetKey } : s
+        );
+      }
+    }
+    stored.config = nextConfig;
   }
+
   if (payload.seats) {
+    if (payload.seats.length < 2 || payload.seats.length > 4) {
+      throw makeRoomHttpError(400, "A sala deve ter entre 2 e 4 assentos");
+    }
     const oldByColor = Object.fromEntries(
       stored.seats.map((s) => [s.color, s])
     );
-    const usedBotNames = new Set<string>();
+    const oldTokens = { ...(stored.seat_tokens || {}) };
+    const nextSeatTokens: Record<string, string | null> = {};
+
+    const { explicitByIndex, usedNames: usedBotNames } = prescanRequestedBotNames(
+      payload.seats.map((item, idx) => {
+        const src = item.source_color || item.color || SEAT_COLORS[idx];
+        const prev = oldByColor[src];
+        const reqName =
+          item.player_name?.trim() ||
+          (prev && prev.player_key !== "HUMAN" ? prev.player_name : undefined);
+        return {
+          isBot: item.player_key !== "HUMAN",
+          requestedName: reqName,
+        };
+      })
+    );
+
     stored.seats = payload.seats.map((item, idx) => {
       const color = SEAT_COLORS[idx];
-      const prev = oldByColor[color];
+      const sourceColor = item.source_color || item.color || color;
+      const prev = oldByColor[sourceColor];
+      const prevTok = prev ? (oldTokens[prev.color] ?? null) : null;
       const isBot = item.player_key !== "HUMAN";
       if (isBot) {
-        stored.seat_tokens[color] = null;
-        const requested = item.player_name?.trim() || (prev?.is_bot ? prev.player_name : "");
+        nextSeatTokens[color] = null;
         const botName =
-          isOfficialBotName(requested) && !usedBotNames.has(requested)
-            ? requested
-            : pickBotNames(1, usedBotNames)[0];
+          explicitByIndex.get(idx) ?? pickBotNames(1, usedBotNames)[0];
         usedBotNames.add(botName);
         return {
           color,
@@ -2810,21 +4289,43 @@ export function localUpdateRoom(
           avatar_config: BOT_AVATAR_PROFILES[botName],
         };
       }
-      const hasClaim = Boolean(stored.seat_tokens[color]);
+
+      const wasHuman = !prev || prev.player_key === "HUMAN";
+      const seatTok = item.release_claim ? null : wasHuman ? prevTok : null;
+      nextSeatTokens[color] = seatTok;
+      if (seatTok && prev) {
+        const reqName = (item.player_name ?? "").trim();
+        const prevName = (prev.player_name ?? "").trim();
+        const resolvedName =
+          reqName && !isOpenSeatPlaceholderName(reqName)
+            ? reqName
+            : prevName || "Jogador";
+        return {
+          color,
+          player_key: "HUMAN",
+          player_name: resolvedName,
+          is_bot: false,
+          claimed: true,
+          is_me: Boolean(payload.token && seatTok === payload.token),
+          seat_kind: prev.seat_kind || "GUEST",
+          username: prev.username ?? null,
+          avatar_config: prev.avatar_config ?? {},
+        };
+      }
+
       return {
         color,
         player_key: "HUMAN",
-        player_name: item.player_name || "Aguardando Amigo...",
+        player_name: OPEN_SEAT_LABEL,
         is_bot: false,
-        claimed: hasClaim,
-        is_me: Boolean(
-          payload.token && stored.seat_tokens[color] === payload.token
-        ),
-        seat_kind: hasClaim ? prev?.seat_kind || "GUEST" : ("GUEST" as const),
-        username: hasClaim ? prev?.username ?? null : null,
-        avatar_config: hasClaim ? prev?.avatar_config ?? {} : {},
+        claimed: false,
+        is_me: false,
+        seat_kind: "GUEST" as const,
+        username: null,
+        avatar_config: {},
       };
     });
+    stored.seat_tokens = nextSeatTokens;
   }
 
   saveRoomsMap(rooms);
@@ -2835,7 +4336,7 @@ export function localStartRoomGame(
   roomCode: string,
   token?: string | null
 ): { game_id: string; room: RoomState } {
-  const code = roomCode.toUpperCase();
+  const code = roomCode.trim().toUpperCase();
   const resolvedRoom = localGetRoom(code, token);
   const rooms = loadRoomsMap();
   const stored = rooms[code];
@@ -2844,10 +4345,9 @@ export function localStartRoomGame(
     const seatNames: Partial<Record<Color, string>> = {};
     const seatMeta = {} as Record<Color, LocalSeatMeta>;
     for (const s of resolvedRoom.seats) {
-      const cleanLabel =
-        s.player_name === "Aguardando Amigo..."
-          ? PLAYER_COLOR_META[s.color].label
-          : s.player_name;
+      const cleanLabel = isOpenSeatPlaceholderName(s.player_name)
+        ? PLAYER_COLOR_META[s.color].label
+        : s.player_name;
       seatNames[s.color] = cleanLabel;
       seatMeta[s.color] = {
         color: s.color,
@@ -2868,6 +4368,7 @@ export function localStartRoomGame(
       vpsToWin: stored.config.vps_to_win,
       discardLimit: stored.config.discard_limit,
       friendlyRobber: stored.config.friendly_robber,
+      diceMode: stored.config.dice_mode,
       seatNames,
       seatMeta,
       roomCode: code,
@@ -2884,5 +4385,123 @@ export function localStartRoomGame(
 
 export function localListActiveRooms(token?: string | null): RoomState[] {
   const rooms = loadRoomsMap();
-  return Object.keys(rooms).map((code) => localGetRoom(code, token));
+  const games = loadGamesMap();
+  const finishedIds = new Set(localGetMatchHistory().map((m) => m.game_id));
+  const list: RoomState[] = [];
+
+  for (const code of Object.keys(rooms)) {
+    const stored = rooms[code];
+    if (!stored || isRoomClosedLocally(code)) continue;
+    if (
+      stored.game_id &&
+      (finishedIds.has(stored.game_id) ||
+        Boolean(games[stored.game_id]?.state?.winning_color))
+    ) {
+      continue;
+    }
+    list.push(localGetRoom(code, token));
+  }
+
+  list.sort((a, b) => {
+    const mineA = a.is_host || Boolean(a.my_color) ? 1 : 0;
+    const mineB = b.is_host || Boolean(b.my_color) ? 1 : 0;
+    if (mineB !== mineA) return mineB - mineA;
+    const waitA = a.status === "WAITING" ? 1 : 0;
+    const waitB = b.status === "WAITING" ? 1 : 0;
+    if (waitB !== waitA) return waitB - waitA;
+    return (b.config.created_at ?? 0) - (a.config.created_at ?? 0);
+  });
+  return list;
+}
+
+export const LOCAL_MESSAGES_STORAGE_KEY = "catan_game_messages_v1";
+export const LOCAL_MESSAGES_CHANNEL_NAME = "catan_game_messages_v1";
+
+function loadLocalMessagesMap(): Record<string, GameMessage[]> {
+  try {
+    const raw = localStorage.getItem(LOCAL_MESSAGES_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalMessagesMap(map: Record<string, GameMessage[]>): void {
+  try {
+    localStorage.setItem(LOCAL_MESSAGES_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
+export function localGetGameMessages(
+  gameId: string,
+  afterId = 0
+): GameMessage[] {
+  const map = loadLocalMessagesMap();
+  const rows = Array.isArray(map[gameId]) ? map[gameId] : [];
+  return rows.filter((m) => m.id > afterId).slice(-100);
+}
+
+export function localPostGameMessage(
+  gameId: string,
+  options: {
+    color?: Color | null;
+    senderName?: string | null;
+    body: string;
+    kind?: GameMessageKind;
+  }
+): GameMessage {
+  const trimmed = String(options.body || "").trim();
+  if (!trimmed) {
+    throw new Error("A mensagem não pode ficar vazia.");
+  }
+  if (trimmed.length > 240) {
+    throw new Error("Mensagem muito longa (máx. 240 caracteres).");
+  }
+
+  const games = loadGamesMap();
+  const game = games[gameId];
+  const color: Color =
+    options.color && SEAT_COLORS.includes(options.color)
+      ? options.color
+      : game?.state?.colors?.[0] || "RED";
+  const resolvedSender =
+    options.senderName?.trim() ||
+    game?.state?.seat_names?.[color] ||
+    PLAYER_COLOR_META[color]?.label ||
+    "Jogador";
+  const kind: GameMessageKind = options.kind === "TAUNT" ? "TAUNT" : "CHAT";
+
+  const map = loadLocalMessagesMap();
+  const existing = Array.isArray(map[gameId]) ? [...map[gameId]] : [];
+  const nextId =
+    existing.length > 0 ? existing[existing.length - 1].id + 1 : 1;
+
+  const entry: GameMessage = {
+    id: nextId,
+    game_id: gameId,
+    color,
+    sender_name: resolvedSender.slice(0, 64),
+    kind,
+    body: trimmed,
+    created_at: Math.floor(Date.now() / 1000),
+  };
+  existing.push(entry);
+  map[gameId] = existing.slice(-150);
+  saveLocalMessagesMap(map);
+
+  try {
+    if (typeof BroadcastChannel !== "undefined") {
+      const ch = new BroadcastChannel(LOCAL_MESSAGES_CHANNEL_NAME);
+      ch.postMessage({ gameId, message: entry });
+      ch.close();
+    }
+  } catch {
+    // ignore BroadcastChannel failures in unsupported test envs
+  }
+
+  return entry;
 }

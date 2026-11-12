@@ -8,19 +8,20 @@ import {
   type CubeCoordinate,
 } from "../utils/coordinates";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { RoadSvgPiece } from "../components/icons/GameIcons";
 
 function Road({ color }: { color: Color }) {
   const palette = PLAYER_COLOR_META[color];
   return (
     <div
-      className={cn("road", color)}
+      className={cn("road road-piece", color)}
       title={`Estrada — ${palette.label}`}
       style={{
-        background: `linear-gradient(180deg, ${palette.secondary} 0%, ${palette.primary} 55%, ${palette.dark} 100%)`,
-        borderColor: "#090d16",
-        boxShadow: `0 3px 7px rgba(0,0,0,0.75), 0 0 10px ${palette.glow}`,
+        filter: `drop-shadow(0 3px 5px rgba(0, 0, 0, 0.72)) drop-shadow(0 0 6px ${palette.glow})`,
       }}
-    />
+    >
+      <RoadSvgPiece color={color} className="road-piece__svg" />
+    </div>
   );
 }
 
@@ -37,6 +38,7 @@ type EdgeProps = {
   color: Color | null;
   flashing: boolean;
   isRecent?: boolean;
+  isPending?: boolean;
   onClick: React.MouseEventHandler;
 };
 
@@ -49,6 +51,7 @@ export default function Edge({
   color,
   flashing,
   isRecent,
+  isPending,
   onClick,
 }: EdgeProps) {
   const [centerX, centerY] = center;
@@ -62,6 +65,7 @@ export default function Edge({
         "edge--occupied": !!color,
         "edge--buildable": flashing,
         "edge--recent": !!isRecent,
+        "edge--pending": !!isPending,
       })}
       style={{
         left: tileX,

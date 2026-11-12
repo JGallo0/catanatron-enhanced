@@ -99,6 +99,7 @@ class Game:
         catan_map: Optional[CatanMap] = None,
         number_placement: NumberPlacement = "official_spiral",
         initialize: bool = True,
+        dice_mode: str = "random",
     ):
         """Creates a game (doesn't run it).
 
@@ -109,6 +110,7 @@ class Game:
             vps_to_win (int, optional): Victory Points needed to win. Defaults to 10.
             catan_map (CatanMap, optional): Map to use. Defaults to None.
             initialize (bool, optional): Whether to initialize. Defaults to True.
+            dice_mode (str, optional): Dice mode ("random" or "balanced"). Defaults to "random".
         """
         #: Everything watching this game: the seated players, plus any
         #: accumulators handed to play(). One list, so each hook is one loop.
@@ -123,6 +125,7 @@ class Game:
             self.id = str(uuid.uuid4())
             self.vps_to_win = vps_to_win
             self.friendly_robber = friendly_robber
+            self.dice_mode = dice_mode
             self.state = State(
                 players,
                 catan_map,
@@ -130,6 +133,7 @@ class Game:
                 friendly_robber=friendly_robber,
                 number_placement=number_placement,
                 rng=self.random,
+                dice_mode=dice_mode,
             )
             self.playable_actions = generate_playable_actions(self.state)
 
@@ -240,6 +244,7 @@ class Game:
         game_copy.id = self.id
         game_copy.vps_to_win = self.vps_to_win
         game_copy.friendly_robber = self.friendly_robber
+        game_copy.dice_mode = getattr(self, "dice_mode", "random")
         game_copy.state = self.state.copy()
         game_copy.playable_actions = self.playable_actions
         return game_copy

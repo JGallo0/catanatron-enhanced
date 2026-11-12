@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import cn from "classnames";
 import type { Color } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
-import { DiceFaceSvg } from "./icons/GameIcons";
+import Dice3D from "./Dice3D";
 import "./DiceRollOverlay.scss";
 
 export type DiceRollOverlayProps = {
@@ -20,21 +19,8 @@ export default function DiceRollOverlay({
   rollerName,
   rollerColor,
 }: DiceRollOverlayProps) {
-  const [spinFaces, setSpinFaces] = useState<[number, number]>([1, 6]);
-
-  useEffect(() => {
-    if (!open || !rolling) return;
-    let step = 0;
-    const iv = setInterval(() => {
-      step += 1;
-      setSpinFaces([((step * 2) % 6) + 1, ((step * 5 + 1) % 6) + 1]);
-    }, 85);
-    return () => clearInterval(iv);
-  }, [open, rolling]);
-
   if (!open || !dice) return null;
 
-  const shownDice = rolling ? spinFaces : dice;
   const sum = dice[0] + dice[1];
   const isHot = !rolling && (sum === 6 || sum === 8);
   const isSeven = !rolling && sum === 7;
@@ -48,10 +34,27 @@ export default function DiceRollOverlay({
         "is-hot": isHot,
         "is-seven": isSeven,
       })}
-      style={{ borderColor: palette.primary }}
+      style={{ "--roller-color": palette.primary } as React.CSSProperties}
       role="status"
       aria-live="polite"
     >
+      <span
+        className="tabletop-dice-stage__rivet tabletop-dice-stage__rivet--tl"
+        aria-hidden="true"
+      />
+      <span
+        className="tabletop-dice-stage__rivet tabletop-dice-stage__rivet--tr"
+        aria-hidden="true"
+      />
+      <span
+        className="tabletop-dice-stage__rivet tabletop-dice-stage__rivet--bl"
+        aria-hidden="true"
+      />
+      <span
+        className="tabletop-dice-stage__rivet tabletop-dice-stage__rivet--br"
+        aria-hidden="true"
+      />
+
       <div className="tabletop-dice-stage__header">
         <span
           className="tabletop-dice-stage__dot"
@@ -59,21 +62,51 @@ export default function DiceRollOverlay({
         />
         <span className="tabletop-dice-stage__roller">{rollerName}</span>
       </div>
-      <div className="tabletop-dice-stage__faces">
-        <span className="tabletop-dice-stage__die">
-          <DiceFaceSvg value={shownDice[0]} size={42} isHot={isHot || isSeven} />
-        </span>
-        <span className="tabletop-dice-stage__die tabletop-dice-stage__die--second">
-          <DiceFaceSvg value={shownDice[1]} size={42} isHot={isHot || isSeven} />
-        </span>
+
+      <div className="tabletop-dice-stage__tray">
+        <div className="tabletop-dice-stage__felt-ring" aria-hidden="true" />
+        <div className="tabletop-dice-stage__faces">
+          <div className="tabletop-dice-stage__die-slot">
+            <span className="tabletop-dice-stage__die tabletop-dice-stage__die--first">
+              <Dice3D
+                value={dice[0]}
+                rolling={rolling}
+                isHot={isHot || isSeven}
+                size={52}
+                dieIndex={0}
+                variant="stage"
+              />
+            </span>
+            <span className="tabletop-dice-stage__shadow" aria-hidden="true" />
+          </div>
+          <div className="tabletop-dice-stage__die-slot">
+            <span className="tabletop-dice-stage__die tabletop-dice-stage__die--second">
+              <Dice3D
+                value={dice[1]}
+                rolling={rolling}
+                isHot={isHot || isSeven}
+                size={52}
+                dieIndex={1}
+                variant="stage"
+              />
+            </span>
+            <span
+              className="tabletop-dice-stage__shadow tabletop-dice-stage__shadow--second"
+              aria-hidden="true"
+            />
+          </div>
+        </div>
       </div>
+
       <div className="tabletop-dice-stage__footer">
         {rolling ? (
-          <span>🎲 Rolando...</span>
+          <span className="tabletop-dice-stage__status-rolling">
+            🎲 Rolando...
+          </span>
         ) : isSeven ? (
-          <strong>Total 7 — Ladrão!</strong>
+          <strong>⚔️ Total 7 — Ladrão!</strong>
         ) : (
-          <strong>Total {sum}</strong>
+          <strong>✦ Total {sum} ✦</strong>
         )}
       </div>
     </div>

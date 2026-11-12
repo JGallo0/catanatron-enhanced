@@ -8,31 +8,42 @@ import {
 import type {
   AccountStats,
   AvatarConfig,
+  BotDifficulty,
   Color,
+  DiceMode,
   GameAction,
+  GameMessage,
+  GameMessageKind,
   GameState,
   LeaderboardEntry,
   MatchRecord,
   RoomState,
 } from "./api.types";
+import { OPEN_SEAT_LABEL } from "../config/botCatalog";
 import {
+  isRoomClosedLocally,
   localAbandonGame,
+  localCloseRoom,
   localCreateGame,
   localCreateRoom,
   localGameHeartbeat,
   localGetLeaderboard,
   localGetMatchHistory,
   localGetMctsAnalysis,
+  localGetGameMessages,
   localGetRoom,
   localGetState,
   localGetUserRankAndStats,
   localJoinRoom,
+  localLeaveRoom,
   localListActiveRooms,
   localLoginOrRegister,
   localLoginUser,
   localPostAction,
+  localPostGameMessage,
   localReclaimGame,
   localRegisterUser,
+  localRemoveRoomCache,
   localStartRoomGame,
   localUpdateProfile,
   localUpdateRoom,
@@ -74,6 +85,7 @@ export type AuthConfig = {
   google_client_id: string | null;
 };
 
+export type { BotDifficulty, DiceMode };
 export type MapTemplate = "BASE" | "MINI" | "TOURNAMENT";
 export type StateIndex = number | `${number}` | "latest";
 
@@ -83,6 +95,10 @@ type CreateGameOptions = {
   vpsToWin: number;
   discardLimit: number;
   friendlyRobber: boolean;
+  diceMode?: DiceMode;
+  seatNamesList?: Array<string | null>;
+  hostName?: string;
+  hostSeatIndex?: number;
 };
 
 const ACCOUNT_STORAGE_KEY = "catan_player_account";
@@ -380,48 +396,48 @@ export async function loginOrRegisterAccount(options: {
 
 const PLAYER_PT_NAMES: Record<string, { name: string; description: string }> = {
   HUMAN: {
-    name: "Humano (Você / Amigo)",
-    description: "Jogador controlado por pessoa na mesa ou via link.",
+    name: OPEN_SEAT_LABEL,
+    description: "Assento livre para entrar pela sala ou link de convite.",
   },
   CATANATRON: {
-    name: "IA: Mestre da Ilha (AlphaBeta Forte)",
-    description: "Bot estratégico mais forte do motor de jogo com busca Alpha-Beta.",
+    name: "Bot (Difícil)",
+    description: "Estratégia avançada com planejamento de jogadas.",
   },
   AB: {
-    name: "IA: AlphaBeta Configurável",
-    description: "Busca em árvore Alpha-Beta com profundidade ajustável.",
+    name: "Bot (Difícil)",
+    description: "Estratégia avançada com busca tática.",
   },
   F: {
-    name: "IA: Função de Valor (Rápida)",
-    description: "Avalia a melhor jogada imediata por heurística.",
+    name: "Bot (Moderado)",
+    description: "Estratégia equilibrada em ritmo rápido.",
   },
   MCTS: {
-    name: "IA: Monte Carlo (MCTS)",
-    description: "Simula partidas completas para decidir a jogada.",
+    name: "Bot (Moderado)",
+    description: "Simula partidas para decidir a jogada.",
   },
   G: {
-    name: "IA: Gananciosa (Greedy)",
+    name: "Bot (Moderado)",
     description: "Prioriza ganhos imediatos de produção.",
   },
   VP: {
-    name: "IA: Caçadora de Pontos (VP)",
+    name: "Bot (Moderado)",
     description: "Foca diretamente em ações que geram pontos de vitória.",
   },
   W: {
-    name: "IA: Aleatória Ponderada",
-    description: "Escolhe jogadas aleatórias com peso maior para construções.",
+    name: "Bot (Fácil)",
+    description: "Jogadas mais leves e ocasionais.",
   },
   WEIGHTED_RANDOM: {
-    name: "IA: Aleatória Ponderada",
-    description: "Escolhe jogadas aleatórias com peso maior para construções.",
+    name: "Bot (Fácil)",
+    description: "Jogadas mais leves e ocasionais.",
   },
   R: {
-    name: "IA: Aleatória Simples (Fácil)",
-    description: "Escolhe qualquer ação válida aleatoriamente.",
+    name: "Bot (Fácil)",
+    description: "Escolhe jogadas válidas de forma leve.",
   },
   RANDOM: {
-    name: "IA: Aleatória Simples (Fácil)",
-    description: "Escolhe qualquer ação válida aleatoriamente.",
+    name: "Bot (Fácil)",
+    description: "Escolhe jogadas válidas de forma leve.",
   },
 };
 
@@ -507,11 +523,16 @@ export async function createGame({
   vpsToWin,
   discardLimit,
   friendlyRobber,
+  diceMode,
+  seatNamesList,
+  hostName,
+  hostSeatIndex,
 }: CreateGameOptions): Promise<string> {
   const acct = getSavedAccount();
   const guest = !acct ? getGuestProfile() : null;
   const guestAvatar = !acct ? getCustomGuestAvatarPayload() : undefined;
   const resolvedHostName =
+    hostName?.trim() ||
     acct?.display_name ||
     (guest?.customized ||
     (guest?.display_name && guest.display_name !== "Explorador da Ilha")
@@ -526,7 +547,12 @@ export async function createGame({
         vps_to_win: vpsToWin,
         discard_limit: discardLimit,
         friendly_robber: friendlyRobber,
+        ...(diceMode ? { dice_mode: diceMode } : {}),
         host_name: resolvedHostName,
+        ...(seatNamesList ? { seat_names: seatNamesList } : {}),
+        ...(typeof hostSeatIndex === "number"
+          ? { host_seat_index: hostSeatIndex }
+          : {}),
         ...(guestAvatar ? { avatar_config: guestAvatar } : {}),
       },
       { headers: authHeaders() }
@@ -543,28 +569,78 @@ export async function createGame({
     vpsToWin,
     discardLimit,
     friendlyRobber,
-    seatNames: resolvedHostName ? { RED: resolvedHostName } : undefined,
+    diceMode,
+    seatNamesList,
+    hostName: resolvedHostName,
+    hostSeatIndex,
     hostAvatarConfig: guestAvatar,
   });
 }
 
 // ===== Private & Online Rooms + Shareable Invite Links =====
+export function getStoredRoomToken(roomCode: string): string | null {
+  try {
+    const clean = roomCode.trim().toUpperCase();
+    if (!clean) return null;
+    return localStorage.getItem(`catan_room_token_${clean}`);
+  } catch {
+    return null;
+  }
+}
+
+export function getAllStoredRoomTokens(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("catan_room_token_")) {
+        const code = k.slice("catan_room_token_".length).trim().toUpperCase();
+        const val = localStorage.getItem(k);
+        if (code && val) {
+          out[code] = val;
+        }
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return out;
+}
+
+function isAuthoritativeHttpError(err: any): boolean {
+  const status = err?.response?.status;
+  return (
+    typeof status === "number" &&
+    status >= 400 &&
+    status < 500 &&
+    typeof err?.response?.data?.description === "string"
+  );
+}
+
 export async function listActiveRooms(
   token?: string | null
 ): Promise<RoomState[]> {
-  const resolvedToken = token ?? getSavedAccount()?.auth_token ?? undefined;
+  const acct = getSavedAccount();
+  const resolvedToken = token ?? acct?.auth_token ?? undefined;
+  const roomTokens = getAllStoredRoomTokens();
   try {
     const response = await axios.get<{ rooms: RoomState[] }>(
       `${API_URL}/api/rooms`,
       {
         params: resolvedToken ? { token: resolvedToken } : {},
+        headers: {
+          ...authHeaders(resolvedToken),
+          ...(Object.keys(roomTokens).length > 0
+            ? { "X-Room-Tokens": JSON.stringify(roomTokens) }
+            : {}),
+        },
       }
     );
     if (response.data && Array.isArray(response.data.rooms)) {
       const localRooms = localListActiveRooms(resolvedToken);
       const remoteCodes = new Set(response.data.rooms.map((r) => r.room_code));
       return [
-        ...response.data.rooms,
+        ...response.data.rooms.filter((r) => !isRoomClosedLocally(r.room_code)),
         ...localRooms.filter((r) => !remoteCodes.has(r.room_code)),
       ];
     }
@@ -576,11 +652,19 @@ export async function listActiveRooms(
 
 export async function createRoom(options: {
   hostName: string;
-  players: PlayerKey[];
+  players?: PlayerKey[];
+  seats?: Array<{
+    player_key: string;
+    player_name?: string | null;
+    is_host?: boolean;
+  }>;
+  seatNames?: Partial<Record<Color, string>> | Array<string | null>;
+  botDifficulty?: BotDifficulty;
   mapTemplate: MapTemplate;
   vpsToWin: number;
   discardLimit: number;
   friendlyRobber: boolean;
+  diceMode?: DiceMode;
   token?: string | null;
 }): Promise<{ room_code: string; seat_token: string; room: RoomState }> {
   const acct = getSavedAccount();
@@ -591,11 +675,15 @@ export async function createRoom(options: {
       `${API_URL}/api/rooms`,
       {
         host_name: options.hostName,
-        players: options.players,
+        ...(options.players ? { players: options.players } : {}),
+        ...(options.seats ? { seats: options.seats } : {}),
+        ...(options.seatNames ? { seat_names: options.seatNames } : {}),
+        ...(options.botDifficulty ? { bot_difficulty: options.botDifficulty } : {}),
         map_template: options.mapTemplate,
         vps_to_win: options.vpsToWin,
         discard_limit: options.discardLimit,
         friendly_robber: options.friendlyRobber,
+        ...(options.diceMode ? { dice_mode: options.diceMode } : {}),
         token: resolvedToken,
         ...(guestAvatar ? { avatar_config: guestAvatar } : {}),
       },
@@ -608,8 +696,10 @@ export async function createRoom(options: {
     ) {
       return response.data;
     }
-  } catch {
-    // Fallback to local room manager
+  } catch (err: any) {
+    if (isAuthoritativeHttpError(err)) {
+      throw err;
+    }
   }
   return localCreateRoom({
     ...options,
@@ -622,11 +712,18 @@ export async function getRoom(
   roomCode: string,
   token?: string | null
 ): Promise<RoomState> {
+  const cleanCode = roomCode.trim().toUpperCase();
+  const resolvedToken =
+    token ?? getStoredRoomToken(cleanCode) ?? getSavedAccount()?.auth_token ?? undefined;
   try {
     const response = await axios.get<RoomState>(
-      `${API_URL}/api/rooms/${roomCode}`,
+      `${API_URL}/api/rooms/${cleanCode}`,
       {
-        params: token ? { token } : {},
+        params: resolvedToken ? { token: resolvedToken } : {},
+        headers: {
+          ...authHeaders(),
+          ...(resolvedToken ? { "X-Seat-Token": resolvedToken } : {}),
+        },
       }
     );
     if (
@@ -636,10 +733,15 @@ export async function getRoom(
     ) {
       return response.data;
     }
-  } catch {
-    // Fallback to local room
+  } catch (err: any) {
+    if (isAuthoritativeHttpError(err)) {
+      if (err.response.status === 404 || err.response.status === 410) {
+        localRemoveRoomCache(cleanCode, { markClosed: true });
+      }
+      throw err;
+    }
   }
-  return localGetRoom(roomCode, token);
+  return localGetRoom(cleanCode, resolvedToken);
 }
 
 export async function joinRoom(
@@ -650,19 +752,26 @@ export async function joinRoom(
     token?: string | null;
   }
 ): Promise<{ seat_token: string; seat_color: Color; room: RoomState }> {
+  const cleanCode = roomCode.trim().toUpperCase();
   const acct = getSavedAccount();
   const guestAvatar = !acct ? getCustomGuestAvatarPayload() : undefined;
-  const resolvedToken = options.token ?? acct?.auth_token;
+  const resolvedToken =
+    options.token ?? getStoredRoomToken(cleanCode) ?? acct?.auth_token ?? undefined;
   try {
     const response = await axios.post(
-      `${API_URL}/api/rooms/${roomCode}/join`,
+      `${API_URL}/api/rooms/${cleanCode}/join`,
       {
         player_name: options.playerName,
         preferred_color: options.preferredColor,
         token: resolvedToken,
         ...(guestAvatar ? { avatar_config: guestAvatar } : {}),
       },
-      { headers: authHeaders() }
+      {
+        headers: {
+          ...authHeaders(),
+          ...(resolvedToken ? { "X-Seat-Token": resolvedToken } : {}),
+        },
+      }
     );
     if (
       response.data &&
@@ -671,11 +780,17 @@ export async function joinRoom(
     ) {
       return response.data;
     }
-  } catch {
-    // Fallback to local room
+  } catch (err: any) {
+    if (isAuthoritativeHttpError(err)) {
+      if (err.response.status === 404 || err.response.status === 410) {
+        localRemoveRoomCache(cleanCode, { markClosed: true });
+      }
+      throw err;
+    }
   }
-  return localJoinRoom(roomCode, {
+  return localJoinRoom(cleanCode, {
     ...options,
+    token: resolvedToken,
     avatarConfig: guestAvatar,
   });
 }
@@ -689,19 +804,31 @@ export async function updateRoom(
       vps_to_win: number;
       discard_limit: number;
       friendly_robber: boolean;
+      bot_difficulty: BotDifficulty;
+      dice_mode: DiceMode;
     }>;
     seats?: Array<{
       color: Color;
+      source_color?: Color;
       player_key: string;
       player_name?: string;
+      release_claim?: boolean;
     }>;
   }
 ): Promise<RoomState> {
+  const cleanCode = roomCode.trim().toUpperCase();
+  const resolvedTok =
+    payload.token ?? getStoredRoomToken(cleanCode) ?? getSavedAccount()?.auth_token ?? undefined;
   try {
     const response = await axios.patch<RoomState>(
-      `${API_URL}/api/rooms/${roomCode}`,
-      payload,
-      { headers: authHeaders() }
+      `${API_URL}/api/rooms/${cleanCode}`,
+      { ...payload, token: resolvedTok },
+      {
+        headers: {
+          ...authHeaders(),
+          ...(resolvedTok ? { "X-Seat-Token": resolvedTok } : {}),
+        },
+      }
     );
     if (
       response.data &&
@@ -710,21 +837,33 @@ export async function updateRoom(
     ) {
       return response.data;
     }
-  } catch {
-    // Fallback to local room
+  } catch (err: any) {
+    if (isAuthoritativeHttpError(err)) {
+      if (err.response.status === 404 || err.response.status === 410) {
+        localRemoveRoomCache(cleanCode, { markClosed: true });
+      }
+      throw err;
+    }
   }
-  return localUpdateRoom(roomCode, payload);
+  return localUpdateRoom(cleanCode, { ...payload, token: resolvedTok });
 }
 
 export async function startRoomGame(
   roomCode: string,
   token?: string | null
 ): Promise<{ game_id: string; room: RoomState }> {
+  const cleanCode = roomCode.trim().toUpperCase();
+  const resolvedTok =
+    token ?? getStoredRoomToken(cleanCode) ?? getSavedAccount()?.auth_token ?? undefined;
   try {
     const response = await axios.post(
-      `${API_URL}/api/rooms/${roomCode}/start`,
+      `${API_URL}/api/rooms/${cleanCode}/start`,
+      { token: resolvedTok },
       {
-        token,
+        headers: {
+          ...authHeaders(),
+          ...(resolvedTok ? { "X-Seat-Token": resolvedTok } : {}),
+        },
       }
     );
     if (
@@ -734,10 +873,119 @@ export async function startRoomGame(
     ) {
       return response.data;
     }
-  } catch {
-    // Fallback to local room game start
+  } catch (err: any) {
+    if (isAuthoritativeHttpError(err)) {
+      if (err.response.status === 404 || err.response.status === 410) {
+        localRemoveRoomCache(cleanCode, { markClosed: true });
+      }
+      throw err;
+    }
   }
-  return localStartRoomGame(roomCode, token);
+  return localStartRoomGame(cleanCode, resolvedTok);
+}
+
+export async function closeRoom(
+  roomCode: string,
+  token?: string | null
+): Promise<{ closed: boolean; room_code: string; game_id?: string | null }> {
+  const cleanCode = roomCode.trim().toUpperCase();
+  const acct = getSavedAccount();
+  const resolvedTok =
+    token ?? getStoredRoomToken(cleanCode) ?? acct?.auth_token ?? undefined;
+  const headers: Record<string, string> = {
+    ...authHeaders(acct?.auth_token),
+    ...(resolvedTok ? { "X-Seat-Token": resolvedTok } : {}),
+  };
+  const params = resolvedTok ? { token: resolvedTok } : {};
+
+  try {
+    const response = await axios.delete<{
+      closed: boolean;
+      room_code: string;
+      game_id?: string | null;
+    }>(`${API_URL}/api/rooms/${cleanCode}`, {
+      params,
+      headers,
+    });
+    if (response.data && response.data.closed) {
+      localRemoveRoomCache(cleanCode, { markClosed: true });
+      return response.data;
+    }
+  } catch (err: any) {
+    if (err?.response?.status === 405) {
+      try {
+        const postResp = await axios.post<{
+          closed: boolean;
+          room_code: string;
+          game_id?: string | null;
+        }>(
+          `${API_URL}/api/rooms/${cleanCode}/close`,
+          resolvedTok ? { token: resolvedTok } : {},
+          { headers }
+        );
+        if (postResp.data && postResp.data.closed) {
+          localRemoveRoomCache(cleanCode, { markClosed: true });
+          return postResp.data;
+        }
+      } catch (postErr: any) {
+        if (isAuthoritativeHttpError(postErr)) {
+          if (
+            postErr.response.status === 404 ||
+            postErr.response.status === 410
+          ) {
+            localRemoveRoomCache(cleanCode, { markClosed: true });
+          }
+          throw postErr;
+        }
+      }
+    } else if (isAuthoritativeHttpError(err)) {
+      if (err.response.status === 404 || err.response.status === 410) {
+        localRemoveRoomCache(cleanCode, { markClosed: true });
+      }
+      throw err;
+    }
+  }
+
+  return localCloseRoom(cleanCode, resolvedTok);
+}
+
+export async function leaveRoom(
+  roomCode: string,
+  token?: string | null
+): Promise<{ left: boolean; room: RoomState }> {
+  const cleanCode = roomCode.trim().toUpperCase();
+  const acct = getSavedAccount();
+  const resolvedTok =
+    token ?? getStoredRoomToken(cleanCode) ?? acct?.auth_token ?? undefined;
+  const headers: Record<string, string> = {
+    ...authHeaders(acct?.auth_token),
+    ...(resolvedTok ? { "X-Seat-Token": resolvedTok } : {}),
+  };
+
+  try {
+    const response = await axios.post<{ left: boolean; room: RoomState }>(
+      `${API_URL}/api/rooms/${cleanCode}/leave`,
+      resolvedTok ? { token: resolvedTok } : {},
+      { headers }
+    );
+    if (response.data && response.data.left) {
+      try {
+        localStorage.removeItem(`catan_room_token_${cleanCode}`);
+      } catch {
+        // ignore
+      }
+      return response.data;
+    }
+  } catch (err: any) {
+    if (isAuthoritativeHttpError(err)) {
+      if (err.response.status === 404 || err.response.status === 410) {
+        localRemoveRoomCache(cleanCode, { markClosed: true });
+      }
+      throw err;
+    }
+  }
+
+  return localLeaveRoom(cleanCode, resolvedTok);
 }
 
 export function saveGameRoomCode(gameId: string, roomCode?: string | null) {
@@ -960,4 +1208,65 @@ export async function getMctsAnalysis(
     // Fallback to local MCTS probability estimator
   }
   return localGetMctsAnalysis(gameId);
+}
+
+export async function getGameMessages(
+  gameId: string,
+  afterId = 0
+): Promise<GameMessage[]> {
+  if (!gameId) return [];
+  if (gameId.startsWith("local-")) {
+    return localGetGameMessages(gameId, afterId);
+  }
+  try {
+    const response = await axios.get<{ messages: GameMessage[] }>(
+      `${API_URL}/api/games/${gameId}/messages`,
+      { params: { after_id: afterId } }
+    );
+    if (response.data && Array.isArray(response.data.messages)) {
+      return response.data.messages;
+    }
+  } catch (err: any) {
+    if (isAuthoritativeHttpError(err)) {
+      throw err;
+    }
+  }
+  return localGetGameMessages(gameId, afterId);
+}
+
+export async function sendGameMessage(
+  gameId: string,
+  options: {
+    body: string;
+    color?: Color | null;
+    senderName?: string | null;
+    kind?: GameMessageKind;
+  }
+): Promise<GameMessage> {
+  if (gameId.startsWith("local-")) {
+    return localPostGameMessage(gameId, options);
+  }
+  try {
+    const response = await axios.post<{ message: GameMessage } | GameMessage>(
+      `${API_URL}/api/games/${gameId}/messages`,
+      {
+        body: options.body,
+        ...(options.color ? { color: options.color } : {}),
+        ...(options.kind ? { kind: options.kind } : {}),
+      },
+      { params: viewParams(), headers: presenceHeaders(gameId) }
+    );
+    const data = response.data as any;
+    if (data?.message && typeof data.message.id === "number") {
+      return data.message as GameMessage;
+    }
+    if (data && typeof data.id === "number") {
+      return data as GameMessage;
+    }
+  } catch (err: any) {
+    if (isAuthoritativeHttpError(err)) {
+      throw err;
+    }
+  }
+  return localPostGameMessage(gameId, options);
 }

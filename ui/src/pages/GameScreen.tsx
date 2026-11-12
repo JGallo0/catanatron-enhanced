@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext, useRef, useMemo } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import { GridLoader } from "react-spinners";
@@ -21,40 +21,74 @@ import ActionsToolbar from "./ActionsToolbar";
 import "./GameScreen.scss";
 import LeftDrawer from "../components/LeftDrawer";
 import RightDrawer from "../components/RightDrawer";
-import PlayerTopBar from "../components/PlayerTopBar";
+import PlayerTopBar, {
+  type ActivePortraitTaunt,
+  type FloatingDiscardFX,
+  type FloatingVpFX,
+  type FloatingYieldFX,
+} from "../components/PlayerTopBar";
 import DiceRollOverlay from "../components/DiceRollOverlay";
+import GameChatPanel from "../components/GameChatPanel";
+import MatchIntroOverlay from "../components/MatchIntroOverlay";
+import AlmanacModal from "../components/AlmanacModal";
+import DiceHistogram from "../components/DiceHistogram";
+import OceanBackdrop from "../components/OceanBackdrop";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import {
   type StateIndex,
   abandonGame,
+  getGameMessages,
   getSavedAccount,
   getState,
   postAction,
   reclaimGame,
   sendGameHeartbeat,
+  sendGameMessage,
   setPerspective,
 } from "../utils/apiClient";
 import { dispatchSnackbar } from "../components/Snackbar";
-import { getHumanColor } from "../utils/stateUtils";
+import { getHumanColor, playerKey } from "../utils/stateUtils";
 import AnalysisBox from "../components/AnalysisBox";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { getSavedAccountAvatarSummary } from "../config/avatarCatalog";
 import { resolvePlayerDisplayName } from "../config/botCatalog";
-import type { Color, GameState } from "../utils/api.types";
+import {
+  TAUNT_CATALOG,
+  TAUNT_COOLDOWN_MS,
+  TAUNT_DISPLAY_MS,
+  type TauntDefinition,
+  encodeTauntBody,
+  getTauntById,
+  parseTauntMessage,
+} from "../config/tauntCatalog";
+import type { Color, GameMessage, GameState } from "../utils/api.types";
 import { getSavedGameSeat } from "./RoomLobbyPage";
 import {
   isSoundMuted,
   setSoundMuted,
   playActionRecordSound,
+  playChatSound,
+  playTauntSound,
   playVictorySound,
 } from "../utils/soundEffects";
 import { humanizeActionRecordPt } from "../utils/promptUtils";
 import {
+  LOCAL_MESSAGES_CHANNEL_NAME,
+  LOCAL_MESSAGES_STORAGE_KEY,
+} from "../utils/localEngine";
+import {
   type GameSpeed,
+  type RobberNoticeFX,
+  type TurnHandoffFX,
+  INTRO_SPLASH_MS,
+  TURN_TRANSITION_MS,
+  cycleGameSpeed,
   electBotCoordinator,
+  extractBatchTransitionFX,
   extractTransitionVisuals,
   getActionDelayMs,
+  getDiceOverlayDurationMs,
   getRollSpinDurationMs,
   getSavedGameSpeed,
   saveGameSpeed,
@@ -116,6 +150,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   gameSpeedRef.current = gameSpeed;
 
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
+  const [almanacOpen, setAlmanacOpen] = useState(false);
   const [isAbandoning, setIsAbandoning] = useState(false);
   const [isReclaiming, setIsReclaiming] = useState(false);
   const hasAbandonedRef = useRef(false);
@@ -136,19 +171,75 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [recentEdgeId, setRecentEdgeId] = useState<string | null>(null);
   const [recentDevColor, setRecentDevColor] = useState<Color | null>(null);
 
+  const [introDismissedForGameId, setIntroDismissedForGameId] = useState<
+    string | null
+  >(null);
+  const [turnPauseBanner, setTurnPauseBanner] = useState<TurnHandoffFX | null>(
+    null
+  );
+  const [discardDrops, setDiscardDrops] = useState<FloatingDiscardFX[]>([]);
+  const [yieldFX, setYieldFX] = useState<FloatingYieldFX[]>([]);
+  const [vpFX, setVpFX] = useState<FloatingVpFX[]>([]);
+  const [robberNotice, setRobberNotice] = useState<RobberNoticeFX | null>(null);
+
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<GameMessage[]>([]);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [isSendingChat, setIsSendingChat] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [chatPreview, setChatPreview] = useState<GameMessage | null>(null);
+
+  const [tauntPickerOpen, setTauntPickerOpen] = useState(false);
+  const [tauntCoolingDown, setTauntCoolingDown] = useState(false);
+  const [activeTaunts, setActiveTaunts] = useState<
+    Partial<Record<Color, ActivePortraitTaunt>>
+  >({});
+
+  const prevStateRef = useRef<GameState | null>(null);
   const prevStateIndexRef = useRef<number | null>(null);
   const prevWinnerRef = useRef<Color | null>(null);
   const latestStateIndexRef = useRef<number | null>(null);
+  const fxCounterRef = useRef<number>(1);
+  const fxCleanupTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(
+    new Set()
+  );
   const nextBotReadyAtRef = useRef<number>(0);
   const botGenerationRef = useRef<number>(0);
+  const lastSeenMessageIdRef = useRef<number>(0);
+  const knownMessageIdsRef = useRef<Set<number>>(new Set());
+  const chatInitializedRef = useRef<boolean>(false);
+  const chatOpenRef = useRef<boolean>(false);
+  const mySeatColorRef = useRef<Color | null>(null);
+  chatOpenRef.current = chatOpen;
 
+  const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const turnPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const robberNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const diceSpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const diceHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chatPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tauntCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const tauntTimersRef = useRef<
+    Partial<Record<Color, ReturnType<typeof setTimeout>>>
+  >({});
+  const tauntNonceRef = useRef<number>(1);
+  const lastBotTauntAtRef = useRef<number>(0);
 
   const gs = state.gameState;
   latestStateIndexRef.current = gs?.state_index ?? null;
+  const introActive = Boolean(
+    gs &&
+      !replayMode &&
+      gs.state_index === 0 &&
+      gameId &&
+      introDismissedForGameId !== gameId
+  );
 
   const mySeatColor: Color | null = useMemo(() => {
     if (!gs) return null;
@@ -196,23 +287,152 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       (gs?.seat_takeover?.[mySeatColor]?.taken_over ||
         gs?.taken_over_colors?.includes(mySeatColor))
   );
+  mySeatColorRef.current = mySeatColor;
+
+  const triggerPortraitTaunt = useCallback(
+    (color: Color, taunt: TauntDefinition, playAudio: boolean) => {
+      const nonce = tauntNonceRef.current++;
+      setActiveTaunts((prev) => ({
+        ...prev,
+        [color]: {
+          id: taunt.id,
+          emoji: taunt.emoji,
+          label: taunt.label,
+          bubbleText: taunt.bubbleText,
+          tone: taunt.tone,
+          nonce,
+        },
+      }));
+      const prevTimer = tauntTimersRef.current[color];
+      if (prevTimer) clearTimeout(prevTimer);
+      tauntTimersRef.current[color] = setTimeout(() => {
+        delete tauntTimersRef.current[color];
+        setActiveTaunts((prev) => {
+          if (!prev[color] || prev[color]?.nonce !== nonce) return prev;
+          const next = { ...prev };
+          delete next[color];
+          return next;
+        });
+      }, TAUNT_DISPLAY_MS);
+      if (playAudio) {
+        playTauntSound(taunt.tone);
+      }
+    },
+    []
+  );
+
+  const applyIncomingChatMessages = useCallback(
+    (incoming: GameMessage[], notifyOnNew: boolean) => {
+      if (!Array.isArray(incoming) || incoming.length === 0) return;
+      const unseen: GameMessage[] = [];
+      for (const m of incoming) {
+        if (m && typeof m.id === "number") {
+          if (!knownMessageIdsRef.current.has(m.id)) {
+            knownMessageIdsRef.current.add(m.id);
+            unseen.push(m);
+          }
+          if (m.id > lastSeenMessageIdRef.current) {
+            lastSeenMessageIdRef.current = m.id;
+          }
+        }
+      }
+      if (unseen.length === 0) return;
+
+      setChatMessages((prev) => {
+        const byId = new Map<number, GameMessage>();
+        for (const existing of prev) byId.set(existing.id, existing);
+        for (const nextMsg of unseen) byId.set(nextMsg.id, nextMsg);
+        return Array.from(byId.values()).sort((a, b) => a.id - b.id);
+      });
+
+      if (notifyOnNew) {
+        const mySeat = mySeatColorRef.current;
+        const fromOthers = unseen.filter((m) => !mySeat || m.color !== mySeat);
+        if (fromOthers.length > 0) {
+          const regularChatMsgs: GameMessage[] = [];
+          for (const msg of fromOthers) {
+            const parsed = parseTauntMessage(msg.body, msg.kind);
+            if (parsed.taunt) {
+              triggerPortraitTaunt(msg.color, parsed.taunt, true);
+            } else {
+              regularChatMsgs.push(msg);
+            }
+          }
+          if (regularChatMsgs.length > 0) {
+            playChatSound();
+            if (!chatOpenRef.current) {
+              setUnreadChatCount((c) => c + regularChatMsgs.length);
+              setChatPreview(regularChatMsgs[regularChatMsgs.length - 1]);
+              if (chatPreviewTimerRef.current) {
+                clearTimeout(chatPreviewTimerRef.current);
+              }
+              chatPreviewTimerRef.current = setTimeout(() => {
+                setChatPreview(null);
+              }, 4200);
+            }
+          }
+        }
+      }
+    },
+    [triggerPortraitTaunt]
+  );
 
   // Reset game-scoped refs when switching gameId
   useEffect(() => {
+    prevStateRef.current = null;
     prevStateIndexRef.current = null;
     prevWinnerRef.current = null;
     latestStateIndexRef.current = null;
     nextBotReadyAtRef.current = 0;
     hasAbandonedRef.current = false;
+    lastSeenMessageIdRef.current = 0;
+    knownMessageIdsRef.current = new Set();
+    chatInitializedRef.current = false;
+    lastBotTauntAtRef.current = 0;
+    for (const timer of Object.values(tauntTimersRef.current)) {
+      if (timer) clearTimeout(timer);
+    }
+    tauntTimersRef.current = {};
+    if (tauntCooldownTimerRef.current) {
+      clearTimeout(tauntCooldownTimerRef.current);
+      tauntCooldownTimerRef.current = null;
+    }
+    setIntroDismissedForGameId(null);
+    setTurnPauseBanner(null);
+    setDiscardDrops([]);
+    setYieldFX([]);
+    setVpFX([]);
+    setRobberNotice(null);
+    setChatMessages([]);
+    setUnreadChatCount(0);
+    setChatPreview(null);
+    setChatError(null);
+    setTauntPickerOpen(false);
+    setTauntCoolingDown(false);
+    setActiveTaunts({});
   }, [gameId]);
 
   // Clean up visual presentation timers on unmount
   useEffect(() => {
+    const cleanupTimers = fxCleanupTimersRef.current;
+    const tauntTimers = tauntTimersRef.current;
     return () => {
+      if (introTimerRef.current) clearTimeout(introTimerRef.current);
+      if (turnPauseTimerRef.current) clearTimeout(turnPauseTimerRef.current);
+      if (robberNoticeTimerRef.current) clearTimeout(robberNoticeTimerRef.current);
       if (diceSpinTimerRef.current) clearTimeout(diceSpinTimerRef.current);
       if (diceHideTimerRef.current) clearTimeout(diceHideTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      if (chatPreviewTimerRef.current) clearTimeout(chatPreviewTimerRef.current);
+      if (tauntCooldownTimerRef.current) {
+        clearTimeout(tauntCooldownTimerRef.current);
+      }
+      for (const timer of Object.values(tauntTimers)) {
+        if (timer) clearTimeout(timer);
+      }
+      for (const timer of cleanupTimers) clearTimeout(timer);
+      cleanupTimers.clear();
     };
   }, []);
 
@@ -381,15 +601,116 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     dispatch,
   ]);
 
-  // Play tabletop audio cues, opening announcement, 2D6 dice stage, recent board highlights, and spotlight toast
+  // Initial chat history load + BroadcastChannel/storage sync + immediate refresh when drawer opens
+  useEffect(() => {
+    if (!gameId || !hasGameState) return;
+    let active = true;
+
+    (async () => {
+      try {
+        const msgs = await getGameMessages(
+          gameId,
+          chatInitializedRef.current ? lastSeenMessageIdRef.current : 0
+        );
+        if (!active) return;
+        const notify = !replayMode && chatInitializedRef.current;
+        chatInitializedRef.current = true;
+        applyIncomingChatMessages(msgs, notify);
+      } catch {
+        // ignore transient chat fetch errors
+      }
+    })();
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        channel = new BroadcastChannel(LOCAL_MESSAGES_CHANNEL_NAME);
+        channel.onmessage = (ev) => {
+          if (!active || ev?.data?.gameId !== gameId || !ev?.data?.message) {
+            return;
+          }
+          applyIncomingChatMessages([ev.data.message as GameMessage], !replayMode);
+        };
+      }
+    } catch {
+      channel = null;
+    }
+
+    const onStorage = (ev: StorageEvent) => {
+      if (!active || ev.key !== LOCAL_MESSAGES_STORAGE_KEY || !ev.newValue) {
+        return;
+      }
+      try {
+        const map = JSON.parse(ev.newValue) as Record<string, GameMessage[]>;
+        const rows = Array.isArray(map?.[gameId]) ? map[gameId] : [];
+        if (rows.length > 0) {
+          applyIncomingChatMessages(rows, !replayMode);
+        }
+      } catch {
+        // ignore storage parse error
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      active = false;
+      if (channel) channel.close();
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [gameId, hasGameState, replayMode, applyIncomingChatMessages]);
+
+  // Refresh immediately when chat drawer opens
+  useEffect(() => {
+    if (!gameId || !hasGameState || !chatOpen) return;
+    let active = true;
+    (async () => {
+      try {
+        const msgs = await getGameMessages(gameId, lastSeenMessageIdRef.current);
+        if (active && msgs.length > 0) {
+          applyIncomingChatMessages(msgs, false);
+        }
+      } catch {
+        // ignore transient errors
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [gameId, hasGameState, chatOpen, applyIncomingChatMessages]);
+
+  // Real-time chat polling (1500ms) in active multiplayer matches even during your own turn
+  useEffect(() => {
+    if (!gameId || !hasGameState || !isMultiplayerGame || replayMode) {
+      return;
+    }
+    const interval = setInterval(async () => {
+      try {
+        const msgs = await getGameMessages(gameId, lastSeenMessageIdRef.current);
+        if (msgs.length > 0) {
+          applyIncomingChatMessages(msgs, chatInitializedRef.current);
+        }
+      } catch {
+        // ignore transient chat polling errors
+      }
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [gameId, hasGameState, isMultiplayerGame, replayMode, applyIncomingChatMessages]);
+
+  // Play tabletop audio cues, intro "Boa Guerra", turn pause "Vez de...", 2D6 dice stage, visible discards/yields, and spotlight toast
   useEffect(() => {
     if (!gs) return;
 
     if (prevStateIndexRef.current === null) {
+      prevStateRef.current = gs;
       prevStateIndexRef.current = gs.state_index;
       prevWinnerRef.current = gs.winning_color;
 
       if (!replayMode && gs.state_index === 0) {
+        if (introTimerRef.current) clearTimeout(introTimerRef.current);
+        introTimerRef.current = setTimeout(() => {
+          setIntroDismissedForGameId(gameId ?? "__done__");
+        }, INTRO_SPLASH_MS);
+
         const activeHumans = gs.colors.filter((c) => !gs.bot_colors.includes(c));
         const starterIsLocal =
           !gs.bot_colors.includes(gs.current_color) &&
@@ -411,16 +732,83 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         });
         toastTimerRef.current = setTimeout(() => {
           setSpotlightToast(null);
-        }, 3000);
+        }, INTRO_SPLASH_MS);
       }
       return;
     }
 
     if (gs.state_index > prevStateIndexRef.current && !replayMode) {
+      const batchFx = extractBatchTransitionFX(
+        prevStateRef.current,
+        gs,
+        mySeatColor
+      );
       const latestRecord = gs.action_records?.[gs.action_records.length - 1];
       playActionRecordSound(latestRecord);
       if (gs.winning_color && !prevWinnerRef.current) {
         playVictorySound();
+      }
+
+      if (batchFx.discards.length > 0) {
+        const createdDrops = batchFx.discards.map((d) => ({
+          id: fxCounterRef.current++,
+          color: d.color,
+          resource: d.resource,
+        }));
+        const createdIds = new Set(createdDrops.map((d) => d.id));
+        setDiscardDrops((prev) => [...prev.slice(-8), ...createdDrops]);
+        const t = setTimeout(() => {
+          fxCleanupTimersRef.current.delete(t);
+          setDiscardDrops((prev) => prev.filter((item) => !createdIds.has(item.id)));
+        }, 2500);
+        fxCleanupTimersRef.current.add(t);
+      }
+
+      if (batchFx.yields.length > 0) {
+        const createdYields = batchFx.yields.map((y) => ({
+          id: fxCounterRef.current++,
+          color: y.color,
+          resource: y.resource,
+          amount: y.amount,
+        }));
+        const createdIds = new Set(createdYields.map((y) => y.id));
+        setYieldFX((prev) => [...prev.slice(-10), ...createdYields]);
+        const t = setTimeout(() => {
+          fxCleanupTimersRef.current.delete(t);
+          setYieldFX((prev) => prev.filter((item) => !createdIds.has(item.id)));
+        }, 2300);
+        fxCleanupTimersRef.current.add(t);
+      }
+
+      if (batchFx.vpDeltas.length > 0) {
+        const createdVps = batchFx.vpDeltas.map((v) => ({
+          id: fxCounterRef.current++,
+          color: v.color,
+          delta: v.delta,
+        }));
+        const createdIds = new Set(createdVps.map((v) => v.id));
+        setVpFX((prev) => [...prev.slice(-6), ...createdVps]);
+        const t = setTimeout(() => {
+          fxCleanupTimersRef.current.delete(t);
+          setVpFX((prev) => prev.filter((item) => !createdIds.has(item.id)));
+        }, 2500);
+        fxCleanupTimersRef.current.add(t);
+      }
+
+      if (batchFx.robberEvent) {
+        if (robberNoticeTimerRef.current) clearTimeout(robberNoticeTimerRef.current);
+        setRobberNotice(batchFx.robberEvent);
+        robberNoticeTimerRef.current = setTimeout(() => {
+          setRobberNotice(null);
+        }, 4800);
+      }
+
+      if (batchFx.turnHandoff) {
+        if (turnPauseTimerRef.current) clearTimeout(turnPauseTimerRef.current);
+        setTurnPauseBanner(batchFx.turnHandoff);
+        turnPauseTimerRef.current = setTimeout(() => {
+          setTurnPauseBanner(null);
+        }, TURN_TRANSITION_MS);
       }
 
       if (latestRecord && latestRecord[0]) {
@@ -445,7 +833,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           });
 
           const spinMs = getRollSpinDurationMs(gameSpeedRef.current);
-          const totalMs = getActionDelayMs(latestRecord, gameSpeedRef.current);
+          const overlayMs = getDiceOverlayDurationMs(gameSpeedRef.current);
 
           diceSpinTimerRef.current = setTimeout(() => {
             setDiceStage((prev) =>
@@ -455,7 +843,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
           diceHideTimerRef.current = setTimeout(() => {
             setDiceStage(null);
-          }, totalMs);
+          }, overlayMs);
         }
 
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -466,7 +854,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         });
         toastTimerRef.current = setTimeout(() => {
           setSpotlightToast(null);
-        }, 2200);
+        }, 3600);
 
         if (
           visuals.recentNodeId !== null ||
@@ -483,14 +871,62 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             setRecentNodeId(null);
             setRecentEdgeId(null);
             setRecentDevColor(null);
-          }, 2200);
+          }, 4200);
+        }
+
+        // Contextual rate-limited bot portrait reactions (>= 18s global cooldown)
+        const nowTs = Date.now();
+        if (nowTs - lastBotTauntAtRef.current >= 18_000) {
+          const [, recType, recVal] = latestRecord[0];
+          let botReaction: { color: Color; tauntId: string } | null = null;
+          if (recType === "MOVE_ROBBER" && Array.isArray(recVal)) {
+            const victim = recVal[1] as Color | undefined;
+            if (victim && gs.bot_colors.includes(victim)) {
+              botReaction = { color: victim, tauntId: "furioso_ladrao" };
+            } else if (victim && gs.bot_colors.includes(actorColor)) {
+              botReaction = { color: actorColor, tauntId: "olho_vivo" };
+            }
+          } else if (
+            gs.winning_color &&
+            !prevWinnerRef.current &&
+            gs.bot_colors.includes(gs.winning_color)
+          ) {
+            botReaction = { color: gs.winning_color, tauntId: "ouro" };
+          } else if (
+            gs.bot_colors.includes(actorColor) &&
+            (recType === "BUILD_SETTLEMENT" || recType === "BUILD_CITY")
+          ) {
+            const actorKey = playerKey(gs, actorColor);
+            const vps =
+              gs.player_state?.[`${actorKey}_ACTUAL_VICTORY_POINTS`] ??
+              gs.player_state?.[`${actorKey}_VICTORY_POINTS`] ??
+              0;
+            const targetVp = gs.game?.vps_to_win ?? 10;
+            if (vps >= Math.max(4, targetVp - 2)) {
+              botReaction = { color: actorColor, tauntId: "ouro" };
+            }
+          }
+
+          if (botReaction) {
+            const def = getTauntById(botReaction.tauntId);
+            if (def) {
+              lastBotTauntAtRef.current = nowTs;
+              triggerPortraitTaunt(botReaction.color, def, false);
+            }
+          }
         }
       }
     }
 
+    prevStateRef.current = gs;
     prevStateIndexRef.current = gs.state_index;
     prevWinnerRef.current = gs.winning_color;
-  }, [gs, replayMode, mySeatColor]);
+  }, [gs, replayMode, mySeatColor, gameId, triggerPortraitTaunt]);
+
+  const handleDismissIntro = () => {
+    if (introTimerRef.current) clearTimeout(introTimerRef.current);
+    setIntroDismissedForGameId(gameId ?? "__done__");
+  };
 
   const toggleSoundMute = () => {
     const next = !muted;
@@ -499,9 +935,85 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   };
 
   const toggleGameSpeed = () => {
-    const next: GameSpeed = gameSpeed === "normal" ? "fast" : "normal";
+    const next = cycleGameSpeed(gameSpeed);
     setGameSpeed(next);
     saveGameSpeed(next);
+  };
+
+  const handleToggleChat = () => {
+    setChatOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setUnreadChatCount(0);
+        setChatPreview(null);
+        setChatError(null);
+      }
+      return next;
+    });
+  };
+
+  const handleSendChat = async (body: string) => {
+    if (!gameId || !gs || !mySeatColor || replayMode || isSendingChat) return;
+    setIsSendingChat(true);
+    setChatError(null);
+    try {
+      const sent = await sendGameMessage(gameId, {
+        body,
+        color: mySeatColor,
+        senderName: resolvePlayerDisplayName(
+          gs,
+          mySeatColor,
+          PLAYER_COLOR_META[mySeatColor]?.label || mySeatColor
+        ),
+      });
+      applyIncomingChatMessages([sent], false);
+    } catch (err: any) {
+      const desc =
+        err?.response?.data?.description ||
+        err?.message ||
+        "Não foi possível enviar a mensagem.";
+      setChatError(desc);
+    } finally {
+      setIsSendingChat(false);
+    }
+  };
+
+  const handleSendTaunt = async (tauntId: string) => {
+    if (!gameId || !gs || !mySeatColor || replayMode || tauntCoolingDown) {
+      return;
+    }
+    const def = getTauntById(tauntId);
+    if (!def) return;
+
+    setTauntPickerOpen(false);
+    setTauntCoolingDown(true);
+    if (tauntCooldownTimerRef.current) {
+      clearTimeout(tauntCooldownTimerRef.current);
+    }
+    tauntCooldownTimerRef.current = setTimeout(() => {
+      tauntCooldownTimerRef.current = null;
+      setTauntCoolingDown(false);
+    }, TAUNT_COOLDOWN_MS);
+
+    triggerPortraitTaunt(mySeatColor, def, true);
+
+    try {
+      const sent = await sendGameMessage(gameId, {
+        body: encodeTauntBody(def.id),
+        color: mySeatColor,
+        senderName: resolvePlayerDisplayName(
+          gs,
+          mySeatColor,
+          PLAYER_COLOR_META[mySeatColor]?.label || mySeatColor
+        ),
+        kind: "TAUNT",
+      });
+      if (sent && typeof sent.id === "number") {
+        applyIncomingChatMessages([sent], false);
+      }
+    } catch {
+      // Portrait feedback stays active even if network sync fails transiently
+    }
   };
 
   const handleConfirmAbandon = async () => {
@@ -533,9 +1045,18 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     }
   };
 
+  const isTurnPauseActive = Boolean(turnPauseBanner);
+
   // Coordinated ?bot_only=1 pacing loop
   useEffect(() => {
-    if (!gs || replayMode || !gameId || gs.winning_color) {
+    if (
+      !gs ||
+      replayMode ||
+      !gameId ||
+      gs.winning_color ||
+      introActive ||
+      isTurnPauseActive
+    ) {
       return;
     }
     if (!gs.bot_colors.includes(gs.current_color)) {
@@ -610,6 +1131,8 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     gameId,
     replayMode,
     gs,
+    introActive,
+    isTurnPauseActive,
     mySeatColor,
     state.perspective,
     dispatch,
@@ -620,6 +1143,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   if (!gs) {
     return (
       <main className="catan-game-screen">
+        <OceanBackdrop />
         <GridLoader className="loader" color="#FACC15" size={80} />
       </main>
     );
@@ -632,6 +1156,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
   return (
     <main className="catan-game-screen">
+      <OceanBackdrop />
       {/* Top Floating HUD Bar (Steam Catan style) */}
       <header className="game-top-hud">
         <div className="game-top-hud__left">
@@ -674,58 +1199,6 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             🃏 <span className="hud-btn-label">Baralho Dev: </span>
             <strong>{devCardsRemaining}</strong>
           </span>
-          {!replayMode && (
-            <button
-              type="button"
-              className={cn("game-top-hud__speed-btn", {
-                "is-fast": gameSpeed === "fast",
-              })}
-              onClick={toggleGameSpeed}
-              title={
-                gameSpeed === "fast"
-                  ? "Velocidade: Rápido (0.5x) — Clique para voltar para Normal (1x)"
-                  : "Velocidade: Normal (1x) — Clique para acelerar para Rápido (0.5x)"
-              }
-              aria-label={
-                gameSpeed === "fast"
-                  ? "Velocidade: Rápido (0.5x)"
-                  : "Velocidade: Normal (1x)"
-              }
-            >
-              <span>{gameSpeed === "fast" ? "⚡" : "🐢"}</span>
-              <span className="game-top-hud__speed-text">
-                {gameSpeed === "fast" ? "Rápido (0.5x)" : "Normal (1x)"}
-              </span>
-            </button>
-          )}
-          <button
-            type="button"
-            className="game-top-hud__mcts-btn"
-            onClick={() =>
-              dispatch({
-                type: ACTIONS.SET_LEFT_DRAWER_OPENED,
-                data: !state.isLeftDrawerOpen,
-              })
-            }
-            aria-label="Histórico"
-            title="Abrir Histórico de Jogadas"
-          >
-            📜 <span className="hud-btn-label">Histórico</span>
-          </button>
-          <button
-            type="button"
-            className="game-top-hud__mcts-btn"
-            onClick={() =>
-              dispatch({
-                type: ACTIONS.SET_RIGHT_DRAWER_OPENED,
-                data: !state.isRightDrawerOpen,
-              })
-            }
-            aria-label="Chances (IA)"
-            title="Abrir Análise de Probabilidade de Vitória (IA MCTS)"
-          >
-            📊 <span className="hud-btn-label">Chances (IA)</span>
-          </button>
           {isMultiplayerGame &&
             !replayMode &&
             !gs.winning_color &&
@@ -741,19 +1214,201 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                 🚪 <span className="hud-btn-label">Sair (Bot Assume)</span>
               </button>
             )}
-          <button
-            type="button"
-            className="game-top-hud__sound-btn"
-            onClick={toggleSoundMute}
-            title={muted ? "Ativar efeitos sonoros" : "Silenciar efeitos sonoros"}
-            aria-label={muted ? "Ativar som" : "Silenciar som"}
-          >
-            {muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
-          </button>
         </div>
       </header>
 
-      <PlayerTopBar gameState={gs} recentDevColor={recentDevColor} />
+      {/* Left Vertical Quick Dock (Catan Universe style shortcuts) */}
+      <nav
+        className="game-left-dock"
+        aria-label="Atalhos da partida"
+      >
+        {!replayMode && (
+          <button
+            type="button"
+            className={cn("game-left-dock__btn", {
+              "is-fast": gameSpeed === "fast",
+              "is-turbo": gameSpeed === "turbo",
+            })}
+            onClick={toggleGameSpeed}
+            title={
+              gameSpeed === "normal"
+                ? "Velocidade: Normal — Clique para mudar para Rápida"
+                : gameSpeed === "fast"
+                  ? "Velocidade: Rápida — Clique para mudar para Turbo"
+                  : "Velocidade: Turbo — Clique para voltar para Normal"
+            }
+            aria-label={
+              gameSpeed === "normal"
+                ? "Velocidade: Normal"
+                : gameSpeed === "fast"
+                  ? "Velocidade: Rápida"
+                  : "Velocidade: Turbo"
+            }
+          >
+            <span className="game-left-dock__icon" aria-hidden="true">
+              {gameSpeed === "normal"
+                ? "🐢"
+                : gameSpeed === "fast"
+                  ? "⏩"
+                  : "⚡"}
+            </span>
+            <span className="game-left-dock__tag">
+              {gameSpeed === "normal"
+                ? "1×"
+                : gameSpeed === "fast"
+                  ? "Ráp"
+                  : "Trb"}
+            </span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          className={cn("game-left-dock__btn", {
+            "is-open": chatOpen,
+            "has-unread": unreadChatCount > 0,
+          })}
+          onClick={handleToggleChat}
+          aria-label={
+            unreadChatCount > 0
+              ? `Bate-papo (${unreadChatCount} não lidas)`
+              : "Bate-papo"
+          }
+          aria-expanded={chatOpen}
+          title="Abrir Bate-papo da Partida"
+        >
+          <span className="game-left-dock__icon" aria-hidden="true">💬</span>
+          {unreadChatCount > 0 && (
+            <span className="game-left-dock__badge">
+              {unreadChatCount > 9 ? "9+" : unreadChatCount}
+            </span>
+          )}
+        </button>
+
+        {!replayMode && mySeatColor && (
+          <div className="taunt-picker-wrap">
+            <button
+              type="button"
+              className={cn("game-left-dock__btn", {
+                "is-open": tauntPickerOpen,
+                "is-cooldown": tauntCoolingDown,
+              })}
+              onClick={() => setTauntPickerOpen((prev) => !prev)}
+              aria-label="Provocações"
+              aria-expanded={tauntPickerOpen}
+              disabled={tauntCoolingDown}
+              title={
+                tauntCoolingDown
+                  ? "Aguarde 3s para enviar outra provocação"
+                  : "Enviar provocação ou saudação animada"
+              }
+            >
+              <span className="game-left-dock__icon" aria-hidden="true">🎭</span>
+            </button>
+            {tauntPickerOpen && (
+              <div
+                className="taunt-picker-popover taunt-picker-popover--dock"
+                role="dialog"
+                aria-label="Escolher provocação"
+              >
+                <div className="taunt-picker-popover__header">
+                  <span>🎭 Provocações & Saudações</span>
+                  <button
+                    type="button"
+                    className="taunt-picker-popover__close"
+                    onClick={() => setTauntPickerOpen(false)}
+                    aria-label="Fechar provocações"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="taunt-picker-popover__grid">
+                  {TAUNT_CATALOG.map((taunt) => (
+                    <button
+                      key={taunt.id}
+                      type="button"
+                      className="taunt-picker-popover__item"
+                      onClick={() => handleSendTaunt(taunt.id)}
+                    >
+                      <span className="taunt-picker-popover__emoji">
+                        {taunt.emoji}
+                      </span>
+                      <span className="taunt-picker-popover__label">
+                        {taunt.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className={cn("game-left-dock__btn", {
+            "is-open": state.isLeftDrawerOpen,
+          })}
+          onClick={() =>
+            dispatch({
+              type: ACTIONS.SET_LEFT_DRAWER_OPENED,
+              data: !state.isLeftDrawerOpen,
+            })
+          }
+          aria-label="Histórico"
+          title="Abrir Histórico de Jogadas"
+        >
+          <span className="game-left-dock__icon" aria-hidden="true">📜</span>
+        </button>
+
+        <button
+          type="button"
+          className={cn("game-left-dock__btn", {
+            "is-open": state.isRightDrawerOpen,
+          })}
+          onClick={() =>
+            dispatch({
+              type: ACTIONS.SET_RIGHT_DRAWER_OPENED,
+              data: !state.isRightDrawerOpen,
+            })
+          }
+          aria-label="Chances (IA)"
+          title="Chances (IA) & Histograma de Dados"
+        >
+          <span className="game-left-dock__icon" aria-hidden="true">📊</span>
+        </button>
+
+        <button
+          type="button"
+          className={cn("game-left-dock__btn", {
+            "is-open": almanacOpen,
+          })}
+          onClick={() => setAlmanacOpen(true)}
+          aria-label="Almanaque"
+          title="Abrir Almanaque & Regras"
+        >
+          <span className="game-left-dock__icon" aria-hidden="true">📖</span>
+        </button>
+
+        <button
+          type="button"
+          className="game-left-dock__btn"
+          onClick={toggleSoundMute}
+          title={muted ? "Ativar efeitos sonoros" : "Silenciar efeitos sonoros"}
+          aria-label={muted ? "Ativar som" : "Silenciar som"}
+        >
+          {muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
+        </button>
+      </nav>
+
+      <PlayerTopBar
+        gameState={gs}
+        recentDevColor={recentDevColor}
+        discardDrops={discardDrops}
+        yieldFX={yieldFX}
+        vpFX={vpFX}
+        activeTaunts={activeTaunts}
+      />
 
       {isMultiplayerGame &&
         !replayMode &&
@@ -818,16 +1473,140 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         rollerColor={diceStage?.rollerColor ?? gs.current_color}
       />
 
+      {turnPauseBanner && !introActive && (
+        <div
+          className={cn("turn-transition-banner", {
+            "is-local": turnPauseBanner.isLocal,
+          })}
+          style={
+            {
+              "--turn-color":
+                PLAYER_COLOR_META[turnPauseBanner.color]?.primary || "#facc15",
+              "--turn-glow":
+                PLAYER_COLOR_META[turnPauseBanner.color]?.glow ||
+                "rgba(250, 204, 21, 0.55)",
+            } as React.CSSProperties
+          }
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            className="turn-transition-banner__dot"
+            style={{
+              background:
+                PLAYER_COLOR_META[turnPauseBanner.color]?.primary || "#facc15",
+            }}
+          />
+          <span className="turn-transition-banner__text">
+            {turnPauseBanner.isLocal
+              ? `Vez de ${turnPauseBanner.name} — Sua vez!`
+              : `Vez de ${turnPauseBanner.name}`}
+          </span>
+        </div>
+      )}
+
+      {robberNotice && (
+        <div
+          className={cn(
+            "game-robber-notice",
+            `game-robber-notice--${robberNotice.tone}`
+          )}
+          role="status"
+          aria-live="polite"
+        >
+          {robberNotice.message}
+        </div>
+      )}
+
+      {gs.action_records && gs.action_records.length > 0 && (
+        <aside
+          className="mini-action-log"
+          aria-label="Últimas jogadas na mesa"
+        >
+          {gs.action_records.slice(-3).map((rec, idx, arr) => {
+            const c = rec[0]?.[0];
+            const palette = c ? PLAYER_COLOR_META[c] : null;
+            const globalIdx = gs.action_records.length - arr.length + idx;
+            return (
+              <div key={globalIdx} className="mini-action-log__row">
+                <span
+                  className="mini-action-log__dot"
+                  style={{ background: palette?.primary || "#94a3b8" }}
+                />
+                <span className="mini-action-log__text">
+                  {humanizeActionRecordPt(gs, rec)}
+                </span>
+              </div>
+            );
+          })}
+        </aside>
+      )}
+
+      <MatchIntroOverlay
+        open={introActive && !replayMode}
+        gameState={gs}
+        perspective={state.perspective}
+        onDismiss={handleDismissIntro}
+      />
+
+      {!chatOpen && chatPreview && (
+        <button
+          type="button"
+          className="game-chat-preview-toast"
+          onClick={() => {
+            setChatOpen(true);
+            setUnreadChatCount(0);
+            setChatPreview(null);
+          }}
+          style={{
+            borderColor:
+              PLAYER_COLOR_META[chatPreview.color]?.primary || "#facc15",
+          }}
+        >
+          <span
+            className="game-chat-preview-toast__dot"
+            style={{
+              background:
+                PLAYER_COLOR_META[chatPreview.color]?.primary || "#facc15",
+            }}
+          />
+          <span className="game-chat-preview-toast__sender">
+            {chatPreview.sender_name}:
+          </span>
+          <span className="game-chat-preview-toast__body">
+            {parseTauntMessage(chatPreview.body, chatPreview.kind).displayText}
+          </span>
+        </button>
+      )}
+
+      <GameChatPanel
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        messages={chatMessages}
+        mySeatColor={mySeatColor}
+        replayMode={replayMode}
+        isSending={isSendingChat}
+        errorMessage={chatError}
+        onSendMessage={handleSendChat}
+      />
+
       <ActionsToolbar
         isBotThinking={isBotThinking}
         replayMode={replayMode}
         isRollingDice={Boolean(diceStage?.open && diceStage.rolling)}
+        onSendChatMessage={handleSendChat}
       />
       <LeftDrawer />
       <RightDrawer>
         <AnalysisBox stateIndex={"latest"} />
         <Divider />
+        <DiceHistogram gameState={gs} />
       </RightDrawer>
+
+      <AlmanacModal
+        open={almanacOpen}
+        onClose={() => setAlmanacOpen(false)}
+      />
 
       <Dialog
         open={abandonConfirmOpen}

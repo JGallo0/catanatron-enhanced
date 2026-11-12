@@ -1,11 +1,21 @@
 import { describe, expect, test } from "vitest";
 import {
   BOT_AVATAR_PROFILES,
+  BOT_DIFFICULTY_OPTIONS,
+  MAP_TEMPLATE_OPTIONS,
   OFFICIAL_BOT_NAMES,
+  OPEN_SEAT_LABEL,
+  difficultyFromPlayerKey,
+  formatBotDifficultyLabel,
+  formatMapTemplateLabel,
   isOfficialBotName,
+  isOpenSeatPlaceholderName,
   isTakenOverSeat,
+  normalizeBotDifficulty,
   pickBotNameDeterministic,
   pickBotNames,
+  playerKeyForDifficulty,
+  prescanRequestedBotNames,
   resolveBotDisplayName,
   resolvePlayerDisplayName,
   resolveSeatAvatarProps,
@@ -130,5 +140,52 @@ describe("botCatalog", () => {
     expect(avatar.isCustomUserOrGuest).toBe(true);
     expect(avatar.username).toBe("beto");
     expect(avatar.config?.hat).toBe("explorer");
+  });
+
+  test("maps unified bot difficulty levels, Open Seat placeholders, map template labels, and prescan names", () => {
+    expect(OPEN_SEAT_LABEL).toBe("Assento livre");
+    expect(isOpenSeatPlaceholderName("Assento livre")).toBe(true);
+    expect(isOpenSeatPlaceholderName("Aguardando Amigo...")).toBe(true);
+    expect(isOpenSeatPlaceholderName("Vaga Aberta")).toBe(true);
+    expect(isOpenSeatPlaceholderName("   ")).toBe(true);
+    expect(isOpenSeatPlaceholderName("Marina")).toBe(false);
+
+    expect(BOT_DIFFICULTY_OPTIONS.map((o) => [o.value, o.label])).toEqual([
+      ["easy", "Fácil"],
+      ["medium", "Moderado"],
+      ["hard", "Difícil"],
+    ]);
+    expect(normalizeBotDifficulty("EASY")).toBe("easy");
+    expect(normalizeBotDifficulty("invalid")).toBeNull();
+    expect(playerKeyForDifficulty("easy")).toBe("W");
+    expect(playerKeyForDifficulty("medium")).toBe("F");
+    expect(playerKeyForDifficulty("hard")).toBe("CATANATRON");
+    expect(difficultyFromPlayerKey("W")).toBe("easy");
+    expect(difficultyFromPlayerKey("F")).toBe("medium");
+    expect(difficultyFromPlayerKey("CATANATRON")).toBe("hard");
+    expect(formatBotDifficultyLabel("easy")).toBe("Fácil");
+    expect(formatBotDifficultyLabel("medium")).toBe("Moderado");
+    expect(formatBotDifficultyLabel("hard")).toBe("Difícil");
+
+    expect(MAP_TEMPLATE_OPTIONS.map((m) => [m.value, m.label])).toEqual([
+      ["BASE", "Padrão (Mapa aleatório)"],
+      ["MINI", "Mini"],
+      ["TOURNAMENT", "Torneio (Mapa fixo)"],
+    ]);
+    expect(formatMapTemplateLabel("BASE")).toBe("Padrão (Mapa aleatório)");
+    expect(formatMapTemplateLabel("MINI")).toBe("Mini");
+    expect(formatMapTemplateLabel("TOURNAMENT")).toBe("Torneio (Mapa fixo)");
+
+    const prescan = prescanRequestedBotNames([
+      { isBot: false, requestedName: "Anfitrião" },
+      { isBot: true, requestedName: "Angeleri" },
+      { isBot: true, requestedName: "Angeleri" },
+      { isBot: true, requestedName: "Guiri" },
+    ]);
+    expect(Array.from(prescan.explicitByIndex.entries())).toEqual([
+      [1, "Angeleri"],
+      [3, "Guiri"],
+    ]);
+    expect(Array.from(prescan.usedNames)).toEqual(["Angeleri", "Guiri"]);
   });
 });

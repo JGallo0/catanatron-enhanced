@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import type {
   Color,
   DevelopmentCard,
@@ -399,16 +399,211 @@ export const TerrainHexIllustration: React.FC<{
           preserveAspectRatio="xMidYMid slice"
           aria-hidden="true"
         >
+          {/* Soft teal caustic highlight + dusk gold surface glints */}
+          <ellipse
+            cx="102"
+            cy="96"
+            rx="68"
+            ry="34"
+            fill="rgba(56, 189, 248, 0.08)"
+          />
           <path
-            d="M35 80 Q65 68 95 80 T155 80 M45 150 Q75 138 105 150 T165 150"
+            d="M32 62 Q68 54 100 63 T168 60"
+            stroke="rgba(224, 242, 254, 0.24)"
+            strokeWidth="2.4"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <path
+            d="M24 108 Q64 98 102 108 T178 106"
+            stroke="rgba(254, 240, 138, 0.16)"
+            strokeWidth="2.1"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <path
+            d="M42 148 Q84 139 124 148 T166 146"
             stroke="rgba(125, 211, 252, 0.22)"
-            strokeWidth="3"
+            strokeWidth="2.2"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <path
+            d="M58 182 Q96 175 138 184"
+            stroke="rgba(165, 243, 252, 0.16)"
+            strokeWidth="1.8"
             fill="none"
             strokeLinecap="round"
           />
         </svg>
       );
   }
+};
+
+/**
+ * Illustrated coastal timber wharf & moored merchant vessel for sea ports
+ * (inspired by the red-and-gold striped caravels of Rule the Isle's home art).
+ */
+export const HarborPortSvg: React.FC<{
+  resource: ResourceCard | null;
+  width?: number;
+  height?: number;
+}> = ({ resource, width = 62, height = 50 }) => {
+  const uid = useId().replace(/:/g, "");
+  const waterGlowId = `harbor-glow-${uid}`;
+  const sailColor =
+    resource === "WOOD"
+      ? "#15803d"
+      : resource === "BRICK"
+        ? "#c2410c"
+        : resource === "SHEEP"
+          ? "#4d7c0f"
+          : resource === "WHEAT"
+            ? "#d97706"
+            : resource === "ORE"
+              ? "#475569"
+              : "#b91c1c";
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 100 80"
+      aria-hidden="true"
+      className="port-scene__artwork-svg"
+    >
+      <defs>
+        <radialGradient id={waterGlowId} cx="50%" cy="68%" r="48%">
+          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.48" />
+          <stop offset="70%" stopColor="#0e7490" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#082f49" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* Harbor turquoise bay reflection & water wake */}
+      <ellipse cx="50" cy="56" rx="44" ry="20" fill={`url(#${waterGlowId})`} />
+      <path
+        d="M16 62 Q34 58 52 63 T84 61"
+        stroke="rgba(224, 242, 254, 0.55)"
+        strokeWidth="1.8"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <path
+        d="M24 69 Q48 65 76 69"
+        stroke="rgba(254, 240, 138, 0.45)"
+        strokeWidth="1.4"
+        fill="none"
+        strokeLinecap="round"
+      />
+
+      {/* Timber dock wharf pilings & deck */}
+      <g>
+        <rect x="64" y="42" width="3.8" height="20" rx="1.2" fill="#451a03" />
+        <rect x="82" y="40" width="3.8" height="22" rx="1.2" fill="#451a03" />
+        <polygon
+          points="56,42 90,37 94,45 60,51"
+          fill="#92400e"
+          stroke="#271206"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <line
+          x1="62"
+          y1="44.5"
+          x2="88"
+          y2="40.5"
+          stroke="#d97706"
+          strokeWidth="1.1"
+          opacity="0.7"
+        />
+        <circle cx="65.9" cy="41.5" r="2.2" fill="#fde68a" />
+        <circle cx="83.9" cy="39.5" r="2.2" fill="#fde68a" />
+
+        {/* Harbor cargo crates/barrels matching the port specialty */}
+        {resource === "WOOD" && (
+          <g transform="translate(75, 36)">
+            <rect x="-6" y="0" width="12" height="4" rx="1.8" fill="#78350f" stroke="#271206" strokeWidth="1" />
+            <rect x="-5" y="-3.5" width="11" height="4" rx="1.8" fill="#92400e" stroke="#271206" strokeWidth="1" />
+          </g>
+        )}
+        {resource === "BRICK" && (
+          <g transform="translate(76, 36)">
+            <rect x="-5" y="-2" width="10" height="5" rx="1" fill="#dc2626" stroke="#450a0a" strokeWidth="1" />
+            <rect x="-3" y="-6" width="7" height="4.5" rx="1" fill="#ef4444" stroke="#450a0a" strokeWidth="1" />
+          </g>
+        )}
+        {resource === "SHEEP" && (
+          <g transform="translate(76, 36)">
+            <circle cx="-3" cy="-1" r="4" fill="#f8fafc" stroke="#475569" strokeWidth="0.9" />
+            <circle cx="3" cy="-2" r="4.2" fill="#ffffff" stroke="#475569" strokeWidth="0.9" />
+          </g>
+        )}
+        {resource === "WHEAT" && (
+          <g transform="translate(76, 36)">
+            <ellipse cx="-3" cy="-1" rx="3.8" ry="5" fill="#facc15" stroke="#713f12" strokeWidth="1" />
+            <ellipse cx="3" cy="-2" rx="3.8" ry="5" fill="#eab308" stroke="#713f12" strokeWidth="1" />
+          </g>
+        )}
+        {resource === "ORE" && (
+          <g transform="translate(76, 36)">
+            <polygon points="-5,2 -2,-5 3,-2 5,3 -3,4" fill="#64748b" stroke="#0f172a" strokeWidth="1" />
+            <polygon points="-1,0 2,-6 5,-1 2,2" fill="#38bdf8" opacity="0.85" />
+          </g>
+        )}
+        {!resource && (
+          <g transform="translate(76, 36)">
+            <rect x="-5" y="-2" width="9" height="6" rx="1" fill="#b45309" stroke="#271206" strokeWidth="1" />
+            <circle cx="0" cy="-5" r="2.2" fill="#fef08a" />
+          </g>
+        )}
+      </g>
+
+      {/* Moored Merchant Caravel / Viking Longship rocking beside pier */}
+      <g className="port-scene__ship">
+        {/* Hull shadow in harbor water */}
+        <ellipse cx="37" cy="57" rx="22" ry="5" fill="rgba(2, 12, 27, 0.52)" />
+        {/* Wooden mast & yardarm */}
+        <line x1="36" y1="12" x2="36" y2="50" stroke="#451a03" strokeWidth="2.8" strokeLinecap="round" />
+        <line x1="18" y1="17" x2="54" y2="17" stroke="#78350f" strokeWidth="2.3" strokeLinecap="round" />
+
+        {/* Striped billowing merchant sail (Rule the Isle motif) */}
+        <path
+          d="M19 18 Q26 28 21 40 L51 40 Q55 28 52 18 Z"
+          fill="#fef3c7"
+          stroke="#451a03"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path d="M26 18 Q30 29 27 40 L33 40 Q36 29 33 18 Z" fill={sailColor} />
+        <path d="M39 18 Q43 29 40 40 L46 40 Q49 29 46 18 Z" fill={sailColor} />
+
+        {/* Brass/gold top pennant */}
+        <path d="M36 9 L47 12.5 L36 15.5 Z" fill="#facc15" stroke="#78350f" strokeWidth="1" />
+
+        {/* Carved Oak Hull with bow figurehead */}
+        <path
+          d="M12 45 C14 55, 22 59, 37 59 C52 59, 58 55, 62 44 L54 45 L37 46 L19 45 Z"
+          fill="#78350f"
+          stroke="#271206"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M16 47 C24 51, 48 51, 58 46"
+          stroke="#d97706"
+          strokeWidth="1.4"
+          fill="none"
+        />
+        {/* Decorative wooden shields along ship rail */}
+        <circle cx="27" cy="48" r="2.2" fill="#facc15" stroke="#451a03" strokeWidth="0.8" />
+        <circle cx="37" cy="48.5" r="2.2" fill={sailColor} stroke="#451a03" strokeWidth="0.8" />
+        <circle cx="47" cy="48" r="2.2" fill="#facc15" stroke="#451a03" strokeWidth="0.8" />
+        {/* Mooring rope tied to wharf piling */}
+        <path d="M58 46 Q62 50 65 44" stroke="#fde68a" strokeWidth="1.2" fill="none" strokeDasharray="2 1" />
+      </g>
+    </svg>
+  );
 };
 
 /**
@@ -735,135 +930,514 @@ export const DevCardIcon: React.FC<{
   }
 };
 
+type PiecePalette = {
+  light: string;
+  main: string;
+  shade: string;
+  deep: string;
+  outline: string;
+  trim: string;
+};
+
+function getPiecePalette(color: Color): PiecePalette {
+  const base = PLAYER_COLOR_META[color];
+  if (color === "WHITE") {
+    return {
+      light: "#FFFFFF",
+      main: "#F5F0E6",
+      shade: "#CBD5E1",
+      deep: "#64748B",
+      outline: "#1E293B",
+      trim: "#E2E8F0",
+    };
+  }
+  return {
+    light: base.secondary,
+    main: base.primary,
+    shade: base.dark,
+    deep: "#23140B",
+    outline: "#190E08",
+    trim: "#FDE68A",
+  };
+}
+
 /**
- * 3D-styled Board Game Piece SVG for Settlement (Aldeia) — Catan Universe style
+ * Artisanal Wooden & Half-Timbered Island Homestead SVG for Settlement (Aldeia)
  */
 export const SettlementSvgPiece: React.FC<{
   color: Color;
   scale?: number;
 }> = ({ color, scale = 1 }) => {
-  const palette = PLAYER_COLOR_META[color];
+  const palette = getPiecePalette(color);
+  const uid = useId().replace(/:/g, "");
+  const wallGradId = `set-wall-${color}-${uid}`;
+  const roofGradId = `set-roof-${color}-${uid}`;
+
   return (
     <g transform={`scale(${scale})`}>
-      {/* Base shadow */}
-      <ellipse cx="0" cy="12" rx="16" ry="6" fill="rgba(0,0,0,0.65)" />
-      {/* Pedestal token */}
-      <ellipse
-        cx="0"
-        cy="10"
-        rx="14"
-        ry="4.5"
-        fill={palette.dark}
-        stroke="#0f172a"
+      <defs>
+        <linearGradient id={wallGradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={palette.light} />
+          <stop offset="48%" stopColor={palette.main} />
+          <stop offset="100%" stopColor={palette.shade} />
+        </linearGradient>
+        <linearGradient id={roofGradId} x1="0" y1="0" x2="0.8" y2="1">
+          <stop offset="0%" stopColor={palette.light} />
+          <stop offset="55%" stopColor={palette.main} />
+          <stop offset="100%" stopColor={palette.shade} />
+        </linearGradient>
+      </defs>
+
+      {/* Warm ground contact shadow */}
+      <ellipse cx="0" cy="13" rx="17" ry="5.5" fill="rgba(10, 6, 3, 0.72)" />
+
+      {/* Carved stone/oak plinth base */}
+      <path
+        d="M-14 9.5 L-11 13 L11 13 L15 9.5 L15 7.5 L-14 7.5 Z"
+        fill="#473120"
+        stroke={palette.outline}
         strokeWidth="1.5"
-      />
-      {/* House front wall */}
-      <path
-        d="M-11 2 L0 -12 L11 2 L11 10 L-11 10 Z"
-        fill={palette.primary}
-        stroke="#090d16"
-        strokeWidth="2.2"
         strokeLinejoin="round"
       />
-      {/* 3D Side wall */}
+      <line
+        x1="-12"
+        y1="8.2"
+        x2="13"
+        y2="8.2"
+        stroke="#D6BFA3"
+        strokeWidth="0.9"
+        opacity="0.55"
+      />
+
+      {/* Stone chimney behind left roof pitch */}
+      <rect
+        x="-10"
+        y="-14"
+        width="4.4"
+        height="8.5"
+        rx="0.8"
+        fill="#64748B"
+        stroke={palette.outline}
+        strokeWidth="1.4"
+      />
+      <rect
+        x="-10.8"
+        y="-15.2"
+        width="6"
+        height="2.2"
+        rx="0.6"
+        fill="#CBD5E1"
+        stroke={palette.outline}
+        strokeWidth="1.1"
+      />
+
+      {/* Front gable wall */}
       <path
-        d="M0 -12 L13 -7 L13 7 L11 10 L11 2 Z"
-        fill={palette.dark}
-        stroke="#090d16"
-        strokeWidth="1.8"
+        d="M-11.5 9.5 L-11.5 0 L-1 -11 L9 0 L9 9.5 Z"
+        fill={`url(#${wallGradId})`}
+        stroke={palette.outline}
+        strokeWidth="1.9"
         strokeLinejoin="round"
       />
-      {/* Pitched Roof highlight */}
+
+      {/* Right 3D perspective flank wall */}
       <path
-        d="M-13 2 L0 -14 L13 2 L8 2 L0 -8 L-8 2 Z"
-        fill={palette.secondary}
-        stroke="#090d16"
+        d="M9 0 L14.5 -2.5 L14.5 7.5 L9 9.5 Z"
+        fill={palette.shade}
+        stroke={palette.outline}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+
+      {/* Half-timber cottage trim & subtle roof eave shadow */}
+      <line
+        x1="-9.5"
+        y1="1.2"
+        x2="7.5"
+        y2="1.2"
+        stroke={palette.outline}
+        strokeWidth="1.2"
+        opacity="0.45"
+      />
+
+      {/* Sloped right roof wing */}
+      <path
+        d="M-1 -12.5 L8 -14.5 L16.2 -2.2 L9.5 0.5 Z"
+        fill={palette.shade}
+        stroke={palette.outline}
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
-      {/* Warm lit window/door */}
-      <rect
-        x="-3"
-        y="2"
-        width="6"
-        height="8"
-        rx="1.5"
-        fill="#fef08a"
-        stroke="#090d16"
+
+      {/* Main sunlit pitched shingle gable roof */}
+      <path
+        d="M-14.2 1.2 L-1 -13 L10.8 1.2 L8.2 2.2 L-1 -8.8 L-11.2 2.2 Z"
+        fill={`url(#${roofGradId})`}
+        stroke={palette.outline}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      {/* Roof ridge highlight */}
+      <line
+        x1="-12.5"
+        y1="0.2"
+        x2="-1"
+        y2="-12"
+        stroke="#FFFFFF"
         strokeWidth="1.2"
+        strokeLinecap="round"
+        opacity="0.55"
+      />
+
+      {/* Arched oak door */}
+      <path
+        d="M-4.2 9.5 L-4.2 3.8 C-4.2 1.8, 1.8 1.8, 1.8 3.8 L1.8 9.5 Z"
+        fill="#4A2511"
+        stroke={palette.outline}
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <circle cx="0.3" cy="6.2" r="0.7" fill="#FDE68A" />
+
+      {/* Warm lantern-lit side window */}
+      <rect
+        x="10.4"
+        y="1.6"
+        width="2.9"
+        height="4"
+        rx="0.7"
+        fill="#FDE68A"
+        stroke={palette.outline}
+        strokeWidth="1"
+      />
+      {/* Gable attic rose window */}
+      <circle
+        cx="-1.2"
+        cy="-3.6"
+        r="1.9"
+        fill="#FEF3C7"
+        stroke={palette.outline}
+        strokeWidth="1"
       />
     </g>
   );
 };
 
 /**
- * 3D-styled Board Game Piece SVG for City (Cidade / Catedral) — Catan Universe style
+ * Fortified Manor Keep & Citadel SVG for City (Cidade / Vila Fortificada)
  */
 export const CitySvgPiece: React.FC<{
   color: Color;
   scale?: number;
 }> = ({ color, scale = 1 }) => {
-  const palette = PLAYER_COLOR_META[color];
+  const palette = getPiecePalette(color);
+  const uid = useId().replace(/:/g, "");
+  const keepGradId = `city-keep-${color}-${uid}`;
+  const hallGradId = `city-hall-${color}-${uid}`;
+
   return (
     <g transform={`scale(${scale})`}>
-      {/* Base shadow */}
-      <ellipse cx="0" cy="13" rx="19" ry="7" fill="rgba(0,0,0,0.7)" />
-      {/* Pedestal */}
-      <ellipse
-        cx="0"
-        cy="11"
-        rx="17"
-        ry="5"
-        fill={palette.dark}
-        stroke="#090d16"
-        strokeWidth="1.6"
-      />
-      {/* High Castle Keep Tower */}
+      <defs>
+        <linearGradient id={keepGradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={palette.light} />
+          <stop offset="55%" stopColor={palette.main} />
+          <stop offset="100%" stopColor={palette.shade} />
+        </linearGradient>
+        <linearGradient id={hallGradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={palette.light} />
+          <stop offset="65%" stopColor={palette.shade} />
+        </linearGradient>
+      </defs>
+
+      {/* Wide ambient shadow */}
+      <ellipse cx="0" cy="14" rx="20" ry="6.2" fill="rgba(10, 6, 3, 0.78)" />
+
+      {/* Stone courtyard pedestal */}
       <path
-        d="M-14 11 L-14 -8 L-8 -18 L-2 -8 L-2 11 Z"
-        fill={palette.primary}
-        stroke="#090d16"
-        strokeWidth="2.2"
-        strokeLinejoin="round"
-      />
-      {/* Tower Roof */}
-      <polygon
-        points="-15,-8 -8,-20 -1,-8"
-        fill={palette.secondary}
-        stroke="#090d16"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      {/* Great Hall */}
-      <path
-        d="M-4 11 L-4 -3 L6 -10 L15 -3 L15 11 Z"
-        fill={palette.dark}
-        stroke="#090d16"
-        strokeWidth="2.2"
-        strokeLinejoin="round"
-      />
-      <polygon
-        points="-5,-3 6,-12 16,-3"
-        fill={palette.secondary}
-        stroke="#090d16"
+        d="M-18 10.5 L-15 14 L15 14 L18.5 10.5 L18.5 8.5 L-18 8.5 Z"
+        fill="#473120"
+        stroke={palette.outline}
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
-      {/* Golden windows */}
-      <rect x="-10" y="-4" width="4" height="6" rx="1" fill="#fef08a" />
-      <rect x="3" y="1" width="5" height="6" rx="1" fill="#fef08a" />
+      <line
+        x1="-16"
+        y1="9.2"
+        x2="16.5"
+        y2="9.2"
+        stroke="#E7D3B5"
+        strokeWidth="0.9"
+        opacity="0.55"
+      />
+
+      {/* Towering Watchtower Keep (left) */}
+      <rect
+        x="-14.5"
+        y="-11"
+        width="12.5"
+        height="21.5"
+        rx="1.2"
+        fill={`url(#${keepGradId})`}
+        stroke={palette.outline}
+        strokeWidth="1.9"
+      />
+      {/* Keep crenellated overhang collar */}
+      <path
+        d="M-16 -10.5 L-1 -10.5 L-1 -13 L-4.5 -13 L-4.5 -11.5 L-7 -11.5 L-7 -13 L-10 -13 L-10 -11.5 L-12.5 -11.5 L-12.5 -13 L-16 -13 Z"
+        fill={palette.shade}
+        stroke={palette.outline}
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+
+      {/* Keep conical citadel spire */}
+      <polygon
+        points="-16.5,-13 -8.2,-23.5 -0.2,-13"
+        fill={`url(#${hallGradId})`}
+        stroke={palette.outline}
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <line
+        x1="-14.5"
+        y1="-14"
+        x2="-8.2"
+        y2="-22.3"
+        stroke="#FFFFFF"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        opacity="0.55"
+      />
+
+      {/* Spire finial & billowing faction pennant */}
+      <line
+        x1="-8.2"
+        y1="-23.5"
+        x2="-8.2"
+        y2="-28"
+        stroke="#FDE68A"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M-8.2 -27.5 L0.5 -25.2 L-8.2 -22.8 Z"
+        fill={palette.main}
+        stroke={palette.outline}
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+      />
+
+      {/* Great Hall body & shaded 3D east wall */}
+      <path
+        d="M-3 10.5 L-3 -2.5 L6 -10 L14.5 -2.5 L14.5 10.5 Z"
+        fill={`url(#${keepGradId})`}
+        stroke={palette.outline}
+        strokeWidth="1.9"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14.5 -2.5 L18 -4.5 L18 8.5 L14.5 10.5 Z"
+        fill={palette.shade}
+        stroke={palette.outline}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+
+      {/* Steep Great Hall gabled roof */}
+      <path
+        d="M-4.5 -1.5 L6 -11.2 L16.2 -1.5 L13.8 -0.6 L6 -7.8 L-2.2 -0.6 Z"
+        fill={`url(#${hallGradId})`}
+        stroke={palette.outline}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 -11.2 L12.5 -12.6 L18.5 -4.2 L14.5 -2.5 Z"
+        fill={palette.shade}
+        stroke={palette.outline}
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+
+      {/* Keep arched windows */}
+      <rect
+        x="-10.2"
+        y="-7.5"
+        width="3.8"
+        height="5.6"
+        rx="1.8"
+        fill="#FEF3C7"
+        stroke={palette.outline}
+        strokeWidth="1.1"
+      />
+      <rect
+        x="-10.2"
+        y="0.5"
+        width="3.8"
+        height="5"
+        rx="1.2"
+        fill="#FDE68A"
+        stroke={palette.outline}
+        strokeWidth="1.1"
+      />
+
+      {/* Great Hall twin gatehouse arch & glowing lancet windows */}
+      <path
+        d="M2.5 10.5 L2.5 3.6 C2.5 1.2, 9.2 1.2, 9.2 3.6 L9.2 10.5 Z"
+        fill="#3F1E0D"
+        stroke={palette.outline}
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <line
+        x1="5.85"
+        y1="2.2"
+        x2="5.85"
+        y2="10.5"
+        stroke="#FDE68A"
+        strokeWidth="0.9"
+        opacity="0.7"
+      />
+      <circle
+        cx="5.85"
+        cy="-3.8"
+        r="1.9"
+        fill="#FEF3C7"
+        stroke={palette.outline}
+        strokeWidth="1"
+      />
     </g>
   );
 };
 
 /**
- * Visual 2D6 Dice Face SVG
+ * Carved Timber & Cobblestone Causeway SVG for Road (Estrada)
+ */
+export const RoadSvgPiece: React.FC<{
+  color: Color;
+  className?: string;
+}> = ({ color, className }) => {
+  const palette = getPiecePalette(color);
+  const uid = useId().replace(/:/g, "");
+  const topGradId = `road-top-${color}-${uid}`;
+
+  return (
+    <svg
+      viewBox="0 0 100 22"
+      width="100%"
+      height="100%"
+      preserveAspectRatio="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={topGradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={palette.light} />
+          <stop offset="48%" stopColor={palette.main} />
+          <stop offset="100%" stopColor={palette.shade} />
+        </linearGradient>
+      </defs>
+
+      {/* Ground shadow */}
+      <rect x="4" y="8" width="92" height="12" rx="4.5" fill="rgba(10, 6, 3, 0.72)" />
+
+      {/* Beveled wooden/stone cradle base */}
+      <path
+        d="M6 6 L12 3.5 L88 3.5 L94 6 L96 14 L90 17.5 L10 17.5 L4 14 Z"
+        fill={palette.shade}
+        stroke={palette.outline}
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+
+      {/* Faceted top causeway beam */}
+      <path
+        d="M8 6.5 L13.5 4.2 L86.5 4.2 L92 6.5 L92 12 L86.5 14 L13.5 14 L8 12 Z"
+        fill={`url(#${topGradId})`}
+        stroke={palette.outline}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+
+      {/* Subtle plank/cobble divider notches */}
+      <path
+        d="M28 5.2 L28 13 M50 5.2 L50 13 M72 5.2 L72 13"
+        stroke={palette.outline}
+        strokeWidth="1.2"
+        opacity="0.32"
+      />
+
+      {/* Top carved specular highlight */}
+      <line
+        x1="15"
+        y1="6.1"
+        x2="85"
+        y2="6.1"
+        stroke="#FFFFFF"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        opacity="0.52"
+      />
+    </svg>
+  );
+};
+
+/**
+ * Faceted Heraldic Gold Star Badge for Longest Road / Largest Army awards
+ */
+export const AwardStarSvg: React.FC<{
+  size?: number;
+  className?: string;
+  label?: string;
+  awardType?: "army" | "road";
+}> = ({ size = 15, className, label, awardType }) => {
+  const uid = useId().replace(/:/g, "");
+  const starGradId = `award-star-${uid}`;
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      role={label ? "img" : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      data-testid={awardType ? `award-star-${awardType}` : undefined}
+    >
+      <defs>
+        <linearGradient id={starGradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FEF9C3" />
+          <stop offset="45%" stopColor="#FACC15" />
+          <stop offset="100%" stopColor="#CA8A04" />
+        </linearGradient>
+      </defs>
+      <polygon
+        points="12,1.6 15.1,8.1 22.3,9.1 17.1,14.1 18.4,21.2 12,17.8 5.6,21.2 6.9,14.1 1.7,9.1 8.9,8.1"
+        fill={`url(#${starGradId})`}
+        stroke="#78350F"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="12,3.4 13.9,8.3 12,11.8 10.1,8.3"
+        fill="#FFFFFF"
+        opacity="0.48"
+      />
+    </svg>
+  );
+};
+
+/**
+ * Carved Ivory & Bronze 2D6 Dice Face SVG
  */
 export const DiceFaceSvg: React.FC<{
   value: number;
   size?: number;
   isHot?: boolean;
 }> = ({ value, size = 34, isHot = false }) => {
+  const uid = useId().replace(/:/g, "");
+  const ivoryGradId = `die-ivory-${uid}`;
   const pipPositions: Record<number, Array<[number, number]>> = {
     1: [[16, 16]],
     2: [
@@ -871,9 +1445,9 @@ export const DiceFaceSvg: React.FC<{
       [23, 23],
     ],
     3: [
-      [8, 8],
+      [8.5, 8.5],
       [16, 16],
-      [24, 24],
+      [23.5, 23.5],
     ],
     4: [
       [9, 9],
@@ -882,22 +1456,23 @@ export const DiceFaceSvg: React.FC<{
       [23, 23],
     ],
     5: [
-      [8, 8],
-      [24, 8],
+      [8.5, 8.5],
+      [23.5, 8.5],
       [16, 16],
-      [8, 24],
-      [24, 24],
+      [8.5, 23.5],
+      [23.5, 23.5],
     ],
     6: [
-      [9, 7],
-      [23, 7],
+      [9, 7.5],
+      [23, 7.5],
       [9, 16],
       [23, 16],
-      [9, 25],
-      [23, 25],
+      [9, 24.5],
+      [23, 24.5],
     ],
   };
   const pips = pipPositions[value] || pipPositions[1];
+  const pipFill = isHot ? "#B91C1C" : value === 1 ? "#991B1B" : "#1C1917";
 
   return (
     <svg
@@ -906,24 +1481,41 @@ export const DiceFaceSvg: React.FC<{
       viewBox="0 0 32 32"
       aria-label={`Dado ${value}`}
     >
+      <defs>
+        <linearGradient id={ivoryGradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={isHot ? "#FFF5F5" : "#FFFEF8"} />
+          <stop offset="60%" stopColor={isHot ? "#FEE2E2" : "#F5E7C8"} />
+          <stop offset="100%" stopColor={isHot ? "#FECACA" : "#DEC293"} />
+        </linearGradient>
+      </defs>
+      {/* Carved rounded die body */}
       <rect
         x="1.5"
         y="1.5"
         width="29"
         height="29"
-        rx="6.5"
-        fill={isHot ? "#FEF2F2" : "#FFFBEB"}
-        stroke={isHot ? "#EF4444" : "#D97706"}
-        strokeWidth="2.2"
+        rx="6.8"
+        fill={`url(#${ivoryGradId})`}
+        stroke={isHot ? "#B91C1C" : "#78350F"}
+        strokeWidth="2.1"
+      />
+      {/* Chamfer inner facet highlight */}
+      <rect
+        x="3.6"
+        y="3.6"
+        width="24.8"
+        height="24.8"
+        rx="4.8"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth="1"
+        opacity="0.7"
       />
       {pips.map(([cx, cy], idx) => (
-        <circle
-          key={idx}
-          cx={cx}
-          cy={cy}
-          r="2.7"
-          fill={isHot ? "#DC2626" : "#1E293B"}
-        />
+        <g key={idx}>
+          <circle cx={cx} cy={cy + 0.5} r="2.7" fill="rgba(255,255,255,0.45)" />
+          <circle cx={cx} cy={cy} r="2.65" fill={pipFill} />
+        </g>
       ))}
     </svg>
   );

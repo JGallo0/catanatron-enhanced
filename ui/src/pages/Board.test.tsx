@@ -23,6 +23,8 @@ test("renders the nested tile, node, and edge shapes emitted by GameEncoder", ()
   );
 
   expect(container.querySelectorAll(".tile")).toHaveLength(3);
+  expect(container.querySelector(".board__seascape-underlay")).toBeInTheDocument();
+  expect(container.querySelector(".port-scene")).toBeInTheDocument();
   expect(container.querySelectorAll(".node")).toHaveLength(1);
   expect(container.querySelectorAll(".edge")).toHaveLength(1);
   expect(container.querySelectorAll(".robber")).toHaveLength(1);
@@ -73,6 +75,32 @@ test("fits narrow portrait and landscape mobile viewports without overflowing ho
   expect(landscapeBoard).toBeTruthy();
   expect(parseInt(landscapeBoard.style.width, 10)).toBeLessThanOrEqual(667);
   expect(parseInt(landscapeBoard.style.height, 10)).toBeLessThanOrEqual(240);
+});
+
+test("uses explicit measured ResizeObserver containerWidth and containerHeight when provided", () => {
+  const gameState = makeGameState();
+
+  const { container } = render(
+    <Board
+      width={769}
+      height={769}
+      containerWidth={769}
+      containerHeight={428}
+      buildOnNodeClick={() => () => undefined}
+      buildOnEdgeClick={() => () => undefined}
+      handleTileClick={() => undefined}
+      replayMode={false}
+      gameState={gameState}
+      isMobile={false}
+      show
+      isMovingRobber={false}
+    />
+  );
+
+  const board = container.querySelector(".board") as HTMLElement;
+  expect(board).toBeTruthy();
+  expect(parseInt(board.style.width, 10)).toBe(769);
+  expect(parseInt(board.style.height, 10)).toBe(428);
 });
 
 test("highlights recently placed node and normalized edge with .node--recent and .edge--recent", () => {

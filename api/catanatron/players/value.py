@@ -59,11 +59,28 @@ CONTENDER_WEIGHTS = {
 
 def base_fn(params=DEFAULT_WEIGHTS):
     def fn(game, p0_color):
+        winner = game.winning_color()
+        if winner is not None:
+            win_bonus = float(params["public_vps"]) * 100.0
+            return win_bonus if winner == p0_color else -win_bonus
+
         production_features = build_production_features(True)
-        our_production_sample = production_features(game, p0_color)
-        enemy_production_sample = production_features(game, p0_color)
-        production = value_production(our_production_sample, "P0")
-        enemy_production = value_production(enemy_production_sample, "P1", False)
+        production_sample = production_features(game, p0_color)
+        production = value_production(production_sample, "P0")
+
+        num_enemies = len(game.state.colors) - 1
+        if num_enemies <= 0:
+            enemy_production = 0.0
+        elif num_enemies == 1:
+            enemy_production = value_production(production_sample, "P1", False)
+        else:
+            enemy_prods = [
+                value_production(production_sample, f"P{i}", False)
+                for i in range(1, len(game.state.colors))
+            ]
+            enemy_production = 0.5 * max(enemy_prods) + 0.5 * (
+                sum(enemy_prods) / len(enemy_prods)
+            )
 
         key = player_key(game.state, p0_color)
         longest_road_length = get_longest_road_length(game.state, p0_color)
@@ -74,35 +91,86 @@ def base_fn(params=DEFAULT_WEIGHTS):
         features = [f"P0_1_ROAD_REACHABLE_{resource}" for resource in RESOURCES]
         reachable_production_at_one = sum([reachability_sample[f] for f in features])
 
-        hand_sample = resource_hand_features(game, p0_color)
-        features = [f"P0_{resource}_IN_HAND" for resource in RESOURCES]
-        distance_to_city = (
-            max(2 - hand_sample["P0_WHEAT_IN_HAND"], 0)
-            + max(3 - hand_sample["P0_ORE_IN_HAND"], 0)
-        ) / 5.0  # 0 means good. 1 means bad.
-        distance_to_settlement = (
-            max(1 - hand_sample["P0_WHEAT_IN_HAND"], 0)
-            + max(1 - hand_sample["P0_SHEEP_IN_HAND"], 0)
-            + max(1 - hand_sample["P0_BRICK_IN_HAND"], 0)
-            + max(1 - hand_sample["P0_WOOD_IN_HAND"], 0)
-        ) / 4.0  # 0 means good. 1 means bad.
-        hand_synergy = (2 - distance_to_city - distance_to_settlement) / 2
-
-        num_in_hand = player_num_resource_cards(game.state, p0_color)
-        discard_penalty = params["discard_penalty"] if num_in_hand > 7 else 0
-
-        # blockability
+        # blockability & buildability
         buildings = game.state.buildings_by_color[p0_color]
+        owned_settlements = len(buildings[SETTLEMENT])
         owned_nodes = buildings[SETTLEMENT] + buildings[CITY]
         owned_tiles = set()
         for n in owned_nodes:
             owned_tiles.update(game.state.board.map.adjacent_tiles[n])
         num_tiles = len(owned_tiles)
 
-        # TODO: Simplify to linear(?)
         num_buildable_nodes = len(game.state.board.buildable_node_ids(p0_color))
+        cities_avail = game.state.player_state[f"{key}_CITIES_AVAILABLE"]
+        settlements_avail = game.state.player_state[f"{key}_SETTLEMENTS_AVAILABLE"]
+        roads_avail = game.state.player_state[f"{key}_ROADS_AVAILABLE"]
+        can_build_city = cities_avail > 0 and owned_settlements > 0
+        can_build_settlement = settlements_avail > 0 and (
+            num_buildable_nodes > 0 or roads_avail > 0
+        )
+
+        hand_sample = resource_hand_features(game, p0_color)
+        wheat = hand_sample["P0_WHEAT_IN_HAND"]
+        ore = hand_sample["P0_ORE_IN_HAND"]
+        sheep = hand_sample["P0_SHEEP_IN_HAND"]
+        brick = hand_sample["P0_BRICK_IN_HAND"]
+        wood = hand_sample["P0_WOOD_IN_HAND"]
+
+        if can_build_city:
+            distance_to_city = (max(2 - wheat, 0) + max(3 - ore, 0)) / 5.0
+            city_synergy = (1.0 - distance_to_city) ** 1.5
+        else:
+            city_synergy = 0.0
+
+        if can_build_settlement:
+            distance_to_settlement = (
+                max(1 - wheat, 0)
+                + max(1 - sheep, 0)
+                + max(1 - brick, 0)
+                + max(1 - wood, 0)
+            ) / 4.0
+            sett_gate = 1.0 if num_buildable_nodes > 0 else 0.35
+            settlement_synergy = sett_gate * ((1.0 - distance_to_settlement) ** 1.5)
+        else:
+            settlement_synergy = 0.0
+
+        discard_limit = max(1, int(getattr(game.state, "discard_limit", 7)))
+        raw_num_in_hand = player_num_resource_cards(game.state, p0_color)
+        p0_idx = game.state.color_to_index[p0_color]
+        pending_discard = (
+            game.state.discard_counts[p0_idx]
+            if getattr(game.state, "is_discarding", False)
+            else 0
+        )
+        effective_num_in_hand = max(0, raw_num_in_hand - pending_discard)
+
+        hand_synergy = 0.35 * (city_synergy + settlement_synergy) / 2.0
+        if pending_discard > 0 and raw_num_in_hand > 0:
+            hand_synergy *= effective_num_in_hand / raw_num_in_hand
+
+        excess = max(0, raw_num_in_hand - discard_limit)
+        discard_penalty = (
+            params["discard_penalty"] * (5.0 + 3.5 * excess)
+            if excess > 0
+            else 0.0
+        )
+        if pending_discard > 0:
+            discard_penalty += params["discard_penalty"] * (2.5 * pending_discard)
+
+        surplus_cards = (
+            max(wood - 2, 0)
+            + max(brick - 2, 0)
+            + max(sheep - 2, 0)
+            + max(wheat - 2, 0)
+            + max(ore - 3, 0)
+        )
+        surplus_penalty = surplus_cards * (0.4 * params["discard_penalty"])
+
         longest_road_factor = (
             params["longest_road"] if num_buildable_nodes == 0 else 0.1
+        )
+        dev_value = player_num_dev_cards(game.state, p0_color) * (
+            1.4 * params["hand_devs"]
         )
 
         return float(
@@ -114,10 +182,11 @@ def base_fn(params=DEFAULT_WEIGHTS):
             + hand_synergy * params["hand_synergy"]
             + num_buildable_nodes * params["buildable_nodes"]
             + num_tiles * params["num_tiles"]
-            + num_in_hand * params["hand_resources"]
+            + effective_num_in_hand * params["hand_resources"]
             + discard_penalty
+            + surplus_penalty
             + longest_road_length * longest_road_factor
-            + player_num_dev_cards(game.state, p0_color) * params["hand_devs"]
+            + dev_value
             + get_played_dev_cards(game.state, p0_color, "KNIGHT") * params["army_size"]
         )
 

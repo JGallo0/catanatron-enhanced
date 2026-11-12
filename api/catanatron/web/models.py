@@ -12,7 +12,7 @@ import uuid
 from contextlib import contextmanager
 
 from catanatron.game import Game
-from catanatron.models.map import build_map
+from catanatron.models.map import TOURNAMENT_MAP, build_map
 from catanatron.models.player import Color
 from catanatron.registry import REGISTRY, SpecError
 from catanatron.serialization import (
@@ -22,6 +22,7 @@ from catanatron.serialization import (
     state_from_json,
     state_to_json,
 )
+from catanatron.state import VALID_DICE_MODES
 from catanatron.state_functions import get_actual_victory_points, get_state_index
 from sqlalchemy import (
     Boolean,
@@ -75,6 +76,53 @@ OFFICIAL_BOT_NAMES: tuple[str, ...] = (
     "Jaó",
     "Angeleri",
 )
+
+OPEN_SEAT_NAME = "Assento livre"
+LEGACY_OPEN_SEAT_NAMES: tuple[str, ...] = (
+    "Assento livre",
+    "Aguardando Amigo...",
+    "Vaga Aberta",
+    "Vaga para Amigo",
+    "",
+)
+
+BOT_DIFFICULTY_TO_KEY: dict[str, str] = {
+    "easy": "W",
+    "medium": "F",
+    "hard": "CATANATRON",
+}
+
+
+def normalize_bot_difficulty(raw: object) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    clean = raw.strip().lower()
+    return clean if clean in BOT_DIFFICULTY_TO_KEY else None
+
+
+def infer_bot_difficulty_from_key(player_key: str | None) -> str:
+    key = str(player_key or "").split(":")[0].strip().upper()
+    if key in ("W", "WEIGHTED_RANDOM", "R", "RANDOM"):
+        return "easy"
+    if key in ("CATANATRON", "AB", "SAB"):
+        return "hard"
+    return "medium"
+
+
+def prescan_requested_bot_names(
+    entries: list[tuple[str, str | None]],
+) -> tuple[dict[int, str], set[str]]:
+    """Reserve explicit valid official bot names first so fallback draws never collide."""
+    chosen: dict[int, str] = {}
+    used: set[str] = set()
+    for idx, (player_key, requested_name) in enumerate(entries):
+        if str(player_key).split(":")[0].strip().upper() == "HUMAN":
+            continue
+        clean = str(requested_name or "").strip()
+        if clean in OFFICIAL_BOT_NAMES and clean not in used:
+            chosen[idx] = clean
+            used.add(clean)
+    return chosen, used
 
 BOT_AVATAR_BY_NAME: dict[str, dict[str, str]] = {
     "Creitu": {
@@ -221,6 +269,22 @@ class StoredAction(Base):
     uuid = Column(String(64), ForeignKey("games.uuid"), primary_key=True)
     index = Column(Integer, primary_key=True)
     payload = Column(String, nullable=False)
+
+
+class StoredGameMessage(Base):
+    """In-match chat and taunt event persisted per game."""
+
+    __tablename__ = "game_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(
+        String(64), ForeignKey("games.uuid"), index=True, nullable=False
+    )
+    color = Column(String(16), nullable=False)
+    sender_name = Column(String(64), nullable=False)
+    kind = Column(String(16), nullable=False, default="CHAT")
+    body = Column(String(280), nullable=False)
+    created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
 
 
 class StoredRoom(Base):
@@ -811,11 +875,80 @@ def _generate_room_code(session) -> str:
     return uuid.uuid4().hex[:6].upper()
 
 
-def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
-    config = json.loads(room.config_json)
+def _tokens_equal(left: str | None, right: str | None) -> bool:
+    if not left or not right:
+        return False
+    return hmac.compare_digest(str(left).encode("utf-8"), str(right).encode("utf-8"))
+
+
+def _collect_candidate_tokens(
+    caller_token: str | None = None,
+    caller_tokens: list[str] | tuple[str, ...] | set[str] | None = None,
+) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for raw in ([caller_token] if caller_token else []) + list(caller_tokens or ()):
+        clean = str(raw).strip() if raw is not None else ""
+        if clean and clean not in seen:
+            seen.add(clean)
+            ordered.append(clean)
+    return ordered
+
+
+def _is_room_host(
+    room: StoredRoom,
+    caller_tokens: list[str] | tuple[str, ...] | set[str] | None = None,
+    auth_user: StoredUser | None = None,
+    raw_config: dict | None = None,
+    seats: list[dict] | None = None,
+) -> bool:
+    tokens = _collect_candidate_tokens(caller_tokens=caller_tokens)
+    if any(_tokens_equal(tok, room.host_token) for tok in tokens):
+        return True
+    if auth_user is None:
+        return False
+
+    cfg = raw_config if raw_config is not None else json.loads(room.config_json)
+    host_uname = cfg.get("host_username")
+    if host_uname and host_uname == auth_user.username:
+        return True
+
+    parsed_seats = seats if seats is not None else json.loads(room.seats_json)
+    for seat in parsed_seats:
+        if _tokens_equal(seat.get("seat_token"), room.host_token):
+            if seat.get("username") == auth_user.username:
+                return True
+    return False
+
+
+def serialize_room(
+    room: StoredRoom,
+    caller_token: str | None = None,
+    auth_user: StoredUser | None = None,
+    caller_tokens: list[str] | tuple[str, ...] | set[str] | None = None,
+) -> dict:
+    raw_config = json.loads(room.config_json)
+    config = {k: v for k, v in raw_config.items() if k != "host_username"}
+    if config.get("dice_mode") not in VALID_DICE_MODES:
+        config["dice_mode"] = "random"
     seats = json.loads(room.seats_json)
+    if not normalize_bot_difficulty(config.get("bot_difficulty")):
+        first_bot = next((s for s in seats if s.get("player_key") != "HUMAN"), None)
+        config["bot_difficulty"] = (
+            infer_bot_difficulty_from_key(first_bot.get("player_key"))
+            if first_bot
+            else "medium"
+        )
+    tokens = _collect_candidate_tokens(caller_token, caller_tokens)
     my_color = None
-    is_host = bool(caller_token and caller_token == room.host_token)
+    token_matched_color = None
+    is_host = _is_room_host(
+        room,
+        caller_tokens=tokens,
+        auth_user=auth_user,
+        raw_config=raw_config,
+        seats=seats,
+    )
 
     user_names = [
         s.get("username")
@@ -832,8 +965,6 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
         and s.get("player_name") in OFFICIAL_BOT_NAMES
     }
     for seat in seats:
-        if caller_token and seat.get("seat_token") == caller_token:
-            my_color = seat["color"]
         is_bot = seat["player_key"] != "HUMAN"
         uname = seat.get("username") if not is_bot else None
         seat_kind = (
@@ -841,6 +972,23 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
             if is_bot
             else (seat.get("seat_kind") or ("USER" if uname else "GUEST"))
         )
+        matched_by_token = bool(
+            seat.get("seat_token")
+            and any(_tokens_equal(seat.get("seat_token"), tok) for tok in tokens)
+        )
+        matched_by_user = bool(
+            auth_user is not None
+            and not is_bot
+            and seat_kind == "USER"
+            and uname == auth_user.username
+        )
+        is_me = matched_by_token or matched_by_user
+        if matched_by_token:
+            token_matched_color = seat["color"]
+            my_color = seat["color"]
+        elif matched_by_user and token_matched_color is None and my_color is None:
+            my_color = seat["color"]
+
         if is_bot:
             raw_name = seat.get("player_name")
             if raw_name in OFFICIAL_BOT_NAMES:
@@ -855,7 +1003,11 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
             resolved_name = seat["player_name"]
             seat_avatar = avatars.get(uname, {})
         else:
-            resolved_name = seat["player_name"]
+            raw_human_name = str(seat.get("player_name") or "").strip()
+            if not seat.get("seat_token") and raw_human_name in LEGACY_OPEN_SEAT_NAMES:
+                resolved_name = OPEN_SEAT_NAME
+            else:
+                resolved_name = raw_human_name or OPEN_SEAT_NAME
             seat_avatar = filter_unlocked_avatar_config(
                 seat.get("avatar_config"), wins=0
             )
@@ -867,7 +1019,7 @@ def serialize_room(room: StoredRoom, caller_token: str | None = None) -> dict:
                 "player_name": resolved_name,
                 "is_bot": is_bot,
                 "claimed": bool(seat.get("seat_token")) or is_bot,
-                "is_me": bool(caller_token and seat.get("seat_token") == caller_token),
+                "is_me": is_me,
                 "seat_kind": seat_kind,
                 "username": uname,
                 "avatar_config": seat_avatar,
@@ -1184,6 +1336,8 @@ def build_seat_metadata_for_game(
     auth_user: StoredUser | None = None,
     host_name: str | None = None,
     host_avatar_config: dict | None = None,
+    seat_names: list | dict | None = None,
+    host_seat_index: int | None = None,
 ) -> dict[str, dict]:
     """Seat metadata keyed by color.
 
@@ -1199,15 +1353,56 @@ def build_seat_metadata_for_game(
         else str(spec).split(":")[0].upper()
         for spec in player_keys
     ]
-    num_bots = sum(1 for k in parsed_keys if k != "HUMAN")
-    bot_names_iter = iter(pick_bot_names(num_bots))
 
-    human_assigned = False
+    def _requested_name_for(idx: int, color: str) -> str | None:
+        if isinstance(seat_names, dict):
+            val = seat_names.get(color)
+        elif isinstance(seat_names, list) and idx < len(seat_names):
+            val = seat_names[idx]
+        else:
+            val = None
+        if val is None:
+            return None
+        clean = str(val).strip()[:32]
+        return clean or None
+
+    explicit_bots, used_bot_names = prescan_requested_bot_names(
+        [
+            (key, _requested_name_for(idx, SEAT_COLORS[idx]))
+            for idx, key in enumerate(parsed_keys)
+        ]
+    )
+    remaining_bots = sum(
+        1
+        for idx, k in enumerate(parsed_keys)
+        if k != "HUMAN" and idx not in explicit_bots
+    )
+    bot_names_iter = iter(pick_bot_names(remaining_bots, exclude=used_bot_names))
+
+    resolved_host_idx: int | None = None
+    if (
+        isinstance(host_seat_index, int)
+        and 0 <= host_seat_index < len(parsed_keys)
+        and parsed_keys[host_seat_index] == "HUMAN"
+    ):
+        resolved_host_idx = host_seat_index
+    else:
+        for idx, k in enumerate(parsed_keys):
+            if k == "HUMAN":
+                resolved_host_idx = idx
+                break
+
     extra_guest_index = 1
     for idx, key in enumerate(parsed_keys):
         color = SEAT_COLORS[idx]
         if key == "HUMAN":
-            if not human_assigned and auth_user is not None:
+            req_human_name = _requested_name_for(idx, color)
+            clean_req_human = (
+                req_human_name
+                if req_human_name and req_human_name not in LEGACY_OPEN_SEAT_NAMES
+                else None
+            )
+            if idx == resolved_host_idx and auth_user is not None:
                 try:
                     user_avatar = sanitize_avatar_config(
                         json.loads(auth_user.avatar_json or "{}")
@@ -1219,20 +1414,22 @@ def build_seat_metadata_for_game(
                     "seat_kind": "USER",
                     "username": auth_user.username,
                     "player_key": "HUMAN",
-                    "display_name": auth_user.display_name,
+                    "display_name": clean_req_human or auth_user.display_name,
                     "avatar_config": user_avatar,
                 }
             else:
-                if not human_assigned:
+                if idx == resolved_host_idx:
                     guest_label = (
-                        (host_name or "").strip()[:32] or "Explorador da Ilha"
+                        clean_req_human
+                        or (host_name or "").strip()[:32]
+                        or "Explorador da Ilha"
                     )
                     guest_avatar = filter_unlocked_avatar_config(
                         host_avatar_config, wins=0
                     )
                 else:
                     extra_guest_index += 1
-                    guest_label = f"Convidado {extra_guest_index}"
+                    guest_label = clean_req_human or f"Convidado {extra_guest_index}"
                     guest_avatar = {}
                 by_color[color] = {
                     "color": color,
@@ -1242,9 +1439,8 @@ def build_seat_metadata_for_game(
                     "display_name": guest_label,
                     "avatar_config": guest_avatar,
                 }
-            human_assigned = True
         else:
-            bot_name = next(bot_names_iter)
+            bot_name = explicit_bots.get(idx) or next(bot_names_iter)
             by_color[color] = {
                 "color": color,
                 "seat_kind": "BOT",
@@ -1257,9 +1453,17 @@ def build_seat_metadata_for_game(
 
 
 def _detect_map_template(game: Game) -> str:
-    land_count = len(game.state.board.map.land_tiles)
-    if land_count <= 7:
+    land_tiles = game.state.board.map.land_tiles
+    if len(land_tiles) <= 7:
         return "MINI"
+    tournament_lands = TOURNAMENT_MAP.land_tiles
+    if len(land_tiles) == len(tournament_lands) and all(
+        coord in land_tiles
+        and land_tiles[coord].resource == ref_tile.resource
+        and land_tiles[coord].number == ref_tile.number
+        for coord, ref_tile in tournament_lands.items()
+    ):
+        return "TOURNAMENT"
     return "BASE"
 
 
@@ -1573,23 +1777,96 @@ def create_room(
     host_token: str | None = None,
     host_username: str | None = None,
     host_avatar_config: dict | None = None,
+    seats: list[dict] | None = None,
+    seat_names: list | dict | None = None,
+    bot_difficulty: str | None = None,
+    dice_mode: str = "random",
 ) -> tuple[StoredRoom, str]:
     session = db.session
     room_code = _generate_room_code(session)
     resolved_host_token = (host_token or "").strip() or uuid.uuid4().hex
 
-    initial_keys = players if players and 2 <= len(players) <= 4 else ["HUMAN", "HUMAN", "CATANATRON", "CATANATRON"]
-    num_bots = sum(1 for k in initial_keys if k != "HUMAN")
-    bot_names_iter = iter(pick_bot_names(num_bots))
+    normalized_diff = normalize_bot_difficulty(bot_difficulty)
+    default_bot_key = BOT_DIFFICULTY_TO_KEY[normalized_diff or "medium"]
+
+    initial_specs: list[dict] = []
+    if seats and 2 <= len(seats) <= 4:
+        for idx, item in enumerate(seats):
+            if not isinstance(item, dict):
+                continue
+            raw_key = str(item.get("player_key") or "HUMAN").strip() or "HUMAN"
+            if raw_key != "HUMAN" and normalized_diff is not None and item.get("use_room_difficulty"):
+                raw_key = default_bot_key
+            initial_specs.append(
+                {
+                    "player_key": raw_key,
+                    "player_name": (
+                        str(item.get("player_name")).strip()[:32]
+                        if item.get("player_name") is not None
+                        else None
+                    ),
+                    "is_host": bool(item.get("is_host")),
+                }
+            )
+    if not 2 <= len(initial_specs) <= 4:
+        fallback_keys = (
+            players
+            if players and 2 <= len(players) <= 4
+            else ["HUMAN", "HUMAN", default_bot_key, default_bot_key]
+        )
+        for idx, p_key in enumerate(fallback_keys):
+            color = SEAT_COLORS[idx]
+            req_name = None
+            if isinstance(seat_names, dict):
+                req_name = seat_names.get(color)
+            elif isinstance(seat_names, list) and idx < len(seat_names):
+                req_name = seat_names[idx]
+            initial_specs.append(
+                {
+                    "player_key": str(p_key),
+                    "player_name": (
+                        str(req_name).strip()[:32] if req_name is not None else None
+                    ),
+                    "is_host": False,
+                }
+            )
+
+    host_idx = next(
+        (
+            idx
+            for idx, sp in enumerate(initial_specs)
+            if sp["player_key"] == "HUMAN" and sp.get("is_host")
+        ),
+        None,
+    )
+    if host_idx is None:
+        host_idx = next(
+            (idx for idx, sp in enumerate(initial_specs) if sp["player_key"] == "HUMAN"),
+            0,
+        )
+    if initial_specs[host_idx]["player_key"] != "HUMAN":
+        initial_specs[host_idx]["player_key"] = "HUMAN"
+
+    explicit_bots, used_bot_names = prescan_requested_bot_names(
+        [(sp["player_key"], sp.get("player_name")) for sp in initial_specs]
+    )
+    remaining_bots = sum(
+        1
+        for idx, sp in enumerate(initial_specs)
+        if sp["player_key"] != "HUMAN" and idx not in explicit_bots
+    )
+    bot_names_iter = iter(pick_bot_names(remaining_bots, exclude=used_bot_names))
+
     safe_guest_avatar = (
         {} if host_username else filter_unlocked_avatar_config(host_avatar_config, wins=0)
     )
-    seats = []
-    host_seated = False
-    for idx, p_key in enumerate(initial_keys):
+    resolved_seats = []
+    first_bot_key: str | None = None
+    for idx, sp in enumerate(initial_specs):
         color = SEAT_COLORS[idx]
-        if p_key == "HUMAN" and not host_seated:
-            seats.append(
+        p_key = sp["player_key"]
+        if p_key == "HUMAN" and idx == host_idx:
+            resolved_seats.append(
                 {
                     "color": color,
                     "player_key": "HUMAN",
@@ -1600,13 +1877,12 @@ def create_room(
                     "avatar_config": safe_guest_avatar,
                 }
             )
-            host_seated = True
         elif p_key == "HUMAN":
-            seats.append(
+            resolved_seats.append(
                 {
                     "color": color,
                     "player_key": "HUMAN",
-                    "player_name": "Aguardando Amigo...",
+                    "player_name": OPEN_SEAT_NAME,
                     "seat_token": None,
                     "seat_kind": "GUEST",
                     "username": None,
@@ -1614,8 +1890,10 @@ def create_room(
                 }
             )
         else:
-            bot_name = next(bot_names_iter)
-            seats.append(
+            if first_bot_key is None:
+                first_bot_key = p_key
+            bot_name = explicit_bots.get(idx) or next(bot_names_iter)
+            resolved_seats.append(
                 {
                     "color": color,
                     "player_key": p_key,
@@ -1627,20 +1905,28 @@ def create_room(
                 }
             )
 
+    resolved_difficulty = normalized_diff or (
+        infer_bot_difficulty_from_key(first_bot_key) if first_bot_key else "medium"
+    )
+    resolved_dice_mode = dice_mode if dice_mode in VALID_DICE_MODES else "random"
     config = {
         "map_template": map_template,
         "vps_to_win": vps_to_win,
         "discard_limit": discard_limit,
         "friendly_robber": friendly_robber,
+        "bot_difficulty": resolved_difficulty,
+        "dice_mode": resolved_dice_mode,
         "created_at": int(time.time()),
     }
+    if host_username:
+        config["host_username"] = host_username
 
     room = StoredRoom(
         room_code=room_code,
         host_token=resolved_host_token,
         status="WAITING",
         config_json=json.dumps(config),
-        seats_json=json.dumps(seats),
+        seats_json=json.dumps(resolved_seats),
         game_id=None,
     )
     session.add(room)
@@ -1648,14 +1934,131 @@ def create_room(
     return room, resolved_host_token
 
 
-def list_active_rooms(caller_token: str | None = None, limit: int = 20) -> list[dict]:
+def close_room(
+    room_code: str,
+    caller_tokens: list[str] | tuple[str, ...] | set[str] | None = None,
+    auth_user: StoredUser | None = None,
+) -> dict:
+    code = (room_code or "").strip().upper()
+    room = db.session.get(StoredRoom, code)
+    if room is None:
+        abort(404, description="Sala não encontrada")
+    if not _is_room_host(room, caller_tokens=caller_tokens, auth_user=auth_user):
+        abort(403, description="Apenas o anfitrião pode encerrar esta sala.")
+
+    closed_game_id = room.game_id
+    db.session.delete(room)
+    db.session.commit()
+    return {
+        "closed": True,
+        "room_code": code,
+        "game_id": closed_game_id,
+    }
+
+
+def leave_room(
+    room_code: str,
+    caller_tokens: list[str] | tuple[str, ...] | set[str] | None = None,
+    auth_user: StoredUser | None = None,
+) -> dict:
+    code = (room_code or "").strip().upper()
+    room = db.session.get(StoredRoom, code)
+    if room is None:
+        abort(404, description="Sala não encontrada")
+    if room.status != "WAITING":
+        abort(
+            400,
+            description="A partida já foi iniciada. Peça ao anfitrião para encerrar a sala ou use Sair (Bot Assume) na mesa.",
+        )
+
+    tokens = _collect_candidate_tokens(caller_tokens=caller_tokens)
+    if _is_room_host(room, caller_tokens=tokens, auth_user=auth_user):
+        abort(
+            400,
+            description="Você é o anfitrião desta sala. Use Encerrar Sala para fechá-la.",
+        )
+
+    seats = json.loads(room.seats_json)
+    released = False
+    for seat in seats:
+        if seat.get("player_key") != "HUMAN":
+            continue
+        seat_tok = seat.get("seat_token")
+        tok_match = bool(seat_tok and any(_tokens_equal(seat_tok, tok) for tok in tokens))
+        user_match = bool(
+            auth_user is not None
+            and seat.get("seat_kind") == "USER"
+            and seat.get("username") == auth_user.username
+        )
+        if tok_match or user_match:
+            seat["seat_token"] = None
+            seat["player_name"] = OPEN_SEAT_NAME
+            seat["seat_kind"] = "GUEST"
+            seat["username"] = None
+            seat["avatar_config"] = {}
+            released = True
+
+    if not released:
+        abort(403, description="Você não ocupa nenhum assento nesta sala.")
+
+    room.seats_json = json.dumps(seats)
+    db.session.commit()
+    return {
+        "left": True,
+        "room": serialize_room(room, auth_user=auth_user, caller_tokens=tokens),
+    }
+
+
+def list_active_rooms(
+    caller_token: str | None = None,
+    limit: int = 20,
+    auth_user: StoredUser | None = None,
+    caller_tokens_by_room: dict[str, str] | None = None,
+) -> list[dict]:
     session = db.session
     rooms = session.query(StoredRoom).limit(60).all()
-    serialized = [serialize_room(r, caller_token) for r in rooms]
-    # Sort so rooms where caller is seated come first, then WAITING rooms, then newest created_at
+    active_candidates = [r for r in rooms if r.status != "CLOSED"]
+
+    game_ids = [r.game_id for r in active_candidates if r.game_id]
+    finished_game_ids: set[str] = set()
+    if game_ids:
+        finished_game_ids = {
+            row.game_id
+            for row in session.query(StoredMatch.game_id)
+            .filter(StoredMatch.game_id.in_(game_ids))
+            .all()
+        }
+        remaining_ids = [gid for gid in game_ids if gid not in finished_game_ids]
+        if remaining_ids:
+            stored_games = (
+                session.query(StoredGame)
+                .filter(StoredGame.uuid.in_(remaining_ids))
+                .all()
+            )
+            for sg in stored_games:
+                if _stored_game_is_finished(sg):
+                    finished_game_ids.add(sg.uuid)
+
+    tokens_map = caller_tokens_by_room or {}
+    serialized = []
+    for r in active_candidates:
+        if r.game_id and r.game_id in finished_game_ids:
+            continue
+        room_tok = tokens_map.get(r.room_code)
+        extra_tokens = [room_tok] if room_tok else None
+        serialized.append(
+            serialize_room(
+                r,
+                caller_token=caller_token,
+                auth_user=auth_user,
+                caller_tokens=extra_tokens,
+            )
+        )
+
+    # Sort so host/seated rooms come first, then WAITING rooms, then newest created_at
     serialized.sort(
         key=lambda item: (
-            1 if item.get("my_color") else 0,
+            1 if (item.get("is_host") or item.get("my_color")) else 0,
             1 if item.get("status") == "WAITING" else 0,
             int(item.get("config", {}).get("created_at", 0)),
         ),
@@ -1667,3 +2070,62 @@ def list_active_rooms(caller_token: str | None = None, limit: int = 20) -> list[
 def get_room_by_game_id(game_id: str) -> StoredRoom | None:
     session = db.session
     return session.query(StoredRoom).filter_by(game_id=game_id).first()
+
+
+def serialize_game_message(msg: StoredGameMessage) -> dict:
+    return {
+        "id": int(msg.id),
+        "game_id": msg.game_id,
+        "color": msg.color,
+        "sender_name": msg.sender_name,
+        "kind": msg.kind or "CHAT",
+        "body": msg.body,
+        "created_at": int(msg.created_at),
+    }
+
+
+def list_game_messages(
+    game_id: str, after_id: int = 0, limit: int = 100
+) -> list[dict]:
+    safe_after = max(0, int(after_id or 0))
+    safe_limit = min(max(1, int(limit or 100)), 200)
+    rows = (
+        db.session.query(StoredGameMessage)
+        .filter(
+            StoredGameMessage.game_id == game_id,
+            StoredGameMessage.id > safe_after,
+        )
+        .order_by(StoredGameMessage.id.asc())
+        .limit(safe_limit)
+        .all()
+    )
+    return [serialize_game_message(row) for row in rows]
+
+
+def create_game_message(
+    game_id: str,
+    color: str,
+    sender_name: str,
+    body: str,
+    kind: str = "CHAT",
+) -> dict:
+    clean_kind = str(kind or "CHAT").strip().upper()
+    if clean_kind not in ("CHAT", "TAUNT"):
+        clean_kind = "CHAT"
+    clean_color = str(color or "RED").strip().upper()[:16]
+    clean_sender = (
+        str(sender_name or "").strip()
+        or COLOR_LABELS_PT.get(clean_color, clean_color)
+    )[:64]
+    clean_body = str(body or "").strip()[:240]
+    row = StoredGameMessage(
+        game_id=game_id,
+        color=clean_color,
+        sender_name=clean_sender,
+        kind=clean_kind,
+        body=clean_body,
+        created_at=int(time.time()),
+    )
+    db.session.add(row)
+    db.session.commit()
+    return serialize_game_message(row)

@@ -3,8 +3,8 @@ import { Button, Dialog, DialogContent, DialogTitle } from "@mui/material";
 import cn from "classnames";
 
 import "./PlayerTopBar.scss";
-import type { Color, GameState } from "../utils/api.types";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import type { Color, GameState, ResourceCard } from "../utils/api.types";
+import { PLAYER_COLOR_META, RESOURCE_META } from "../config/assetRegistry";
 import {
   getGuestProfile,
   getSavedAccountAvatarSummary,
@@ -16,7 +16,7 @@ import {
 } from "../config/botCatalog";
 import { store } from "../store";
 import { playerKey } from "../utils/stateUtils";
-import { HybridIllustration } from "./icons/GameIcons";
+import { AwardStarSvg, ResourceIcon } from "./icons/GameIcons";
 import PlayerAvatar from "./PlayerAvatar";
 
 /* -------------------------------------------------------------------------- */
@@ -279,197 +279,371 @@ function computeSeatStats(
   };
 }
 
+export type FloatingDiscardFX = {
+  id: number;
+  color: Color;
+  resource: ResourceCard;
+};
+
+export type FloatingYieldFX = {
+  id: number;
+  color: Color;
+  resource: ResourceCard;
+  amount: number;
+};
+
+export type FloatingVpFX = {
+  id: number;
+  color: Color;
+  delta: number;
+};
+
+export type ActivePortraitTaunt = {
+  id: string;
+  emoji: string;
+  label: string;
+  bubbleText: string;
+  tone: string;
+  nonce: number;
+};
+
+function resolveTurnPhaseMicroIcon(gameState: GameState): {
+  icon: string;
+  label: string;
+} {
+  switch (gameState.current_prompt) {
+    case "DISCARD":
+      return { icon: "⚠️", label: "Descartando cartas (7 nos dados)" };
+    case "MOVE_ROBBER":
+      return { icon: "🥷", label: "Movendo o Ladrão" };
+    case "DECIDE_TRADE":
+    case "DECIDE_ACCEPTEES":
+      return { icon: "🤝", label: "Negociando troca" };
+    case "BUILD_INITIAL_SETTLEMENT":
+    case "BUILD_INITIAL_ROAD":
+      return { icon: "🏠", label: "Posicionamento inicial" };
+    case "PLAY_TURN": {
+      const k = playerKey(gameState, gameState.current_color);
+      const hasRolled = Boolean(gameState.player_state?.[`${k}_HAS_ROLLED`]);
+      return hasRolled
+        ? { icon: "⏩", label: "Construindo / negociando" }
+        : { icon: "🎲", label: "Pronto para rolar os dados" };
+    }
+    default:
+      return { icon: "🎲", label: "Jogador ativo" };
+  }
+}
+
 function PlayerCard({
   seat,
+  discardLimit,
   isInspected,
   isRecentDev,
+  isTradeProposer,
+  turnPhase,
+  discardDrops,
+  yieldItems,
+  vpItems,
+  activeTaunt,
   onInspect,
 }: {
   seat: PlayerSeatStats;
+  discardLimit: number;
   isInspected: boolean;
   isRecentDev: boolean;
+  isTradeProposer: boolean;
+  turnPhase: { icon: string; label: string };
+  discardDrops: FloatingDiscardFX[];
+  yieldItems: FloatingYieldFX[];
+  vpItems: FloatingVpFX[];
+  activeTaunt?: ActivePortraitTaunt;
   onInspect: (color: Color) => void;
 }) {
   const meta = PLAYER_COLOR_META[seat.color];
 
   return (
-    <div
-      className={cn("cu-player-card", seat.color, {
-        "cu-player-card--active": seat.isActive,
-        "cu-player-card--winner": seat.isWinner,
-        "cu-player-card--taken-over": seat.isTakenOver,
-      })}
-      style={
-        {
-          "--cu-color": meta.primary,
-          "--cu-secondary": meta.secondary,
-          "--cu-glow": meta.glow,
-        } as React.CSSProperties
-      }
-      onClick={() => onInspect(seat.color)}
-      title={`${seat.name}${seat.isTakenOver ? " (Bot assumiu)" : ""} • Peças: ${seat.builtSettlements}/5 Aldeias, ${seat.builtCities}/4 Cidades, ${seat.builtRoads}/15 Estradas`}
-    >
-      <button
-        type="button"
-        className="cu-player-card__inspect-trigger"
-        aria-label={`Inspecionar ${seat.name}`}
-        aria-expanded={isInspected}
-        onClick={(e) => {
-          e.stopPropagation();
-          onInspect(seat.color);
-        }}
-      />
+    <div className="cu-player-seat-slot">
+      <div
+        className={cn("cu-player-card", seat.color, {
+          "cu-player-card--active": seat.isActive,
+          "cu-player-card--winner": seat.isWinner,
+          "cu-player-card--taken-over": seat.isTakenOver,
+        })}
+        style={
+          {
+            "--cu-color": meta.primary,
+            "--cu-secondary": meta.secondary,
+            "--cu-glow": meta.glow,
+          } as React.CSSProperties
+        }
+        onClick={() => onInspect(seat.color)}
+        title={`${seat.name}${seat.isTakenOver ? " (Bot assumiu)" : ""} • Peças: ${seat.builtSettlements}/5 Aldeias, ${seat.builtCities}/4 Cidades, ${seat.builtRoads}/15 Estradas`}
+      >
+        <button
+          type="button"
+          className="cu-player-card__inspect-trigger"
+          aria-label={`Inspecionar ${seat.name}`}
+          aria-expanded={isInspected}
+          onClick={(e) => {
+            e.stopPropagation();
+            onInspect(seat.color);
+          }}
+        />
 
-      {/* LEFT HALF: Player Portrait & Name on Solid Color */}
-      <div className="cu-player-card__portrait-col">
-        <div className="cu-player-card__name-bar">
-          {seat.isActive && (
-            <span
-              className="cu-player-card__turn-badge"
-              title="Jogador Ativo — É a vez deste jogador!"
-            >
-              <TurnSpinSvg />
+        {/* LEFT HALF: Player Portrait & Name on Solid Color */}
+        <div className="cu-player-card__portrait-col">
+          <div className="cu-player-card__name-bar">
+            {seat.isActive && (
+              <span
+                className="cu-player-card__turn-badge"
+                title={`Jogador Ativo — ${turnPhase.label}`}
+              >
+                <span aria-hidden="true">{turnPhase.icon}</span>
+                <TurnSpinSvg />
+              </span>
+            )}
+            <span className="cu-player-card__name" title={seat.name}>
+              {seat.name}
             </span>
-          )}
-          <span className="cu-player-card__name" title={seat.name}>
-            {seat.name}
-          </span>
-        </div>
-        <div
-          className={cn("cu-player-card__avatar-wrap", {
-            "cu-player-card__avatar-wrap--custom":
-              seat.resolvedAvatar.isCustomUserOrGuest,
-          })}
-        >
-          <PlayerAvatar
-            config={seat.resolvedAvatar.config}
-            username={seat.resolvedAvatar.username}
-            size={58}
-            className="cu-player-card__custom-avatar"
-          />
-        </div>
-      </div>
-
-      {/* RIGHT HALF: Crisp 2x3 Stat Grid on Dark Slate */}
-      <div className="cu-player-card__stats-col">
-        {seat.isTakenOver && (
-          <div
-            className="cu-player-card__takeover-chip"
-            title="Jogador desconectou ou saiu — Bot IA assumiu o controle"
-          >
-            🤖 Bot assumiu
           </div>
-        )}
-        {/* Row 1: Knights & Longest Road */}
-        <div className="cu-stat-row cu-stat-row--awards">
           <div
-            className={cn("cu-stat", { "cu-stat--awarded": seat.hasArmy })}
-            title={
-              seat.hasArmy ? "Maior Exército (+2 PV)" : "Cavaleiros Jogados"
-            }
+            className={cn("cu-player-card__avatar-wrap", {
+              "cu-player-card__avatar-wrap--custom":
+                seat.resolvedAvatar.isCustomUserOrGuest,
+            })}
           >
-            <span className="cu-stat__num">{seat.knights}</span>
-            {seat.hasArmy ? (
-              <span className="cu-stat__medallion">
-                <HybridIllustration
-                  src="/assets/illustrations/ui/largest_army.webp"
-                  alt="Maior Exército"
-                  fallback={<SwordStatSvg />}
-                />
+            <PlayerAvatar
+              config={seat.resolvedAvatar.config}
+              username={seat.resolvedAvatar.username}
+              size={58}
+              className="cu-player-card__custom-avatar"
+            />
+            {isTradeProposer && (
+              <span
+                className="cu-player-card__trade-sack"
+                title="Propôs uma troca"
+                aria-label="Proponente da troca"
+              >
+                💼
               </span>
-            ) : (
-              <SwordStatSvg />
             )}
-          </div>
-          <div
-            className={cn("cu-stat", { "cu-stat--awarded": seat.hasRoad })}
-            title={
-              seat.hasRoad ? "Maior Estrada (+2 PV)" : "Sequência de Estrada"
-            }
-          >
-            <span className="cu-stat__num">{seat.roadLength}</span>
-            {seat.hasRoad ? (
-              <span className="cu-stat__medallion">
-                <HybridIllustration
-                  src="/assets/illustrations/ui/longest_road.webp"
-                  alt="Maior Estrada"
-                  fallback={<RoadStatSvg />}
-                />
-              </span>
-            ) : (
-              <RoadStatSvg />
+            {activeTaunt && (
+              <div
+                key={activeTaunt.nonce}
+                className={cn(
+                  "cu-portrait-taunt-fx",
+                  `cu-portrait-taunt-fx--${activeTaunt.id}`
+                )}
+                aria-label={`${seat.name}: ${activeTaunt.label}`}
+              >
+                <span className="cu-portrait-taunt-fx__emoji" aria-hidden="true">
+                  {activeTaunt.emoji}
+                </span>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Row 2: Resources & Dev Cards */}
-        <div className="cu-stat-row cu-stat-row--cards">
-          <div
-            className={cn("cu-stat cu-stat--resources", {
-              "cu-stat--danger": seat.resources > 7,
-            })}
-            title={
-              seat.resources > 7
-                ? `Atenção: ${seat.resources} cartas! Perderá metade se rolar 7.`
-                : "Cartas de Recurso na mão"
-            }
-          >
-            <span className="cu-stat__num">{seat.resources}</span>
-            <ResourceStatSvg />
-          </div>
-          <div
-            className={cn("cu-stat cu-stat--devcards", {
-              "cu-stat--recent": isRecentDev,
-            })}
-            title="Cartas de Desenvolvimento na mão"
-          >
-            <span className="cu-stat__num">{seat.devCards}</span>
-            <DevCardStatSvg />
-          </div>
-        </div>
-
-        {/* Row 3: Victory Points + Built Pieces Summary */}
-        <div className="cu-stat-row cu-stat-row--vp">
-          <div className="cu-stat cu-stat--vp" title="Victory Points">
-            <span className="cu-stat__num cu-stat__num--vp">{seat.vps}</span>
-            <TrophyStatSvg />
-          </div>
-
-          {(seat.hasArmy || seat.hasRoad) && (
-            <div className="cu-mobile-award-badges" aria-hidden="true">
-              {seat.hasArmy && <span title="Maior Exército">⚔️</span>}
-              {seat.hasRoad && <span title="Maior Estrada">🛤️</span>}
+        {/* RIGHT HALF: Crisp 2x3 Stat Grid on Dark Slate */}
+        <div className="cu-player-card__stats-col">
+          {seat.isTakenOver && (
+            <div
+              className="cu-player-card__takeover-chip"
+              title="Jogador desconectou ou saiu — Bot IA assumiu o controle"
+            >
+              🤖 Bot assumiu
             </div>
           )}
+          {/* Row 1: Knights & Longest Road */}
+          <div className="cu-stat-row cu-stat-row--awards">
+            <div
+              className={cn("cu-stat cu-stat--knights", {
+                "cu-stat--awarded": seat.hasArmy,
+              })}
+              title={
+                seat.hasArmy ? "Maior Exército (+2 PV)" : "Cavaleiros Jogados"
+              }
+            >
+              <span className="cu-stat__num">{seat.knights}</span>
+              <span className="cu-stat__icon-wrap">
+                <SwordStatSvg />
+                {seat.hasArmy && (
+                  <AwardStarSvg
+                    awardType="army"
+                    size={14}
+                    className="cu-award-star"
+                    label="Maior Exército"
+                  />
+                )}
+              </span>
+            </div>
+            <div
+              className={cn("cu-stat cu-stat--roads", {
+                "cu-stat--awarded": seat.hasRoad,
+              })}
+              title={
+                seat.hasRoad ? "Maior Estrada (+2 PV)" : "Sequência de Estrada"
+              }
+            >
+              <span className="cu-stat__num">{seat.roadLength}</span>
+              <span className="cu-stat__icon-wrap">
+                <RoadStatSvg />
+                {seat.hasRoad && (
+                  <AwardStarSvg
+                    awardType="road"
+                    size={14}
+                    className="cu-award-star"
+                    label="Maior Estrada"
+                  />
+                )}
+              </span>
+            </div>
+          </div>
 
-          <div
-            className="cu-pieces-mini"
-            title={`Peças no mapa: ${seat.builtSettlements}/5 Aldeias · ${seat.builtCities}/4 Cidades · ${seat.builtRoads}/15 Estradas`}
-          >
-            <span
-              className="cu-piece-chip"
-              title={`${seat.builtSettlements} Aldeia(s) construída(s) (${seat.settlementsLeft} restante(s))`}
+          {/* Row 2: Resources & Dev Cards */}
+          <div className="cu-stat-row cu-stat-row--cards">
+            <div
+              className={cn("cu-stat cu-stat--resources", {
+                "cu-stat--danger": seat.resources > discardLimit,
+              })}
+              title={
+                seat.resources > discardLimit
+                  ? `Atenção: ${seat.resources}/${discardLimit} cartas! Perderá metade se rolar 7.`
+                  : "Cartas de Recurso na mão"
+              }
             >
-              <MiniSettlementIcon />
-              <span>{seat.builtSettlements}</span>
-            </span>
-            <span
-              className="cu-piece-chip"
-              title={`${seat.builtCities} Cidade(s) construída(s) (${seat.citiesLeft} restante(s))`}
+              <span className="cu-stat__num">{seat.resources}</span>
+              <ResourceStatSvg />
+            </div>
+            <div
+              className={cn("cu-stat cu-stat--devcards", {
+                "cu-stat--recent": isRecentDev,
+              })}
+              title="Cartas de Desenvolvimento na mão"
             >
-              <MiniCityIcon />
-              <span>{seat.builtCities}</span>
-            </span>
-            <span
-              className="cu-piece-chip"
-              title={`${seat.builtRoads} Estrada(s) construída(s) (${seat.roadsLeft} restante(s))`}
+              <span className="cu-stat__num">{seat.devCards}</span>
+              <DevCardStatSvg />
+            </div>
+          </div>
+
+          {/* Row 3: Victory Points + Built Pieces Summary */}
+          <div className="cu-stat-row cu-stat-row--vp">
+            <div className="cu-stat cu-stat--vp" title="Victory Points">
+              <span className="cu-stat__num cu-stat__num--vp">{seat.vps}</span>
+              <TrophyStatSvg />
+            </div>
+
+            {(seat.hasArmy || seat.hasRoad) && (
+              <div className="cu-mobile-award-badges" aria-hidden="true">
+                {seat.hasArmy && (
+                  <span className="cu-mobile-award-badges__item" title="Maior Exército">
+                    <SwordStatSvg />
+                    <AwardStarSvg size={11} className="cu-award-star" />
+                  </span>
+                )}
+                {seat.hasRoad && (
+                  <span className="cu-mobile-award-badges__item" title="Maior Estrada">
+                    <RoadStatSvg />
+                    <AwardStarSvg size={11} className="cu-award-star" />
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div
+              className="cu-pieces-mini"
+              title={`Peças no mapa: ${seat.builtSettlements}/5 Aldeias · ${seat.builtCities}/4 Cidades · ${seat.builtRoads}/15 Estradas`}
             >
-              <MiniRoadIcon />
-              <span>{seat.builtRoads}</span>
-            </span>
+              <span
+                className="cu-piece-chip"
+                title={`${seat.builtSettlements} Aldeia(s) construída(s) (${seat.settlementsLeft} restante(s))`}
+              >
+                <MiniSettlementIcon />
+                <span>{seat.builtSettlements}</span>
+              </span>
+              <span
+                className="cu-piece-chip"
+                title={`${seat.builtCities} Cidade(s) construída(s) (${seat.citiesLeft} restante(s))`}
+              >
+                <MiniCityIcon />
+                <span>{seat.builtCities}</span>
+              </span>
+              <span
+                className="cu-piece-chip"
+                title={`${seat.builtRoads} Estrada(s) construída(s) (${seat.roadsLeft} restante(s))`}
+              >
+                <MiniRoadIcon />
+                <span>{seat.builtRoads}</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Floating Live Table Animations Outside Clipped Card */}
+      {activeTaunt && (
+        <div
+          key={`bubble-${activeTaunt.nonce}`}
+          className="cu-portrait-taunt-bubble"
+          role="status"
+        >
+          {activeTaunt.bubbleText}
+        </div>
+      )}
+
+      {(discardDrops.length > 0 || yieldItems.length > 0 || vpItems.length > 0) && (
+        <div className="cu-player-seat-slot__fx" aria-live="polite">
+          {vpItems.map((vp) => (
+            <div key={vp.id} className="cu-float-vp-badge">
+              🏆 +{vp.delta} PV
+            </div>
+          ))}
+          {yieldItems.map((y) => {
+            const rMeta = RESOURCE_META[y.resource];
+            return (
+              <div
+                key={y.id}
+                className="cu-float-yield-pill"
+                style={{ borderColor: rMeta?.borderColor || "#4ade80" }}
+                title={`+${y.amount} ${rMeta?.label || y.resource}`}
+              >
+                <ResourceIcon resource={y.resource} size={14} />
+                <span>
+                  +{y.amount} {rMeta?.label || y.resource}
+                </span>
+              </div>
+            );
+          })}
+          {discardDrops.length > 0 && (
+            <div
+              className="cu-discard-drop-row"
+              aria-label={`${seat.name} descartou ${discardDrops.map((d) => RESOURCE_META[d.resource]?.label || d.resource).join(", ")}`}
+            >
+              {discardDrops.map((drop, idx) => {
+                const rMeta = RESOURCE_META[drop.resource];
+                return (
+                  <div
+                    key={drop.id}
+                    className="cu-discard-card-drop"
+                    style={
+                      {
+                        borderColor: rMeta?.borderColor || "#ef4444",
+                        animationDelay: `${Math.min(idx, 5) * 90}ms`,
+                      } as React.CSSProperties
+                    }
+                    title={`Descartou ${rMeta?.label || drop.resource}`}
+                  >
+                    <ResourceIcon resource={drop.resource} size={15} />
+                    <span className="cu-discard-card-drop__label">
+                      −{rMeta?.label || drop.resource}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -481,12 +655,26 @@ function PlayerCard({
 export default function PlayerTopBar({
   gameState,
   recentDevColor = null,
+  discardDrops = [],
+  yieldFX = [],
+  vpFX = [],
+  activeTaunts = {},
 }: {
   gameState: GameState;
   recentDevColor?: Color | null;
+  discardDrops?: FloatingDiscardFX[];
+  yieldFX?: FloatingYieldFX[];
+  vpFX?: FloatingVpFX[];
+  activeTaunts?: Partial<Record<Color, ActivePortraitTaunt>>;
 }) {
   const { state } = useContext(store);
   const [inspectedColor, setInspectedColor] = useState<Color | null>(null);
+
+  const discardLimit = gameState.game?.discard_limit ?? 7;
+  const turnPhase = resolveTurnPhaseMicroIcon(gameState);
+  const tradeProposerColor = gameState.is_resolving_trade
+    ? gameState.colors[gameState.current_turn_index] ?? null
+    : null;
 
   const seats = gameState.colors.map((color) =>
     computeSeatStats(gameState, color, state.perspective)
@@ -501,8 +689,15 @@ export default function PlayerTopBar({
           <PlayerCard
             key={seat.color}
             seat={seat}
+            discardLimit={discardLimit}
             isInspected={inspectedColor === seat.color}
             isRecentDev={recentDevColor === seat.color}
+            isTradeProposer={tradeProposerColor === seat.color}
+            turnPhase={turnPhase}
+            discardDrops={discardDrops.filter((d) => d.color === seat.color)}
+            yieldItems={yieldFX.filter((y) => y.color === seat.color)}
+            vpItems={vpFX.filter((v) => v.color === seat.color)}
+            activeTaunt={activeTaunts[seat.color]}
             onInspect={setInspectedColor}
           />
         ))}
@@ -574,7 +769,8 @@ export default function PlayerTopBar({
                 </div>
                 <div
                   className={cn("cu-inspect-stat-box", {
-                    "cu-inspect-stat-box--warn": inspectedSeat.resources > 7,
+                    "cu-inspect-stat-box--warn":
+                      inspectedSeat.resources > discardLimit,
                   })}
                 >
                   <span>Cartas de Recurso</span>

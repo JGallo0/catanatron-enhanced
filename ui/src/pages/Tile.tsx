@@ -10,6 +10,7 @@ import {
 } from "../utils/api.types";
 import { DESERT_META, RESOURCE_META } from "../config/assetRegistry";
 import {
+  HarborPortSvg,
   ResourceIcon,
   TerrainHexIllustration,
 } from "../components/icons/GameIcons";
@@ -82,27 +83,24 @@ const calculatePortOffset = (
   direction: Direction,
   size: number
 ): { x: number; y: number; angle: number } => {
-  const dist = size * 0.34;
-  switch (direction) {
-    case "NORTH":
-      return { x: 0, y: -dist, angle: 0 };
-    case "SOUTH":
-      return { x: 0, y: dist, angle: 180 };
-    case "NORTHEAST":
-      return { x: dist * 0.86, y: -dist * 0.5, angle: 60 };
-    case "SOUTHEAST":
-      return { x: dist * 0.86, y: dist * 0.5, angle: 120 };
-    case "SOUTHWEST":
-      return { x: -dist * 0.86, y: dist * 0.5, angle: 240 };
-    case "NORTHWEST":
-      return { x: -dist * 0.86, y: -dist * 0.5, angle: 300 };
-    case "EAST":
-      return { x: dist, y: 0, angle: 90 };
-    case "WEST":
-      return { x: -dist, y: 0, angle: 270 };
-    default:
-      return { x: 0, y: 0, angle: 0 };
-  }
+  const dist = size * 0.28;
+  const angleByDir: Record<Direction, number> = {
+    NORTH: 0,
+    NORTHEAST: 30,
+    EAST: 90,
+    SOUTHEAST: 150,
+    SOUTH: 180,
+    SOUTHWEST: 210,
+    WEST: 270,
+    NORTHWEST: 330,
+  };
+  const angle = angleByDir[direction] ?? 0;
+  const rad = (angle * Math.PI) / 180;
+  return {
+    x: dist * Math.sin(rad),
+    y: -dist * Math.cos(rad),
+    angle,
+  };
 };
 
 const Port = ({
@@ -117,19 +115,18 @@ const Port = ({
   const ratio = resource ? "2:1" : "3:1";
   const offset = calculatePortOffset(direction, size);
   const meta = resource ? RESOURCE_META[resource] : null;
-  const badgeSize = Math.max(36, Math.min(54, Math.round(size * 0.68)));
+  const harborWidth = Math.max(54, Math.min(82, Math.round(size * 0.96)));
+  const harborHeight = Math.round(harborWidth * 0.78);
+  const bridgeLen = Math.max(20, Math.round(size * 0.44));
 
   return (
     <div
-      className={cn("port", {
+      className={cn("port port-scene", {
         "port--specialized": !!resource,
         "port--generic": !resource,
       })}
       style={{
         transform: `translate(${offset.x}px, ${offset.y}px)`,
-        width: badgeSize,
-        height: badgeSize,
-        borderColor: meta ? meta.borderColor : "#FCD34D",
       }}
       title={
         meta
@@ -137,25 +134,53 @@ const Port = ({
           : "Porto Marítimo Geral 3:1 (Qualquer Recurso)"
       }
     >
+      {/* Twin timber piers pointing perpendicularly to the coastal land edge */}
       <div
-        className="port__pier-indicator"
+        className="port-scene__gangway-wrap"
         style={{
-          transform: `rotate(${offset.angle}deg)`,
+          transform: `translate(-50%, -50%) rotate(${offset.angle}deg)`,
         }}
-      />
-      <div className="port__icon">
-        {resource ? (
-          <ResourceIcon
-            resource={resource}
-            size={Math.round(badgeSize * 0.42)}
-          />
-        ) : (
-          <span className="port__anchor" aria-hidden="true">
-            ⛵
-          </span>
-        )}
+        aria-hidden="true"
+      >
+        <div
+          className="port-scene__gangway"
+          style={{ height: bridgeLen }}
+        />
       </div>
-      <div className="port__ratio">{ratio}</div>
+
+      {/* Illustrated Harbor Wharf + Moored Merchant Ship */}
+      <div
+        className="port-scene__artwork"
+        style={{ width: harborWidth, height: harborHeight }}
+      >
+        <HarborPortSvg
+          resource={resource}
+          width={harborWidth}
+          height={harborHeight}
+        />
+      </div>
+
+      {/* Hanging Weathered Parchment Harbor Trade Sign */}
+      <div
+        className="port-scene__placard"
+        style={{
+          borderColor: meta ? meta.borderColor : "#f59e0b",
+        }}
+      >
+        <span className="port-scene__icon">
+          {resource ? (
+            <ResourceIcon
+              resource={resource}
+              size={Math.max(12, Math.round(size * 0.21))}
+            />
+          ) : (
+            <span className="port-scene__anchor" aria-hidden="true">
+              ⚓
+            </span>
+          )}
+        </span>
+        <span className="port-scene__ratio">{ratio}</span>
+      </div>
     </div>
   );
 };
@@ -231,6 +256,25 @@ export default function Tile({
       }}
       onClick={onClick}
     >
+      {!isLand && (
+        <div className="tile__sea-surface" aria-hidden="true">
+          <div className="tile__sea-artwork">
+            <TerrainHexIllustration terrain="WATER" />
+          </div>
+          <svg
+            className="tile__frame-svg"
+            viewBox="0 0 100 115.47"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <polygon
+              className="tile__sea-bevel"
+              points="50,1.2 98.8,29.2 98.8,86.2 50,114.2 1.2,86.2 1.2,29.2"
+            />
+          </svg>
+        </div>
+      )}
+
       {isLand && (
         <div className="tile__hex-surface">
           {/* Rich Catan Universe style vector landscape */}

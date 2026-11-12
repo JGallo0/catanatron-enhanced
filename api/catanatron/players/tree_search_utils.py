@@ -17,6 +17,8 @@ from catanatron.state_functions import (
     get_dev_cards_in_hand,
     get_player_freqdeck,
     get_enemy_colors,
+    get_visible_victory_points,
+    player_num_resource_cards,
 )
 from catanatron.features import build_production_features
 from catanatron.players.value import value_production
@@ -168,45 +170,72 @@ def list_prunned_actions(game: Game):
 
 
 def prune_robber_actions(current_color, game, actions):
-    """Eliminate all but the most impactful tile"""
-    enemy_color = next(filter(lambda c: c != current_color, game.state.colors))
+    """Eliminate all but the most impactful robber placement across all enemies."""
+    enemy_colors = list(get_enemy_colors(game.state.colors, current_color))
     enemy_owned_tiles = set()
-    for node_id in get_player_buildings(game.state, enemy_color, SETTLEMENT):
-        enemy_owned_tiles.update(game.state.board.map.adjacent_tiles[node_id])
-    for node_id in get_player_buildings(game.state, enemy_color, CITY):
-        enemy_owned_tiles.update(game.state.board.map.adjacent_tiles[node_id])
+    for enemy_color in enemy_colors:
+        for node_id in get_player_buildings(game.state, enemy_color, SETTLEMENT):
+            enemy_owned_tiles.update(game.state.board.map.adjacent_tiles[node_id])
+        for node_id in get_player_buildings(game.state, enemy_color, CITY):
+            enemy_owned_tiles.update(game.state.board.map.adjacent_tiles[node_id])
 
-    robber_moves = set(
-        filter(
-            lambda a: a.action_type == ActionType.MOVE_ROBBER
-            and game.state.board.map.tiles[a.value[0]] in enemy_owned_tiles,
-            actions,
-        )
-    )
+    robber_moves = [
+        a
+        for a in actions
+        if a.action_type == ActionType.MOVE_ROBBER
+        and game.state.board.map.tiles[a.value[0]] in enemy_owned_tiles
+    ]
 
     if len(robber_moves) == 0:
         return actions
 
-    production_features = build_production_features(True)
+    board = game.state.board
+    discard_limit = max(1, int(getattr(game.state, "discard_limit", 7)))
+    vps_to_win = getattr(game, "vps_to_win", 10)
+    visible_vps = {
+        c: get_visible_victory_points(game.state, c) for c in game.state.colors
+    }
+    hand_sizes = {
+        c: player_num_resource_cards(game.state, c) for c in game.state.colors
+    }
 
     def impact(action):
-        game_copy = game.copy()
-        game_copy.execute(action)
+        coordinate, robbed_color = action.value
+        tile = board.map.tiles[coordinate]
+        tile_proba = 0.0 if tile.resource is None else number_probability(tile.number)
 
-        our_production_sample = production_features(game_copy, current_color)
-        enemy_production_sample = production_features(game_copy, current_color)
-        production = value_production(our_production_sample, "P0")
-        enemy_production = value_production(enemy_production_sample, "P1")
+        self_loss = 0.0
+        enemy_impact = 0.0
+        for node_id in tile.nodes.values():
+            building = board.buildings.get(node_id)
+            if building is None:
+                continue
+            b_color, b_type = building
+            mult = 2.0 if b_type == CITY else 1.0
+            if b_color == current_color:
+                self_loss += mult * tile_proba
+            else:
+                vp = visible_vps[b_color]
+                threat = 2.2 if vp >= vps_to_win - 2 else (1.0 + 0.15 * vp)
+                enemy_impact += mult * max(tile_proba, 0.01) * threat
 
-        return enemy_production - production
+        steal_bonus = 0.0
+        if robbed_color is not None:
+            cards = hand_sizes.get(robbed_color, 0)
+            if cards > 0:
+                v_vp = visible_vps.get(robbed_color, 0)
+                steal_bonus = (
+                    0.05
+                    + 0.012 * v_vp
+                    + 0.004 * min(cards, 12)
+                    + (0.04 if cards > discard_limit else 0.0)
+                )
 
-    most_impactful_robber_action = max(
-        robber_moves, key=impact
-    )  # most production and variety producing
-    actions = filter(
-        lambda a: a.action_type != ActionType.MOVE_ROBBER
-        or a == most_impactful_robber_action,
-        # lambda a: a.action_type != ActionType.MOVE_ROBBER or a in robber_moves,
-        actions,
-    )
-    return actions
+        return enemy_impact - 5.0 * self_loss + steal_bonus
+
+    most_impactful_robber_action = max(robber_moves, key=impact)
+    return [
+        a
+        for a in actions
+        if a.action_type != ActionType.MOVE_ROBBER or a == most_impactful_robber_action
+    ]

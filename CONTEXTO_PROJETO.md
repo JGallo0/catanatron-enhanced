@@ -19,40 +19,43 @@ Este documento consolida **todo o histórico, arquitetura, decisões de design e
 - **[`ui/src/components/icons/GameIcons.tsx`](ui/src/components/icons/GameIcons.tsx):**
   - `HybridIllustration`: Carregador inteligente que tenta carregar automaticamente imagens customizadas em `.webp`, `.png` ou `.jpg` dentro de `ui/public/assets/illustrations/...` e faz fallback imediato para os componentes vetoriais caso a imagem ainda não exista.
   - `TerrainHexIllustration`: Dioramas vetoriais estilo Catan Universe para Floresta, Colinas de Argila, Pastagem de Ovelhas, Campos de Trigo, Montanha de Minério e Oásis no Deserto.
+  - `HarborPortSvg`: Portos ilustrados com píeres de madeira, cargas por tipo de recurso, caravelas balançando sobre o mar turquesa e placas de câmbio (`2:1` / `3:1`).
   - `CardArtIllustration`: Arte de fundo das cartas de Recurso e Desenvolvimento.
-  - `SettlementSvgPiece` & `CitySvgPiece`: Peças 3D de tabuleiro para Aldeia (1 PV) e Cidade (2 PV) na cor de cada jogador.
-  - `DiceFaceSvg` & `RobberPawnSvg`: Dados visuais 2D6 e peão do Ladrão.
-- **Tabuleiro e Câmera (`ui/src/pages/`):**
-  - [`Board.tsx`](ui/src/pages/Board.tsx) & [`Board.scss`](ui/src/pages/Board.scss): Cálculo centralizado da ilha descontando a barra lateral esquerda (`300px`) e a doca inferior (`175px`), garantindo que o tabuleiro nasça centralizado na tela.
-  - [`ZoomableBoard.tsx`](ui/src/pages/ZoomableBoard.tsx): Controle de zoom/pan (`react-zoom-pan-pinch`) com exclusão de classes clicáveis (`node--buildable`, `edge--buildable`, `pulse`) para que cliques em vértices e estradas nunca sejam engolidos pelo arrasto da câmera.
-  - [`Tile.tsx`](ui/src/pages/Tile.tsx) & [`Tile.scss`](ui/src/pages/Tile.scss): Renderização dos hexágonos com costa de areia dourada, fichas numéricas com pontos de probabilidade (`•` a `•••••`) e portos marítimos (`3:1` e `2:1`).
-  - [`Node.tsx`](ui/src/pages/Node.tsx) & [`Edge.tsx`](ui/src/pages/Edge.tsx): Vértices (Aldeias/Cidades) e Arestas (Estradas) com indicadores pulsantes de construção.
-- **HUD, Jogadores, Cartas e Modais (`ui/src/components/` & `ui/src/pages/`):**
-  - **[`PlayerTopBar.tsx`](ui/src/components/PlayerTopBar.tsx) & [`PlayerTopBar.scss`](ui/src/components/PlayerTopBar.scss):** Barra superior de jogadores com visual escuro polido, avatares SVG 100% originais ([`PlayerAvatar.tsx`](ui/src/components/PlayerAvatar.tsx)) para usuários logados, convidados personalizados e bots, além de faixa compacta responsiva em dispositivos móveis (`<= 768px`) com **diálogo tátil de inspeção (*tap-to-inspect*)** ao tocar em qualquer jogador:
-    - **Lado Esquerdo (Desktop):** Retrato SVG modular com moldura e nome sobre fundo na cor do jogador, com badge animado de turno `↻` embutido sem sobreposição de texto.
-    - **Lado Direito (Grid 2×3 em ardósia escura):** Estatísticas com ícones vetoriais nítidos para Cavaleiros `🗡️`, Sequência de Estrada `〰️`, Cartas de Recurso `🂠` (com alerta pulsante se > 7 cartas), Cartas de Desenvolvimento `🎴` e Pontos de Vitória `🏆` em fonte grande colorida.
-    - **Destaque Ativo:** Borda de `2.5px` e brilho luminoso na cor do jogador ativo.
-  - **[`LeftDrawer.tsx`](ui/src/components/LeftDrawer.tsx):** Gaveta lateral recolhível (acionada pelo botão `📜 Histórico` no topo) contendo o histórico detalhado de jogadas em `pt-BR` (incluindo negociações entre jogadores), meta de PV, turno atual e alternador de perspectiva (`Espectador` / `Visão do Assento`).
-  - [`ResourceCards.tsx`](ui/src/components/ResourceCards.tsx): Renderiza tanto a versão compacta quanto o **baralho completo ilustrado (`showEmptySlots={true}`)** na doca inferior do jogador, mostrando sempre os 5 tipos de recurso (`Madeira`, `Argila`, `Lã`, `Trigo`, `Minério`) e as Cartas de Desenvolvimento.
-  - [`ActionsToolbar.tsx`](ui/src/pages/ActionsToolbar.tsx) & [`ActionsToolbar.scss`](ui/src/pages/ActionsToolbar.scss): Doca inferior em 3 zonas com layout adaptativo mobile (`44px+` em alvos táteis), dados 2D6, mão de cartas ilustradas e botões de ação (`Custos`, `Usar Carta`, `Construir`, `Trocar`, `Rolar Dados` / `Passar Vez` / `Responder` / `Confirmar`).
+  - `SettlementSvgPiece`, `CitySvgPiece`, `RoadSvgPiece`, `AwardStarSvg`, `DiceFaceSvg` & `RobberPawnSvg`: Peças artesanais 3D de Aldeia, Cidade/Fortaleza, Estrada em madeira/pedra, estrela de conquista (Maior Exército / Maior Estrada), dados e peão do Ladrão.
+- **Tabuleiro, Oceano e Câmera (`ui/src/pages/` & `ui/src/components/`):**
+  - [`OceanBackdrop.tsx`](ui/src/components/OceanBackdrop.tsx) & [`ocean_backdrop.webp`](ui/public/assets/illustrations/ui/ocean_backdrop.webp): Cenário panorâmico de mar ao pôr do sol atrás de toda a partida (ondas animadas, reflexos solares, ilhas distantes, castelo, farol e embarcações), cercando a ilha do tabuleiro.
+  - [`Board.tsx`](ui/src/pages/Board.tsx) & [`Board.scss`](ui/src/pages/Board.scss): Cálculo responsivo baseado nas dimensões medidas via `ResizeObserver` (`ZoomableBoard.tsx`), anel de água turquesa costeira (`.board__seascape-underlay`), marolas e rosa dos ventos ao redor do tabuleiro, garantindo espaço livre para os portos externos em desktop e tablets.
+  - [`ZoomableBoard.tsx`](ui/src/pages/ZoomableBoard.tsx): Controle de zoom/pan (`react-zoom-pan-pinch`), exclusão de classes clicáveis (`node--buildable`, `edge--buildable`, `pulse`), seleção de vítima ao mover o Ladrão com nomes reais (`seat_names`) e modo opcional **Confirmar jogada** (`catan_confirm_placement_v1`).
+  - [`Tile.tsx`](ui/src/pages/Tile.tsx) & [`Tile.scss`](ui/src/pages/Tile.scss): Renderização dos hexágonos com costa de areia dourada, fichas numéricas com pontos de probabilidade (`•` a `•••••`) e portos marítimos ilustrados ancorados nas arestas da ilha.
+  - [`Node.tsx`](ui/src/pages/Node.tsx) & [`Edge.tsx`](ui/src/pages/Edge.tsx): Vértices (Aldeias/Cidades) e Arestas (Estradas) com indicadores pulsantes e destaque temporário (`.node--recent` / `.edge--recent`).
+- **HUD, Jogadores, Cartas, Chat, Dados 3D e Modais (`ui/src/components/` & `ui/src/pages/`):**
+  - **[`PlayerTopBar.tsx`](ui/src/components/PlayerTopBar.tsx) & [`PlayerTopBar.scss`](ui/src/components/PlayerTopBar.scss):** Barra superior de jogadores com visual escuro polido, layout compacto automático abaixo de `980px` e `768px`, avatares SVG 100% originais ([`PlayerAvatar.tsx`](ui/src/components/PlayerAvatar.tsx)) e diálogo **tap-to-inspect** ao tocar em qualquer jogador:
+    - **Retrato e Provocações:** Avatar SVG com moldura por mérito e efeitos animados de provocações/saudações diretamente no retrato (`.cu-portrait-taunt-fx` + `.cu-portrait-taunt-bubble`).
+    - **Grid de Estatísticas e Conquistas:** Ícones vetoriais nítidos para Cavaleiros, Estrada, Recursos (alerta pulsante acima do limite de descarte), Dev Cards e PV, com estrela dourada `AwardStarSvg` ao lado de Cavaleiros/Estrada conforme o detentor atual de Maior Exército / Maior Estrada.
+    - **Animações na Mesa:** Cartas descartadas ao rolar 7 exibidas publicamente sobre o card do jogador (`.cu-discard-drop-row`), ganhos de produção (`.cu-float-yield-pill`) e deltas de PV (`.cu-float-vp-badge`).
+  - **[`LeftDrawer.tsx`](ui/src/components/LeftDrawer.tsx):** Gaveta lateral recolhível contendo histórico detalhado em `pt-BR`, meta de PV, turno atual e alternador de perspectiva (`Espectador` / `Visão do Assento`).
+  - **[`RightDrawer.tsx`](ui/src/components/RightDrawer.tsx) & [`DiceHistogram.tsx`](ui/src/components/DiceHistogram.tsx):** Gaveta de probabilidades MCTS (`📊 Chances (IA)`) e histograma ao vivo dos dados rolados vs distribuição teórica (`Dados Equilibrados` / `Dados Clássicos`).
+  - **[`AlmanacModal.tsx`](ui/src/components/AlmanacModal.tsx):** Guia ilustrado em abas (Construções & Custos, Cartas de Desenvolvimento & Conquistas, Modos de Mapa & Regras de Dados).
+  - **[`GameChatPanel.tsx`](ui/src/components/GameChatPanel.tsx) & [`tauntCatalog.ts`](ui/src/config/tauntCatalog.ts):** Bate-papo em tempo real durante a partida (frases rápidas + envio livre + contador de não lidas) e menu de provocações/saudações animadas (`CHAT` / `TAUNT`, cooldown de `3s`).
+  - [`ResourceCards.tsx`](ui/src/components/ResourceCards.tsx) & [`PlayerStateBox.scss`](ui/src/components/PlayerStateBox.scss): Baralho completo ilustrado (`showEmptySlots={true}`) sempre mostrando os 5 recursos + Cartas de Desenvolvimento.
+  - [`ActionsToolbar.tsx`](ui/src/pages/ActionsToolbar.tsx) & [`ActionsToolbar.scss`](ui/src/pages/ActionsToolbar.scss): Doca inferior em 3 zonas com dados **3D** compactos (`<Dice3D variant="mini" />`), centralização segura do leque de cartas sem cortes laterais e botão principal dourado.
   - [`TradeModal.tsx`](ui/src/components/TradeModal.tsx) & [`TradeOfferDecisionDialog.tsx`](ui/src/components/TradeOfferDecisionDialog.tsx): Bancada unificada com abas **🤝 Entre Jogadores** (negociação doméstica em 3 etapas `OFFER_TRADE` → `DECIDE_TRADE` → `DECIDE_ACCEPTEES`) e **⚓ Porto & Banco** (`4:1`, `3:1`, `2:1`).
-  - [`ZoomableBoard.tsx`](ui/src/pages/ZoomableBoard.tsx): Inclui seleção de vítima ao mover o Ladrão e suporte *pinch/pan* tátil com `touch-action: none`.
-  - [`RightDrawer.tsx`](ui/src/components/RightDrawer.tsx): Gaveta recolhível de análise de IA MCTS (aberta pelo botão `📊 Chances (IA)` no topo).
-  - [`GameScreen.tsx`](ui/src/pages/GameScreen.tsx), [`tabletopPacing.ts`](ui/src/utils/tabletopPacing.ts) & [`DiceRollOverlay.tsx`](ui/src/components/DiceRollOverlay.tsx): Orquestração do ritmo clássico de tabuleiro (`Normal (1x)` / `Rápido (0.5x)`), estágio animado de rolagem 2D6 sincronizado com os dados da barra inferior, highlights `.node--recent`/`.edge--recent`/`.cu-stat--recent`, banner `.action-spotlight-toast` em desktop e mobile, coordenador multiplayer `?bot_only=1`, heartbeat de `10s`, botão **`🚪 Sair (Bot Assume)`** e banner **`↩️ Retomar Meu Assento`**.
-- **Lobby, Contas e Motor Local Fallback:**
-  - [`HomePage.tsx`](ui/src/pages/HomePage.tsx) & [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx): Tela inicial em palco panorâmico **A2** (`lobby_hero.webp` descoberto ao centro, cabeçalho de 3 colunas com avatar/`#rank` e doca inferior com 5 modos), apoiada pela suíte modular de diálogos em `ui/src/components/home/` ([`AuthModal.tsx`](ui/src/components/home/AuthModal.tsx), [`MatchSetupModal.tsx`](ui/src/components/home/MatchSetupModal.tsx), [`OpenLobbyModal.tsx`](ui/src/components/home/OpenLobbyModal.tsx)), além da sala de espera multiplayer (`/rooms/:roomCode`) com link compartilhável, adição de Bots (`RANDOM`, `WEIGHTED_RANDOM`, `VICTORY_POINT`, `AB_2`, `AB_4`) e partida rápida.
-  - [`ui/src/utils/apiClient.ts`](ui/src/utils/apiClient.ts) & [`ui/src/utils/localEngine.ts`](ui/src/utils/localEngine.ts): Cliente de API com fallback automático (`localEngine.ts`) que executa toda a lógica de Catan, salas, contas e Bots diretamente no navegador caso o backend serverless da Vercel sofra *cold start* ou perda de memória efêmera entre funções.
+  - [`GameScreen.tsx`](ui/src/pages/GameScreen.tsx), [`GameScreen.scss`](ui/src/pages/GameScreen.scss), [`tabletopPacing.ts`](ui/src/utils/tabletopPacing.ts), [`MatchIntroOverlay.tsx`](ui/src/components/MatchIntroOverlay.tsx), [`DiceRollOverlay.tsx`](ui/src/components/DiceRollOverlay.tsx) & [`Dice3D.tsx`](ui/src/components/Dice3D.tsx): Dock vertical esquerdo (`z-index: 44`, clicável), apresentação inicial `"Boa Guerra"` de `10s` (`INTRO_SPLASH_MS = 10000`) com botão *Zarpar para a Ilha*, velocidades `Normal (4x)` / `Rápida (1x)` / `Turbo (0.5x)` com ações dos bots dobradas, banner de transição `"Vez de <Jogador>"` (`3s`, `TURN_TRANSITION_MS = 3000`), dados **3D CSS `preserve-3d`** (`Dice3D`) com duração de rolagem dobrada, pílula de desfecho do Ladrão (`.game-robber-notice`), mini-histórico flutuante (`.mini-action-log`), coordenador `?bot_only=1`, heartbeat `10s`, **`🚪 Sair (Bot Assume)`** e **`↩️ Retomar Meu Assento`**.
+- **Lobby, Mapas, Dificuldade Única, Contas e Motor Local Fallback:**
+  - [`HomePage.tsx`](ui/src/pages/HomePage.tsx) & [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx): Tela inicial A2 com `lobby_hero.webp` em alta resolução, modais em `ui/src/components/home/` ([`AuthModal.tsx`](ui/src/components/home/AuthModal.tsx), [`MatchSetupModal.tsx`](ui/src/components/home/MatchSetupModal.tsx), [`OpenLobbyModal.tsx`](ui/src/components/home/OpenLobbyModal.tsx), [`MapTemplatePreview.tsx`](ui/src/components/home/MapTemplatePreview.tsx)), seletor único de dificuldade (`Fácil`, `Moderado`, `Difícil`), perfis oficiais de bots na mesa (`Creitu`, `Felire`, `Guiri`, `Jaó`, `Angeleri`), vaga explícita **`Assento livre`** preenchida pelo nome de quem entrar, mapas **Padrão (Mapa aleatório)** / **Mini** / **Torneio (Mapa fixo)**, modo de dados **Clássico** vs **Equilibrado** (`balanced`) e encerramento/saída de salas abertas.
+  - [`ui/src/utils/apiClient.ts`](ui/src/utils/apiClient.ts) & [`ui/src/utils/localEngine.ts`](ui/src/utils/localEngine.ts): Cliente de API com fallback automático offline (`localEngine.ts`), incluindo paridade completa de chat/provocações, dados equilibrados, descarte/anti-hoarding dos bots, encerramento de salas e dificuldade única.
 
 ### Backend (`api/` e `catanatron/`) — Flask + Vercel Python Serverless
 - **[`vercel.json`](vercel.json) & [`api/index.py`](api/index.py):** Entrada Serverless Python (`3.12` via `.python-version`) na Vercel que roteia `/api/*` para o Flask (`catanatron.web`).
-- **[`catanatron/catanatron/web/api.py`](catanatron/catanatron/web/api.py) & [`models.py`](catanatron/catanatron/web/models.py)** *(espelhados identicamente em `api/catanatron/web/` para a Vercel)*: Endpoints REST para jogos (`/api/games`, `/actions?bot_only=1`, `/heartbeat`, `/abandon`, `/reclaim`), salas (`/api/rooms`), autenticação/perfil (`/api/auth/register`, `/api/auth/login`, `/api/auth/google`, `/api/auth/me`, `/api/auth/profile`) com exposição de `leaderboard_rank` no ranking global, histórico de partidas, seeds CSPRNG (`secrets.randbits(63)`), substituição por Bot multiplayer *serverless-safe* (`45s` / saída explícita) e análise MCTS.
+- **[`catanatron/catanatron/web/api.py`](catanatron/catanatron/web/api.py) & [`models.py`](catanatron/catanatron/web/models.py)** *(espelhados identicamente em `api/catanatron/web/` para a Vercel)*: Endpoints REST para jogos (`/api/games`, `/actions?bot_only=1`, `/heartbeat`, `/abandon`, `/reclaim`, `/messages`), salas (`/api/rooms`, `/close`, `/leave`, `/join`, `/start`), autenticação/perfil (`/api/auth/register`, `/api/auth/login`, `/api/auth/google`, `/api/auth/me`, `/api/auth/profile`) com exposição de `leaderboard_rank` no ranking global, histórico de partidas, seeds CSPRNG (`secrets.randbits(63)`), suporte a dados equilibrados (`dice_mode = "balanced"`), dificuldade única (`easy`/`medium`/`hard`), encerramento seguro de salas por anfitrião/token e análise MCTS.
+- **Motor Anti-Hoarding & Regras (`catanatron/catanatron/apply_action.py`, `game.py`, `state.py`, `serialization.py`, `players/`):** Baralho de dados equilibrados (36 combinações com reembaralhamento em `<= 5` restantes), avaliação anti-acúmulo de cartas nos bots (`search.py`, `value.py`, `tree_search_utils.py`, `weighted_random.py`) e priorização de descarte/uso em mãos acima de 7 cartas.
 
 ---
 
-## 3. Como Rodar no PC de Casa e Sincronizar via GitHub / Vercel
+## 3. Como Rodar em Qualquer Máquina e Sincronizar via GitHub / Vercel
 
 ```bash
-# 1. Clonar o repositório (primeira vez) ou atualizar no PC de casa
+# 1. Clonar o repositório (primeira vez) ou atualizar
 git clone https://github.com/JGallo0/catanatron-enhanced.git
 cd catanatron-enhanced
 
@@ -71,12 +74,12 @@ npx tsc --noEmit
 npx vitest run
 npm run build
 
-# 4. (Opcional) Rodar suíte de testes Python do backend web + regras de troca
+# 4. (Opcional) Rodar suíte de testes Python do backend web + regras de troca + anti-hoarding + dados
 cd ..
-.venv/Scripts/python -m pytest -o addopts="" tests/web tests/test_game.py tests/test_domestic_trade.py tests/test_web_view.py -v
+.venv/Scripts/python -m pytest -o addopts="" tests/web tests/test_game.py tests/test_domestic_trade.py tests/test_web_view.py tests/test_anti_hoarding.py tests/test_balanced_dice.py -v
 ```
 
-> **Nota:** Graças ao [`localEngine.ts`](ui/src/utils/localEngine.ts), você pode rodar apenas `cd ui && npm start` no PC de casa sem nem precisar subir o Flask em Python para testar o visual, o tabuleiro, os dados 2D6, as cartas, o ritmo dos bots e partidas completas contra Bots! Se quiser testar salas multiplayer reais localmente contra a API Flask, suba também `.venv/Scripts/python -m flask --app catanatron.web:create_app run --host 127.0.0.1 --port 5001 --no-reload` com `PYTHONPATH=catanatron`.
+> **Nota:** Graças ao [`localEngine.ts`](ui/src/utils/localEngine.ts), você pode rodar apenas `cd ui && npm start` sem nem precisar subir o Flask em Python para testar todo o fluxo visual, o tabuleiro cercado pelo oceano, os dados 3D, chat/provocações, almanaque, bots anti-hoarding e partidas completas! Para testar salas multiplayer reais localmente contra a API Flask, suba também `.venv/Scripts/python -m flask --app catanatron.web:create_app run --host 127.0.0.1 --port 5001 --no-reload` com `PYTHONPATH=catanatron`.
 
 ---
 
@@ -133,7 +136,8 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
 19. **`robber.webp` (ou `robber.png`) — Peão do Ladrão (`512×512` fundo transparente)**
 20. **`largest_army.webp` (ou `largest_army.png`) — Medalha Maior Exército (`512×512`)**
 21. **`longest_road.webp` (ou `longest_road.png`) — Medalha Maior Estrada (`512×512`)**
-22. **`lobby_hero.webp` (ou `lobby_hero.png`) — Banner de Fundo da Tela Inicial (`1920×1080`)**
+22. **`lobby_hero.webp` — Banner de Fundo da Tela Inicial (`1920×1080`, atualizado com `panoramic_view.jpg` em alta resolução)**
+23. **`ocean_backdrop.webp` — Paisagem Marítima Panorâmica do Tabuleiro (`1376×768`, pôr do sol, ondas, ilhas distantes, castelo, farol e embarcações)**
 
 ### E. Sistema de Avatares SVG 100% Originais (`ui/src/config/avatarCatalog.ts` & `ui/src/components/PlayerAvatar.tsx`)
 Os retratos legados `.webp` herdados do Catan Universe foram completamente aposentados e removidos da interface em favor do compositor vetorial próprio em camadas (`<PlayerAvatar />`), garantindo:
@@ -223,6 +227,33 @@ Os retratos legados `.webp` herdados do Catan Universe foram completamente apose
   - **Bateria de Testes Verificada (Bloco 5):**
     - Backend (`.\.venv\Scripts\python.exe -m pytest -o addopts="" tests/web tests/test_game.py tests/test_domestic_trade.py tests/test_web_view.py -v`): **97/97 passando** (`53/53` em `tests/web/`, incluindo `test_takeover_and_turn_order.py` e paridade do espelho Vercel).
     - Frontend (`npx tsc --noEmit`, `npx vitest run` e `npm run build` em `ui/`): **0 erros TS**, **25 arquivos / 119 testes passando** e build de produção Vite concluído.
+- **Bloco 6 Concluído: Anti-Hoarding dos Bots, Encerramento de Salas, Seletor Único de Dificuldade, Dados Equilibrados, Chat & Provocações:**
+  - **Home em Alta Resolução:** Banner [`lobby_hero.webp`](ui/public/assets/illustrations/ui/lobby_hero.webp) substituído por versão em alta definição (`panoramic_view.jpg`).
+  - **IA Anti-Hoarding (`apply_action.py`, `players/search.py`, `value.py`, `tree_search_utils.py`, `weighted_random.py` & `localEngine.ts`):**
+    - Bots gastam ou negociam cartas excedentes em vez de passar turno com mãos gigantes; avaliadores penalizam excesso sobre `discard_limit` e descarte pendente, priorizando alvos de maior ameaça com cartas ao mover o Ladrão e descartando excedentes antes de quebrar mão de Cidade.
+  - **Gerenciamento Real de Salas Abertas (`POST /api/rooms/<code>/close`, `DELETE /api/rooms/<code>`, `POST /api/rooms/<code>/leave`):**
+    - Anfitriões podem encerrar salas em `WAITING` ou `IN_PROGRESS` (ou sair se convidado), com verificação de propriedade por token de assento/usuário autenticado/mapa `X-Room-Tokens` e ocultação automática de salas finalizadas em [`OpenLobbyModal.tsx`](ui/src/components/home/OpenLobbyModal.tsx).
+  - **Lobby Simplificado, Perfis Oficiais & `Assento livre` ([`botCatalog.ts`](ui/src/config/botCatalog.ts), [`MatchSetupModal.tsx`](ui/src/components/home/MatchSetupModal.tsx), [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx)):**
+    - Seletor único de dificuldade dos bots (`Fácil`, `Moderado`, `Difícil`), lista explícita dos 5 perfis oficiais (`Creitu`, `Felire`, `Guiri`, `Jaó`, `Angeleri`) com nomes respeitados na mesa, vagas abertas nomeadas **`Assento livre`** substituídas pelo nome do jogador que entrar e rótulos de mapa **Padrão (Mapa aleatório)**, **Mini** e **Torneio (Mapa fixo)** com prévia visual em [`MapTemplatePreview.tsx`](ui/src/components/home/MapTemplatePreview.tsx).
+  - **Dados Equilibrados (`dice_mode = "balanced"`), Histograma & Almanaque:**
+    - Baralho de 36 combinações de `2d6` com saque sem reposição e reembaralhamento automático ao restarem `<= 5` cartas (`tests/test_balanced_dice.py`), histograma ao vivo em [`DiceHistogram.tsx`](ui/src/components/DiceHistogram.tsx) e modal de consulta [`AlmanacModal.tsx`](ui/src/components/AlmanacModal.tsx).
+  - **Bate-Papo & Provocações Animadas na Partida (`GET/POST /api/games/<id>/messages`, [`GameChatPanel.tsx`](ui/src/components/GameChatPanel.tsx), [`tauntCatalog.ts`](ui/src/config/tauntCatalog.ts)):**
+    - Chat persistente por partida (online + espelho em `localEngine.ts`), frases rápidas, prévia toast, contador de não lidas e catálogo de provocações/saudações animadas (`TAUNT`, cooldown `3s`) exibidas no retrato e balão do jogador com síntese de áudio.
+- **Bloco 7 Concluído: Oceano Realista ao Pôr do Sol, Portos Ilustrados, Dados 3D, Peças Artesanais, Cadência Ampliada & Dock Vertical:**
+  - **Identidade *Rule the Isle* no Tabuleiro (`GameIcons.tsx`, `Tile.tsx`, `Board.tsx`, `OceanBackdrop.tsx`, `PlayerTopBar.tsx`):**
+    - Peças artesanais `SettlementSvgPiece` (cabanas enxaimel), `CitySvgPiece` (cidadela/torre) e `RoadSvgPiece` (calçadão de madeira/pedra); estrelas douradas `AwardStarSvg` posicionadas diretamente ao lado do ícone de Cavaleiro/Estrada no card do jogador (sem medalhões isolados).
+    - Ilha totalmente cercada por oceano panorâmico realista ao pôr do sol ([`ocean_backdrop.webp`](ui/public/assets/illustrations/ui/ocean_backdrop.webp) + ondas e brilhos em [`OceanBackdrop.tsx`](ui/src/components/OceanBackdrop.tsx), halo marinho e rosa dos ventos em [`Board.scss`](ui/src/pages/Board.scss)) e **portos ilustrados** ([`HarborPortSvg`](ui/src/components/icons/GameIcons.tsx)) com píer, carga e caravelas no lugar dos círculos antigos.
+  - **Dados 3D Reais (`Dice3D.tsx` & `Dice3D.scss`):**
+    - Cubos 3D CSS `preserve-3d` com 6 faces chanfradas em marfim/bronze, presentes tanto no estágio central [`DiceRollOverlay.tsx`](ui/src/components/DiceRollOverlay.tsx) quanto no console inferior [`ActionsToolbar.tsx`](ui/src/pages/ActionsToolbar.tsx).
+  - **Ritmo Ampliado & Feedback Público de Mesa (`tabletopPacing.ts` & `GameScreen.tsx`):**
+    - Apresentação inicial **"Boa Guerra"** estendida para **`10s`** (`INTRO_SPLASH_MS = 10000`) com barra de progresso e botão **Zarpar para a Ilha**.
+    - Velocidades **`Normal (4x)`**, **`Rápida (1x)`** e **`Turbo (0.5x)`**, com atrasos das ações dos bots dobrados em todas as faixas, mensagem de transição **`"Vez de <Nome>"`** dobrada para **`3s`** (`TURN_TRANSITION_MS = 3000`) e duração do giro/overlay dos dados 3D dobrada para humanos e bots.
+    - Descarte animado público ao rolar 7 (mostrando as cartas descartadas sobre o card do jogador), ganhos de recursos/PV flutuantes, avisos do Ladrão (`.game-robber-notice`) e confirmação opcional de jogada (`Confirmar jogada`).
+  - **Dock Vertical Esquerdo Clicável & Enquadramento Responsivo:**
+    - Hierarquia explícita de `z-index` em [`GameScreen.scss`](ui/src/pages/GameScreen.scss) garantindo clique imediato na `.game-left-dock` (`z-index: 44`), medição real do container do mapa via `ResizeObserver` em [`ZoomableBoard.tsx`](ui/src/pages/ZoomableBoard.tsx) (`numLevels = 7.0`) e centralização segura das cartas e cards de jogadores em desktop (`1280x800`) e larguras intermediárias (`769–980px`).
+  - **Bateria de Testes e Build Verificada (Blocos 6 e 7):**
+    - Backend (`.\.venv\Scripts\python.exe -m pytest -o addopts="" tests/web tests/test_game.py tests/test_domestic_trade.py tests/test_web_view.py tests/test_anti_hoarding.py tests/test_balanced_dice.py -v`): **112/112 passando** (incluindo `test_game_chat.py`, `test_rooms_and_bots.py` e verificação de espelho `api/catanatron` == `catanatron/catanatron`).
+    - Frontend (`npx tsc --noEmit`, `npx vitest run` e `npm run build` em `ui/`): **0 erros TS**, **32 arquivos / 160 testes passando** e build de produção Vite (`ui/dist/`) concluído com sucesso; verificado ao vivo no navegador em `1280x800` e `769x769`.
 
 ---
 
@@ -245,6 +276,8 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 1. ~~**Bloco 2 — Customização de Avatar e Perfil**~~ *(Concluído)*
 2. ~~**Bloco 3 — Redesign da Tela Inicial e Lobby Aberto**~~ *(Concluído)*
 3. ~~**Bloco 4 — Fix Home/Google OAuth, Bots & Avatares Oficiais, Troca Entre Jogadores e Mobile-First**~~ *(Concluído)*
-4. ~~**Bloco 5 — Ritmo de Tabuleiro com Dados 2D6 Animados, Assunção/Retomada por Bot Multiplayer e Turnos Aleatórios**~~ *(Concluído e publicado em `main` + `layout-topbar`)*
-5. **Testes Reais Multiplayer + Produção (PC de Casa / Celular):** Conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase, testar partida multiplayer real entre PC e celular na URL da Vercel validando heartbeat/abandono/retomada e rolagem animada 2D6.
-6. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.
+4. ~~**Bloco 5 — Ritmo de Tabuleiro com Dados 2D6 Animados, Assunção/Retomada por Bot Multiplayer e Turnos Aleatórios**~~ *(Concluído)*
+5. ~~**Bloco 6 — Bots Anti-Hoarding, Encerramento de Salas, Dificuldade Única, Dados Equilibrados, Chat & Provocações**~~ *(Concluído)*
+6. ~~**Bloco 7 — Oceano ao Pôr do Sol, Portos Ilustrados, Dados 3D, Peças Artesanais, Ritmo 10s/3s/2x & Dock Vertical**~~ *(Concluído e publicado em `main` + `layout-topbar`)*
+7. **Testes Reais Multiplayer + Produção (PC / Celular):** Conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase, validar chat `/messages`, provocações, encerramento de salas e partidas multiplayer reais entre PC e celular na URL da Vercel.
+8. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.

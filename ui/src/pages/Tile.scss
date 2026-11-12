@@ -101,6 +101,35 @@
     transition: transform 0.22s ease, filter 0.22s ease;
   }
 
+  &__sea-surface {
+    position: absolute;
+    inset: -2px;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    overflow: hidden;
+    background: radial-gradient(
+      circle at 50% 48%,
+      rgba(20, 184, 166, 0.14) 0%,
+      rgba(14, 116, 144, 0.08) 56%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  &__sea-artwork {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.52;
+    animation: sea-hex-ripple 8s ease-in-out infinite alternate;
+  }
+
+  &__sea-bevel {
+    fill: none;
+    stroke: rgba(186, 230, 253, 0.04);
+    stroke-width: 0.7;
+  }
+
   &__artwork {
     position: absolute;
     inset: 0;
@@ -184,6 +213,17 @@
   }
 }
 
+@keyframes sea-hex-ripple {
+  0% {
+    transform: translateY(-1px) scale(1);
+    opacity: 0.78;
+  }
+  100% {
+    transform: translateY(1.5px) scale(1.03);
+    opacity: 0.95;
+  }
+}
+
 @keyframes robber-target-spin {
   from {
     transform: rotate(0deg);
@@ -193,55 +233,114 @@
   }
 }
 
-// ===== Port Medallions
-.port {
+// ===== Illustrated Harbor Ports (Timber Wharf + Moored Ship + Parchment Sign)
+.port-scene {
   position: relative;
-  z-index: 4;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 30% 30%,
-    #1e3a5f 0%,
-    #0f172a 85%
-  );
-  border: 2.5px solid #fcd34d;
-  box-shadow:
-    0 6px 14px rgba(0, 0, 0, 0.65),
-    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #f8fafc;
-  padding: 2px;
+  pointer-events: auto;
+  user-select: none;
 
-  &__pier-indicator {
+  &__gangway-wrap {
     position: absolute;
-    inset: -5px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    border-top-color: #facc15;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    z-index: 0;
     pointer-events: none;
   }
 
-  &__icon {
+  &__gangway {
+    position: absolute;
+    bottom: 2px;
+    left: -13px;
+    width: 26px;
+    border-left: 3.5px solid #78350f;
+    border-right: 3.5px solid #78350f;
+    background: repeating-linear-gradient(
+      180deg,
+      rgba(180, 83, 9, 0.88) 0px,
+      rgba(180, 83, 9, 0.88) 3px,
+      transparent 3px,
+      transparent 6px
+    );
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.65));
+    opacity: 0.9;
+  }
+
+  &__artwork {
+    position: relative;
+    z-index: 1;
     display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.62));
+  }
+
+  &__artwork-svg {
+    overflow: visible;
+  }
+
+  &__ship {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+    animation: harbor-ship-bob 4.4s ease-in-out infinite alternate;
+  }
+
+  &__placard {
+    position: relative;
+    z-index: 2;
+    margin-top: -10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #fef3c7 0%, #fde68a 60%, #d97706 100%);
+    border: 1.5px solid #78350f;
+    box-shadow:
+      0 3px 8px rgba(0, 0, 0, 0.72),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    color: #291507;
+  }
+
+  &__icon {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
   }
 
   &__anchor {
-    font-size: 0.95rem;
-    color: #fde047;
+    font-size: 0.78rem;
+    color: #78350f;
   }
 
   &__ratio {
-    font-family: "JetBrains Mono", "Outfit", monospace;
+    font-family: "Cinzel", "Outfit", serif;
     font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: #fef08a;
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    color: #1c1917;
     line-height: 1;
-    margin-top: 1px;
+  }
+}
+
+@keyframes harbor-ship-bob {
+  0% {
+    transform: translateY(-1px) rotate(-2.2deg);
+  }
+  100% {
+    transform: translateY(1.6px) rotate(2.2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .port-scene__ship {
+    animation: none;
   }
 }

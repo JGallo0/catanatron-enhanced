@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import OpenLobbyModal from "./OpenLobbyModal";
+import { OPEN_SEAT_LABEL } from "../../config/botCatalog";
 import type { RoomState } from "../../utils/api.types";
 
 afterEach(() => {
@@ -21,6 +22,7 @@ const sampleRooms: RoomState[] = [
       vps_to_win: 10,
       discard_limit: 7,
       friendly_robber: true,
+      bot_difficulty: "medium",
     },
     seats: [
       {
@@ -37,7 +39,7 @@ const sampleRooms: RoomState[] = [
       {
         color: "BLUE",
         player_key: "HUMAN",
-        player_name: "Aguardando Amigo...",
+        player_name: OPEN_SEAT_LABEL,
         is_bot: false,
         claimed: false,
         is_me: false,
@@ -47,7 +49,7 @@ const sampleRooms: RoomState[] = [
       },
       {
         color: "ORANGE",
-        player_key: "CATANATRON",
+        player_key: "F",
         player_name: "Creitu",
         is_bot: true,
         claimed: true,
@@ -69,6 +71,7 @@ const sampleRooms: RoomState[] = [
       vps_to_win: 7,
       discard_limit: 7,
       friendly_robber: true,
+      bot_difficulty: "medium",
     },
     seats: [
       {
@@ -87,7 +90,7 @@ const sampleRooms: RoomState[] = [
 ];
 
 describe("OpenLobbyModal", () => {
-  test("renders rooms with seat PlayerAvatars, supports filters and code join", async () => {
+  test("renders rooms with Assento livre and formatted map labels, supports filters and code join", async () => {
     const user = userEvent.setup();
     const onJoinRoom = vi.fn();
     const onOpenMatch = vi.fn();
@@ -106,8 +109,12 @@ describe("OpenLobbyModal", () => {
 
     expect(screen.getByText("#AB12CD")).toBeInTheDocument();
     expect(screen.getByText("#MINE99")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Mapa Padrão \(Mapa aleatório\)/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Mapa Mini/i)).toBeInTheDocument();
     expect(screen.getAllByTestId("player-avatar").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText(/Vaga Aberta/i)).toBeInTheDocument();
+    expect(screen.getByText(OPEN_SEAT_LABEL)).toBeInTheDocument();
 
     const allFilter = screen.getByRole("button", { name: /Todas/i });
     const openFilter = screen.getByRole("button", { name: /Com Vagas/i });
@@ -141,7 +148,7 @@ describe("OpenLobbyModal", () => {
     expect(onJoinRoom).toHaveBeenCalledWith("K7M4P9");
   }, 15000);
 
-  test("handles WAITING room join, spectating, refresh, close, and contrasting seat icon colors", async () => {
+  test("handles WAITING room join, spectating, Torneio map label, and contrasting seat icon colors", async () => {
     const user = userEvent.setup();
     const onJoinRoom = vi.fn();
     const onOpenMatch = vi.fn();
@@ -161,6 +168,7 @@ describe("OpenLobbyModal", () => {
           vps_to_win: 12,
           discard_limit: 9,
           friendly_robber: false,
+          bot_difficulty: "hard",
         },
         seats: [
           {
@@ -177,7 +185,7 @@ describe("OpenLobbyModal", () => {
           {
             color: "WHITE",
             player_key: "HUMAN",
-            player_name: "Aguardando Amigo...",
+            player_name: OPEN_SEAT_LABEL,
             is_bot: false,
             claimed: false,
             is_me: false,
@@ -201,10 +209,10 @@ describe("OpenLobbyModal", () => {
       />
     );
 
+    expect(screen.getByText(/Mapa Torneio \(Mapa fixo\)/i)).toBeInTheDocument();
     expect(screen.getByText("Creitu")).toBeInTheDocument();
     expect(screen.getByText("Felire")).toBeInTheDocument();
-    // Open seat icon uses palette.textOnFill for high contrast on light fills (e.g. WHITE -> #0F172A)
-    const openLabels = screen.getAllByText("Vaga Aberta");
+    const openLabels = screen.getAllByText(OPEN_SEAT_LABEL);
     const whiteOpenChip = openLabels[openLabels.length - 1].closest(
       ".open-lobby-seat-chip"
     );
@@ -247,5 +255,101 @@ describe("OpenLobbyModal", () => {
       screen.getByRole("button", { name: /Criar Nova Sala Online/i })
     );
     expect(onCreateRoomClick).toHaveBeenCalledTimes(1);
+  }, 15000);
+
+  test("lets hosts close WAITING or IN_PROGRESS rooms with confirmation, handles errors, and keeps modal Fechar button unique", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onCloseRoom = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Falha simulada ao encerrar."))
+      .mockResolvedValueOnce(undefined);
+
+    render(
+      <OpenLobbyModal
+        open={true}
+        onClose={onClose}
+        rooms={sampleRooms}
+        onJoinRoom={vi.fn()}
+        onOpenMatch={vi.fn()}
+        onCreateRoomClick={vi.fn()}
+        onRefresh={vi.fn()}
+        onCloseRoom={onCloseRoom}
+      />
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Encerrar sala MINE99/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Encerrar sala AB12CD/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Fechar/i })).toHaveLength(1);
+
+    await user.click(
+      screen.getByRole("button", { name: /Encerrar sala MINE99/i })
+    );
+    expect(
+      screen.getByRole("group", { name: /Confirmar encerramento da sala MINE99/i })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Cancelar$/i }));
+    expect(onCloseRoom).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", { name: /Encerrar sala MINE99/i })
+    );
+    await user.click(screen.getByRole("button", { name: /^Confirmar$/i }));
+    expect(onCloseRoom).toHaveBeenNthCalledWith(1, "MINE99");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /Falha simulada ao encerrar/i
+    );
+
+    await user.click(screen.getByRole("button", { name: /^Confirmar$/i }));
+    expect(onCloseRoom).toHaveBeenNthCalledWith(2, "MINE99");
+  }, 15000);
+
+  test("lets seated WAITING guest leave room and includes host-only room without my_color in Minhas filter", async () => {
+    const user = userEvent.setup();
+    const onLeaveRoom = vi.fn().mockResolvedValueOnce(undefined);
+    const rooms: RoomState[] = [
+      {
+        ...sampleRooms[0],
+        room_code: "JOIN88",
+        status: "WAITING",
+        is_host: false,
+        my_color: "BLUE",
+      },
+      {
+        ...sampleRooms[1],
+        room_code: "HOST00",
+        status: "WAITING",
+        is_host: true,
+        my_color: null,
+      },
+    ];
+
+    render(
+      <OpenLobbyModal
+        open={true}
+        onClose={vi.fn()}
+        rooms={rooms}
+        onJoinRoom={vi.fn()}
+        onOpenMatch={vi.fn()}
+        onCreateRoomClick={vi.fn()}
+        onRefresh={vi.fn()}
+        onCloseRoom={vi.fn()}
+        onLeaveRoom={onLeaveRoom}
+      />
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Minhas \(2\)/i })
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: /Encerrar sala JOIN88/i })
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Sair da sala JOIN88/i }));
+    expect(onLeaveRoom).toHaveBeenCalledWith("JOIN88");
   }, 15000);
 });

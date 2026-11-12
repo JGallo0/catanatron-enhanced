@@ -18,7 +18,7 @@ import "./Board.scss";
  * Computes optimal hex size based on available canvas dimensions.
  */
 function computeDefaultSize(divWidth: number, divHeight: number): number {
-  const numLevels = 6.2; // 3 land rings + outer port ring + margin
+  const numLevels = 7.0; // 3 land rings + outer illustrated harbor ring + ocean clearance
   const maxSizeThatRespectsHeight = (4 * divHeight) / (3 * numLevels + 1) / 2;
   const correspondingWidth = SQRT3 * maxSizeThatRespectsHeight;
   if (numLevels * correspondingWidth < divWidth) {
@@ -44,6 +44,8 @@ function getLastRolledSum(gameState: GameState): number | null {
 type BoardProps = {
   width: number;
   height: number;
+  containerWidth?: number;
+  containerHeight?: number;
   buildOnNodeClick: (
     id: number,
     action?: GameAction
@@ -63,11 +65,15 @@ type BoardProps = {
   robberCoordinates?: Set<string>;
   recentNodeId?: number | null;
   recentEdgeId?: string | null;
+  pendingNodeId?: number | null;
+  pendingEdgeId?: string | null;
 };
 
 export default function Board({
   width,
   height,
+  containerWidth,
+  containerHeight,
   buildOnNodeClick,
   buildOnEdgeClick,
   handleTileClick,
@@ -81,20 +87,39 @@ export default function Board({
   robberCoordinates,
   recentNodeId = null,
   recentEdgeId = null,
+  pendingNodeId = null,
+  pendingEdgeId = null,
 }: BoardProps) {
-  // Exact available viewport after accounting for HUD, PlayerTopBar and bottom console
+  // Exact available viewport: prefer ResizeObserver container bounds when mounted in ZoomableBoard
   const leftSidebarWidth = 0;
   const isCompactHeight = height <= 520;
-  const canvasWidth = Math.max(280, width - leftSidebarWidth);
-  const reservedHeight = isCompactHeight ? 184 : isMobile ? 248 : 238;
-  const canvasHeight = Math.max(
+  const hasMeasuredContainer =
+    typeof containerWidth === "number" &&
+    containerWidth > 0 &&
+    typeof containerHeight === "number" &&
+    containerHeight > 0;
+  const fallbackCanvasWidth = Math.max(280, width - leftSidebarWidth);
+  const reservedHeight = isCompactHeight
+    ? 184
+    : isMobile || width <= 980
+      ? 344
+      : 268;
+  const fallbackCanvasHeight = Math.max(
     isCompactHeight ? 200 : 280,
     height - reservedHeight
   );
-  const margin = isMobile ? 12 : 24;
+  const canvasWidth = hasMeasuredContainer ? containerWidth : fallbackCanvasWidth;
+  const canvasHeight = hasMeasuredContainer
+    ? Math.max(180, containerHeight)
+    : fallbackCanvasHeight;
+  const margin = isMobile ? 16 : 24;
 
-  const center: [number, number] = [canvasWidth / 2, canvasHeight / 2];
   const size = computeDefaultSize(canvasWidth - margin, canvasHeight - margin);
+  // Nudge center up slightly so bottom harbor ships + hanging 2:1/3:1 placards share balanced sea margin
+  const center: [number, number] = [
+    canvasWidth / 2,
+    canvasHeight / 2 - (size ? size * 0.1 : 0),
+  ];
 
   const lastRolledSum = useMemo(() => getLastRolledSum(gameState), [gameState]);
   const robberCoordKey = `${gameState.robber_coordinate}`;
@@ -142,6 +167,7 @@ export default function Board({
         color={color}
         flashing={!replayMode && !!nodeActions && id in nodeActions}
         isRecent={recentNodeId === id}
+        isPending={pendingNodeId === id}
         onClick={buildOnNodeClick(
           id,
           nodeActions ? nodeActions[id] : undefined
@@ -170,6 +196,7 @@ export default function Board({
           color={color}
           flashing={!!action}
           isRecent={recentEdgeId === normalizedEdgeId}
+          isPending={pendingEdgeId === normalizedEdgeId}
           onClick={buildOnEdgeClick(id, action)}
         />
       );
@@ -184,16 +211,77 @@ export default function Board({
         height: canvasHeight,
       }}
     >
-      {/* Ambient Caribbean Ocean Reef Glow behind Catan island */}
+      {/* Realistic Sunset Ocean Lagoons, Turquoise Coastal Shoals & Nautical Chart */}
       <div
-        className="board__island-glow"
+        className="board__seascape-underlay"
         style={{
           left: center[0],
           top: center[1],
-          width: size * 8.4,
-          height: size * 8.4,
+          width: size * 10.6,
+          height: size * 10.6,
         }}
-      />
+        aria-hidden="true"
+      >
+        <svg viewBox="0 0 600 600" width="100%" height="100%">
+          <defs>
+            <radialGradient id="catanReefShallow" cx="50%" cy="50%" r="48%">
+              <stop offset="0%" stopColor="#fde68a" stopOpacity="0.46" />
+              <stop offset="46%" stopColor="#2dd4bf" stopOpacity="0.42" />
+              <stop offset="68%" stopColor="#0284c7" stopOpacity="0.28" />
+              <stop offset="86%" stopColor="#075985" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#04182b" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="catanSunCaustic" cx="62%" cy="32%" r="36%">
+              <stop offset="0%" stopColor="#fef08a" stopOpacity="0.26" />
+              <stop offset="60%" stopColor="#f59e0b" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="#0284c7" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          <circle cx="300" cy="300" r="292" fill="url(#catanReefShallow)" />
+          <circle cx="300" cy="300" r="285" fill="url(#catanSunCaustic)" />
+
+          {/* Gentle coastal surf ripples embracing Catan Island */}
+          <circle
+            className="board__surf-ring board__surf-ring--inner"
+            cx="300"
+            cy="300"
+            r="204"
+            fill="none"
+            stroke="rgba(224, 242, 254, 0.34)"
+            strokeWidth="2.4"
+            strokeDasharray="18 14 8 16"
+          />
+          <circle
+            className="board__surf-ring board__surf-ring--outer"
+            cx="300"
+            cy="300"
+            r="238"
+            fill="none"
+            stroke="rgba(125, 211, 252, 0.24)"
+            strokeWidth="2"
+            strokeDasharray="28 22 10 24"
+          />
+
+          {/* Faint nautical atlas rhumb ring & miniature compass rose */}
+          <circle
+            cx="300"
+            cy="300"
+            r="268"
+            fill="none"
+            stroke="rgba(250, 204, 21, 0.14)"
+            strokeWidth="1"
+            strokeDasharray="4 8"
+          />
+          <g transform="translate(506, 492)" opacity="0.34">
+            <circle cx="0" cy="0" r="22" fill="none" stroke="#fde68a" strokeWidth="1" />
+            <polygon points="0,-24 4,-4 0,-8 -4,-4" fill="#facc15" />
+            <polygon points="0,24 4,4 0,8 -4,4" fill="#bae6fd" />
+            <polygon points="24,0 4,4 8,0 4,-4" fill="#bae6fd" />
+            <polygon points="-24,0 -4,4 -8,0 -4,-4" fill="#bae6fd" />
+          </g>
+        </svg>
+      </div>
       {tiles}
       {edges}
       {nodes}

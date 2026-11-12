@@ -21,13 +21,18 @@ import { PLAYER_COLOR_META } from "../config/assetRegistry";
 type BuildingProps<T = Color | null> = {
   color: T;
   building: T extends Color ? BuildingType : null;
+  size: number;
 };
 
-function Building({ building, color }: BuildingProps) {
+function Building({ building, color, size }: BuildingProps) {
   if (!color) return null;
   const type = building === "CITY" ? "city" : "settlement";
   const label = PLAYER_COLOR_META[color]?.label || color;
   const pieceName = building === "CITY" ? "Cidade (2 PV)" : "Aldeia (1 PV)";
+  const svgSize =
+    building === "CITY"
+      ? Math.max(38, Math.min(54, Math.round(size * 0.72)))
+      : Math.max(34, Math.min(48, Math.round(size * 0.64)));
 
   return (
     <div
@@ -35,15 +40,15 @@ function Building({ building, color }: BuildingProps) {
       title={`${pieceName} — ${label}`}
     >
       <svg
-        width="44"
-        height="44"
-        viewBox="-22 -24 44 42"
+        width={svgSize}
+        height={svgSize}
+        viewBox="-24 -30 48 52"
         className="building-piece__svg"
       >
         {building === "CITY" ? (
-          <CitySvgPiece color={color} scale={1.12} />
+          <CitySvgPiece color={color} scale={1.06} />
         ) : (
-          <SettlementSvgPiece color={color} scale={1.12} />
+          <SettlementSvgPiece color={color} scale={1.08} />
         )}
       </svg>
     </div>
@@ -59,6 +64,7 @@ type NodeProps = {
   color: Color | null;
   flashing: boolean;
   isRecent?: boolean;
+  isPending?: boolean;
   onClick: React.MouseEventHandler<HTMLDivElement>;
 };
 
@@ -71,6 +77,7 @@ export default function Node({
   color,
   flashing,
   isRecent,
+  isPending,
   onClick,
 }: NodeProps) {
   const [centerX, centerY] = center;
@@ -88,6 +95,7 @@ export default function Node({
         "node--occupied": !!color,
         "node--buildable": flashing,
         "node--recent": !!isRecent,
+        "node--pending": !!isPending,
       })}
       style={{
         width: nodeDiameter,
@@ -103,7 +111,7 @@ export default function Node({
         onClick(e);
       }}
     >
-      {color && <Building building={building} color={color} />}
+      {color && <Building building={building} color={color} size={size} />}
       {flashing && (
         <div
           className="pulse"

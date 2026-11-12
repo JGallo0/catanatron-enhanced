@@ -1,31 +1,42 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Button, MenuItem, Select } from "@mui/material";
+import { Button, IconButton, MenuItem, Select, Tooltip } from "@mui/material";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import { GridLoader } from "react-spinners";
 import {
-  DEFAULT_PLAYERS,
+  closeRoom,
   fetchCurrentAccount,
-  getPlayers,
   getRoom,
   getSavedAccount,
   joinRoom,
+  leaveRoom,
   saveGameRoomCode,
   updateRoom,
   startRoomGame,
+  type BotDifficulty,
+  type DiceMode,
   type PlayerAccount,
-  type PlayerEntry,
 } from "../utils/apiClient";
 import type { Color, RoomState } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { getGuestProfile, type GuestProfile } from "../config/avatarCatalog";
 import {
+  BOT_AVATAR_PROFILES,
+  BOT_DIFFICULTY_OPTIONS,
+  difficultyFromPlayerKey,
+  formatBotDifficultyLabel,
+  formatMapTemplateLabel,
   isOfficialBotName,
+  OFFICIAL_BOT_NAMES,
+  OPEN_SEAT_LABEL,
   pickBotNameDeterministic,
   pickBotNames,
+  playerKeyForDifficulty,
   resolveSeatAvatarProps,
 } from "../config/botCatalog";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
+import MapTemplatePreview from "../components/home/MapTemplatePreview";
 
 import "./RoomLobbyPage.scss";
 
@@ -74,8 +85,6 @@ export default function RoomLobbyPage() {
   const navigate = useNavigate();
 
   const [room, setRoom] = useState<RoomState | null>(null);
-  const [availablePlayers, setAvailablePlayers] =
-    useState<PlayerEntry[]>(DEFAULT_PLAYERS);
   const [playerName, setPlayerName] = useState(() => {
     const saved = getSavedAccount();
     if (saved?.display_name) return saved.display_name;
@@ -86,6 +95,10 @@ export default function RoomLobbyPage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [roomGone, setRoomGone] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [closingRoom, setClosingRoom] = useState(false);
+  const [leavingRoom, setLeavingRoom] = useState(false);
   const [account, setAccount] = useState<PlayerAccount | null>(() =>
     getSavedAccount()
   );
@@ -93,6 +106,7 @@ export default function RoomLobbyPage() {
     getGuestProfile()
   );
   const [avatarStudioOpen, setAvatarStudioOpen] = useState(false);
+  const roomEpochRef = useRef(0);
 
   useEffect(() => {
     fetchCurrentAccount()
@@ -107,12 +121,12 @@ export default function RoomLobbyPage() {
       .catch(() => {});
   }, []);
 
-  const token = getStoredToken(roomCode);
-
   const fetchRoomState = useCallback(async () => {
-    if (!roomCode) return;
+    if (!roomCode || roomGone || closingRoom) return;
+    const startEpoch = roomEpochRef.current;
     try {
       const data = await getRoom(roomCode, getStoredToken(roomCode));
+      if (startEpoch !== roomEpochRef.current) return;
       setRoom(data);
       if (data.status === "IN_PROGRESS" && data.game_id) {
         saveGameSeat(data.game_id, data.my_color);
@@ -121,24 +135,24 @@ export default function RoomLobbyPage() {
         navigate(`/games/${data.game_id}${query}`);
       }
     } catch (err: any) {
+      if (startEpoch !== roomEpochRef.current) return;
+      if (err?.response?.status === 404 || err?.response?.status === 410) {
+        setRoom(null);
+        setRoomGone(true);
+      }
       setError(
         err?.response?.data?.description ||
-          "Sala não encontrada ou expirada."
+          "Sala não encontrada ou encerrada."
       );
     }
-  }, [roomCode, navigate]);
+  }, [roomCode, roomGone, closingRoom, navigate]);
 
   useEffect(() => {
-    getPlayers()
-      .then(setAvailablePlayers)
-      .catch(() => setAvailablePlayers([]));
-  }, []);
-
-  useEffect(() => {
+    if (!roomCode || roomGone || closingRoom) return;
     fetchRoomState();
     const interval = setInterval(fetchRoomState, 1500);
     return () => clearInterval(interval);
-  }, [fetchRoomState]);
+  }, [roomCode, roomGone, closingRoom, fetchRoomState]);
 
   const inviteUrl =
     typeof window !== "undefined"
@@ -157,6 +171,7 @@ export default function RoomLobbyPage() {
 
   const handleClaimSeat = async (preferredColor?: Color) => {
     if (!roomCode) return;
+    roomEpochRef.current += 1;
     try {
       setError("");
       const cleanName = playerName.trim() || "Amigo";
@@ -176,94 +191,194 @@ export default function RoomLobbyPage() {
     }
   };
 
-  const handleSeatTypeChange = async (index: number, newPlayerKey: string) => {
-    if (!room) return;
-    const usedBotNames = new Set(
-      room.seats
-        .filter((_, idx) => idx !== index)
-        .map((s) => s.player_name)
-        .filter((n) => isOfficialBotName(n))
-    );
-    const nextSeats = room.seats.map((s, idx) => {
-      if (idx !== index) {
+  const resolveRoomDifficulty = (currentRoom: RoomState): BotDifficulty => {
+    if (currentRoom.config.bot_difficulty) {
+      return currentRoom.config.bot_difficulty;
+    }
+    const firstBot = currentRoom.seats.find((s) => s.is_bot);
+    return firstBot ? difficultyFromPlayerKey(firstBot.player_key) : "medium";
+  };
+
+  const handleDifficultyChange = async (nextDiff: BotDifficulty) => {
+    if (!room || !room.is_host || room.status !== "WAITING") return;
+    if (resolveRoomDifficulty(room) === nextDiff) return;
+    roomEpochRef.current += 1;
+    try {
+      setError("");
+      const updated = await updateRoom(room.room_code, {
+        token: getStoredToken(room.room_code),
+        config: { bot_difficulty: nextDiff },
+      });
+      setRoom(updated);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.description ||
+          "Não foi possível alterar a dificuldade dos bots."
+      );
+    }
+  };
+
+  const resolveRoomDiceMode = (currentRoom: RoomState): DiceMode => {
+    return currentRoom.config.dice_mode === "balanced" ? "balanced" : "random";
+  };
+
+  const handleDiceModeChange = async (nextMode: DiceMode) => {
+    if (!room || !room.is_host || room.status !== "WAITING") return;
+    if (resolveRoomDiceMode(room) === nextMode) return;
+    roomEpochRef.current += 1;
+    try {
+      setError("");
+      const updated = await updateRoom(room.room_code, {
+        token: getStoredToken(room.room_code),
+        config: { dice_mode: nextMode },
+      });
+      setRoom(updated);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.description ||
+          "Não foi possível alterar o modo dos dados."
+      );
+    }
+  };
+
+  const handleSeatChange = async (index: number, selectionValue: string) => {
+    if (!room || !room.is_host || room.status !== "WAITING") return;
+    const roomDiff = resolveRoomDifficulty(room);
+    const botKey = playerKeyForDifficulty(roomDiff);
+
+    if (selectionValue.startsWith("BOT:")) {
+      const targetBot = selectionValue.slice(4);
+      const dupOther = room.seats.some(
+        (s, idx) => idx !== index && s.is_bot && s.player_name === targetBot
+      );
+      if (dupOther) return;
+    }
+
+    roomEpochRef.current += 1;
+    try {
+      setError("");
+      const nextSeats = room.seats.map((s, idx) => {
+        if (idx !== index) {
+          return {
+            color: SEAT_COLORS[idx],
+            source_color: s.color,
+            player_key: s.player_key,
+            player_name: s.player_name,
+          };
+        }
+        if (selectionValue === "HUMAN") {
+          return {
+            color: SEAT_COLORS[idx],
+            source_color: s.color,
+            player_key: "HUMAN",
+            player_name: s.claimed ? s.player_name : OPEN_SEAT_LABEL,
+          };
+        }
+        if (selectionValue === "RELEASE_HUMAN") {
+          return {
+            color: SEAT_COLORS[idx],
+            source_color: s.color,
+            player_key: "HUMAN",
+            player_name: OPEN_SEAT_LABEL,
+            release_claim: true,
+          };
+        }
+        const chosenBot = selectionValue.startsWith("BOT:")
+          ? selectionValue.slice(4)
+          : pickBotNames(1)[0];
         return {
-          color: s.color,
-          player_key: s.player_key,
-          player_name: s.player_name,
+          color: SEAT_COLORS[idx],
+          source_color: s.color,
+          player_key: botKey,
+          player_name: chosenBot,
         };
-      }
-      if (newPlayerKey === "HUMAN") {
-        return {
-          color: s.color,
-          player_key: "HUMAN",
-          player_name: s.is_me ? playerName : "Aguardando Amigo...",
-        };
-      }
-      const keptName = isOfficialBotName(s.player_name) && !usedBotNames.has(s.player_name)
-        ? s.player_name
-        : pickBotNames(1, usedBotNames)[0];
-      return {
-        color: s.color,
-        player_key: newPlayerKey,
-        player_name: keptName,
-      };
-    });
-    const updated = await updateRoom(room.room_code, {
-      token,
-      seats: nextSeats,
-    });
-    setRoom(updated);
+      });
+
+      const updated = await updateRoom(room.room_code, {
+        token: getStoredToken(room.room_code),
+        seats: nextSeats,
+      });
+      setRoom(updated);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.description ||
+          "Não foi possível atualizar o assento."
+      );
+    }
   };
 
   const handleAddSeat = async () => {
-    if (!room || room.seats.length >= 4) return;
+    if (!room || !room.is_host || room.seats.length >= 4) return;
     const nextColor = SEAT_COLORS[room.seats.length];
     const usedBotNames = new Set(
       room.seats
+        .filter((s) => s.is_bot)
         .map((s) => s.player_name)
         .filter((n) => isOfficialBotName(n))
     );
     const nextBotName = pickBotNames(1, usedBotNames)[0];
+    const botKey = playerKeyForDifficulty(resolveRoomDifficulty(room));
     const nextSeats = [
       ...room.seats.map((s) => ({
         color: s.color,
+        source_color: s.color,
         player_key: s.player_key,
         player_name: s.player_name,
       })),
       {
         color: nextColor,
-        player_key: "CATANATRON",
+        player_key: botKey,
         player_name: nextBotName,
       },
     ];
-    const updated = await updateRoom(room.room_code, {
-      token,
-      seats: nextSeats,
-    });
-    setRoom(updated);
+    roomEpochRef.current += 1;
+    try {
+      setError("");
+      const updated = await updateRoom(room.room_code, {
+        token: getStoredToken(room.room_code),
+        seats: nextSeats,
+      });
+      setRoom(updated);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.description ||
+          "Não foi possível adicionar um assento."
+      );
+    }
   };
 
   const handleRemoveSeat = async (index: number) => {
-    if (!room || room.seats.length <= 2) return;
+    if (!room || !room.is_host || room.seats.length <= 2) return;
+    if (room.seats[index]?.is_me) return;
     const filtered = room.seats
       .filter((_, idx) => idx !== index)
       .map((s, idx) => ({
         color: SEAT_COLORS[idx],
+        source_color: s.color,
         player_key: s.player_key,
         player_name: s.player_name,
       }));
-    const updated = await updateRoom(room.room_code, {
-      token,
-      seats: filtered,
-    });
-    setRoom(updated);
+    roomEpochRef.current += 1;
+    try {
+      setError("");
+      const updated = await updateRoom(room.room_code, {
+        token: getStoredToken(room.room_code),
+        seats: filtered,
+      });
+      setRoom(updated);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.description ||
+          "Não foi possível remover o assento."
+      );
+    }
   };
 
   const handleStartGame = async () => {
     if (!room) return;
     try {
       setStarting(true);
-      const res = await startRoomGame(room.room_code, token);
+      const res = await startRoomGame(room.room_code, getStoredToken(room.room_code));
       saveGameSeat(res.game_id, res.room.my_color);
       saveGameRoomCode(res.game_id, res.room.room_code || room.room_code);
       const query = res.room.my_color ? `?seat=${res.room.my_color}` : "";
@@ -276,6 +391,52 @@ export default function RoomLobbyPage() {
     }
   };
 
+  const handleCloseRoom = async () => {
+    if (!room) return;
+    try {
+      setClosingRoom(true);
+      setError("");
+      await closeRoom(room.room_code, getStoredToken(room.room_code));
+      setRoomGone(true);
+      navigate("/");
+    } catch (err: any) {
+      if (err?.response?.status === 404 || err?.response?.status === 410) {
+        setRoomGone(true);
+        navigate("/");
+        return;
+      }
+      setClosingRoom(false);
+      setConfirmCloseOpen(false);
+      setError(
+        err?.response?.data?.description ||
+          err?.message ||
+          "Não foi possível encerrar a sala."
+      );
+    }
+  };
+
+  const handleLeaveRoom = async () => {
+    if (!room) return;
+    try {
+      setLeavingRoom(true);
+      setError("");
+      await leaveRoom(room.room_code, getStoredToken(room.room_code));
+      navigate("/");
+    } catch (err: any) {
+      if (err?.response?.status === 404 || err?.response?.status === 410) {
+        setRoomGone(true);
+        navigate("/");
+        return;
+      }
+      setLeavingRoom(false);
+      setError(
+        err?.response?.data?.description ||
+          err?.message ||
+          "Não foi possível sair da sala."
+      );
+    }
+  };
+
   if (!room && !error) {
     return (
       <div className="room-lobby-page">
@@ -283,6 +444,9 @@ export default function RoomLobbyPage() {
       </div>
     );
   }
+
+  const roomDifficulty = room ? resolveRoomDifficulty(room) : "medium";
+  const roomDiceMode = room ? resolveRoomDiceMode(room) : "random";
 
   return (
     <div className="room-lobby-page">
@@ -294,9 +458,66 @@ export default function RoomLobbyPage() {
           <div className="room-lobby-title-group">
             <h1>Sala Privada #{roomCode.toUpperCase()}</h1>
             <p>
-              Envie o link abaixo para seus amigos entrarem na sala e adicione bots nas vagas restantes
+              Envie o link abaixo para seus amigos entrarem no {OPEN_SEAT_LABEL} ou escolha os bots da mesa
             </p>
           </div>
+          {room && room.is_host && (
+            <div className="room-lobby-header__actions">
+              {confirmCloseOpen ? (
+                <div
+                  className="room-lobby-confirm-close"
+                  role="group"
+                  aria-label={`Confirmar encerramento da sala ${room.room_code}`}
+                >
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    className="room-lobby-confirm-btn"
+                    disabled={closingRoom}
+                    onClick={handleCloseRoom}
+                  >
+                    {closingRoom ? "Encerrando..." : "Confirmar"}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="text"
+                    className="room-lobby-cancel-btn"
+                    disabled={closingRoom}
+                    onClick={() => setConfirmCloseOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  className="room-lobby-close-btn"
+                  onClick={() => setConfirmCloseOpen(true)}
+                >
+                  🗑️ Encerrar Sala
+                </Button>
+              )}
+            </div>
+          )}
+          {room &&
+            !room.is_host &&
+            room.my_color &&
+            room.status === "WAITING" && (
+              <div className="room-lobby-header__actions">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  className="room-lobby-leave-btn"
+                  disabled={leavingRoom}
+                  onClick={handleLeaveRoom}
+                >
+                  {leavingRoom ? "Saindo..." : "🚪 Sair da Sala"}
+                </Button>
+              </div>
+            )}
         </div>
 
         {error && <div className="room-lobby-error">{error}</div>}
@@ -337,7 +558,7 @@ export default function RoomLobbyPage() {
               >
                 {room.my_color
                   ? `Atualizar Nome (${PLAYER_COLOR_META[room.my_color].label})`
-                  : "🪑 Ocupar Vaga Humana"}
+                  : "🪑 Ocupar Assento Livre"}
               </Button>
               <Button
                 variant="outlined"
@@ -349,12 +570,100 @@ export default function RoomLobbyPage() {
               </Button>
             </div>
 
+            {/* Bot Difficulty Selector (Single Global Room Setting) */}
+            <div className="lobby-difficulty-bar">
+              <div className="lobby-difficulty-bar__header">
+                <span>Dificuldade dos Bots</span>
+                <strong>{formatBotDifficultyLabel(roomDifficulty)}</strong>
+              </div>
+              <div
+                className="lobby-difficulty-bar__options"
+                role="group"
+                aria-label="Dificuldade dos Bots"
+              >
+                {BOT_DIFFICULTY_OPTIONS.map((opt) => (
+                  <Button
+                    key={opt.value}
+                    variant="contained"
+                    size="small"
+                    disabled={!room.is_host || room.status !== "WAITING"}
+                    aria-pressed={roomDifficulty === opt.value}
+                    title={opt.description}
+                    className={`lobby-difficulty-btn ${
+                      roomDifficulty === opt.value ? "selected" : ""
+                    }`}
+                    onClick={() => handleDifficultyChange(opt.value)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Dice Mode Selector */}
+            <div className="lobby-dice-bar">
+              <div className="lobby-dice-bar__header">
+                <span className="lobby-inline-title">
+                  Modo dos Dados
+                  <Tooltip
+                    title="Padrão usa 2 dados clássicos (2d6). Equilibrados usa um baralho de 36 pares embaralhados, reembaralhando ao restarem 5 cartas."
+                    arrow
+                    enterTouchDelay={0}
+                    leaveTouchDelay={3000}
+                  >
+                    <IconButton
+                      size="small"
+                      className="lobby-help-btn"
+                      aria-label="Ajuda sobre Modo dos Dados"
+                    >
+                      <HelpOutlineRoundedIcon fontSize="inherit" />
+                    </IconButton>
+                  </Tooltip>
+                </span>
+                <strong>
+                  {roomDiceMode === "balanced"
+                    ? "Equilibrados (Baralho 36)"
+                    : "Padrão (2d6)"}
+                </strong>
+              </div>
+              <div
+                className="lobby-dice-bar__options"
+                role="group"
+                aria-label="Modo dos Dados"
+              >
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={!room.is_host || room.status !== "WAITING"}
+                  aria-pressed={roomDiceMode === "random"}
+                  className={`lobby-dice-btn ${
+                    roomDiceMode === "random" ? "selected" : ""
+                  }`}
+                  onClick={() => handleDiceModeChange("random")}
+                >
+                  🎲 Padrão (2d6)
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={!room.is_host || room.status !== "WAITING"}
+                  aria-pressed={roomDiceMode === "balanced"}
+                  className={`lobby-dice-btn ${
+                    roomDiceMode === "balanced" ? "selected" : ""
+                  }`}
+                  onClick={() => handleDiceModeChange("balanced")}
+                >
+                  🎴 Equilibrados (Baralho 36)
+                </Button>
+              </div>
+            </div>
+
             {/* Seats List */}
             <div className="lobby-seats-section">
               <div className="lobby-seats-header">
                 <span>Assentos da Partida ({room.seats.length}/4)</span>
                 <small>
-                  Misture amigos humanos (via link) e bots de estratégia na ilha
+                  Deixe em {OPEN_SEAT_LABEL} para amigos entrarem pelo link ou selecione um perfil de bot
                 </small>
               </div>
 
@@ -367,7 +676,9 @@ export default function RoomLobbyPage() {
                     ? isOfficialBotName(seat.player_name)
                       ? seat.player_name
                       : pickBotNameDeterministic(idx)
-                    : seat.player_name;
+                    : isOpenHuman
+                      ? OPEN_SEAT_LABEL
+                      : seat.player_name;
                   const resolvedAvatar = !isOpenHuman
                     ? resolveSeatAvatarProps({
                         color: seat.color,
@@ -393,6 +704,15 @@ export default function RoomLobbyPage() {
                           : undefined,
                       })
                     : null;
+
+                  const selectValue = seat.is_bot
+                    ? `BOT:${displaySeatName}`
+                    : "HUMAN";
+
+                  const canEditSeat =
+                    room.is_host &&
+                    room.status === "WAITING" &&
+                    !seat.is_me;
 
                   return (
                     <div
@@ -427,7 +747,7 @@ export default function RoomLobbyPage() {
                             {seat.is_me
                               ? `★ Seu Assento (${displaySeatName})`
                               : isOpenHuman
-                                ? "🔓 Vaga Aberta"
+                                ? `🔓 ${OPEN_SEAT_LABEL}`
                                 : displaySeatName}
                           </small>
                         </div>
@@ -437,52 +757,105 @@ export default function RoomLobbyPage() {
                         <Select
                           size="small"
                           fullWidth
-                          value={seat.player_key}
+                          SelectDisplayProps={{
+                            "aria-label": `Assento ${palette.label}`,
+                          }}
+                          disabled={!canEditSeat}
+                          value={selectValue}
                           onChange={(e) =>
-                            handleSeatTypeChange(idx, e.target.value as string)
+                            handleSeatChange(idx, e.target.value as string)
                           }
                         >
-                          <MenuItem value="HUMAN">
-                            👤 Humano ({seat.claimed ? seat.player_name : "Vaga para Amigo"})
-                          </MenuItem>
-                          {availablePlayers
-                            .filter((p) => p.is_bot)
-                            .map((bot) => (
-                              <MenuItem key={bot.key} value={bot.key}>
-                                {bot.name}
+                          {!seat.is_bot && seat.claimed ? (
+                            <MenuItem value="HUMAN">
+                              <span className="lobby-select-option">
+                                <span>
+                                  👤 {displaySeatName}
+                                  {seat.is_me ? " (Você)" : ""}
+                                </span>
+                              </span>
+                            </MenuItem>
+                          ) : (
+                            <MenuItem value="HUMAN">
+                              <span className="lobby-select-option">
+                                <span>🪑 {OPEN_SEAT_LABEL}</span>
+                              </span>
+                            </MenuItem>
+                          )}
+
+                          {!seat.is_bot && seat.claimed && !seat.is_me && (
+                            <MenuItem value="RELEASE_HUMAN">
+                              <span className="lobby-select-option">
+                                <span>🪑 {OPEN_SEAT_LABEL} (Liberar vaga)</span>
+                              </span>
+                            </MenuItem>
+                          )}
+
+                          {OFFICIAL_BOT_NAMES.map((botName) => {
+                            const botVal = `BOT:${botName}`;
+                            const takenElsewhere = room.seats.some(
+                              (other, otherIdx) =>
+                                otherIdx !== idx &&
+                                other.is_bot &&
+                                other.player_name === botName
+                            );
+                            return (
+                              <MenuItem
+                                key={botVal}
+                                value={botVal}
+                                disabled={takenElsewhere}
+                              >
+                                <span className="lobby-select-option">
+                                  <PlayerAvatar
+                                    config={BOT_AVATAR_PROFILES[botName]}
+                                    username={botName}
+                                    size={22}
+                                  />
+                                  <span>{botName}</span>
+                                  {takenElsewhere && (
+                                    <span className="lobby-option-hint">
+                                      (na mesa)
+                                    </span>
+                                  )}
+                                </span>
                               </MenuItem>
-                            ))}
+                            );
+                          })}
                         </Select>
                       </div>
 
                       <div className="lobby-seat-row__actions">
-                        {seat.player_key === "HUMAN" && !seat.is_me && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            className="claim-seat-btn"
-                            onClick={() => handleClaimSeat(seat.color)}
-                          >
-                            Sentar Aqui
-                          </Button>
-                        )}
-                        {room.seats.length > 2 && (
-                          <Button
-                            size="small"
-                            variant="text"
-                            className="remove-seat-btn"
-                            onClick={() => handleRemoveSeat(idx)}
-                          >
-                            Remover
-                          </Button>
-                        )}
+                        {seat.player_key === "HUMAN" &&
+                          !seat.claimed &&
+                          !seat.is_me && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              className="claim-seat-btn"
+                              onClick={() => handleClaimSeat(seat.color)}
+                            >
+                              Sentar Aqui
+                            </Button>
+                          )}
+                        {room.is_host &&
+                          room.seats.length > 2 &&
+                          !seat.is_me && (
+                            <Button
+                              size="small"
+                              variant="text"
+                              className="remove-seat-btn"
+                              onClick={() => handleRemoveSeat(idx)}
+                            >
+                              Remover
+                            </Button>
+                          )}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {room.seats.length < 4 && (
+              {room.is_host && room.seats.length < 4 && (
                 <Button
                   variant="outlined"
                   className="add-seat-btn"
@@ -493,9 +866,24 @@ export default function RoomLobbyPage() {
               )}
             </div>
 
-            {/* Rules Summary */}
+            {/* Map Preview & Rules Summary */}
+            <MapTemplatePreview template={room.config.map_template} compact />
+
             <div className="lobby-rules-summary">
-              <span>🗺️ Mapa: <strong>{room.config.map_template}</strong></span>
+              <span>
+                🗺️ Mapa:{" "}
+                <strong>{formatMapTemplateLabel(room.config.map_template)}</strong>
+              </span>
+              <span>
+                🤖 Bots:{" "}
+                <strong>{formatBotDifficultyLabel(roomDifficulty)}</strong>
+              </span>
+              <span>
+                🎲 Dados:{" "}
+                <strong>
+                  {roomDiceMode === "balanced" ? "Equilibrados" : "Padrão (2d6)"}
+                </strong>
+              </span>
               <span>🏆 Vitória: <strong>{room.config.vps_to_win} PV</strong></span>
               <span>🃏 Limite Descarte: <strong>{room.config.discard_limit} cartas</strong></span>
               <span>

@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -8,10 +8,12 @@ import { StateProvider, store } from "../store";
 import type { GameState } from "../utils/api.types";
 import {
   abandonGame,
+  getGameMessages,
   getState,
   postAction,
   reclaimGame,
   sendGameHeartbeat,
+  sendGameMessage,
   setPerspective,
 } from "../utils/apiClient";
 import { dispatchSnackbar } from "../components/Snackbar";
@@ -28,6 +30,8 @@ vi.mock("../utils/apiClient", () => ({
   postAction: vi.fn(),
   getMctsAnalysis: vi.fn(),
   setPerspective: vi.fn(),
+  getGameMessages: vi.fn().mockResolvedValue([]),
+  sendGameMessage: vi.fn(),
   sendGameHeartbeat: vi.fn().mockResolvedValue({
     ok: true,
     bot_colors: [],
@@ -275,25 +279,29 @@ test("enables Trocar post-roll without maritime 4:1 cards and opens TradeOfferDe
   ).toBeEnabled();
 });
 
-test("toggles pacing speed between Normal (1x) and Rápido (0.5x) and persists catan_game_speed_v1", async () => {
+test("cycles pacing speed across Normal, Rápida, and Turbo and persists catan_game_speed_v1", async () => {
   vi.mocked(getState).mockResolvedValue(baseState);
 
   renderGameScreen();
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
-  const speedBtn = screen.getByRole("button", { name: /Normal \(1x\)/i });
-  expect(speedBtn).toBeInTheDocument();
+  const normalBtn = screen.getByRole("button", { name: /Velocidade: Normal/i });
+  expect(normalBtn).toBeInTheDocument();
   expect(localStorage.getItem("catan_game_speed_v1")).toBeNull();
 
-  fireEvent.click(speedBtn);
-  expect(
-    screen.getByRole("button", { name: /Rápido \(0\.5x\)/i })
-  ).toBeInTheDocument();
+  fireEvent.click(normalBtn);
+  const fastBtn = screen.getByRole("button", { name: /Velocidade: Rápida/i });
+  expect(fastBtn).toBeInTheDocument();
   expect(localStorage.getItem("catan_game_speed_v1")).toBe("fast");
 
-  fireEvent.click(screen.getByRole("button", { name: /Rápido \(0\.5x\)/i }));
+  fireEvent.click(fastBtn);
+  const turboBtn = screen.getByRole("button", { name: /Velocidade: Turbo/i });
+  expect(turboBtn).toBeInTheDocument();
+  expect(localStorage.getItem("catan_game_speed_v1")).toBe("turbo");
+
+  fireEvent.click(turboBtn);
   expect(
-    screen.getByRole("button", { name: /Normal \(1x\)/i })
+    screen.getByRole("button", { name: /Velocidade: Normal/i })
   ).toBeInTheDocument();
   expect(localStorage.getItem("catan_game_speed_v1")).toBe("normal");
 });
@@ -350,6 +358,7 @@ test("shows animated DiceRollOverlay (Total 8) and .action-spotlight-toast on RO
   const { container } = renderGameScreen();
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
+  expect(container.querySelector(".ocean-panorama-backdrop")).toBeInTheDocument();
   expect(postAction).toHaveBeenCalledWith("game-123", undefined, {
     botOnly: true,
   });
@@ -366,13 +375,13 @@ test("shows animated DiceRollOverlay (Total 8) and .action-spotlight-toast on RO
   expect(screen.getByText(/Rolando\.\.\./i)).toBeInTheDocument();
 
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(600);
+    await vi.advanceTimersByTimeAsync(3350);
   });
 
   expect(screen.getByText(/Total 8/i)).toBeInTheDocument();
 
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(5200);
   });
 
   expect(screen.queryByText(/Total 8/i)).not.toBeInTheDocument();
@@ -470,4 +479,315 @@ test("supports multiplayer Sair (Bot Assume) dialog, abandonGame, Retomar Meu As
   expect(
     screen.queryByRole("button", { name: /Retomar Meu Assento/i })
   ).not.toBeInTheDocument();
+});
+
+test("supports in-match chat sending and incoming peer unread badge notifications", async () => {
+  vi.useFakeTimers();
+  const mpState = makeGameState({
+    room_code: "CHAT99",
+    colors: ["RED", "BLUE"],
+    bot_colors: [],
+    current_color: "BLUE",
+    seat_names: { RED: "Ana", BLUE: "João" },
+  });
+
+  vi.mocked(getState).mockResolvedValue(mpState);
+  vi.mocked(getGameMessages).mockResolvedValue([]);
+  vi.mocked(sendGameMessage).mockResolvedValue({
+    id: 1,
+    game_id: "game-123",
+    color: "BLUE",
+    sender_name: "João",
+    kind: "CHAT",
+    body: "Troco tijolo!",
+    created_at: 1700000100,
+  });
+
+  renderGameScreen({ initialEntry: "/games/game-123?seat=BLUE" });
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
+  expect(screen.getByTestId("board")).toBeInTheDocument();
+
+  const chatBtn = screen.getByRole("button", { name: /^Bate-papo$/i });
+  await act(async () => {
+    fireEvent.click(chatBtn);
+    await vi.advanceTimersByTimeAsync(10);
+  });
+
+  const input = screen.getByLabelText("Mensagem de bate-papo");
+  fireEvent.change(input, { target: { value: "Troco tijolo!" } });
+  await act(async () => {
+    fireEvent.submit(input.closest("form")!);
+  });
+
+  expect(sendGameMessage).toHaveBeenCalledWith("game-123", {
+    body: "Troco tijolo!",
+    color: "BLUE",
+    senderName: "João",
+  });
+  expect(screen.getByText("Troco tijolo!")).toBeInTheDocument();
+
+  // Close chat and simulate peer message arriving on poll
+  fireEvent.click(screen.getByRole("button", { name: "Fechar bate-papo" }));
+
+  vi.mocked(getGameMessages).mockResolvedValueOnce([
+    {
+      id: 2,
+      game_id: "game-123",
+      color: "RED",
+      sender_name: "Ana",
+      kind: "CHAT",
+      body: "Fechado!",
+      created_at: 1700000120,
+    },
+  ]);
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1600);
+  });
+
+  expect(
+    screen.getByRole("button", { name: /Bate-papo \(1 não lidas\)/i })
+  ).toBeInTheDocument();
+  expect(screen.getByText("Fechado!")).toBeInTheDocument();
+});
+
+test("shows 10s 'Boa Guerra' splash at state_index === 0 while gating bots until elapsed and supports Zarpar early dismiss", async () => {
+  vi.useFakeTimers();
+  const introBotState = makeGameState({
+    state_index: 0,
+    colors: ["RED", "BLUE"],
+    bot_colors: ["RED"],
+    current_color: "RED",
+    seat_names: { RED: "Creitu", BLUE: "João" },
+  });
+  vi.mocked(getState).mockResolvedValue(introBotState);
+  vi.mocked(postAction).mockResolvedValue(introBotState);
+
+  renderGameScreen({ initialEntry: "/games/game-123?seat=BLUE" });
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+
+  expect(screen.getByText("Boa Guerra")).toBeInTheDocument();
+  expect(postAction).not.toHaveBeenCalled();
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(9800);
+  });
+  expect(screen.getByText("Boa Guerra")).toBeInTheDocument();
+  expect(postAction).not.toHaveBeenCalled();
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(250);
+  });
+
+  expect(screen.queryByText("Boa Guerra")).not.toBeInTheDocument();
+  expect(postAction).toHaveBeenCalledWith("game-123", undefined, {
+    botOnly: true,
+  });
+
+  cleanup();
+  vi.clearAllMocks();
+  vi.mocked(getState).mockResolvedValue(introBotState);
+  vi.mocked(postAction).mockResolvedValue(introBotState);
+
+  renderGameScreen({ initialEntry: "/games/game-123?seat=BLUE" });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByText("Boa Guerra")).toBeInTheDocument();
+  const zarparBtn = screen.getByRole("button", { name: /Zarpar para a Ilha/i });
+  await act(async () => {
+    fireEvent.click(zarparBtn);
+  });
+  expect(screen.queryByText("Boa Guerra")).not.toBeInTheDocument();
+  expect(postAction).toHaveBeenCalledWith("game-123", undefined, {
+    botOnly: true,
+  });
+});
+
+test("shows 3s 'Vez de ...' turn transition banner and visible discarded resource drops", async () => {
+  const botTurn = makeGameState({
+    state_index: 12,
+    current_color: "RED",
+    bot_colors: ["RED"],
+    seat_names: { RED: "Jaó", BLUE: "João" },
+    action_records: [],
+  });
+  const afterTurn = makeGameState({
+    state_index: 15,
+    current_color: "BLUE",
+    bot_colors: ["RED"],
+    seat_names: { RED: "Jaó", BLUE: "João" },
+    action_records: [
+      [["RED", "DISCARD_RESOURCE", "BRICK"], "BRICK"],
+      [["RED", "DISCARD_RESOURCE", "WOOD"], "WOOD"],
+      [["RED", "END_TURN", null], null],
+    ] as GameState["action_records"],
+  });
+  const firstAction = deferred<GameState>();
+  vi.mocked(getState).mockResolvedValue(botTurn);
+  vi.mocked(postAction).mockReturnValue(firstAction.promise);
+
+  renderGameScreen({ initialEntry: "/games/game-123?seat=BLUE" });
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  vi.useFakeTimers();
+
+  await act(async () => {
+    firstAction.resolve(afterTurn);
+    await firstAction.promise;
+  });
+
+  expect(screen.getByText(/Vez de João — Sua vez!/i)).toBeInTheDocument();
+  expect(screen.getByText("−Argila")).toBeInTheDocument();
+  expect(screen.getByText("−Madeira")).toBeInTheDocument();
+  expect(
+    screen.getByRole("complementary", { name: /Últimas jogadas na mesa/i })
+  ).toBeInTheDocument();
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1600);
+  });
+  expect(screen.getByText(/Vez de João — Sua vez!/i)).toBeInTheDocument();
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1550);
+  });
+
+  expect(screen.queryByText(/Vez de João — Sua vez!/i)).not.toBeInTheDocument();
+});
+
+test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animates incoming peer taunt", async () => {
+  vi.useFakeTimers();
+  const mpState = makeGameState({
+    room_code: "TAUNT1",
+    colors: ["RED", "BLUE"],
+    bot_colors: [],
+    current_color: "BLUE",
+    seat_names: { RED: "Ana", BLUE: "João" },
+  });
+
+  vi.mocked(getState).mockResolvedValue(mpState);
+  vi.mocked(getGameMessages).mockResolvedValue([]);
+  vi.mocked(sendGameMessage).mockResolvedValue({
+    id: 10,
+    game_id: "game-123",
+    color: "BLUE",
+    sender_name: "João",
+    kind: "TAUNT",
+    body: "[TAUNT:boa_guerra] ⚔️ Boa guerra a todos!",
+    created_at: 1700000200,
+  });
+
+  renderGameScreen({ initialEntry: "/games/game-123?seat=BLUE" });
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
+  expect(screen.getByTestId("board")).toBeInTheDocument();
+
+  const tauntBtn = screen.getByRole("button", { name: /^Provocações$/i });
+  fireEvent.click(tauntBtn);
+
+  const boaGuerraItem = screen.getByRole("button", { name: /Boa Guerra!/i });
+  await act(async () => {
+    fireEvent.click(boaGuerraItem);
+  });
+
+  expect(sendGameMessage).toHaveBeenCalledWith("game-123", {
+    body: "[TAUNT:boa_guerra] ⚔️ Boa guerra a todos!",
+    color: "BLUE",
+    senderName: "João",
+    kind: "TAUNT",
+  });
+  expect(screen.getByText(/Boa guerra a todos!/i)).toBeInTheDocument();
+  expect(tauntBtn).toBeDisabled();
+
+  // Cooldown clears after 3s
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3100);
+  });
+  expect(tauntBtn).toBeEnabled();
+  expect(screen.queryByText(/Boa guerra a todos!/i)).not.toBeInTheDocument();
+
+  // Incoming peer TAUNT animates without adding unread chat count
+  vi.mocked(getGameMessages).mockResolvedValueOnce([
+    {
+      id: 11,
+      game_id: "game-123",
+      color: "RED",
+      sender_name: "Ana",
+      kind: "TAUNT",
+      body: "[TAUNT:brinde] 🍻 Um brinde à ilha!",
+      created_at: 1700000210,
+    },
+  ]);
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1600);
+  });
+
+  expect(screen.getByText(/Um brinde à ilha!/i)).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Bate-papo \(1 não lidas\)/i })
+  ).not.toBeInTheDocument();
+});
+
+test("renders left vertical quick dock shortcuts for AlmanacModal and RightDrawer DiceHistogram", async () => {
+  const rollRichState = makeGameState({
+    game: {
+      id: "game-123",
+      vps_to_win: 10,
+      discard_limit: 7,
+      friendly_robber: false,
+      dice_mode: "balanced",
+    },
+    dice_deck_remaining: 34,
+    action_records: [
+      [["RED", "ROLL", null], [2, 6]],
+      [["BLUE", "ROLL", null], [3, 4]],
+    ] as GameState["action_records"],
+  });
+  vi.mocked(getState).mockResolvedValue(rollRichState);
+
+  renderGameScreen();
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  const dock = screen.getByRole("navigation", { name: /Atalhos da partida/i });
+  expect(dock).toBeInTheDocument();
+
+  const almanacBtn = screen.getByRole("button", { name: /^Almanaque$/i });
+  fireEvent.click(almanacBtn);
+  expect(
+    await screen.findByText(/Almanaque & Regras — Rule the Isle/i)
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Fechar almanaque/i }));
+  await waitFor(() => {
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  const historyBtn = screen.getByRole("button", { name: /^Histórico$/i });
+  fireEvent.click(historyBtn);
+  expect(await screen.findByText(/Histórico de Jogadas/i)).toBeInTheDocument();
+  fireEvent.keyDown(document.activeElement || document.body, { key: "Escape" });
+
+  const soundBtn = screen.getByRole("button", { name: /^Silenciar som$/i });
+  fireEvent.click(soundBtn);
+  expect(screen.getByRole("button", { name: /^Ativar som$/i })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /^Ativar som$/i }));
+
+  const analysisBtn = screen.getByRole("button", { name: /^Chances \(IA\)$/i });
+  fireEvent.click(analysisBtn);
+  expect(
+    await screen.findByRole("region", {
+      name: /Estatísticas e distribuição dos dados/i,
+    })
+  ).toBeInTheDocument();
+  expect(screen.getByText(/2 rolagem\(ns\) · Último: 7/i)).toBeInTheDocument();
+  expect(screen.getByText(/Equilibrados · 34\/36/i)).toBeInTheDocument();
 });

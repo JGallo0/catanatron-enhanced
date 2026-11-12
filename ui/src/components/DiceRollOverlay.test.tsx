@@ -8,9 +8,9 @@ afterEach(() => {
 });
 
 describe("DiceRollOverlay", () => {
-  test("animates cycling dice faces while rolling and settles cleanly on the rolled sum", () => {
+  test("renders 3D tumbling dice cubes while rolling and settles cleanly on the rolled sum", () => {
     vi.useFakeTimers();
-    const { rerender } = render(
+    const { container, rerender } = render(
       <DiceRollOverlay
         open
         rolling
@@ -22,6 +22,9 @@ describe("DiceRollOverlay", () => {
 
     expect(screen.getByText(/Creitu/i)).toBeInTheDocument();
     expect(screen.getByText(/Rolando/i)).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/Dado em rotação/i)).toHaveLength(2);
+    expect(container.querySelectorAll(".dice3d-cube")).toHaveLength(2);
+    expect(container.querySelectorAll(".dice3d-face")).toHaveLength(12);
     expect(screen.queryByText(/Total 8/i)).not.toBeInTheDocument();
 
     act(() => {
@@ -40,5 +43,20 @@ describe("DiceRollOverlay", () => {
 
     expect(screen.getByText(/Total 8/i)).toBeInTheDocument();
     expect(screen.getAllByLabelText(/Dado 4/i)).toHaveLength(2);
+    const stage = screen.getByRole("status");
+    expect(stage).toHaveClass("is-settled");
+    expect(stage).toHaveClass("is-hot");
+
+    rerender(
+      <DiceRollOverlay
+        open
+        rolling={false}
+        dice={[3, 4]}
+        rollerName="Creitu"
+        rollerColor="RED"
+      />
+    );
+    expect(screen.getByText(/Total 7 — Ladrão!/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveClass("is-seven");
   });
 });

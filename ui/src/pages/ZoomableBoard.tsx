@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   useMediaQuery,
@@ -10,6 +10,8 @@ import {
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
+import CheckIcon from "@mui/icons-material/Check";
+import cn from "classnames";
 import { useSnackbar } from "notistack";
 
 import useWindowSize from "../utils/useWindowSize";
@@ -29,6 +31,7 @@ import type {
   TileCoordinate,
 } from "../utils/api.types";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { resolvePlayerDisplayName } from "../config/botCatalog";
 import { dispatchSnackbar } from "../components/Snackbar";
 
 function buildNodeActions(state: CatanState) {
@@ -93,6 +96,30 @@ type ZoomableBoardProps = {
   recentEdgeId?: string | null;
 };
 
+export const CONFIRM_PLACEMENT_STORAGE_KEY = "catan_confirm_placement_v1";
+
+type PendingPlacement =
+  | {
+      kind: "node";
+      nodeId: number;
+      action: GameAction;
+      label: string;
+    }
+  | {
+      kind: "edge";
+      edgeId: string;
+      action: GameAction;
+      label: string;
+    };
+
+function loadSavedConfirmPlacement(): boolean {
+  try {
+    return localStorage.getItem(CONFIRM_PLACEMENT_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export default function ZoomableBoard({
   replayMode,
   recentNodeId = null,
@@ -108,31 +135,121 @@ export default function ZoomableBoard({
   const [pendingRobberActions, setPendingRobberActions] = useState<
     MoveRobberAction[]
   >([]);
+  const [confirmPlacement, setConfirmPlacement] = useState<boolean>(() =>
+    loadSavedConfirmPlacement()
+  );
+  const [pendingPlacement, setPendingPlacement] =
+    useState<PendingPlacement | null>(null);
+  const boardContainerRef = useRef<HTMLDivElement | null>(null);
+  const [containerSize, setContainerSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   const gameState = state.gameState;
   if (!gameState) throw new Error("GameState is not ready!");
   if (!gameId) throw new Error("expecting gameId in URL");
 
-  const buildOnNodeClick = useCallback(
-    (_id: number, action?: GameAction) => async () => {
-      if (action) {
-        const nextState = await postAction(gameId, action);
-        dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
-        dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+  useEffect(() => {
+    const el = boardContainerRef.current;
+    if (!el) return;
+
+    const updateSize = () => {
+      const nextWidth = Math.round(el.clientWidth);
+      const nextHeight = Math.round(el.clientHeight);
+      if (nextWidth > 0 && nextHeight > 0) {
+        setContainerSize((prev) =>
+          prev && prev.width === nextWidth && prev.height === nextHeight
+            ? prev
+            : { width: nextWidth, height: nextHeight }
+        );
       }
+    };
+
+    updateSize();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateSize);
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, [width, height]);
+
+  useEffect(() => {
+    setPendingPlacement(null);
+  }, [gameState.state_index, gameState.current_prompt, replayMode, confirmPlacement]);
+
+  const executePlacementAction = useCallback(
+    async (action: GameAction) => {
+      setPendingPlacement(null);
+      const nextState = await postAction(gameId, action);
+      dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+      dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
     },
     [gameId, dispatch, enqueueSnackbar, closeSnackbar]
   );
 
-  const buildOnEdgeClick = useCallback(
-    (_id: [number, number], action?: GameAction) => async () => {
-      if (action) {
-        const nextState = await postAction(gameId, action);
-        dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
-        dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+  const handleToggleConfirmPlacement = () => {
+    setConfirmPlacement((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(CONFIRM_PLACEMENT_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        // ignore storage errors
       }
+      if (!next) {
+        setPendingPlacement(null);
+      }
+      return next;
+    });
+  };
+
+  const buildOnNodeClick = useCallback(
+    (id: number, action?: GameAction) => async () => {
+      if (!action) return;
+      if (!confirmPlacement) {
+        await executePlacementAction(action);
+        return;
+      }
+      if (pendingPlacement?.kind === "node" && pendingPlacement.nodeId === id) {
+        await executePlacementAction(action);
+        return;
+      }
+      setPendingPlacement({
+        kind: "node",
+        nodeId: id,
+        action,
+        label:
+          action[1] === "BUILD_CITY"
+            ? "Confirmar melhoria para Cidade?"
+            : "Confirmar construção de Aldeia?",
+      });
     },
-    [gameId, dispatch, enqueueSnackbar, closeSnackbar]
+    [confirmPlacement, pendingPlacement, executePlacementAction]
+  );
+
+  const buildOnEdgeClick = useCallback(
+    (id: [number, number], action?: GameAction) => async () => {
+      if (!action) return;
+      if (!confirmPlacement) {
+        await executePlacementAction(action);
+        return;
+      }
+      const normId = `${Math.min(id[0], id[1])},${Math.max(id[0], id[1])}`;
+      if (pendingPlacement?.kind === "edge" && pendingPlacement.edgeId === normId) {
+        await executePlacementAction(action);
+        return;
+      }
+      setPendingPlacement({
+        kind: "edge",
+        edgeId: normId,
+        action,
+        label: "Confirmar construção de Estrada?",
+      });
+    },
+    [confirmPlacement, pendingPlacement, executePlacementAction]
   );
 
   const handleTileClick = useCallback(
@@ -218,11 +335,14 @@ export default function ZoomableBoard({
             "edge--buildable",
             "pulse",
             "camera-btn",
+            "board-confirm-toggle",
+            "placement-confirm-bar",
+            "placement-confirm-btn",
           ],
         }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
-          <div className="board-container">
+          <div className="board-container" ref={boardContainerRef}>
             <div className="board-camera-controls">
               <button
                 type="button"
@@ -251,11 +371,31 @@ export default function ZoomableBoard({
               >
                 <CenterFocusStrongIcon fontSize="small" />
               </button>
+              {!replayMode && (
+                <button
+                  type="button"
+                  className={cn("camera-btn board-confirm-toggle", {
+                    "is-active": confirmPlacement,
+                  })}
+                  onClick={handleToggleConfirmPlacement}
+                  title={
+                    confirmPlacement
+                      ? "Confirmação em 2 cliques: Ativa (clique para voltar a 1 clique)"
+                      : "Ativar confirmação antes de construir (2 cliques)"
+                  }
+                  aria-label="Confirmar jogada em 2 cliques"
+                  aria-pressed={confirmPlacement}
+                >
+                  <CheckIcon fontSize="small" />
+                </button>
+              )}
             </div>
             <TransformComponent>
               <Board
                 width={width}
                 height={height}
+                containerWidth={containerSize?.width}
+                containerHeight={containerSize?.height}
                 buildOnNodeClick={buildOnNodeClick}
                 buildOnEdgeClick={buildOnEdgeClick}
                 handleTileClick={handleTileClick}
@@ -269,8 +409,46 @@ export default function ZoomableBoard({
                 robberCoordinates={robberCoordinates}
                 recentNodeId={recentNodeId}
                 recentEdgeId={recentEdgeId}
+                pendingNodeId={
+                  pendingPlacement?.kind === "node"
+                    ? pendingPlacement.nodeId
+                    : null
+                }
+                pendingEdgeId={
+                  pendingPlacement?.kind === "edge"
+                    ? pendingPlacement.edgeId
+                    : null
+                }
               />
             </TransformComponent>
+
+            {pendingPlacement && !replayMode && (
+              <div
+                className="placement-confirm-bar"
+                role="region"
+                aria-label="Confirmar posicionamento no tabuleiro"
+              >
+                <span className="placement-confirm-bar__label">
+                  {pendingPlacement.label}
+                </span>
+                <div className="placement-confirm-bar__actions">
+                  <button
+                    type="button"
+                    className="placement-confirm-btn placement-confirm-btn--confirm"
+                    onClick={() => executePlacementAction(pendingPlacement.action)}
+                  >
+                    ✓ Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    className="placement-confirm-btn placement-confirm-btn--cancel"
+                    onClick={() => setPendingPlacement(null)}
+                  >
+                    ✕ Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </TransformWrapper>
@@ -289,8 +467,16 @@ export default function ZoomableBoard({
         <DialogContent className="catan-modal-content">
           <div className="victim-selector-grid">
             {pendingRobberActions.map((action, idx) => {
-              const victimColor = action[2][1] as Color | undefined;
+              const rawVictim = action[2][1];
+              const victimColor = rawVictim ? (rawVictim as Color) : undefined;
               const meta = victimColor ? PLAYER_COLOR_META[victimColor] : null;
+              const victimName = victimColor
+                ? resolvePlayerDisplayName(
+                    gameState,
+                    victimColor,
+                    meta?.label ?? victimColor
+                  )
+                : "Ninguém";
               const pKey = victimColor
                 ? playerKey(gameState, victimColor)
                 : null;
@@ -319,7 +505,7 @@ export default function ZoomableBoard({
                     style={{ background: meta?.primary ?? "#64748B" }}
                   />
                   <div className="victim-card-btn__info">
-                    <strong>{meta ? meta.label : "Ninguém"}</strong>
+                    <strong>{victimName}</strong>
                     <span>{numCards} carta(s) na mão</span>
                   </div>
                 </button>

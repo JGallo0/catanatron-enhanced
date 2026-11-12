@@ -1,0 +1,354 @@
+.almanac-modal-paper {
+  background: #0b1426 !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(250, 204, 21, 0.34) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 28px 68px rgba(0, 0, 0, 0.8) !important;
+}
+
+.almanac-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 22px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    > span {
+      font-size: 1.55rem;
+    }
+
+    strong,
+    div > span {
+      display: block;
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #fde047;
+      line-height: 1.25;
+    }
+
+    small {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.76rem;
+      font-weight: 500;
+      color: #94a3b8;
+    }
+  }
+}
+
+.almanac-modal-close {
+  color: #94a3b8 !important;
+
+  &:hover {
+    color: #f8fafc !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+  }
+}
+
+.almanac-modal-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 10px 22px 0;
+}
+
+.almanac-tab-btn {
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.78);
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: rgba(30, 41, 59, 0.92);
+    color: #ffffff;
+  }
+
+  &.is-active {
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.35), rgba(180, 83, 9, 0.25));
+    border-color: rgba(250, 204, 21, 0.65);
+    color: #fef08a;
+  }
+}
+
+.almanac-modal-body {
+  padding: 16px 22px 22px !important;
+}
+
+.almanac-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.almanac-build-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+
+  @media (max-width: 680px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.almanac-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__icon {
+    font-size: 1.35rem;
+  }
+
+  &__title-group {
+    flex: 1;
+    min-width: 0;
+
+    strong {
+      display: block;
+      font-size: 0.92rem;
+      color: #f8fafc;
+    }
+
+    small {
+      display: block;
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+  }
+
+  &__desc {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: #cbd5e1;
+  }
+
+  &__costs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+  }
+}
+
+.almanac-vp-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.14);
+  border: 1px solid rgba(250, 204, 21, 0.42);
+  color: #fde047;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.almanac-cost-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #e2e8f0;
+
+  &__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+}
+
+.almanac-callout-row,
+.almanac-honors-grid,
+.almanac-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+
+  @media (max-width: 680px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.almanac-callout,
+.almanac-honor-box {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.56);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  h4 {
+    margin: 0 0 8px;
+    font-size: 0.86rem;
+    font-weight: 800;
+    color: #93c5fd;
+  }
+
+  p,
+  ul {
+    margin: 0;
+    font-size: 0.77rem;
+    line-height: 1.48;
+    color: #cbd5e1;
+  }
+
+  ul {
+    padding-left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  code {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: rgba(15, 23, 42, 0.85);
+    color: #fde047;
+    font-size: 0.74rem;
+  }
+}
+
+.almanac-muted {
+  margin-top: 7px !important;
+  color: #94a3b8 !important;
+}
+
+.almanac-honor-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &__badge {
+    width: fit-content;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(234, 179, 8, 0.16);
+    border: 1px solid rgba(250, 204, 21, 0.45);
+    color: #fde047;
+    font-size: 0.7rem;
+    font-weight: 800;
+  }
+
+  strong {
+    color: #f8fafc;
+    font-size: 0.88rem;
+  }
+}
+
+.almanac-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fde047;
+}
+
+.almanac-dev-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.almanac-dev-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  &__icon {
+    font-size: 1.2rem;
+    line-height: 1.2;
+  }
+
+  &__copy {
+    flex: 1;
+    min-width: 0;
+
+    p {
+      margin: 3px 0 0;
+      font-size: 0.77rem;
+      line-height: 1.4;
+      color: #cbd5e1;
+    }
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
+    strong {
+      font-size: 0.85rem;
+      color: #f8fafc;
+    }
+  }
+}
+
+.almanac-dev-qty {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #bae6fd;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.almanac-maps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+
+  @media (max-width: 680px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.almanac-map-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  strong {
+    display: block;
+    font-size: 0.8rem;
+    color: #93c5fd;
+    margin-bottom: 4px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.74rem;
+    line-height: 1.4;
+    color: #cbd5e1;
+  }
+}

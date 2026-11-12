@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, DialogContent, DialogTitle } from "@mui/material";
 import { PLAYER_COLOR_META } from "../../config/assetRegistry";
 import {
+  formatMapTemplateLabel,
   isOfficialBotName,
+  OPEN_SEAT_LABEL,
   pickBotNameDeterministic,
   resolveSeatAvatarProps,
 } from "../../config/botCatalog";
@@ -20,6 +22,8 @@ export type OpenLobbyModalProps = {
   onOpenMatch: (gameId: string, myColor: Color | null) => void;
   onCreateRoomClick: () => void;
   onRefresh: () => void;
+  onCloseRoom?: (roomCode: string) => Promise<void> | void;
+  onLeaveRoom?: (roomCode: string) => Promise<void> | void;
 };
 
 export default function OpenLobbyModal({
@@ -30,9 +34,24 @@ export default function OpenLobbyModal({
   onOpenMatch,
   onCreateRoomClick,
   onRefresh,
+  onCloseRoom,
+  onLeaveRoom,
 }: OpenLobbyModalProps) {
   const [filter, setFilter] = useState<LobbyFilter>("all");
   const [joinCodeInput, setJoinCodeInput] = useState("");
+  const [confirmingCloseCode, setConfirmingCloseCode] = useState<string | null>(
+    null
+  );
+  const [closingCode, setClosingCode] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setConfirmingCloseCode(null);
+      setClosingCode(null);
+      setActionError("");
+    }
+  }, [open]);
 
   const openRooms = useMemo(
     () =>
@@ -44,7 +63,7 @@ export default function OpenLobbyModal({
   );
 
   const myRooms = useMemo(
-    () => rooms.filter((r) => Boolean(r.my_color)),
+    () => rooms.filter((r) => Boolean(r.my_color) || r.is_host),
     [rooms]
   );
 
@@ -142,6 +161,12 @@ export default function OpenLobbyModal({
           </button>
         </div>
 
+        {actionError && (
+          <div className="open-lobby-error" role="alert">
+            {actionError}
+          </div>
+        )}
+
         {filteredRooms.length === 0 ? (
           <div className="open-lobby-empty">
             <p>Nenhuma sala encontrada neste filtro no momento.</p>
@@ -167,7 +192,7 @@ export default function OpenLobbyModal({
                 <div
                   key={room.room_code}
                   className={`open-lobby-card ${
-                    room.my_color ? "open-lobby-card--mine" : ""
+                    room.my_color || room.is_host ? "open-lobby-card--mine" : ""
                   }`}
                 >
                   <div className="open-lobby-card__top">
@@ -189,7 +214,8 @@ export default function OpenLobbyModal({
                       )}
                     </div>
                     <small className="open-lobby-card__rules">
-                      Mapa {room.config.map_template} • {room.config.vps_to_win} PV
+                      Mapa {formatMapTemplateLabel(room.config.map_template)} •{" "}
+                      {room.config.vps_to_win} PV
                     </small>
                   </div>
 
@@ -248,31 +274,126 @@ export default function OpenLobbyModal({
                               </span>
                             )}
                             <span>
-                              {isOpen ? "Vaga Aberta" : displayName}
+                              {isOpen ? OPEN_SEAT_LABEL : displayName}
                             </span>
                           </div>
                         );
                       })}
                     </div>
 
-                    <Button
-                      size="small"
-                      variant="contained"
-                      className="open-lobby-join-btn"
-                      onClick={() => {
-                        if (room.status === "IN_PROGRESS" && room.game_id) {
-                          onOpenMatch(room.game_id, room.my_color);
-                        } else {
-                          onJoinRoom(room.room_code);
-                        }
-                      }}
-                    >
-                      {room.status === "IN_PROGRESS"
-                        ? room.my_color
-                          ? "▶ Retomar"
-                          : "👁 Assistir"
-                        : "Entrar"}
-                    </Button>
+                    <div className="open-lobby-card__actions">
+                      {onCloseRoom && room.is_host && (
+                        confirmingCloseCode === room.room_code ? (
+                          <div
+                            className="open-lobby-confirm-close"
+                            role="group"
+                            aria-label={`Confirmar encerramento da sala ${room.room_code}`}
+                          >
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="error"
+                              className="open-lobby-confirm-btn"
+                              disabled={closingCode === room.room_code}
+                              onClick={async () => {
+                                try {
+                                  setClosingCode(room.room_code);
+                                  setActionError("");
+                                  await onCloseRoom(room.room_code);
+                                  setConfirmingCloseCode(null);
+                                } catch (err: any) {
+                                  setActionError(
+                                    err?.response?.data?.description ||
+                                      err?.message ||
+                                      "Não foi possível encerrar a sala."
+                                  );
+                                } finally {
+                                  setClosingCode(null);
+                                }
+                              }}
+                            >
+                              {closingCode === room.room_code
+                                ? "Encerrando..."
+                                : "Confirmar"}
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="text"
+                              className="open-lobby-cancel-close-btn"
+                              disabled={closingCode === room.room_code}
+                              onClick={() => setConfirmingCloseCode(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            className="open-lobby-close-room-btn"
+                            disabled={Boolean(closingCode)}
+                            aria-label={`Encerrar sala ${room.room_code}`}
+                            onClick={() => {
+                              setActionError("");
+                              setConfirmingCloseCode(room.room_code);
+                            }}
+                          >
+                            🗑️ Encerrar Sala
+                          </Button>
+                        )
+                      )}
+
+                      {onLeaveRoom &&
+                        !room.is_host &&
+                        Boolean(room.my_color) &&
+                        room.status === "WAITING" && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            className="open-lobby-leave-room-btn"
+                            disabled={Boolean(closingCode)}
+                            aria-label={`Sair da sala ${room.room_code}`}
+                            onClick={async () => {
+                              try {
+                                setClosingCode(room.room_code);
+                                setActionError("");
+                                await onLeaveRoom(room.room_code);
+                              } catch (err: any) {
+                                setActionError(
+                                  err?.response?.data?.description ||
+                                    err?.message ||
+                                    "Não foi possível sair da sala."
+                                );
+                              } finally {
+                                setClosingCode(null);
+                              }
+                            }}
+                          >
+                            🚪 Sair da Sala
+                          </Button>
+                        )}
+
+                      <Button
+                        size="small"
+                        variant="contained"
+                        className="open-lobby-join-btn"
+                        disabled={closingCode === room.room_code}
+                        onClick={() => {
+                          if (room.status === "IN_PROGRESS" && room.game_id) {
+                            onOpenMatch(room.game_id, room.my_color);
+                          } else {
+                            onJoinRoom(room.room_code);
+                          }
+                        }}
+                      >
+                        {room.status === "IN_PROGRESS"
+                          ? room.my_color
+                            ? "▶ Retomar"
+                            : "👁 Assistir"
+                          : "Entrar"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );

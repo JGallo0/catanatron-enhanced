@@ -93,6 +93,12 @@
   gap: 8px;
 }
 
+.match-setup-dice-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .match-setup-choice-btn {
   background: rgba(30, 41, 59, 0.85) !important;
   color: #e2e8f0 !important;
@@ -100,13 +106,41 @@
   border-radius: 10px !important;
   font-weight: 700 !important;
   font-size: 0.78rem !important;
-  height: 40px;
+  min-height: 44px;
+  height: auto;
+  padding: 8px 10px !important;
+  line-height: 1.25 !important;
+  text-transform: none !important;
+  white-space: normal !important;
 
   &.selected {
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
     border-color: #60a5fa !important;
     color: #ffffff !important;
   }
+}
+
+.match-setup-diff-btn.selected {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+  border-color: #fbbf24 !important;
+}
+
+.match-setup-dice-btn.selected {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  border-color: #38bdf8 !important;
+}
+
+.match-setup-select-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.match-setup-option-hint {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-left: 4px;
 }
 
 .match-setup-sliders-row {
@@ -271,6 +305,7 @@
   }
 
   .match-setup-templates,
+  .match-setup-dice-options,
   .match-setup-sliders-row {
     grid-template-columns: 1fr;
   }
