@@ -582,6 +582,26 @@ function getSavedPlayerAccount(): PlayerAccount | null {
   }
 }
 
+function normalizeLocalUsername(raw: string | undefined | null): string {
+  return (raw || "")
+    .normalize("NFC")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}_-]/gu, "")
+    .slice(0, 24);
+}
+
+function safeBase64(value: string): string {
+  try {
+    return btoa(unescape(encodeURIComponent(value))).replace(/=/g, "");
+  } catch {
+    return value
+      .split("")
+      .map((ch) => ch.charCodeAt(0).toString(16))
+      .join("");
+  }
+}
+
 function getLocalUserDirectory(): Record<
   string,
   { username: string; display_name: string; avatar_config: Partial<AvatarConfig> }
@@ -599,11 +619,7 @@ function getLocalUserDirectory(): Record<
   }
   const saved = getSavedPlayerAccount();
   if (saved?.username) {
-    const clean = saved.username
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9_-]/g, "")
-      .slice(0, 24);
+    const clean = normalizeLocalUsername(saved.username);
     if (clean) {
       dir[clean] = {
         username: clean,
@@ -3168,11 +3184,7 @@ export function localGetUserRankAndStats(username: string): {
   leaderboard_rank: number | null;
   stats: AccountStats;
 } {
-  const cleanUser = username
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_-]/g, "")
-    .slice(0, 24);
+  const cleanUser = normalizeLocalUsername(username);
   if (!cleanUser) {
     return {
       leaderboard_rank: null,
@@ -3204,11 +3216,7 @@ export function localRegisterUser(options: {
   displayName?: string;
   avatarConfig?: Partial<AvatarConfig>;
 }): PlayerAccount {
-  const cleanUser = options.username
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_-]/g, "")
-    .slice(0, 24);
+  const cleanUser = normalizeLocalUsername(options.username);
   if (cleanUser.length < 2) {
     throw new Error(tr("Usuário deve ter pelo menos 2 caracteres.", "Username must be at least 2 characters long."));
   }
@@ -3233,7 +3241,7 @@ export function localRegisterUser(options: {
   return {
     username: cleanUser,
     display_name,
-    auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
+    auth_token: `local_${cleanUser}_${safeBase64(cleanUser)}`,
     avatar_config: cleanAvatar,
     stats: rankMeta.stats,
     leaderboard_rank: rankMeta.leaderboard_rank,
@@ -3245,11 +3253,7 @@ export function localLoginUser(options: {
   username: string;
   password: string;
 }): PlayerAccount {
-  const cleanUser = options.username
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_-]/g, "")
-    .slice(0, 24);
+  const cleanUser = normalizeLocalUsername(options.username);
   const users = loadLocalUsers();
   const existing = users[cleanUser];
   if (!existing || existing.password !== options.password) {
@@ -3259,7 +3263,7 @@ export function localLoginUser(options: {
   return {
     username: existing.username,
     display_name: existing.display_name,
-    auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
+    auth_token: `local_${cleanUser}_${safeBase64(cleanUser)}`,
     avatar_config: sanitizeAvatarConfig(existing.avatar_config),
     stats: rankMeta.stats,
     leaderboard_rank: rankMeta.leaderboard_rank,
@@ -3272,11 +3276,7 @@ export function localUpdateProfile(options: {
   displayName?: string;
   avatarConfig?: Partial<AvatarConfig> | null;
 }): PlayerAccount {
-  const cleanUser = options.username
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_-]/g, "")
-    .slice(0, 24);
+  const cleanUser = normalizeLocalUsername(options.username);
   if (!cleanUser) {
     throw new Error(tr("Usuário inválido.", "Invalid username."));
   }
@@ -3358,7 +3358,7 @@ export function localUpdateProfile(options: {
   return {
     username: cleanUser,
     display_name: nextDisplay,
-    auth_token: `local_${cleanUser}_${btoa(cleanUser)}`,
+    auth_token: `local_${cleanUser}_${safeBase64(cleanUser)}`,
     avatar_config: mergedAvatar,
     leaderboard_rank: statsEntry?.rank ?? null,
     stats: statsEntry
@@ -3397,10 +3397,11 @@ export function localGetMatchHistory(username?: string): MatchRecord[] {
   try {
     const raw = localStorage.getItem(LOCAL_MATCHES_KEY);
     const list: MatchRecord[] = raw ? JSON.parse(raw) : [];
-    const filtered = username
+    const cleanFilter = username ? normalizeLocalUsername(username) : "";
+    const filtered = cleanFilter
       ? list.filter((m) =>
           m.participants.some(
-            (p) => p.seat_kind === "USER" && p.username === username.toLowerCase().trim()
+            (p) => p.seat_kind === "USER" && p.username === cleanFilter
           )
         )
       : list;
@@ -3478,12 +3479,8 @@ export function localLoginOrRegister(options: {
   pin: string;
   displayName?: string;
 }): PlayerAccount {
-  const cleanUser = options.username
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9_-]/g, "")
-    .slice(0, 24);
-  const token = `acct_${cleanUser}_${btoa(cleanUser + ":" + options.pin.trim()).replace(/=/g, "")}`;
+  const cleanUser = normalizeLocalUsername(options.username);
+  const token = `acct_${cleanUser}_${safeBase64(cleanUser + ":" + options.pin.trim())}`;
   return {
     username: cleanUser || "jogador",
     display_name: (options.displayName || options.username).trim() || "Jogador",

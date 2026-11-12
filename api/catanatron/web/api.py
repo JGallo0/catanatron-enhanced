@@ -9,7 +9,7 @@ import urllib.parse
 import urllib.request
 import uuid
 
-from flask import Response, Blueprint, jsonify, abort, request
+from flask import Response, Blueprint, current_app, jsonify, abort, request
 from werkzeug.exceptions import HTTPException
 
 from catanatron.web.models import (
@@ -361,6 +361,21 @@ def _get_google_client_id() -> str | None:
         if value:
             return value
     return None
+
+
+@bp.route("/health", methods=("GET",))
+def get_health_endpoint():
+    backend = current_app.config.get("CATAN_DB_BACKEND", "sqlite")
+    persistent = bool(current_app.config.get("CATAN_DB_PERSISTENT", True))
+    is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+    return jsonify(
+        {
+            "ok": True,
+            "database_backend": backend,
+            "persistent_storage": persistent,
+            "ephemeral_vercel_sqlite": bool(is_vercel and backend == "sqlite"),
+        }
+    )
 
 
 @bp.route("/auth/config", methods=("GET",))

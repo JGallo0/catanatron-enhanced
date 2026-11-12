@@ -4,12 +4,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import AuthModal from "./AuthModal";
 import {
+  getBackendHealth,
   loginAccount,
   registerAccount,
   type PlayerAccount,
 } from "../../utils/apiClient";
 
 vi.mock("../../utils/apiClient", () => ({
+  getBackendHealth: vi.fn(),
   loginAccount: vi.fn(),
   registerAccount: vi.fn(),
   loginWithGoogle: vi.fn(),
@@ -33,6 +35,7 @@ const loggedSample: PlayerAccount = {
 describe("AuthModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getBackendHealth).mockResolvedValue(null);
   });
 
   test("validates credentials, shows promptBanner, logs in and notifies parent", async () => {
@@ -102,6 +105,28 @@ describe("AuthModal", () => {
 
     expect(
       await screen.findByText(/Este nome de usuário já está cadastrado\./i)
+    ).toBeInTheDocument();
+  }, 15000);
+
+  test("warns when Vercel backend uses ephemeral SQLite without DATABASE_URL", async () => {
+    vi.mocked(getBackendHealth).mockResolvedValueOnce({
+      ok: true,
+      database_backend: "sqlite",
+      persistent_storage: false,
+      ephemeral_vercel_sqlite: true,
+    });
+
+    render(
+      <AuthModal
+        open={true}
+        onClose={vi.fn()}
+        authConfig={{ google_enabled: false, google_client_id: null }}
+        onAuthenticated={vi.fn()}
+      />
+    );
+
+    expect(
+      await screen.findByText(/Banco temporário ativo na Vercel/i)
     ).toBeInTheDocument();
   }, 15000);
 });

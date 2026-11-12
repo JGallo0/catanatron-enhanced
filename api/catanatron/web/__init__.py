@@ -1,5 +1,6 @@
 import os
 import tempfile
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from flask import Flask
 from flask_cors import CORS
@@ -62,6 +63,45 @@ def _load_dotenv_files(search_dirs=None) -> None:
             os.environ[key] = value
 
 
+_DB_ENV_KEYS = (
+    "DATABASE_URL",
+    "POSTGRES_URL",
+    "POSTGRES_URL_NON_POOLING",
+    "DATABASE_URL_UNPOOLED",
+    "POSTGRES_PRISMA_URL",
+    "SUPABASE_DB_URL",
+)
+_UNSUPPORTED_LIBPQ_QUERY_PARAMS = {
+    "pgbouncer",
+    "connection_limit",
+    "pool_timeout",
+    "schema",
+}
+
+
+def _resolve_database_url(default_sqlite: str) -> str:
+    raw = ""
+    for key in _DB_ENV_KEYS:
+        candidate = _strip_quotes((os.environ.get(key) or "").strip())
+        if candidate:
+            raw = candidate
+            break
+    if not raw:
+        return default_sqlite
+    if raw.startswith("postgres://"):
+        raw = raw.replace("postgres://", "postgresql://", 1)
+    if raw.startswith("postgresql://"):
+        parsed = urlparse(raw)
+        if parsed.query:
+            filtered = [
+                (k, v)
+                for k, v in parse_qsl(parsed.query, keep_blank_values=True)
+                if k.lower() not in _UNSUPPORTED_LIBPQ_QUERY_PARAMS
+            ]
+            raw = urlunparse(parsed._replace(query=urlencode(filtered)))
+    return raw
+
+
 def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
     _load_dotenv_files()
@@ -83,28 +123,36 @@ def create_app(test_config=None):
     sqlite_path = os.path.join(tmp_dir, "catanatron.db").replace("\\", "/")
     default_sqlite = f"sqlite:///{sqlite_path}"
 
-    database_url = (
-        os.environ.get("DATABASE_URL")
-        or os.environ.get("POSTGRES_URL")
-        or default_sqlite
-    )
-    if database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
-
+    database_url = _resolve_database_url(default_sqlite)
     secret_key = os.environ.get("SECRET_KEY", "dev")
+    effective_uri = (
+        (test_config or {}).get("SQLALCHEMY_DATABASE_URI") or database_url
+    )
+    is_postgres = str(effective_uri).startswith("postgresql://")
+    is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
     engine_options = (
-        {"pool_pre_ping": True, "pool_recycle": 300}
-        if database_url.startswith("postgresql://")
-        else {}
+        {"pool_pre_ping": True, "pool_recycle": 300} if is_postgres else {}
     )
     app.config.from_mapping(
         SECRET_KEY=secret_key,
         SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SQLALCHEMY_ENGINE_OPTIONS=engine_options,
+        CATAN_DB_BACKEND="postgresql" if is_postgres else "sqlite",
+        CATAN_DB_PERSISTENT=bool(is_postgres or not is_vercel),
     )
     if test_config is not None:
         app.config.update(test_config)
+        final_uri = str(app.config.get("SQLALCHEMY_DATABASE_URI") or "")
+        final_pg = final_uri.startswith("postgresql://")
+        app.config["CATAN_DB_BACKEND"] = "postgresql" if final_pg else "sqlite"
+        app.config["CATAN_DB_PERSISTENT"] = bool(final_pg or not is_vercel)
+
+    if is_vercel and app.config.get("CATAN_DB_BACKEND") == "sqlite":
+        app.logger.warning(
+            "Running on Vercel without DATABASE_URL/POSTGRES_URL: SQLite in /tmp is ephemeral and will reset on cold starts or deployments."
+        )
 
     # ===== Initialize Database
     from catanatron.web.models import db, ensure_schema_columns

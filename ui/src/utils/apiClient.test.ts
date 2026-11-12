@@ -149,6 +149,49 @@ describe("local match history and leaderboard calculations", () => {
     await expect(
       loginAccount({ username: "joao", password: "wrong" })
     ).rejects.toBeDefined();
+
+    // HTTP 5xx (ex: falha no Postgres/Vercel) também propaga em vez de criar conta falsa só no localStorage
+    vi.spyOn(axios, "post").mockRejectedValueOnce({
+      response: { status: 500, data: { description: "Database connection failed" } },
+    });
+    await expect(
+      registerAccount({ username: "joao500", password: "1234" })
+    ).rejects.toMatchObject({ response: { status: 500 } });
+
+    vi.spyOn(axios, "post").mockRejectedValueOnce({
+      response: { status: 503, data: "Service Unavailable" },
+    });
+    await expect(
+      loginAccount({ username: "joao500", password: "1234" })
+    ).rejects.toMatchObject({ response: { status: 503 } });
+  });
+
+  test("fetchCurrentAccount preserves local_ accounts without calling /api/auth/me and localEngine keeps accented usernames", async () => {
+    vi.spyOn(axios, "post").mockRejectedValueOnce(new Error("Offline"));
+    const registered = await registerAccount({
+      username: "João",
+      password: "segredo123",
+      displayName: "João Silva",
+    });
+    expect(registered.username).toBe("joão");
+    expect(registered.auth_token.startsWith("local_")).toBe(true);
+
+    // Se o servidor estiver online e responderia 401 para token local_, fetchCurrentAccount não deve enviar /api/auth/me nem apagar a conta
+    const getSpy = vi.spyOn(axios, "get").mockRejectedValue({
+      response: { status: 401, data: { description: "Sessão inválida" } },
+    });
+    const hydrated = await fetchCurrentAccount();
+    expect(getSpy).not.toHaveBeenCalled();
+    expect(hydrated?.username).toBe("joão");
+    expect(getSavedAccount()?.username).toBe("joão");
+
+    // Novo login offline com acento funciona de forma idêntica ao backend
+    vi.spyOn(axios, "post").mockRejectedValueOnce(new Error("Offline"));
+    const relogged = await loginAccount({
+      username: "João",
+      password: "segredo123",
+    });
+    expect(relogged.username).toBe("joão");
   });
 
   test("getLeaderboard and getMatchHistory mark offline fallback when backend is unavailable", async () => {

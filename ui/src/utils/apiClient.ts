@@ -87,6 +87,31 @@ export type AuthConfig = {
   google_client_id: string | null;
 };
 
+export type BackendHealth = {
+  ok: boolean;
+  database_backend: "postgresql" | "sqlite" | string;
+  persistent_storage: boolean;
+  ephemeral_vercel_sqlite: boolean;
+};
+
+export async function getBackendHealth(): Promise<BackendHealth | null> {
+  try {
+    const response = await axios.get<BackendHealth>(`${API_URL}/api/health`, {
+      timeout: 5000,
+    });
+    if (
+      response.data &&
+      typeof response.data === "object" &&
+      typeof response.data.ok === "boolean"
+    ) {
+      return response.data;
+    }
+  } catch {
+    // Offline or health endpoint unavailable
+  }
+  return null;
+}
+
 export type { BotDifficulty, BotSpeed, DiceMode };
 export type MapTemplate = "BASE" | "MINI" | "TOURNAMENT";
 export type StateIndex = number | `${number}` | "latest";
@@ -185,13 +210,28 @@ export async function registerAccount(options: {
         ...(resolvedAvatar ? { avatar_config: resolvedAvatar } : {}),
       }
     );
-    if (response.data?.username) {
+    if (
+      response.data &&
+      typeof response.data === "object" &&
+      typeof response.data.username === "string"
+    ) {
       saveAccount(response.data);
       return response.data;
     }
+    throw new Error(
+      tr(
+        "Resposta inválida do servidor ao criar conta.",
+        "Invalid server response while creating account."
+      )
+    );
   } catch (err: any) {
-    if (err?.response && err.response.status >= 400 && err.response.status < 500) {
+    if (err?.response) {
       throw err;
+    }
+    if (!(err instanceof Error) || err.message.includes("inválida") || err.message.includes("Invalid server")) {
+      if (err instanceof Error && (err.message.includes("inválida") || err.message.includes("Invalid server"))) {
+        throw err;
+      }
     }
   }
   const fallback = localRegisterUser({
@@ -214,12 +254,25 @@ export async function loginAccount(options: {
         password: options.password,
       }
     );
-    if (response.data?.username) {
+    if (
+      response.data &&
+      typeof response.data === "object" &&
+      typeof response.data.username === "string"
+    ) {
       saveAccount(response.data);
       return response.data;
     }
+    throw new Error(
+      tr(
+        "Resposta inválida do servidor ao entrar na conta.",
+        "Invalid server response while signing in."
+      )
+    );
   } catch (err: any) {
-    if (err?.response && err.response.status >= 400 && err.response.status < 500) {
+    if (err?.response) {
+      throw err;
+    }
+    if (err instanceof Error && (err.message.includes("inválida") || err.message.includes("Invalid server"))) {
       throw err;
     }
   }
@@ -244,11 +297,25 @@ export async function loginWithGoogle(
 export async function fetchCurrentAccount(): Promise<PlayerAccount | null> {
   const saved = getSavedAccount();
   if (!saved?.auth_token) return null;
+  if (saved.auth_token.startsWith("local_") || saved.auth_token.startsWith("acct_")) {
+    const offline = localGetUserRankAndStats(saved.username);
+    const hydrated: PlayerAccount = {
+      ...saved,
+      stats: offline.stats,
+      leaderboard_rank: offline.leaderboard_rank,
+    };
+    saveAccount(hydrated);
+    return hydrated;
+  }
   try {
     const response = await axios.get<PlayerAccount>(`${API_URL}/api/auth/me`, {
       headers: authHeaders(saved.auth_token),
     });
-    if (response.data?.username) {
+    if (
+      response.data &&
+      typeof response.data === "object" &&
+      typeof response.data.username === "string"
+    ) {
       const merged: PlayerAccount = {
         ...saved,
         ...response.data,
@@ -311,7 +378,7 @@ export async function updateProfile(payload: {
     saveAccount(updated);
     return updated;
   } catch (err: any) {
-    if (err?.response && err.response.status >= 400 && err.response.status < 500) {
+    if (err?.response) {
       throw err;
     }
     const localUpdated = localUpdateProfile({

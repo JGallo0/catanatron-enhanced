@@ -531,3 +531,43 @@ def test_auth_endpoints_expose_leaderboard_rank_without_altering_stats_keys(app,
     ).get_json()
     assert joao_login["leaderboard_rank"] == 2
 
+
+def test_health_endpoint_and_database_url_normalization(app, client, monkeypatch):
+    res = client.get("/api/health")
+    assert res.status_code == 200
+    assert res.get_json() == {
+        "ok": True,
+        "database_backend": "sqlite",
+        "persistent_storage": True,
+        "ephemeral_vercel_sqlite": False,
+    }
+
+    monkeypatch.setenv("VERCEL", "1")
+    res_vercel = client.get("/api/health")
+    assert res_vercel.status_code == 200
+    assert res_vercel.get_json()["ephemeral_vercel_sqlite"] is True
+
+    from catanatron.web import _resolve_database_url
+
+    for key in (
+        "DATABASE_URL",
+        "POSTGRES_URL",
+        "POSTGRES_URL_NON_POOLING",
+        "DATABASE_URL_UNPOOLED",
+        "POSTGRES_PRISMA_URL",
+        "SUPABASE_DB_URL",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    assert _resolve_database_url("sqlite:////tmp/fallback.db") == "sqlite:////tmp/fallback.db"
+
+    monkeypatch.setenv(
+        "POSTGRES_PRISMA_URL",
+        '"postgres://user:pass@db.example.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1"',
+    )
+    resolved = _resolve_database_url("sqlite:////tmp/fallback.db")
+    assert resolved.startswith("postgresql://user:pass@db.example.com:6543/postgres?")
+    assert "sslmode=require" in resolved
+    assert "pgbouncer" not in resolved
+    assert "connection_limit" not in resolved
+

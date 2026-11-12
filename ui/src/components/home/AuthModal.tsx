@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Dialog, DialogContent, DialogTitle } from "@mui/material";
 import {
+  getBackendHealth,
   loginAccount,
   loginWithGoogle,
   registerAccount,
   type AuthConfig,
+  type BackendHealth,
   type PlayerAccount,
 } from "../../utils/apiClient";
 import GoogleSignInButton from "../GoogleSignInButton";
@@ -33,12 +35,42 @@ export default function AuthModal({
   const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [backendHealth, setBackendHealth] = useState<BackendHealth | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setAuthError("");
     setPasswordInput("");
+    let cancelled = false;
+    if (typeof getBackendHealth === "function") {
+      getBackendHealth()
+        .then((health) => {
+          if (!cancelled) setBackendHealth(health);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
+
+  const formatAuthError = (err: any, fallbackMsg: string): string => {
+    const desc = err?.response?.data?.description;
+    if (typeof desc === "string" && desc.trim()) {
+      return desc;
+    }
+    const status = err?.response?.status;
+    if (typeof status === "number" && status >= 500) {
+      return t(
+        `Erro no servidor (HTTP ${status}) ao acessar o banco de dados. Verifique a variável DATABASE_URL na Vercel.`,
+        `Server error (HTTP ${status}) accessing the database. Check the DATABASE_URL environment variable on Vercel.`
+      );
+    }
+    if (typeof err?.message === "string" && err.message.trim()) {
+      return err.message;
+    }
+    return fallbackMsg;
+  };
 
   const handleLogin = async () => {
     const cleanUsername = usernameInput.trim();
@@ -63,8 +95,10 @@ export default function AuthModal({
       onClose();
     } catch (err: any) {
       setAuthError(
-        err?.response?.data?.description ||
+        formatAuthError(
+          err,
           t("Usuário ou senha incorretos.", "Invalid username or password.")
+        )
       );
     } finally {
       setBusy(false);
@@ -103,8 +137,10 @@ export default function AuthModal({
       onClose();
     } catch (err: any) {
       setAuthError(
-        err?.response?.data?.description ||
+        formatAuthError(
+          err,
           t("Não foi possível cadastrar o usuário.", "Could not register account.")
+        )
       );
     } finally {
       setBusy(false);
@@ -174,6 +210,15 @@ export default function AuthModal({
       <DialogContent className="home-auth-body">
         {promptBanner && (
           <div className="home-auth-banner">{promptBanner}</div>
+        )}
+        {backendHealth?.ephemeral_vercel_sqlite && (
+          <div className="home-auth-warning" role="alert">
+            ⚠️{" "}
+            {t(
+              "Banco temporário ativo na Vercel (sem DATABASE_URL configurada): contas criadas aqui podem se perder ao atualizar ou reiniciar o servidor.",
+              "Temporary database active on Vercel (DATABASE_URL not configured): accounts created here may be lost when refreshing or restarting the server."
+            )}
+          </div>
         )}
 
         <p className="home-auth-subtitle">
