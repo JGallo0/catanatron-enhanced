@@ -91,12 +91,14 @@ export default function PlayerAvatar({
   size = 48,
   className,
   showFrameLabel = false,
+  testId = "player-avatar",
 }: {
   config?: Partial<AvatarConfig> | Record<string, unknown> | null;
   username?: string | null;
   size?: number;
   className?: string;
   showFrameLabel?: boolean;
+  testId?: string | null;
 }) {
   const { language, t } = useLanguage();
   const uid = useId().replace(/:/g, "");
@@ -166,7 +168,7 @@ export default function PlayerAvatar({
         `player-avatar--frame-${resolvedFrame}`,
         className
       )}
-      data-testid="player-avatar"
+      data-testid={testId || undefined}
       data-frame={resolvedFrame}
     >
       <div

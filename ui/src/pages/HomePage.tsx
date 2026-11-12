@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@mui/material";
 import {
@@ -38,6 +38,10 @@ import MatchSetupModal, {
 import OpenLobbyModal from "../components/home/OpenLobbyModal";
 
 import "./HomePage.scss";
+
+const LazyAvatar3DCanvas = lazy(
+  () => import("../components/avatar3d/Avatar3DCanvas")
+);
 
 export default function HomePage() {
   const { language, t } = useLanguage();
@@ -169,6 +173,19 @@ export default function HomePage() {
   const effectiveDefaultHostName = account
     ? hostName
     : localizeGuestDisplayName(hostName, language);
+  const effectiveHeroUsername = account ? account.username : displayGuestName;
+  const activeHeroConfig = useMemo(
+    () =>
+      resolveAvatarConfig(
+        account
+          ? account.avatar_config
+          : guestProfile.customized
+            ? guestProfile.avatar_config
+            : undefined,
+        effectiveHeroUsername
+      ),
+    [account, guestProfile, effectiveHeroUsername]
+  );
 
   return (
     <div className="home-page home-page--stage">
@@ -305,8 +322,54 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Centro 100% Aberto destacando a ilha de lobby_hero.webp */}
-      <main className="home-stage-window" aria-hidden="true" />
+      {/* Palco Central com o Herói 3D de corpo inteiro sobre lobby_hero.webp */}
+      <main className="home-stage-window">
+        <div className="home-hero-stage" data-testid="home-hero-stage">
+          <div className="home-hero-stage__canvas">
+            <Suspense
+              fallback={
+                <div className="home-hero-stage__suspense" aria-hidden="true">
+                  <PlayerAvatar
+                    config={activeHeroConfig}
+                    username={effectiveHeroUsername}
+                    size={136}
+                    testId="home-hero-stage-suspense"
+                  />
+                </div>
+              }
+            >
+              <LazyAvatar3DCanvas
+                config={activeHeroConfig}
+                username={effectiveHeroUsername}
+                mode="hero"
+                backgroundMode="transparent"
+                cameraFocus="full"
+                interactive={true}
+                fallbackSize={136}
+                fallbackTestId="home-hero-stage-fallback"
+              />
+            </Suspense>
+          </div>
+          <div className="home-hero-stage__footer">
+            <span
+              className="home-hero-stage__orbit-hint"
+              title={t(
+                "Arraste para girar o herói em 360°",
+                "Drag to rotate 3D hero"
+              )}
+            >
+              ↻ 360°
+            </span>
+            <button
+              type="button"
+              className="home-hero-stage__studio-pill"
+              onClick={handleOpenAvatarStudio}
+            >
+              ✨ {t("Estúdio 3D", "3D Studio")}
+            </button>
+          </div>
+        </div>
+      </main>
 
       {/* Doca Inferior Flutuante com os 5 Modos Dedicados + Rodapé Legal */}
       <section className="home-dock-wrap">

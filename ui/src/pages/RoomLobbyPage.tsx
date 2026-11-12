@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { lazy, Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button, IconButton, MenuItem, Select, Tooltip } from "@mui/material";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
@@ -52,6 +52,10 @@ import MapTemplatePreview from "../components/home/MapTemplatePreview";
 import { getSavedGameSeat, saveGameSeat } from "../utils/seatStorage";
 
 import "./RoomLobbyPage.scss";
+
+const LazyAvatar3DCanvas = lazy(
+  () => import("../components/avatar3d/Avatar3DCanvas")
+);
 
 const SEAT_COLORS: Color[] = ["RED", "BLUE", "ORANGE", "WHITE"];
 
@@ -798,7 +802,7 @@ export default function RoomLobbyPage() {
                 </small>
               </div>
 
-              <div className="lobby-seats-grid">
+              <div className="lobby-seats-grid lobby-seats-grid--cards">
                 {room.seats.map((seat, idx) => {
                   const palette = colorMeta[seat.color];
                   const isOpenHuman =
@@ -848,150 +852,222 @@ export default function RoomLobbyPage() {
                     room.status === "WAITING" &&
                     !seat.is_me;
 
+                  const seatBadgeText = seat.is_bot
+                    ? t("🤖 Bot", "🤖 Bot")
+                    : isOpenHuman
+                      ? t("🔓 Livre", "🔓 Open")
+                      : seat.seat_kind === "USER"
+                        ? t("👤 Conta", "👤 Account")
+                        : t("👤 Jogador", "👤 Player");
+
                   return (
                     <div
                       key={seat.color}
-                      className={`lobby-seat-row ${seat.is_me ? "lobby-seat-row--me" : ""}`}
+                      className={`lobby-seat-row lobby-hero-card ${
+                        seat.is_me
+                          ? "lobby-seat-row--me lobby-hero-card--me"
+                          : ""
+                      }`}
+                      data-testid={`lobby-hero-card-${seat.color}`}
                       style={{
-                        borderLeftColor: palette.primary,
+                        borderTopColor: palette.primary,
                       }}
                     >
-                      <div className="lobby-seat-row__color">
-                        {resolvedAvatar ? (
-                          <PlayerAvatar
-                            config={resolvedAvatar.config}
-                            username={resolvedAvatar.username}
-                            size={42}
-                          />
-                        ) : (
+                      <div className="lobby-hero-card__header">
+                        <span className="lobby-hero-card__color-pill">
                           <span
-                            className="lobby-seat-row__open-badge"
-                            style={{
-                              borderColor: palette.primary,
-                              background: palette.primary,
-                              color: palette.textOnFill,
-                            }}
-                          >
-                            ➕
-                          </span>
-                        )}
-                        <div>
+                            className="lobby-hero-card__color-dot"
+                            style={{ backgroundColor: palette.primary }}
+                          />
                           <strong>{palette.label}</strong>
-                          <small>
-                            {seat.is_me
-                              ? t(
-                                  `★ Seu Assento (${displaySeatName})`,
-                                  `★ Your Seat (${displaySeatName})`
-                                )
-                              : isOpenHuman
-                                ? `🔓 ${openSeatLabel}`
-                                : displaySeatName}
-                          </small>
-                        </div>
+                        </span>
+                        <span className="lobby-hero-card__role-tag">
+                          {seatBadgeText}
+                        </span>
                       </div>
 
-                      <div className="lobby-seat-row__selector">
-                        <Select
-                          size="small"
-                          fullWidth
-                          SelectDisplayProps={{
-                            "aria-label": t(
-                              `Assento ${palette.label}`,
-                              `${palette.label} Seat`
-                            ),
-                          }}
-                          disabled={!canEditSeat}
-                          value={selectValue}
-                          onChange={(e) =>
-                            handleSeatChange(idx, e.target.value as string)
-                          }
-                        >
-                          {!seat.is_bot && seat.claimed ? (
-                            <MenuItem value="HUMAN">
-                              <span className="lobby-select-option">
-                                <span>
-                                  👤 {displaySeatName}
-                                  {seat.is_me ? t(" (Você)", " (You)") : ""}
-                                </span>
-                              </span>
-                            </MenuItem>
-                          ) : (
-                            <MenuItem value="HUMAN">
-                              <span className="lobby-select-option">
-                                <span>🪑 {openSeatLabel}</span>
-                              </span>
-                            </MenuItem>
-                          )}
+                      <div className="lobby-hero-card__nameplate">
+                        {seat.is_me ? (
+                          <span>
+                            {t(
+                              `★ Seu Assento (${displaySeatName})`,
+                              `★ Your Seat (${displaySeatName})`
+                            )}
+                          </span>
+                        ) : isOpenHuman ? (
+                          <span>🔓 {openSeatLabel}</span>
+                        ) : (
+                          <span>{displaySeatName}</span>
+                        )}
+                      </div>
 
-                          {!seat.is_bot && seat.claimed && !seat.is_me && (
-                            <MenuItem value="RELEASE_HUMAN">
-                              <span className="lobby-select-option">
-                                <span>
-                                  🪑 {openSeatLabel} (
-                                  {t("Liberar vaga", "Release seat")})
-                                </span>
-                              </span>
-                            </MenuItem>
-                          )}
-
-                          {OFFICIAL_BOT_NAMES.map((botName) => {
-                            const botVal = `BOT:${botName}`;
-                            const takenElsewhere = room.seats.some(
-                              (other, otherIdx) =>
-                                otherIdx !== idx &&
-                                other.is_bot &&
-                                other.player_name === botName
-                            );
-                            return (
-                              <MenuItem
-                                key={botVal}
-                                value={botVal}
-                                disabled={takenElsewhere}
+                      <div
+                        className="lobby-hero-card__stage"
+                        style={{
+                          boxShadow: `inset 0 24px 36px -22px ${palette.primary}`,
+                        }}
+                      >
+                        {resolvedAvatar ? (
+                          <Suspense
+                            fallback={
+                              <div
+                                className="lobby-hero-card__open-slot"
+                                aria-hidden="true"
                               >
+                                <PlayerAvatar
+                                  config={resolvedAvatar.config ?? {}}
+                                  username={resolvedAvatar.username}
+                                  size={84}
+                                  testId={`lobby-seat-suspense-${idx}`}
+                                />
+                              </div>
+                            }
+                          >
+                            <LazyAvatar3DCanvas
+                              config={resolvedAvatar.config ?? {}}
+                              username={resolvedAvatar.username}
+                              mode="card"
+                              backgroundMode="themed"
+                              cameraFocus="full"
+                              interactive={false}
+                              fallbackSize={84}
+                              fallbackTestId={`lobby-seat-fallback-${idx}`}
+                            />
+                          </Suspense>
+                        ) : (
+                          <div className="lobby-hero-card__open-slot">
+                            <span
+                              className="lobby-seat-row__open-badge"
+                              style={{
+                                borderColor: palette.primary,
+                                background: palette.primary,
+                                color: palette.textOnFill,
+                              }}
+                            >
+                              ➕
+                            </span>
+                            <small>
+                              {t("Vaga Aberta", "Open Slot")}
+                            </small>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="lobby-hero-card__controls">
+                        <div className="lobby-seat-row__selector">
+                          <Select
+                            size="small"
+                            fullWidth
+                            SelectDisplayProps={{
+                              "aria-label": t(
+                                `Assento ${palette.label}`,
+                                `${palette.label} Seat`
+                              ),
+                            }}
+                            disabled={!canEditSeat}
+                            value={selectValue}
+                            onChange={(e) =>
+                              handleSeatChange(idx, e.target.value as string)
+                            }
+                          >
+                            {!seat.is_bot && seat.claimed ? (
+                              <MenuItem value="HUMAN">
                                 <span className="lobby-select-option">
-                                  <PlayerAvatar
-                                    config={BOT_AVATAR_PROFILES[botName]}
-                                    username={botName}
-                                    size={22}
-                                  />
-                                  <span>{botName}</span>
-                                  {takenElsewhere && (
-                                    <span className="lobby-option-hint">
-                                      ({t("na mesa", "at table")})
-                                    </span>
-                                  )}
+                                  <span>
+                                    👤 {displaySeatName}
+                                    {seat.is_me ? t(" (Você)", " (You)") : ""}
+                                  </span>
                                 </span>
                               </MenuItem>
-                            );
-                          })}
-                        </Select>
-                      </div>
+                            ) : (
+                              <MenuItem value="HUMAN">
+                                <span className="lobby-select-option">
+                                  <span>🪑 {openSeatLabel}</span>
+                                </span>
+                              </MenuItem>
+                            )}
 
-                      <div className="lobby-seat-row__actions">
-                        {seat.player_key === "HUMAN" &&
-                          !seat.claimed &&
-                          !seat.is_me && (
+                            {!seat.is_bot && seat.claimed && !seat.is_me && (
+                              <MenuItem value="RELEASE_HUMAN">
+                                <span className="lobby-select-option">
+                                  <span>
+                                    🪑 {openSeatLabel} (
+                                    {t("Liberar vaga", "Release seat")})
+                                  </span>
+                                </span>
+                              </MenuItem>
+                            )}
+
+                            {OFFICIAL_BOT_NAMES.map((botName) => {
+                              const botVal = `BOT:${botName}`;
+                              const takenElsewhere = room.seats.some(
+                                (other, otherIdx) =>
+                                  otherIdx !== idx &&
+                                  other.is_bot &&
+                                  other.player_name === botName
+                              );
+                              return (
+                                <MenuItem
+                                  key={botVal}
+                                  value={botVal}
+                                  disabled={takenElsewhere}
+                                >
+                                  <span className="lobby-select-option">
+                                    <PlayerAvatar
+                                      config={BOT_AVATAR_PROFILES[botName]}
+                                      username={botName}
+                                      size={22}
+                                      testId={`lobby-option-avatar-${botName}`}
+                                    />
+                                    <span>{botName}</span>
+                                    {takenElsewhere && (
+                                      <span className="lobby-option-hint">
+                                        ({t("na mesa", "at table")})
+                                      </span>
+                                    )}
+                                  </span>
+                                </MenuItem>
+                              );
+                            })}
+                          </Select>
+                        </div>
+
+                        <div className="lobby-seat-row__actions">
+                          {seat.is_me && (
                             <Button
                               size="small"
                               variant="outlined"
-                              className="claim-seat-btn"
-                              onClick={() => handleClaimSeat(seat.color)}
+                              className="lobby-hero-card__edit-btn"
+                              onClick={() => setAvatarStudioOpen(true)}
                             >
-                              {t("Sentar Aqui", "Take Seat")}
+                              🎨 {t("Editar Avatar", "Edit Avatar")}
                             </Button>
                           )}
-                        {room.is_host &&
-                          room.seats.length > 2 &&
-                          !seat.is_me && (
-                            <Button
-                              size="small"
-                              variant="text"
-                              className="remove-seat-btn"
-                              onClick={() => handleRemoveSeat(idx)}
-                            >
-                              {t("Remover", "Remove")}
-                            </Button>
-                          )}
+                          {seat.player_key === "HUMAN" &&
+                            !seat.claimed &&
+                            !seat.is_me && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                className="claim-seat-btn"
+                                onClick={() => handleClaimSeat(seat.color)}
+                              >
+                                {t("Sentar Aqui", "Take Seat")}
+                              </Button>
+                            )}
+                          {room.is_host &&
+                            room.seats.length > 2 &&
+                            !seat.is_me && (
+                              <Button
+                                size="small"
+                                variant="text"
+                                className="remove-seat-btn"
+                                onClick={() => handleRemoveSeat(idx)}
+                              >
+                                {t("Remover", "Remove")}
+                              </Button>
+                            )}
+                        </div>
                       </div>
                     </div>
                   );

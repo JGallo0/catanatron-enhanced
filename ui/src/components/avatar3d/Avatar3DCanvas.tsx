@@ -45,6 +45,7 @@ export type Avatar3DCanvasProps = {
   backgroundMode?: "themed" | "transparent";
   username?: string | null;
   fallbackSize?: number;
+  fallbackTestId?: string | null;
   onReady?: () => void;
 };
 
@@ -116,6 +117,7 @@ export const Avatar3DCanvas = forwardRef<
     backgroundMode,
     username,
     fallbackSize,
+    fallbackTestId = "player-avatar",
     onReady,
   },
   ref
@@ -442,6 +444,7 @@ export const Avatar3DCanvas = forwardRef<
           config={resolved}
           username={username}
           size={computedFallbackSize}
+          testId={fallbackTestId}
         />
       </div>
     );

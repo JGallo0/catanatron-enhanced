@@ -13,7 +13,7 @@
 }
 
 .room-lobby-card {
-  width: min(100%, 720px);
+  width: min(100%, 1040px);
   padding: 24px 26px 30px;
   border-radius: 24px;
   background: rgba(15, 23, 42, 0.9);
@@ -241,64 +241,157 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+
+  &--cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+    align-items: stretch;
+  }
 }
 
-.lobby-seat-row {
-  display: grid;
-  grid-template-columns: minmax(185px, 210px) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: rgba(30, 41, 59, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-left: 4px solid #64748b;
+.lobby-hero-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(7, 13, 25, 0.96) 100%);
+  border: 1.5px solid rgba(250, 204, 21, 0.28);
+  border-top: 4px solid #64748b;
+  box-shadow: 0 14px 32px rgba(2, 6, 23, 0.55);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 
-  &--me {
-    background: rgba(30, 58, 138, 0.32);
-    border-color: rgba(250, 204, 21, 0.4);
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(250, 204, 21, 0.55);
   }
 
-  &__color {
+  &--me {
+    background: linear-gradient(180deg, rgba(30, 58, 138, 0.36) 0%, rgba(9, 17, 32, 0.96) 100%);
+    border-color: rgba(250, 204, 21, 0.65);
+    box-shadow:
+      0 14px 32px rgba(2, 6, 23, 0.65),
+      0 0 0 1px rgba(250, 204, 21, 0.22);
+  }
+
+  &__header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-width: 0;
+    justify-content: space-between;
+    gap: 6px;
+  }
 
-    > div:last-child {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      strong {
-        font-size: 0.88rem;
-      }
-      small {
-        font-size: 0.72rem;
-        color: #fde047;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
+  &__color-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: #f8fafc;
+  }
+
+  &__color-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    flex-shrink: 0;
+  }
+
+  &__role-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    color: #cbd5e1;
+    white-space: nowrap;
+  }
+
+  &__nameplate {
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 9px;
+    background: rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(250, 204, 21, 0.24);
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #fef08a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__stage {
+    position: relative;
+    height: 224px;
+    border-radius: 14px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 35%, rgba(250, 204, 21, 0.1), transparent 70%),
+      rgba(2, 6, 23, 0.68);
+    border: 1px solid rgba(250, 204, 21, 0.34);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__open-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    text-align: center;
+
+    small {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #94a3b8;
     }
   }
 
+  &__controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+  }
+
+  &__edit-btn {
+    border-color: rgba(250, 204, 21, 0.45) !important;
+    color: #fde047 !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: none !important;
+  }
+
+  .lobby-seat-row__actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+.lobby-seat-row {
   &__open-badge {
-    width: 42px;
-    height: 42px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     border: 2px solid;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 800;
   }
 
   &__selector {
     .MuiInputBase-root {
       color: #f8fafc;
-      background: rgba(15, 23, 42, 0.75);
+      background: rgba(15, 23, 42, 0.8);
       border-radius: 10px;
     }
     .MuiSvgIcon-root {
@@ -558,9 +651,12 @@
     font-size: 1.28rem;
   }
 
-  .lobby-seat-row {
+  .lobby-seats-grid--cards {
     grid-template-columns: 1fr;
-    padding: 10px 12px;
+  }
+
+  .lobby-hero-card__stage {
+    height: 190px;
   }
 
   .lobby-seat-row__actions {

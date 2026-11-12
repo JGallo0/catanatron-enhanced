@@ -111,7 +111,8 @@ describe("HomePage A2 Stage", () => {
     );
 
     expect(container.querySelector("main.home-stage-window")).toBeInTheDocument();
-    expect(screen.getAllByTestId("player-avatar").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId("home-hero-stage")).toBeInTheDocument();
+    expect(screen.getAllByTestId("player-avatar")).toHaveLength(1);
 
     await user.click(
       screen.getByRole("button", { name: /Personalizar Avatar/i })
@@ -261,6 +262,22 @@ describe("HomePage A2 Stage", () => {
     expect(screen.getByText("Explorador da Ilha")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Partida Rápida \(Solo\/IA\)/i })
+    ).toBeInTheDocument();
+  }, 15000);
+
+  test("clicking Estúdio 3D pill on central hero stage opens AvatarStudioModal", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    );
+
+    const heroStage = screen.getByTestId("home-hero-stage");
+    expect(heroStage).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Estúdio 3D/i }));
+    expect(
+      await screen.findByText(/Personalizar Avatar & Perfil/i)
     ).toBeInTheDocument();
   }, 15000);
 });

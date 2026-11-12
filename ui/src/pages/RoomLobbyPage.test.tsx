@@ -448,4 +448,26 @@ describe("RoomLobbyPage", () => {
       within(guestSpeedGroup).getByRole("button", { name: /Turbo/i })
     ).toBeDisabled();
   }, 15000);
+
+  test("renders vertical 3D hero cards for occupied seats, open slot card, and opens AvatarStudioModal from card action", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("catan_room_token_RM9988", "tok_host_99");
+    vi.mocked(getRoom).mockResolvedValue(hostRoom);
+
+    renderLobby("RM9988");
+
+    const redCard = await screen.findByTestId("lobby-hero-card-RED");
+    const blueCard = screen.getByTestId("lobby-hero-card-BLUE");
+    const orangeCard = screen.getByTestId("lobby-hero-card-ORANGE");
+
+    expect(redCard).toBeInTheDocument();
+    expect(within(redCard).getByTestId("lobby-seat-fallback-0")).toBeInTheDocument();
+    expect(within(blueCard).getByText(/Vaga Aberta/i)).toBeInTheDocument();
+    expect(within(orangeCard).getByTestId("lobby-seat-fallback-2")).toBeInTheDocument();
+
+    await user.click(within(redCard).getByRole("button", { name: /Editar Avatar/i }));
+    expect(
+      await screen.findByText(/Estúdio 3D — Personalizar Avatar & Perfil/i)
+    ).toBeInTheDocument();
+  }, 15000);
 });

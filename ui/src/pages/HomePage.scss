@@ -211,12 +211,84 @@
   flex-shrink: 0;
 }
 
-/* Centro Aberto para a Arte da Ilha */
+/* Palco Central com o Herói 3D sobre a Arte da Ilha */
 .home-stage-window {
   flex: 1 1 auto;
-  min-height: 200px;
+  min-height: 260px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 6px 0 8px;
   background: transparent;
   pointer-events: none;
+}
+
+.home-hero-stage {
+  position: relative;
+  width: min(100%, 420px);
+  height: clamp(260px, 45vh, 430px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+
+  &__canvas {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    pointer-events: auto;
+    filter: drop-shadow(0 18px 26px rgba(2, 6, 23, 0.55));
+  }
+
+  &__suspense {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.72;
+  }
+
+  &__footer {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: -10px;
+    padding: 4px 6px 4px 12px;
+    border-radius: 999px;
+    background: rgba(9, 17, 32, 0.78);
+    border: 1px solid rgba(250, 204, 21, 0.42);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+    pointer-events: auto;
+    z-index: 2;
+  }
+
+  &__orbit-hint {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #cbd5e1;
+    user-select: none;
+  }
+
+  &__studio-pill {
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(254, 240, 138, 0.55);
+    background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%);
+    color: #0f172a;
+    font-size: 0.76rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(250, 204, 21, 0.45);
+    }
+  }
 }
 
 /* Doca Inferior Flutuante de Modos */
@@ -390,7 +462,12 @@
   }
 
   .home-stage-window {
-    min-height: 72px;
+    min-height: 180px;
+  }
+
+  .home-hero-stage {
+    width: min(100%, 300px);
+    height: clamp(190px, 32vh, 250px);
   }
 
   .home-mode-dock {
@@ -417,6 +494,10 @@
 
 @media (max-height: 520px) {
   .home-stage-window {
-    min-height: 36px;
+    min-height: 110px;
+  }
+
+  .home-hero-stage {
+    height: 150px;
   }
 }
