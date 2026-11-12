@@ -1,16 +1,24 @@
+import { Suspense, lazy } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { SnackbarProvider } from "notistack";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { blue, green } from "@mui/material/colors";
 import Fade from "@mui/material/Fade";
 
-import GameScreen from "./pages/GameScreen";
 import HomePage from "./pages/HomePage";
-import RoomLobbyPage from "./pages/RoomLobbyPage";
 import { StateProvider } from "./store";
 
 import "./App.scss";
-import ReplayScreen from "./pages/ReplayScreen";
+
+const GameScreen = lazy(() => import("./pages/GameScreen"));
+const RoomLobbyPage = lazy(() => import("./pages/RoomLobbyPage"));
+const ReplayScreen = lazy(() => import("./pages/ReplayScreen"));
+
+const RouteFallback = () => (
+  <div className="route-loading-fallback" role="status" aria-live="polite">
+    Carregando ilha...
+  </div>
+);
 
 const theme = createTheme({
   palette: {
@@ -35,19 +43,21 @@ function App() {
           TransitionProps={{ timeout: 100 }}
         >
           <Router>
-            <Routes>
-              <Route path="/rooms/:roomCode" element={<RoomLobbyPage />} />
-              <Route
-                path="/games/:gameId/states/:stateIndex"
-                element={<GameScreen replayMode={true} />}
-              />
-              <Route path="/replays/:gameId" element={<ReplayScreen />} />
-              <Route
-                path="/games/:gameId"
-                element={<GameScreen replayMode={false} />}
-              />
-              <Route path="/" element={<HomePage />} />
-            </Routes>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/rooms/:roomCode" element={<RoomLobbyPage />} />
+                <Route
+                  path="/games/:gameId/states/:stateIndex"
+                  element={<GameScreen replayMode={true} />}
+                />
+                <Route path="/replays/:gameId" element={<ReplayScreen />} />
+                <Route
+                  path="/games/:gameId"
+                  element={<GameScreen replayMode={false} />}
+                />
+                <Route path="/" element={<HomePage />} />
+              </Routes>
+            </Suspense>
           </Router>
         </SnackbarProvider>
       </StateProvider>

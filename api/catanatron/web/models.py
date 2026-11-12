@@ -92,6 +92,15 @@ BOT_DIFFICULTY_TO_KEY: dict[str, str] = {
     "hard": "CATANATRON",
 }
 
+VALID_BOT_SPEEDS: tuple[str, ...] = ("normal", "fast", "turbo")
+
+
+def normalize_bot_speed(raw: object) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    clean = raw.strip().lower()
+    return clean if clean in VALID_BOT_SPEEDS else None
+
 
 def normalize_bot_difficulty(raw: object) -> str | None:
     if not isinstance(raw, str):
@@ -931,6 +940,7 @@ def serialize_room(
     config = {k: v for k, v in raw_config.items() if k != "host_username"}
     if config.get("dice_mode") not in VALID_DICE_MODES:
         config["dice_mode"] = "random"
+    config["bot_speed"] = normalize_bot_speed(config.get("bot_speed")) or "normal"
     seats = json.loads(room.seats_json)
     if not normalize_bot_difficulty(config.get("bot_difficulty")):
         first_bot = next((s for s in seats if s.get("player_key") != "HUMAN"), None)
@@ -1781,6 +1791,7 @@ def create_room(
     seat_names: list | dict | None = None,
     bot_difficulty: str | None = None,
     dice_mode: str = "random",
+    bot_speed: str = "normal",
 ) -> tuple[StoredRoom, str]:
     session = db.session
     room_code = _generate_room_code(session)
@@ -1909,12 +1920,14 @@ def create_room(
         infer_bot_difficulty_from_key(first_bot_key) if first_bot_key else "medium"
     )
     resolved_dice_mode = dice_mode if dice_mode in VALID_DICE_MODES else "random"
+    resolved_bot_speed = normalize_bot_speed(bot_speed) or "normal"
     config = {
         "map_template": map_template,
         "vps_to_win": vps_to_win,
         "discard_limit": discard_limit,
         "friendly_robber": friendly_robber,
         "bot_difficulty": resolved_difficulty,
+        "bot_speed": resolved_bot_speed,
         "dice_mode": resolved_dice_mode,
         "created_at": int(time.time()),
     }

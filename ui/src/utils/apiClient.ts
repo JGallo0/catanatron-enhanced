@@ -9,6 +9,7 @@ import type {
   AccountStats,
   AvatarConfig,
   BotDifficulty,
+  BotSpeed,
   Color,
   DiceMode,
   GameAction,
@@ -85,7 +86,7 @@ export type AuthConfig = {
   google_client_id: string | null;
 };
 
-export type { BotDifficulty, DiceMode };
+export type { BotDifficulty, BotSpeed, DiceMode };
 export type MapTemplate = "BASE" | "MINI" | "TOURNAMENT";
 export type StateIndex = number | `${number}` | "latest";
 
@@ -660,6 +661,7 @@ export async function createRoom(options: {
   }>;
   seatNames?: Partial<Record<Color, string>> | Array<string | null>;
   botDifficulty?: BotDifficulty;
+  botSpeed?: BotSpeed;
   mapTemplate: MapTemplate;
   vpsToWin: number;
   discardLimit: number;
@@ -679,6 +681,7 @@ export async function createRoom(options: {
         ...(options.seats ? { seats: options.seats } : {}),
         ...(options.seatNames ? { seat_names: options.seatNames } : {}),
         ...(options.botDifficulty ? { bot_difficulty: options.botDifficulty } : {}),
+        ...(options.botSpeed ? { bot_speed: options.botSpeed } : {}),
         map_template: options.mapTemplate,
         vps_to_win: options.vpsToWin,
         discard_limit: options.discardLimit,
@@ -805,6 +808,7 @@ export async function updateRoom(
       discard_limit: number;
       friendly_robber: boolean;
       bot_difficulty: BotDifficulty;
+      bot_speed: BotSpeed;
       dice_mode: DiceMode;
     }>;
     seats?: Array<{

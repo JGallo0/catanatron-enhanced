@@ -5,3 +5,16 @@
 .logo {
   font-family: "Bungee Inline", sans-serif;
 }
+
+.route-loading-fallback {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 35%, #0f2544 0%, #060d18 100%);
+  color: #fde68a;
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}

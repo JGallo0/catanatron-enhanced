@@ -1,6 +1,7 @@
 import type {
   AvatarConfig,
   BotDifficulty,
+  BotSpeed,
   Color,
   GameState,
   SeatAvatarMeta,
@@ -78,6 +79,46 @@ export function difficultyFromPlayerKey(playerKey?: string | null): BotDifficult
 export function formatBotDifficultyLabel(difficulty?: BotDifficulty | null): string {
   const found = BOT_DIFFICULTY_OPTIONS.find((d) => d.value === difficulty);
   return found ? found.label : "Moderado";
+}
+
+export const BOT_SPEED_OPTIONS: ReadonlyArray<{
+  value: BotSpeed;
+  label: string;
+  icon: string;
+  description: string;
+}> = [
+  {
+    value: "normal",
+    label: "Normal",
+    icon: "🐢",
+    description: "Ritmo clássico de tabuleiro para acompanhar dados e jogadas",
+  },
+  {
+    value: "fast",
+    label: "Rápida",
+    icon: "⏩",
+    description: "Transições ágeis mantendo destaque visual das jogadas",
+  },
+  {
+    value: "turbo",
+    label: "Turbo",
+    icon: "⚡",
+    description: "Bots respondem quase instantaneamente para partidas rápidas",
+  },
+];
+
+export function normalizeBotSpeed(raw: unknown): BotSpeed | null {
+  if (typeof raw !== "string") return null;
+  const clean = raw.trim().toLowerCase();
+  if (clean === "normal" || clean === "fast" || clean === "turbo") {
+    return clean;
+  }
+  return null;
+}
+
+export function formatBotSpeedLabel(speed?: BotSpeed | null): string {
+  const found = BOT_SPEED_OPTIONS.find((s) => s.value === speed);
+  return found ? found.label : "Normal";
 }
 
 export const MAP_TEMPLATE_OPTIONS: ReadonlyArray<{

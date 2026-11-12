@@ -17,6 +17,7 @@ import {
   createGame,
   createRoom,
   type BotDifficulty,
+  type BotSpeed,
   type DiceMode,
   type MapTemplate,
   type PlayerAccount,
@@ -25,7 +26,9 @@ import {
 import {
   BOT_AVATAR_PROFILES,
   BOT_DIFFICULTY_OPTIONS,
+  BOT_SPEED_OPTIONS,
   formatBotDifficultyLabel,
+  formatBotSpeedLabel,
   formatMapTemplateLabel,
   MAP_TEMPLATE_OPTIONS,
   OFFICIAL_BOT_NAMES,
@@ -33,6 +36,7 @@ import {
   playerKeyForDifficulty,
   type OfficialBotName,
 } from "../../config/botCatalog";
+import { getSavedGameSpeed, saveGameSpeed } from "../../utils/tabletopPacing";
 import PlayerAvatar from "../PlayerAvatar";
 import MapTemplatePreview from "./MapTemplatePreview";
 import "./MatchSetupModal.scss";
@@ -85,6 +89,9 @@ export default function MatchSetupModal({
 }: MatchSetupModalProps) {
   const [mapTemplate, setMapTemplate] = useState<MapTemplate>("BASE");
   const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>("medium");
+  const [botSpeed, setBotSpeed] = useState<BotSpeed>(() =>
+    mode === "solo" ? getSavedGameSpeed() : "normal"
+  );
   const [diceMode, setDiceMode] = useState<DiceMode>("random");
   const [vpsToWin, setVpsToWin] = useState(10);
   const [discardLimit, setDiscardLimit] = useState(7);
@@ -104,6 +111,7 @@ export default function MatchSetupModal({
     setSubmitting(false);
     setSeats(defaultSeatsForMode(mode));
     setBotDifficulty("medium");
+    setBotSpeed(mode === "solo" ? getSavedGameSpeed() : "normal");
     setDiceMode("random");
   }, [mode]);
 
@@ -193,6 +201,7 @@ export default function MatchSetupModal({
       const botKey = playerKeyForDifficulty(botDifficulty);
 
       if (mode === "solo") {
+        saveGameSpeed(botSpeed);
         const hostIdx = Math.max(0, seats.indexOf("HOST"));
         const players = seats.map((s) =>
           s === "HOST" || s === "OPEN" ? "HUMAN" : botKey
@@ -241,6 +250,7 @@ export default function MatchSetupModal({
           players: roomSeats.map((s) => s.player_key),
           seats: roomSeats,
           botDifficulty,
+          botSpeed,
           mapTemplate,
           vpsToWin,
           discardLimit,
@@ -268,6 +278,7 @@ export default function MatchSetupModal({
 
   const selectedTemplateLabel = formatMapTemplateLabel(mapTemplate);
   const selectedDifficultyLabel = formatBotDifficultyLabel(botDifficulty);
+  const selectedSpeedLabel = formatBotSpeedLabel(botSpeed);
   const isRoom = mode === "room";
 
   return (
@@ -517,6 +528,53 @@ export default function MatchSetupModal({
                 }`}
               >
                 {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="match-setup-group">
+          <div className="match-setup-group__header">
+            <span className="match-setup-inline-title">
+              Velocidade dos Bots
+              <Tooltip
+                title={
+                  isRoom
+                    ? "Define o ritmo das animações e jogadas dos bots para todos na sala online (definido antes de iniciar)."
+                    : "Define o ritmo inicial das animações e jogadas dos bots. No modo offline você também pode alterar a qualquer momento durante a partida."
+                }
+                arrow
+                enterTouchDelay={0}
+                leaveTouchDelay={3000}
+              >
+                <IconButton
+                  size="small"
+                  className="match-setup-help-btn"
+                  aria-label="Ajuda sobre Velocidade dos Bots"
+                >
+                  <HelpOutlineRoundedIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+            </span>
+            <strong>{selectedSpeedLabel}</strong>
+          </div>
+          <div
+            className="match-setup-templates"
+            role="group"
+            aria-label="Velocidade dos Bots"
+          >
+            {BOT_SPEED_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                variant="contained"
+                aria-pressed={botSpeed === opt.value}
+                onClick={() => setBotSpeed(opt.value)}
+                title={opt.description}
+                className={`match-setup-choice-btn match-setup-speed-btn ${
+                  botSpeed === opt.value ? "selected" : ""
+                }`}
+              >
+                {opt.icon} {opt.label}
               </Button>
             ))}
           </div>

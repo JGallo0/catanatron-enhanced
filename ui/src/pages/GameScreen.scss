@@ -505,6 +505,22 @@ main.catan-game-screen {
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    &.is-locked {
+      opacity: 0.78;
+      border-style: dashed;
+    }
+  }
+
+  &__lock {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    font-size: 0.55rem;
+    line-height: 1;
+    background: rgba(10, 19, 34, 0.94);
+    border-radius: 999px;
+    padding: 1px;
   }
 
   &__icon {

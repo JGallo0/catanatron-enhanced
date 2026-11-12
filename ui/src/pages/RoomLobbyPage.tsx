@@ -14,6 +14,7 @@ import {
   updateRoom,
   startRoomGame,
   type BotDifficulty,
+  type BotSpeed,
   type DiceMode,
   type PlayerAccount,
 } from "../utils/apiClient";
@@ -23,10 +24,13 @@ import { getGuestProfile, type GuestProfile } from "../config/avatarCatalog";
 import {
   BOT_AVATAR_PROFILES,
   BOT_DIFFICULTY_OPTIONS,
+  BOT_SPEED_OPTIONS,
   difficultyFromPlayerKey,
   formatBotDifficultyLabel,
+  formatBotSpeedLabel,
   formatMapTemplateLabel,
   isOfficialBotName,
+  normalizeBotSpeed,
   OFFICIAL_BOT_NAMES,
   OPEN_SEAT_LABEL,
   pickBotNameDeterministic,
@@ -37,6 +41,7 @@ import {
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
 import MapTemplatePreview from "../components/home/MapTemplatePreview";
+import { getSavedGameSeat, saveGameSeat } from "../utils/seatStorage";
 
 import "./RoomLobbyPage.scss";
 
@@ -62,23 +67,7 @@ function saveStoredToken(roomCode: string, token: string) {
   }
 }
 
-export function saveGameSeat(gameId: string, color: Color | null) {
-  try {
-    if (color) {
-      localStorage.setItem(`catan_game_seat_${gameId}`, color);
-    }
-  } catch {
-    // ignore storage errors
-  }
-}
-
-export function getSavedGameSeat(gameId: string): Color | null {
-  try {
-    return (localStorage.getItem(`catan_game_seat_${gameId}`) as Color) || null;
-  } catch {
-    return null;
-  }
-}
+export { getSavedGameSeat, saveGameSeat };
 
 export default function RoomLobbyPage() {
   const { roomCode = "" } = useParams();
@@ -220,6 +209,29 @@ export default function RoomLobbyPage() {
 
   const resolveRoomDiceMode = (currentRoom: RoomState): DiceMode => {
     return currentRoom.config.dice_mode === "balanced" ? "balanced" : "random";
+  };
+
+  const resolveRoomBotSpeed = (currentRoom: RoomState): BotSpeed => {
+    return normalizeBotSpeed(currentRoom.config.bot_speed) ?? "normal";
+  };
+
+  const handleBotSpeedChange = async (nextSpeed: BotSpeed) => {
+    if (!room || !room.is_host || room.status !== "WAITING") return;
+    if (resolveRoomBotSpeed(room) === nextSpeed) return;
+    roomEpochRef.current += 1;
+    try {
+      setError("");
+      const updated = await updateRoom(room.room_code, {
+        token: getStoredToken(room.room_code),
+        config: { bot_speed: nextSpeed },
+      });
+      setRoom(updated);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.description ||
+          "Não foi possível alterar a velocidade dos bots."
+      );
+    }
   };
 
   const handleDiceModeChange = async (nextMode: DiceMode) => {
@@ -446,6 +458,7 @@ export default function RoomLobbyPage() {
   }
 
   const roomDifficulty = room ? resolveRoomDifficulty(room) : "medium";
+  const roomBotSpeed = room ? resolveRoomBotSpeed(room) : "normal";
   const roomDiceMode = room ? resolveRoomDiceMode(room) : "random";
 
   return (
@@ -595,6 +608,52 @@ export default function RoomLobbyPage() {
                     onClick={() => handleDifficultyChange(opt.value)}
                   >
                     {opt.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bot Speed Selector (Locked Pre-Match Room Setting) */}
+            <div className="lobby-speed-bar">
+              <div className="lobby-speed-bar__header">
+                <span className="lobby-inline-title">
+                  Velocidade dos Bots
+                  <Tooltip
+                    title="Define o ritmo das animações e jogadas dos bots durante toda esta partida online. Depois de iniciada, não poderá ser alterada."
+                    arrow
+                    enterTouchDelay={0}
+                    leaveTouchDelay={3000}
+                  >
+                    <IconButton
+                      size="small"
+                      className="lobby-help-btn"
+                      aria-label="Ajuda sobre Velocidade dos Bots"
+                    >
+                      <HelpOutlineRoundedIcon fontSize="inherit" />
+                    </IconButton>
+                  </Tooltip>
+                </span>
+                <strong>{formatBotSpeedLabel(roomBotSpeed)}</strong>
+              </div>
+              <div
+                className="lobby-speed-bar__options"
+                role="group"
+                aria-label="Velocidade dos Bots"
+              >
+                {BOT_SPEED_OPTIONS.map((opt) => (
+                  <Button
+                    key={opt.value}
+                    variant="contained"
+                    size="small"
+                    disabled={!room.is_host || room.status !== "WAITING"}
+                    aria-pressed={roomBotSpeed === opt.value}
+                    title={opt.description}
+                    className={`lobby-speed-btn ${
+                      roomBotSpeed === opt.value ? "selected" : ""
+                    }`}
+                    onClick={() => handleBotSpeedChange(opt.value)}
+                  >
+                    {opt.icon} {opt.label}
                   </Button>
                 ))}
               </div>
@@ -877,6 +936,10 @@ export default function RoomLobbyPage() {
               <span>
                 🤖 Bots:{" "}
                 <strong>{formatBotDifficultyLabel(roomDifficulty)}</strong>
+              </span>
+              <span>
+                ⚡ Velocidade:{" "}
+                <strong>{formatBotSpeedLabel(roomBotSpeed)}</strong>
               </span>
               <span>
                 🎲 Dados:{" "}

@@ -3,6 +3,7 @@ import type {
   ActiveTradeTuple,
   AvatarConfig,
   BotDifficulty,
+  BotSpeed,
   Color,
   ConfirmTradeAction,
   DevelopmentCard,
@@ -42,6 +43,7 @@ import {
   isOfficialBotName,
   isOpenSeatPlaceholderName,
   normalizeBotDifficulty,
+  normalizeBotSpeed,
   OPEN_SEAT_LABEL,
   pickBotNameDeterministic,
   pickBotNames,
@@ -2611,6 +2613,7 @@ export function localCreateGame(options: {
   hostName?: string;
   hostSeatIndex?: number;
   roomCode?: string;
+  botSpeed?: BotSpeed;
   seatMeta?: Record<Color, LocalSeatMeta>;
   hostAvatarConfig?: Partial<AvatarConfig>;
 }): string {
@@ -2839,6 +2842,9 @@ export function localCreateGame(options: {
     seat_names: { ...metaNames, ...(options.seatNames || {}) },
     seat_avatars: seatAvatars,
     room_code: options.roomCode,
+    ...(options.roomCode || options.botSpeed
+      ? { bot_speed: normalizeBotSpeed(options.botSpeed) ?? "normal" }
+      : {}),
     taken_over_colors: takenOverColors,
     seat_takeover: seatTakeover,
     schema_version: 2,
@@ -3666,6 +3672,7 @@ export function localCreateRoom(options: {
   }>;
   seatNames?: Partial<Record<Color, string>> | Array<string | null>;
   botDifficulty?: BotDifficulty;
+  botSpeed?: BotSpeed;
   mapTemplate: MapTemplate;
   vpsToWin: number;
   discardLimit: number;
@@ -3829,6 +3836,7 @@ export function localCreateRoom(options: {
       discard_limit: options.discardLimit,
       friendly_robber: options.friendlyRobber,
       bot_difficulty: resolvedDifficulty,
+      bot_speed: normalizeBotSpeed(options.botSpeed) ?? "normal",
       dice_mode: resolvedDiceMode,
       created_at: Math.floor(Date.now() / 1000),
     },
@@ -3964,6 +3972,7 @@ export function localGetRoom(
     config: {
       ...stored.config,
       bot_difficulty: normalizedDifficulty,
+      bot_speed: normalizeBotSpeed(stored.config.bot_speed) ?? "normal",
       dice_mode: stored.config.dice_mode === "balanced" ? "balanced" : "random",
     },
     seats,
@@ -4239,6 +4248,16 @@ export function localUpdateRoom(
         );
       }
     }
+    if ("bot_speed" in payload.config) {
+      const normSpeed = normalizeBotSpeed(payload.config.bot_speed);
+      if (!normSpeed) {
+        throw makeRoomHttpError(
+          400,
+          "'bot_speed' deve ser normal, fast ou turbo"
+        );
+      }
+      nextConfig.bot_speed = normSpeed;
+    }
     stored.config = nextConfig;
   }
 
@@ -4372,6 +4391,7 @@ export function localStartRoomGame(
       seatNames,
       seatMeta,
       roomCode: code,
+      botSpeed: normalizeBotSpeed(stored.config.bot_speed) ?? "normal",
     });
     stored.status = "IN_PROGRESS";
     saveRoomsMap(rooms);

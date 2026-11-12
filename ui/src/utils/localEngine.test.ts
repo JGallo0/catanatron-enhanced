@@ -2,10 +2,13 @@ import { afterEach, describe, expect, test } from "vitest";
 import type { GameEdge } from "./api.types";
 import {
   localCreateGame,
+  localCreateRoom,
   localGetGameMessages,
   localGetState,
   localPostAction,
   localPostGameMessage,
+  localStartRoomGame,
+  localUpdateRoom,
 } from "./localEngine";
 
 afterEach(() => {
@@ -196,5 +199,30 @@ describe("localEngine chat messages and longest road star ownership", () => {
     // 32nd roll crosses <= 5 threshold -> fresh 36-card deck shuffled, pops 1 -> 35 remaining
     state = localPostAction(gameId, [state.current_color, "ROLL", null]);
     expect(state.dice_deck_remaining).toBe(35);
+  });
+
+  test("persists bot_speed on local rooms and propagates it to started multiplayer GameState", () => {
+    const created = localCreateRoom({
+      hostName: "Anfitrião",
+      players: ["HUMAN", "HUMAN", "F", "F"],
+      botDifficulty: "medium",
+      botSpeed: "fast",
+      mapTemplate: "BASE",
+      vpsToWin: 10,
+      discardLimit: 7,
+      friendlyRobber: true,
+    });
+    expect(created.room.config.bot_speed).toBe("fast");
+
+    const updated = localUpdateRoom(created.room_code, {
+      token: created.seat_token,
+      config: { bot_speed: "turbo" },
+    });
+    expect(updated.config.bot_speed).toBe("turbo");
+
+    const started = localStartRoomGame(created.room_code, created.seat_token);
+    const gs = localGetState(started.game_id);
+    expect(gs.room_code).toBe(created.room_code);
+    expect(gs.bot_speed).toBe("turbo");
   });
 });

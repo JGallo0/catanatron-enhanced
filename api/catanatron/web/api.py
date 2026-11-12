@@ -45,6 +45,7 @@ from catanatron.web.models import (
     login_with_google_claims,
     maybe_promote_disconnected_seats,
     normalize_bot_difficulty,
+    normalize_bot_speed,
     pick_bot_names,
     prescan_requested_bot_names,
     promote_seat_to_bot,
@@ -100,6 +101,11 @@ def _enrich_view_with_seats(game: Game, view: dict) -> dict:
         room = get_room_by_game_id(game.id)
         if room is not None:
             view["room_code"] = room.room_code
+            try:
+                room_cfg = json.loads(room.config_json)
+            except Exception:
+                room_cfg = {}
+            view["bot_speed"] = normalize_bot_speed(room_cfg.get("bot_speed")) or "normal"
 
         if seat_meta:
             usernames = list(
@@ -553,6 +559,11 @@ def post_room_endpoint():
     if dice_mode not in VALID_DICE_MODES:
         abort(400, description="'dice_mode' must be 'random' or 'balanced'")
 
+    raw_bot_speed = body.get("bot_speed")
+    if raw_bot_speed is not None and normalize_bot_speed(raw_bot_speed) is None:
+        abort(400, description="'bot_speed' must be one of normal, fast, or turbo")
+    bot_speed = normalize_bot_speed(raw_bot_speed) or "normal"
+
     auth_user = resolve_user_from_token(_extract_auth_token())
     if auth_user is not None:
         host_name = (
@@ -575,6 +586,7 @@ def post_room_endpoint():
         seat_names=seat_names if isinstance(seat_names, (list, dict)) else None,
         bot_difficulty=bot_difficulty,
         dice_mode=dice_mode,
+        bot_speed=bot_speed,
     )
     return jsonify(
         {
@@ -829,6 +841,11 @@ def patch_room_endpoint(room_code: str):
                 for s in seats:
                     if s.get("player_key") != "HUMAN":
                         s["player_key"] = target_key
+        if "bot_speed" in cfg:
+            norm_speed = normalize_bot_speed(cfg["bot_speed"])
+            if norm_speed is None:
+                abort(400, description="'bot_speed' deve ser normal, fast ou turbo")
+            config["bot_speed"] = norm_speed
 
     if "seats" in body and isinstance(body["seats"], list):
         raw_seats = body["seats"]

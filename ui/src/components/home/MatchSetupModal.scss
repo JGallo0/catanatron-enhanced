@@ -130,6 +130,11 @@
   border-color: #38bdf8 !important;
 }
 
+.match-setup-speed-btn.selected {
+  background: linear-gradient(135deg, #0f766e 0%, #115e59 100%) !important;
+  border-color: #2dd4bf !important;
+}
+
 .match-setup-select-option {
   display: inline-flex;
   align-items: center;

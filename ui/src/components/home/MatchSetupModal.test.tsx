@@ -168,6 +168,7 @@ describe("MatchSetupModal", () => {
         { player_key: "W", player_name: "Felire", is_host: false },
       ],
       botDifficulty: "easy",
+      botSpeed: "normal",
       mapTemplate: "TOURNAMENT",
       vpsToWin: 10,
       discardLimit: 7,
@@ -313,5 +314,84 @@ describe("MatchSetupModal", () => {
       await screen.findByText(/Não foi possível iniciar a partida\./i)
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Iniciar Partida/i })).toBeEnabled();
+  }, 15000);
+
+  test("configures Velocidade dos Bots for both solo (persists preference) and online room pre-match setup", async () => {
+    const user = userEvent.setup();
+    vi.mocked(createGame).mockResolvedValueOnce("game-speed-fast");
+    vi.mocked(createRoom).mockResolvedValueOnce({
+      room_code: "SP33D1",
+      seat_token: "seat-spd-1",
+      room: {
+        room_code: "SP33D1",
+        status: "WAITING",
+        game_id: null,
+        is_host: true,
+        my_color: "RED",
+        config: {
+          map_template: "BASE",
+          vps_to_win: 10,
+          discard_limit: 7,
+          friendly_robber: true,
+          bot_difficulty: "medium",
+          bot_speed: "turbo",
+        },
+        seats: [],
+      },
+    });
+
+    const { rerender } = render(
+      <MatchSetupModal
+        mode="solo"
+        onClose={vi.fn()}
+        availablePlayers={DEFAULT_PLAYERS}
+        defaultHostName="Anfitrião"
+        account={null}
+        onGameCreated={vi.fn()}
+        onRoomCreated={vi.fn()}
+      />
+    );
+
+    const soloSpeedGroup = screen.getByRole("group", {
+      name: /Velocidade dos Bots/i,
+    });
+    expect(
+      within(soloSpeedGroup).getByRole("button", { name: /Normal/i })
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(soloSpeedGroup).getByRole("button", { name: /Rápida/i }));
+    await user.click(screen.getByRole("button", { name: /Iniciar Partida/i }));
+
+    expect(localStorage.getItem("catan_game_speed_v1")).toBe("fast");
+    expect(createGame).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MatchSetupModal
+        mode="room"
+        onClose={vi.fn()}
+        availablePlayers={DEFAULT_PLAYERS}
+        defaultHostName="João"
+        account={null}
+        onGameCreated={vi.fn()}
+        onRoomCreated={vi.fn()}
+      />
+    );
+
+    const roomSpeedGroup = screen.getByRole("group", {
+      name: /Velocidade dos Bots/i,
+    });
+    // Room mode defaults cleanly to Normal independently of solo preference
+    expect(
+      within(roomSpeedGroup).getByRole("button", { name: /Normal/i })
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(roomSpeedGroup).getByRole("button", { name: /Turbo/i }));
+    await user.click(screen.getByRole("button", { name: /Criar Sala e Gerar Link/i }));
+
+    expect(createRoom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        botSpeed: "turbo",
+      })
+    );
   }, 15000);
 });

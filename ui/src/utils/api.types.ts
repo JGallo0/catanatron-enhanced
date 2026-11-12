@@ -199,6 +199,7 @@ export type RoomSeat = {
 };
 
 export type BotDifficulty = "easy" | "medium" | "hard";
+export type BotSpeed = "normal" | "fast" | "turbo";
 export type DiceMode = "random" | "balanced";
 
 export type RoomState = {
@@ -213,6 +214,7 @@ export type RoomState = {
     discard_limit: number;
     friendly_robber: boolean;
     bot_difficulty?: BotDifficulty;
+    bot_speed?: BotSpeed;
     dice_mode?: DiceMode;
     created_at?: number;
   };
@@ -253,6 +255,7 @@ export type GameState = {
   seat_names?: Partial<Record<Color, string>>;
   seat_avatars?: Partial<Record<Color, SeatAvatarMeta>>;
   room_code?: string;
+  bot_speed?: BotSpeed;
   taken_over_colors?: Color[];
   seat_takeover?: Partial<Record<Color, SeatTakeoverInfo>>;
 

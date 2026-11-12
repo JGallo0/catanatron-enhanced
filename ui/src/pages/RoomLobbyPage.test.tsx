@@ -390,4 +390,62 @@ describe("RoomLobbyPage", () => {
       })
     ).toBeDisabled();
   }, 15000);
+
+  test("host changes Velocidade dos Bots in pre-match lobby and guest sees disabled speed controls", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("catan_room_token_RM9988", "tok_host_99");
+    const turboRoom: RoomState = {
+      ...hostRoom,
+      config: { ...hostRoom.config, bot_speed: "turbo" },
+    };
+    vi.mocked(getRoom).mockResolvedValue(hostRoom);
+    vi.mocked(updateRoom).mockImplementationOnce(async () => {
+      vi.mocked(getRoom).mockResolvedValue(turboRoom);
+      return turboRoom;
+    });
+
+    const { unmount } = renderLobby("RM9988");
+
+    const speedGroup = await screen.findByRole("group", {
+      name: /Velocidade dos Bots/i,
+    });
+    expect(
+      within(speedGroup).getByRole("button", { name: /Normal/i })
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(speedGroup).getByRole("button", { name: /Turbo/i }));
+
+    expect(updateRoom).toHaveBeenCalledWith("RM9988", {
+      token: "tok_host_99",
+      config: { bot_speed: "turbo" },
+    });
+    await waitFor(() => {
+      expect(
+        within(speedGroup).getByRole("button", { name: /Turbo/i })
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    unmount();
+
+    const guestTurboRoom: RoomState = {
+      ...turboRoom,
+      is_host: false,
+      my_color: "BLUE",
+    };
+    vi.mocked(getRoom).mockResolvedValue(guestTurboRoom);
+    renderLobby("RM9988");
+
+    const guestSpeedGroup = await screen.findByRole("group", {
+      name: /Velocidade dos Bots/i,
+    });
+    expect(
+      within(guestSpeedGroup).getByRole("button", { name: /Normal/i })
+    ).toBeDisabled();
+    expect(
+      within(guestSpeedGroup).getByRole("button", { name: /Rápida/i })
+    ).toBeDisabled();
+    expect(
+      within(guestSpeedGroup).getByRole("button", { name: /Turbo/i })
+    ).toBeDisabled();
+  }, 15000);
 });

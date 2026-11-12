@@ -254,6 +254,16 @@ Os retratos legados `.webp` herdados do Catan Universe foram completamente apose
   - **Bateria de Testes e Build Verificada (Blocos 6 e 7):**
     - Backend (`.\.venv\Scripts\python.exe -m pytest -o addopts="" tests/web tests/test_game.py tests/test_domestic_trade.py tests/test_web_view.py tests/test_anti_hoarding.py tests/test_balanced_dice.py -v`): **112/112 passando** (incluindo `test_game_chat.py`, `test_rooms_and_bots.py` e verificação de espelho `api/catanatron` == `catanatron/catanatron`).
     - Frontend (`npx tsc --noEmit`, `npx vitest run` e `npm run build` em `ui/`): **0 erros TS**, **32 arquivos / 160 testes passando** e build de produção Vite (`ui/dist/`) concluído com sucesso; verificado ao vivo no navegador em `1280x800` e `769x769`.
+- **Bloco 8 Concluído: Otimização de Carregamento Vite & Velocidade dos Bots (Offline Permanente vs Online Pré-Partida):**
+  - **Carregamento Rápido do Vite (`App.tsx`, `ReplayBox.tsx`, `seatStorage.ts`, `vite.config.ts`):**
+    - Substituído *barrel import* de `@mui/icons-material` em `ReplayBox.tsx` por *path imports* (`ArrowBackIos` / `ArrowForwardIos`), reduzindo os módulos transformados de `11.872` para `1.118`; *code splitting* via `React.lazy` + `Suspense` para `GameScreen`, `RoomLobbyPage` e `ReplayScreen`; extração de `seatStorage.ts` para eliminar conflito de chunk estático/dinâmico.
+  - **Velocidade dos Bots (`models.py`, `api.py`, `api/catanatron/`, `botCatalog.ts`, `localEngine.ts`, `MatchSetupModal.tsx`, `RoomLobbyPage.tsx`, `GameScreen.tsx`):**
+    - Seletor **Velocidade dos Bots** (`🐢 Normal`, `⏩ Rápida`, `⚡ Turbo`) adicionado tanto na criação de partida Solo quanto na criação de Sala Online (`MatchSetupModal.tsx`) e editável pelo anfitrião no lobby pré-partida (`RoomLobbyPage.tsx`, `POST /api/rooms` & `PATCH /api/rooms/<code>` validando `bot_speed`).
+    - **Offline (Solo):** botão de velocidade no dock lateral esquerdo permanece acessível e editável durante toda a partida (`localStorage["catan_game_speed_v1"]`).
+    - **Online (Salas):** velocidade é gravada em `StoredRoom.config_json["bot_speed"]`, propagada em `GameState.bot_speed` e **travada** durante a partida (`is-locked` + ícone `🔒` no dock).
+  - **Bateria de Testes e Build Verificada (Bloco 8):**
+    - Backend: **113/113 passando** (`pytest`, incluindo `test_room_bot_speed_pre_match_config_and_game_exposure` e paridade `api/catanatron/`).
+    - Frontend: `npx tsc --noEmit` (**0 erros**), **32 arquivos / 164 testes passando** (`vitest`) e `npm run build` concluído (`1.118` módulos, `37.98s`).
 
 ---
 
@@ -279,5 +289,6 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 4. ~~**Bloco 5 — Ritmo de Tabuleiro com Dados 2D6 Animados, Assunção/Retomada por Bot Multiplayer e Turnos Aleatórios**~~ *(Concluído)*
 5. ~~**Bloco 6 — Bots Anti-Hoarding, Encerramento de Salas, Dificuldade Única, Dados Equilibrados, Chat & Provocações**~~ *(Concluído)*
 6. ~~**Bloco 7 — Oceano ao Pôr do Sol, Portos Ilustrados, Dados 3D, Peças Artesanais, Ritmo 10s/3s/2x & Dock Vertical**~~ *(Concluído e publicado em `main` + `layout-topbar`)*
-7. **Testes Reais Multiplayer + Produção (PC / Celular):** Conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase, validar chat `/messages`, provocações, encerramento de salas e partidas multiplayer reais entre PC e celular na URL da Vercel.
+7. ~~**Bloco 8 — Otimização Vite (1.118 módulos) & Velocidade dos Bots (Offline Permanente / Online Pré-Partida Travada)**~~ *(Concluído e publicado em `main` + `layout-topbar`)*
+8. **Testes Reais Multiplayer + Produção (PC / Celular):** Conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase, validar chat `/messages`, provocações, encerramento de salas e partidas multiplayer reais entre PC e celular na URL da Vercel.
 8. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.

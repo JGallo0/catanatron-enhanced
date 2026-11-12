@@ -16,7 +16,7 @@ import {
   type PlayerAccount,
   type PlayerEntry,
 } from "../utils/apiClient";
-import { saveGameSeat } from "./RoomLobbyPage";
+import { saveGameSeat } from "../utils/seatStorage";
 import type { Color, RoomState } from "../utils/api.types";
 import {
   AVATAR_FRAME_OPTIONS,

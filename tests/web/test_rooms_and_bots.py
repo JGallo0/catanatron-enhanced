@@ -599,3 +599,49 @@ def test_bot_difficulty_explicit_bot_names_and_assento_livre_flow(client):
     assert view["seat_names"]["RED"] == "Host Lucas"
     assert view["seat_names"]["ORANGE"] == "Felire"
     assert view["seat_names"]["BLUE"] != OPEN_SEAT_NAME
+
+
+def test_room_bot_speed_pre_match_config_and_game_exposure(client):
+    # Default bot_speed is "normal", rejects invalid speeds on POST and PATCH
+    bad_create = client.post(
+        "/api/rooms",
+        json={"host_name": "Ana", "bot_speed": "hyperspeed"},
+    )
+    assert bad_create.status_code == 400
+
+    create_res = client.post(
+        "/api/rooms",
+        json={
+            "host_name": "Ana",
+            "players": ["HUMAN", "HUMAN", "F", "F"],
+            "bot_speed": "fast",
+        },
+    )
+    assert create_res.status_code == 200
+    created = create_res.get_json()
+    code = created["room_code"]
+    tok = created["seat_token"]
+    assert created["room"]["config"]["bot_speed"] == "fast"
+
+    # Invalid PATCH rejected with 400
+    bad_patch = client.patch(
+        f"/api/rooms/{code}",
+        json={"token": tok, "config": {"bot_speed": "slow"}},
+    )
+    assert bad_patch.status_code == 400
+
+    # Valid PATCH updates room pre-match speed to turbo
+    good_patch = client.patch(
+        f"/api/rooms/{code}",
+        json={"token": tok, "config": {"bot_speed": "turbo"}},
+    )
+    assert good_patch.status_code == 200
+    assert good_patch.get_json()["config"]["bot_speed"] == "turbo"
+
+    # Start room -> live state view exposes locked bot_speed
+    start_res = client.post(f"/api/rooms/{code}/start", json={"token": tok})
+    assert start_res.status_code == 200
+    gid = start_res.get_json()["game_id"]
+    view = client.get(f"/api/games/{gid}/states/latest").get_json()
+    assert view["room_code"] == code
+    assert view["bot_speed"] == "turbo"

@@ -52,7 +52,11 @@ import { getHumanColor, playerKey } from "../utils/stateUtils";
 import AnalysisBox from "../components/AnalysisBox";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { getSavedAccountAvatarSummary } from "../config/avatarCatalog";
-import { resolvePlayerDisplayName } from "../config/botCatalog";
+import {
+  formatBotSpeedLabel,
+  normalizeBotSpeed,
+  resolvePlayerDisplayName,
+} from "../config/botCatalog";
 import {
   TAUNT_CATALOG,
   TAUNT_COOLDOWN_MS,
@@ -63,7 +67,7 @@ import {
   parseTauntMessage,
 } from "../config/tauntCatalog";
 import type { Color, GameMessage, GameState } from "../utils/api.types";
-import { getSavedGameSeat } from "./RoomLobbyPage";
+import { getSavedGameSeat } from "../utils/seatStorage";
 import {
   isSoundMuted,
   setSoundMuted,
@@ -143,11 +147,10 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const [isBotThinking, setIsBotThinking] = useState(false);
   const [muted, setMuted] = useState(() => isSoundMuted());
-  const [gameSpeed, setGameSpeed] = useState<GameSpeed>(() =>
+  const [localGameSpeed, setLocalGameSpeed] = useState<GameSpeed>(() =>
     getSavedGameSpeed()
   );
-  const gameSpeedRef = useRef<GameSpeed>(gameSpeed);
-  gameSpeedRef.current = gameSpeed;
+  const gameSpeedRef = useRef<GameSpeed>(localGameSpeed);
 
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
   const [almanacOpen, setAlmanacOpen] = useState(false);
@@ -282,6 +285,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   }, [gs]);
 
   const isMultiplayerGame = Boolean(gs?.room_code) || originalHumansCount >= 2;
+  const isSpeedLockedOnline = !replayMode && isMultiplayerGame;
+  const gameSpeed: GameSpeed = isSpeedLockedOnline
+    ? (normalizeBotSpeed(gs?.bot_speed) ?? "normal")
+    : localGameSpeed;
+  gameSpeedRef.current = gameSpeed;
   const isMySeatTakenOver = Boolean(
     mySeatColor &&
       (gs?.seat_takeover?.[mySeatColor]?.taken_over ||
@@ -935,8 +943,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   };
 
   const toggleGameSpeed = () => {
-    const next = cycleGameSpeed(gameSpeed);
-    setGameSpeed(next);
+    if (isSpeedLockedOnline) return;
+    const next = cycleGameSpeed(localGameSpeed);
+    setLocalGameSpeed(next);
     saveGameSpeed(next);
   };
 
@@ -1225,24 +1234,30 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         {!replayMode && (
           <button
             type="button"
+            disabled={isSpeedLockedOnline}
             className={cn("game-left-dock__btn", {
               "is-fast": gameSpeed === "fast",
               "is-turbo": gameSpeed === "turbo",
+              "is-locked": isSpeedLockedOnline,
             })}
             onClick={toggleGameSpeed}
             title={
-              gameSpeed === "normal"
-                ? "Velocidade: Normal — Clique para mudar para Rápida"
-                : gameSpeed === "fast"
-                  ? "Velocidade: Rápida — Clique para mudar para Turbo"
-                  : "Velocidade: Turbo — Clique para voltar para Normal"
+              isSpeedLockedOnline
+                ? `Velocidade: ${formatBotSpeedLabel(gameSpeed)} (Definida nas configurações pré-partida da sala)`
+                : gameSpeed === "normal"
+                  ? "Velocidade: Normal — Clique para mudar para Rápida"
+                  : gameSpeed === "fast"
+                    ? "Velocidade: Rápida — Clique para mudar para Turbo"
+                    : "Velocidade: Turbo — Clique para voltar para Normal"
             }
             aria-label={
-              gameSpeed === "normal"
-                ? "Velocidade: Normal"
-                : gameSpeed === "fast"
-                  ? "Velocidade: Rápida"
-                  : "Velocidade: Turbo"
+              isSpeedLockedOnline
+                ? `Velocidade: ${formatBotSpeedLabel(gameSpeed)} (Travada pela sala)`
+                : gameSpeed === "normal"
+                  ? "Velocidade: Normal"
+                  : gameSpeed === "fast"
+                    ? "Velocidade: Rápida"
+                    : "Velocidade: Turbo"
             }
           >
             <span className="game-left-dock__icon" aria-hidden="true">
@@ -1259,6 +1274,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                   ? "Ráp"
                   : "Trb"}
             </span>
+            {isSpeedLockedOnline && (
+              <span className="game-left-dock__lock" aria-hidden="true">
+                🔒
+              </span>
+            )}
           </button>
         )}
 

@@ -791,3 +791,30 @@ test("renders left vertical quick dock shortcuts for AlmanacModal and RightDrawe
   expect(screen.getByText(/2 rolagem\(ns\) · Último: 7/i)).toBeInTheDocument();
   expect(screen.getByText(/Equilibrados · 34\/36/i)).toBeInTheDocument();
 });
+
+test("locks dock speed to room bot_speed in online matches while keeping offline solo speed editable", async () => {
+  localStorage.setItem("catan_game_speed_v1", "normal");
+  const onlineTurboRoomState = makeGameState({
+    state_index: 5,
+    room_code: "RM9988",
+    bot_speed: "turbo",
+    colors: ["RED", "BLUE", "ORANGE"],
+    bot_colors: ["ORANGE"],
+    current_color: "RED",
+    seat_names: { RED: "João", BLUE: "Maria", ORANGE: "Creitu" },
+    current_playable_actions: [["RED", "END_TURN", null]],
+  });
+  vi.mocked(getState).mockResolvedValue(onlineTurboRoomState);
+
+  renderGameScreen({ initialEntry: "/games/game-online?seat=RED" });
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  const lockedBtn = screen.getByRole("button", {
+    name: /Velocidade: Turbo \(Travada pela sala\)/i,
+  });
+  expect(lockedBtn).toBeDisabled();
+  expect(lockedBtn).toHaveClass("is-locked", "is-turbo");
+
+  fireEvent.click(lockedBtn);
+  expect(localStorage.getItem("catan_game_speed_v1")).toBe("normal");
+});

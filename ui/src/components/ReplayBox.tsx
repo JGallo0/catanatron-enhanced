@@ -1,4 +1,5 @@
-import { ArrowBackIos, ArrowForwardIos } from "@mui/icons-material";
+import ArrowBackIos from "@mui/icons-material/ArrowBackIos";
+import ArrowForwardIos from "@mui/icons-material/ArrowForwardIos";
 import { Button, Slider } from "@mui/material";
 
 import "./ReplayBox.scss";
