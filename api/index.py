@@ -1,5 +1,8 @@
+import json
 import os
+import re
 import sys
+import traceback
 from urllib.parse import parse_qsl, urlencode
 
 # Ensure the local catanatron package directory is highest-priority in Vercel Python runtime
@@ -11,9 +14,45 @@ for candidate in (ROOT_DIR, API_DIR, os.path.join(ROOT_DIR, "catanatron")):
             sys.path.remove(candidate)
         sys.path.insert(0, candidate)
 
-from catanatron.web import create_app
 
-app = create_app()
+def _redact_secrets(text: str) -> str:
+    return re.sub(r"://([^:@/\s]+):([^@/\s]+)@", r"://\1:***@", text or "")
+
+
+def _make_startup_error_app(exc: Exception):
+    traceback.print_exc()
+    err_type = type(exc).__name__
+    err_msg = _redact_secrets(str(exc))
+
+    def _error_wsgi(environ, start_response):
+        payload = json.dumps(
+            {
+                "ok": False,
+                "error": err_type,
+                "description": err_msg,
+            }
+        ).encode("utf-8")
+        start_response(
+            "500 Internal Server Error",
+            [
+                ("Content-Type", "application/json; charset=utf-8"),
+                ("Content-Length", str(len(payload))),
+                ("Cache-Control", "no-store"),
+            ],
+        )
+        return [payload]
+
+    return _error_wsgi
+
+
+_STARTUP_OK = True
+try:
+    from catanatron.web import create_app
+
+    app = create_app()
+except Exception as startup_exc:
+    _STARTUP_OK = False
+    app = _make_startup_error_app(startup_exc)
 
 
 class _VercelRoutingMiddleware:
@@ -61,4 +100,5 @@ class _VercelRoutingMiddleware:
         return self.wsgi_app(environ, start_response)
 
 
-app.wsgi_app = _VercelRoutingMiddleware(app.wsgi_app)
+if _STARTUP_OK:
+    app.wsgi_app = _VercelRoutingMiddleware(app.wsgi_app)

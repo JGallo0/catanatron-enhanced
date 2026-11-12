@@ -563,11 +563,12 @@ def test_health_endpoint_and_database_url_normalization(app, client, monkeypatch
 
     monkeypatch.setenv(
         "POSTGRES_PRISMA_URL",
-        '"postgres://user:pass@db.example.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1"',
+        '"postgres://user:pass@db.example.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1&channel_binding=require"',
     )
     resolved = _resolve_database_url("sqlite:////tmp/fallback.db")
     assert resolved.startswith("postgresql://user:pass@db.example.com:6543/postgres?")
     assert "sslmode=require" in resolved
     assert "pgbouncer" not in resolved
     assert "connection_limit" not in resolved
+    assert "channel_binding" not in resolved
 

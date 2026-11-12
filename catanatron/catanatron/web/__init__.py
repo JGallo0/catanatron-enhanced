@@ -76,6 +76,7 @@ _UNSUPPORTED_LIBPQ_QUERY_PARAMS = {
     "connection_limit",
     "pool_timeout",
     "schema",
+    "channel_binding",
 }
 
 
@@ -132,7 +133,13 @@ def create_app(test_config=None):
     is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
 
     engine_options = (
-        {"pool_pre_ping": True, "pool_recycle": 300} if is_postgres else {}
+        {
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+            "connect_args": {"connect_timeout": 10},
+        }
+        if is_postgres
+        else {}
     )
     app.config.from_mapping(
         SECRET_KEY=secret_key,
