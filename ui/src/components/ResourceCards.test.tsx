@@ -1,10 +1,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
+import { setLanguage } from "../i18n";
 import ResourceCards from "./ResourceCards";
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
+  setLanguage("pt");
 });
 
 const OWN_HAND = {
@@ -34,7 +37,7 @@ test("shows every card of a hand it is allowed to read", () => {
   expect(container.querySelectorAll(".wood-cards")).toHaveLength(1);
   expect(container.querySelectorAll(".sheep-cards")).toHaveLength(1);
   expect(container.querySelectorAll(".hidden-cards")).toHaveLength(0);
-  expect(screen.getByTitle("1 Knight Card(s)")).toBeInTheDocument();
+  expect(screen.getByTitle("1 carta(s) de Cavaleiro")).toBeInTheDocument();
 });
 
 test("shows an opponent's hand as two face-down counts", () => {
@@ -43,9 +46,11 @@ test("shows an opponent's hand as two face-down counts", () => {
   );
 
   expect(container.querySelectorAll(".wood-cards")).toHaveLength(0);
-  expect(screen.getByTitle("5 Resource Card(s), face down")).toBeInTheDocument();
   expect(
-    screen.getByTitle("2 Development Card(s), face down")
+    screen.getByTitle("5 carta(s) de recurso, virada(s) para baixo")
+  ).toBeInTheDocument();
+  expect(
+    screen.getByTitle("2 carta(s) de desenvolvimento, virada(s) para baixo")
   ).toBeInTheDocument();
 });
 

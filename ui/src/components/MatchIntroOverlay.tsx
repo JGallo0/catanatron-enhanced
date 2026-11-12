@@ -1,5 +1,6 @@
 import cn from "classnames";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 import {
   getGuestProfile,
   getSavedAccountAvatarSummary,
@@ -27,8 +28,10 @@ export default function MatchIntroOverlay({
   perspective,
   onDismiss,
 }: MatchIntroOverlayProps) {
+  const { language, t } = useLanguage();
   if (!open) return null;
 
+  const colorMeta = getPlayerColorMeta(language);
   const savedAcct = getSavedAccountAvatarSummary();
   const guestProfile = !savedAcct ? getGuestProfile() : null;
   const humanColors = gameState.colors.filter(
@@ -41,7 +44,10 @@ export default function MatchIntroOverlay({
       className="match-intro-overlay"
       role="dialog"
       aria-modal="false"
-      aria-label="Apresentação da partida: Boa Guerra"
+      aria-label={t(
+        "Apresentação da partida: Boa Guerra",
+        "Match intro: Good War"
+      )}
       onClick={onDismiss}
     >
       <div
@@ -51,14 +57,19 @@ export default function MatchIntroOverlay({
         <div className="match-intro-overlay__crest" aria-hidden="true">
           ⚔️⛵⚔️
         </div>
-        <h2 className="match-intro-overlay__title">Boa Guerra</h2>
+        <h2 className="match-intro-overlay__title">
+          {t("Boa Guerra", "Good War")}
+        </h2>
         <p className="match-intro-overlay__subtitle">
-          Rule the Isle • Meta: <strong>{vpsToWin} Pontos de Vitória</strong>
+          Rule the Isle • {t("Meta:", "Goal:")}{" "}
+          <strong>
+            {vpsToWin} {t("Pontos de Vitória", "Victory Points")}
+          </strong>
         </p>
 
         <div className="match-intro-overlay__seats">
           {gameState.colors.map((color, idx) => {
-            const meta = PLAYER_COLOR_META[color];
+            const meta = colorMeta[color];
             const isBot = gameState.bot_colors.includes(color);
             const isTakenOver = isTakenOverSeat(gameState, color);
             const name = resolvePlayerDisplayName(gameState, color, meta.label);
@@ -111,7 +122,7 @@ export default function MatchIntroOverlay({
                 </div>
                 <span className="match-intro-overlay__seat-name">{name}</span>
                 <span className="match-intro-overlay__seat-tag">
-                  {isStarter ? "🎲 Inicia" : meta.label}
+                  {isStarter ? t("🎲 Inicia", "🎲 Starts") : meta.label}
                 </span>
               </div>
             );
@@ -123,7 +134,7 @@ export default function MatchIntroOverlay({
           className="match-intro-overlay__cta"
           onClick={onDismiss}
         >
-          Zarpar para a Ilha
+          {t("Zarpar para a Ilha", "Set Sail for the Isle")}
         </button>
 
         <div

@@ -33,6 +33,7 @@ import MatchIntroOverlay from "../components/MatchIntroOverlay";
 import AlmanacModal from "../components/AlmanacModal";
 import DiceHistogram from "../components/DiceHistogram";
 import OceanBackdrop from "../components/OceanBackdrop";
+import LanguageToggle from "../components/LanguageToggle";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import {
@@ -50,7 +51,7 @@ import {
 import { dispatchSnackbar } from "../components/Snackbar";
 import { getHumanColor, playerKey } from "../utils/stateUtils";
 import AnalysisBox from "../components/AnalysisBox";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
 import { getSavedAccountAvatarSummary } from "../config/avatarCatalog";
 import {
   formatBotSpeedLabel,
@@ -58,14 +59,20 @@ import {
   resolvePlayerDisplayName,
 } from "../config/botCatalog";
 import {
-  TAUNT_CATALOG,
   TAUNT_COOLDOWN_MS,
   TAUNT_DISPLAY_MS,
   type TauntDefinition,
   encodeTauntBody,
   getTauntById,
+  getTauntCatalog,
   parseTauntMessage,
 } from "../config/tauntCatalog";
+import {
+  type AppLanguage,
+  getCurrentLanguage,
+  tr,
+  useLanguage,
+} from "../i18n";
 import type { Color, GameMessage, GameState } from "../utils/api.types";
 import { getSavedGameSeat } from "../utils/seatStorage";
 import {
@@ -102,41 +109,60 @@ const VALID_COLORS = new Set<Color>(["RED", "BLUE", "ORANGE", "WHITE"]);
 
 function describePromptBanner(
   gameState: GameState,
-  isBotThinking: boolean
+  isBotThinking: boolean,
+  lang: AppLanguage = getCurrentLanguage()
 ): string {
+  const colorMeta = getPlayerColorMeta(lang);
+  const en = lang === "en";
   if (gameState.winning_color) {
     const winName = resolvePlayerDisplayName(
       gameState,
       gameState.winning_color,
-      PLAYER_COLOR_META[gameState.winning_color].label
+      colorMeta[gameState.winning_color].label
     );
-    return `🏆 Vitória de ${winName}!`;
+    return en ? `🏆 ${winName} wins!` : `🏆 Vitória de ${winName}!`;
   }
   const activeLabel = resolvePlayerDisplayName(
     gameState,
     gameState.current_color,
-    PLAYER_COLOR_META[gameState.current_color].label
+    colorMeta[gameState.current_color].label
   );
   if (isBotThinking) {
-    return `🧭 ${activeLabel} está calculando a melhor jogada...`;
+    return en
+      ? `🧭 ${activeLabel} is thinking...`
+      : `🧭 ${activeLabel} está calculando a melhor jogada...`;
   }
   switch (gameState.current_prompt) {
     case "BUILD_INITIAL_SETTLEMENT":
-      return `Fase Inicial — ${activeLabel}: Escolha um vértice para fundar sua Aldeia`;
+      return en
+        ? `Setup — ${activeLabel}: Choose a vertex to place your Settlement`
+        : `Fase Inicial — ${activeLabel}: Escolha um vértice para fundar sua Aldeia`;
     case "BUILD_INITIAL_ROAD":
-      return `Fase Inicial — ${activeLabel}: Construa uma Estrada conectada`;
+      return en
+        ? `Setup — ${activeLabel}: Build a connected Road`
+        : `Fase Inicial — ${activeLabel}: Construa uma Estrada conectada`;
     case "MOVE_ROBBER":
-      return `🥷 Ladrão Ativo — ${activeLabel}: Clique em um hexágono iluminado para mover o Ladrão`;
+      return en
+        ? `🥷 Robber Active — ${activeLabel}: Click a highlighted hex to move the Robber`
+        : `🥷 Ladrão Ativo — ${activeLabel}: Clique em um hexágono iluminado para mover o Ladrão`;
     case "DISCARD":
-      return `⚠️ Sete nos Dados — ${activeLabel}: Descarte ${gameState.current_discard_count} carta(s)`;
+      return en
+        ? `⚠️ Rolled a 7 — ${activeLabel}: Discard ${gameState.current_discard_count} card(s)`
+        : `⚠️ Sete nos Dados — ${activeLabel}: Descarte ${gameState.current_discard_count} carta(s)`;
     case "DECIDE_TRADE":
-      return `🤝 Negociação — ${activeLabel}: Avalie a proposta de troca`;
+      return en
+        ? `🤝 Trade — ${activeLabel}: Review the trade offer`
+        : `🤝 Negociação — ${activeLabel}: Avalie a proposta de troca`;
     case "DECIDE_ACCEPTEES":
-      return `⚖️ Negociação — ${activeLabel}: Escolha com quem fechar a troca`;
+      return en
+        ? `⚖️ Trade — ${activeLabel}: Choose whom to finalize the trade with`
+        : `⚖️ Negociação — ${activeLabel}: Escolha com quem fechar a troca`;
     case "PLAY_TURN":
-      return `Vez de ${activeLabel} — Role os dados, negocie ou construa`;
+      return en
+        ? `${activeLabel}'s Turn — Roll dice, trade, or build`
+        : `Vez de ${activeLabel} — Role os dados, negocie ou construa`;
     default:
-      return `Vez de ${activeLabel}`;
+      return en ? `${activeLabel}'s Turn` : `Vez de ${activeLabel}`;
   }
 }
 
@@ -145,6 +171,10 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [searchParams] = useSearchParams();
   const { state, dispatch } = useContext(store);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+  const { language, t } = useLanguage();
+  const colorMeta = useMemo(() => getPlayerColorMeta(language), [language]);
+  const languageRef = useRef<AppLanguage>(language);
+  languageRef.current = language;
   const [isBotThinking, setIsBotThinking] = useState(false);
   const [muted, setMuted] = useState(() => isSoundMuted());
   const [localGameSpeed, setLocalGameSpeed] = useState<GameSpeed>(() =>
@@ -359,7 +389,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         if (fromOthers.length > 0) {
           const regularChatMsgs: GameMessage[] = [];
           for (const msg of fromOthers) {
-            const parsed = parseTauntMessage(msg.body, msg.kind);
+            const parsed = parseTauntMessage(
+              msg.body,
+              msg.kind,
+              languageRef.current
+            );
             if (parsed.taunt) {
               triggerPortraitTaunt(msg.color, parsed.taunt, true);
             } else {
@@ -725,16 +759,26 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           (mySeatColor !== null
             ? gs.current_color === mySeatColor
             : activeHumans.length === 1);
+        const activeLang = languageRef.current;
+        const activeColorMeta = getPlayerColorMeta(activeLang);
         const starterName = resolvePlayerDisplayName(
           gs,
           gs.current_color,
-          PLAYER_COLOR_META[gs.current_color]?.label || gs.current_color
+          activeColorMeta[gs.current_color]?.label || gs.current_color
         );
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setSpotlightToast({
           text: starterIsLocal
-            ? "Ordem sorteada: Você inicia a partida!"
-            : `Ordem sorteada: ${starterName} inicia a partida!`,
+            ? tr(
+                "Ordem sorteada: Você inicia a partida!",
+                "Turn order rolled: You start the match!",
+                activeLang
+              )
+            : tr(
+                `Ordem sorteada: ${starterName} inicia a partida!`,
+                `Turn order rolled: ${starterName} starts the match!`,
+                activeLang
+              ),
           color: gs.current_color,
           icon: "🎲",
         });
@@ -746,10 +790,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     }
 
     if (gs.state_index > prevStateIndexRef.current && !replayMode) {
+      const activeLang = languageRef.current;
+      const activeColorMeta = getPlayerColorMeta(activeLang);
       const batchFx = extractBatchTransitionFX(
         prevStateRef.current,
         gs,
-        mySeatColor
+        mySeatColor,
+        activeLang
       );
       const latestRecord = gs.action_records?.[gs.action_records.length - 1];
       playActionRecordSound(latestRecord);
@@ -825,7 +872,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         const actorName = resolvePlayerDisplayName(
           gs,
           actorColor,
-          PLAYER_COLOR_META[actorColor]?.label || actorColor
+          activeColorMeta[actorColor]?.label || actorColor
         );
 
         if (visuals.rollDice) {
@@ -856,7 +903,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setSpotlightToast({
-          text: humanizeActionRecordPt(gs, latestRecord),
+          text: humanizeActionRecordPt(gs, latestRecord, activeLang),
           color: actorColor,
           icon: visuals.actionIcon,
         });
@@ -916,7 +963,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           }
 
           if (botReaction) {
-            const def = getTauntById(botReaction.tauntId);
+            const def = getTauntById(botReaction.tauntId, activeLang);
             if (def) {
               lastBotTauntAtRef.current = nowTs;
               triggerPortraitTaunt(botReaction.color, def, false);
@@ -972,7 +1019,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         senderName: resolvePlayerDisplayName(
           gs,
           mySeatColor,
-          PLAYER_COLOR_META[mySeatColor]?.label || mySeatColor
+          colorMeta[mySeatColor]?.label || mySeatColor
         ),
       });
       applyIncomingChatMessages([sent], false);
@@ -980,7 +1027,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       const desc =
         err?.response?.data?.description ||
         err?.message ||
-        "Não foi possível enviar a mensagem.";
+        t("Não foi possível enviar a mensagem.", "Could not send the message.");
       setChatError(desc);
     } finally {
       setIsSendingChat(false);
@@ -991,7 +1038,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     if (!gameId || !gs || !mySeatColor || replayMode || tauntCoolingDown) {
       return;
     }
-    const def = getTauntById(tauntId);
+    const def = getTauntById(tauntId, language);
     if (!def) return;
 
     setTauntPickerOpen(false);
@@ -1013,7 +1060,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         senderName: resolvePlayerDisplayName(
           gs,
           mySeatColor,
-          PLAYER_COLOR_META[mySeatColor]?.label || mySeatColor
+          colorMeta[mySeatColor]?.label || mySeatColor
         ),
         kind: "TAUNT",
       });
@@ -1158,10 +1205,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     );
   }
 
-  const currentPalette = PLAYER_COLOR_META[gs.current_color];
+  const currentPalette = colorMeta[gs.current_color];
   const devCardsRemaining = gs.development_listdeck
     ? Object.values(gs.development_listdeck).reduce((a, b) => a + b, 0)
     : 0;
+  const tauntCatalog = getTauntCatalog(language);
 
   return (
     <main className="catan-game-screen">
@@ -1169,7 +1217,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       {/* Top Floating HUD Bar (Steam Catan style) */}
       <header className="game-top-hud">
         <div className="game-top-hud__left">
-          <Link to="/" className="game-top-hud__home-btn" title="Voltar ao Lobby">
+          <Link
+            to="/"
+            className="game-top-hud__home-btn"
+            title={t("Voltar ao Lobby", "Back to Lobby")}
+          >
             ← Lobby
           </Link>
           <h1 className="logo">Rule the Isle</h1>
@@ -1177,9 +1229,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             <Link
               to={`/rooms/${gs.room_code}`}
               className="game-top-hud__room-badge"
-              title="Ver Sala e Link de Convite"
+              title={t("Ver Sala e Link de Convite", "View Room & Invite Link")}
             >
-              🔗 Sala #{gs.room_code}
+              🔗 {t("Sala", "Room")} #{gs.room_code}
             </Link>
           )}
         </div>
@@ -1197,17 +1249,24 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
               boxShadow: `0 0 10px ${currentPalette.glow}`,
             }}
           />
-          <span>{describePromptBanner(gs, isBotThinking)}</span>
+          <span>{describePromptBanner(gs, isBotThinking, language)}</span>
         </div>
 
         <div className="game-top-hud__right">
           <span
             className="game-top-hud__bank-chip"
-            title="Cartas de Desenvolvimento restantes no baralho do banco"
+            title={t(
+              "Cartas de Desenvolvimento restantes no baralho do banco",
+              "Remaining Development Cards in the bank deck"
+            )}
           >
-            🃏 <span className="hud-btn-label">Baralho Dev: </span>
+            🃏{" "}
+            <span className="hud-btn-label">
+              {t("Baralho Dev:", "Dev Deck:")}{" "}
+            </span>
             <strong>{devCardsRemaining}</strong>
           </span>
+          <LanguageToggle compact />
           {isMultiplayerGame &&
             !replayMode &&
             !gs.winning_color &&
@@ -1217,10 +1276,16 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                 type="button"
                 className="game-top-hud__abandon-btn"
                 onClick={() => setAbandonConfirmOpen(true)}
-                title="Sair da partida e deixar um Bot IA assumir seu assento"
-                aria-label="Sair (Bot Assume)"
+                title={t(
+                  "Sair da partida e deixar um Bot IA assumir seu assento",
+                  "Leave the match and let an AI Bot take over your seat"
+                )}
+                aria-label={t("Sair (Bot Assume)", "Leave (Bot Takes Over)")}
               >
-                🚪 <span className="hud-btn-label">Sair (Bot Assume)</span>
+                🚪{" "}
+                <span className="hud-btn-label">
+                  {t("Sair (Bot Assume)", "Leave (Bot Takes Over)")}
+                </span>
               </button>
             )}
         </div>
@@ -1229,7 +1294,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       {/* Left Vertical Quick Dock (Catan Universe style shortcuts) */}
       <nav
         className="game-left-dock"
-        aria-label="Atalhos da partida"
+        aria-label={t("Atalhos da partida", "Match shortcuts")}
       >
         {!replayMode && (
           <button
@@ -1243,21 +1308,36 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             onClick={toggleGameSpeed}
             title={
               isSpeedLockedOnline
-                ? `Velocidade: ${formatBotSpeedLabel(gameSpeed)} (Definida nas configurações pré-partida da sala)`
+                ? t(
+                    `Velocidade: ${formatBotSpeedLabel(gameSpeed, "pt")} (Definida nas configurações pré-partida da sala)`,
+                    `Speed: ${formatBotSpeedLabel(gameSpeed, "en")} (Set in room pre-match settings)`
+                  )
                 : gameSpeed === "normal"
-                  ? "Velocidade: Normal — Clique para mudar para Rápida"
+                  ? t(
+                      "Velocidade: Normal — Clique para mudar para Rápida",
+                      "Speed: Normal — Click to switch to Fast"
+                    )
                   : gameSpeed === "fast"
-                    ? "Velocidade: Rápida — Clique para mudar para Turbo"
-                    : "Velocidade: Turbo — Clique para voltar para Normal"
+                    ? t(
+                        "Velocidade: Rápida — Clique para mudar para Turbo",
+                        "Speed: Fast — Click to switch to Turbo"
+                      )
+                    : t(
+                        "Velocidade: Turbo — Clique para voltar para Normal",
+                        "Speed: Turbo — Click to return to Normal"
+                      )
             }
             aria-label={
               isSpeedLockedOnline
-                ? `Velocidade: ${formatBotSpeedLabel(gameSpeed)} (Travada pela sala)`
+                ? t(
+                    `Velocidade: ${formatBotSpeedLabel(gameSpeed, "pt")} (Travada pela sala)`,
+                    `Speed: ${formatBotSpeedLabel(gameSpeed, "en")} (Locked by room)`
+                  )
                 : gameSpeed === "normal"
-                  ? "Velocidade: Normal"
+                  ? t("Velocidade: Normal", "Speed: Normal")
                   : gameSpeed === "fast"
-                    ? "Velocidade: Rápida"
-                    : "Velocidade: Turbo"
+                    ? t("Velocidade: Rápida", "Speed: Fast")
+                    : t("Velocidade: Turbo", "Speed: Turbo")
             }
           >
             <span className="game-left-dock__icon" aria-hidden="true">
@@ -1271,7 +1351,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
               {gameSpeed === "normal"
                 ? "1×"
                 : gameSpeed === "fast"
-                  ? "Ráp"
+                  ? t("Ráp", "Fast")
                   : "Trb"}
             </span>
             {isSpeedLockedOnline && (
@@ -1291,11 +1371,14 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           onClick={handleToggleChat}
           aria-label={
             unreadChatCount > 0
-              ? `Bate-papo (${unreadChatCount} não lidas)`
-              : "Bate-papo"
+              ? t(
+                  `Bate-papo (${unreadChatCount} não lidas)`,
+                  `Chat (${unreadChatCount} unread)`
+                )
+              : t("Bate-papo", "Chat")
           }
           aria-expanded={chatOpen}
-          title="Abrir Bate-papo da Partida"
+          title={t("Abrir Bate-papo da Partida", "Open Match Chat")}
         >
           <span className="game-left-dock__icon" aria-hidden="true">💬</span>
           {unreadChatCount > 0 && (
@@ -1314,13 +1397,19 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                 "is-cooldown": tauntCoolingDown,
               })}
               onClick={() => setTauntPickerOpen((prev) => !prev)}
-              aria-label="Provocações"
+              aria-label={t("Provocações", "Taunts")}
               aria-expanded={tauntPickerOpen}
               disabled={tauntCoolingDown}
               title={
                 tauntCoolingDown
-                  ? "Aguarde 3s para enviar outra provocação"
-                  : "Enviar provocação ou saudação animada"
+                  ? t(
+                      "Aguarde 3s para enviar outra provocação",
+                      "Wait 3s before sending another taunt"
+                    )
+                  : t(
+                      "Enviar provocação ou saudação animada",
+                      "Send animated taunt or greeting"
+                    )
               }
             >
               <span className="game-left-dock__icon" aria-hidden="true">🎭</span>
@@ -1329,21 +1418,21 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
               <div
                 className="taunt-picker-popover taunt-picker-popover--dock"
                 role="dialog"
-                aria-label="Escolher provocação"
+                aria-label={t("Escolher provocação", "Choose taunt")}
               >
                 <div className="taunt-picker-popover__header">
-                  <span>🎭 Provocações & Saudações</span>
+                  <span>🎭 {t("Provocações & Saudações", "Taunts & Greetings")}</span>
                   <button
                     type="button"
                     className="taunt-picker-popover__close"
                     onClick={() => setTauntPickerOpen(false)}
-                    aria-label="Fechar provocações"
+                    aria-label={t("Fechar provocações", "Close taunts")}
                   >
                     ✕
                   </button>
                 </div>
                 <div className="taunt-picker-popover__grid">
-                  {TAUNT_CATALOG.map((taunt) => (
+                  {tauntCatalog.map((taunt) => (
                     <button
                       key={taunt.id}
                       type="button"
@@ -1375,8 +1464,8 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
               data: !state.isLeftDrawerOpen,
             })
           }
-          aria-label="Histórico"
-          title="Abrir Histórico de Jogadas"
+          aria-label={t("Histórico", "History")}
+          title={t("Abrir Histórico de Jogadas", "Open Action Log")}
         >
           <span className="game-left-dock__icon" aria-hidden="true">📜</span>
         </button>
@@ -1392,8 +1481,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
               data: !state.isRightDrawerOpen,
             })
           }
-          aria-label="Chances (IA)"
-          title="Chances (IA) & Histograma de Dados"
+          aria-label={t("Chances (IA)", "Win Odds (AI)")}
+          title={t(
+            "Chances (IA) & Histograma de Dados",
+            "Win Odds (AI) & Dice Histogram"
+          )}
         >
           <span className="game-left-dock__icon" aria-hidden="true">📊</span>
         </button>
@@ -1404,8 +1496,8 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             "is-open": almanacOpen,
           })}
           onClick={() => setAlmanacOpen(true)}
-          aria-label="Almanaque"
-          title="Abrir Almanaque & Regras"
+          aria-label={t("Almanaque", "Almanac")}
+          title={t("Abrir Almanaque & Regras", "Open Almanac & Rules")}
         >
           <span className="game-left-dock__icon" aria-hidden="true">📖</span>
         </button>
@@ -1414,8 +1506,14 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           type="button"
           className="game-left-dock__btn"
           onClick={toggleSoundMute}
-          title={muted ? "Ativar efeitos sonoros" : "Silenciar efeitos sonoros"}
-          aria-label={muted ? "Ativar som" : "Silenciar som"}
+          title={
+            muted
+              ? t("Ativar efeitos sonoros", "Enable sound effects")
+              : t("Silenciar efeitos sonoros", "Mute sound effects")
+          }
+          aria-label={
+            muted ? t("Ativar som", "Unmute sound") : t("Silenciar som", "Mute sound")
+          }
         >
           {muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
         </button>
@@ -1437,10 +1535,14 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           <div
             className="game-reclaim-banner"
             role="region"
-            aria-label="Retomar assento"
+            aria-label={t("Retomar assento", "Reclaim seat")}
           >
             <span className="game-reclaim-banner__text">
-              🤖 Um Bot IA assumiu o seu assento enquanto você esteve ausente.
+              🤖{" "}
+              {t(
+                "Um Bot IA assumiu o seu assento enquanto você esteve ausente.",
+                "An AI Bot took over your seat while you were away."
+              )}
             </span>
             <button
               type="button"
@@ -1448,7 +1550,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
               disabled={isReclaiming}
               onClick={handleReclaimSeat}
             >
-              {isReclaiming ? "Retomando..." : "↩️ Retomar Meu Assento"}
+              {isReclaiming
+                ? t("Retomando...", "Reclaiming...")
+                : t("↩️ Retomar Meu Assento", "↩️ Reclaim My Seat")}
             </button>
           </div>
         )}
@@ -1464,7 +1568,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           className="action-spotlight-toast"
           style={{
             borderColor:
-              PLAYER_COLOR_META[spotlightToast.color]?.primary || "#facc15",
+              colorMeta[spotlightToast.color]?.primary || "#facc15",
           }}
           role="status"
           aria-live="polite"
@@ -1473,7 +1577,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             className="action-spotlight-toast__dot"
             style={{
               background:
-                PLAYER_COLOR_META[spotlightToast.color]?.primary || "#facc15",
+                colorMeta[spotlightToast.color]?.primary || "#facc15",
             }}
           />
           <span className="action-spotlight-toast__icon" aria-hidden="true">
@@ -1501,9 +1605,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           style={
             {
               "--turn-color":
-                PLAYER_COLOR_META[turnPauseBanner.color]?.primary || "#facc15",
+                colorMeta[turnPauseBanner.color]?.primary || "#facc15",
               "--turn-glow":
-                PLAYER_COLOR_META[turnPauseBanner.color]?.glow ||
+                colorMeta[turnPauseBanner.color]?.glow ||
                 "rgba(250, 204, 21, 0.55)",
             } as React.CSSProperties
           }
@@ -1514,13 +1618,19 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             className="turn-transition-banner__dot"
             style={{
               background:
-                PLAYER_COLOR_META[turnPauseBanner.color]?.primary || "#facc15",
+                colorMeta[turnPauseBanner.color]?.primary || "#facc15",
             }}
           />
           <span className="turn-transition-banner__text">
             {turnPauseBanner.isLocal
-              ? `Vez de ${turnPauseBanner.name} — Sua vez!`
-              : `Vez de ${turnPauseBanner.name}`}
+              ? t(
+                  `Vez de ${turnPauseBanner.name} — Sua vez!`,
+                  `${turnPauseBanner.name}'s Turn — Your turn!`
+                )
+              : t(
+                  `Vez de ${turnPauseBanner.name}`,
+                  `${turnPauseBanner.name}'s Turn`
+                )}
           </span>
         </div>
       )}
@@ -1541,11 +1651,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       {gs.action_records && gs.action_records.length > 0 && (
         <aside
           className="mini-action-log"
-          aria-label="Últimas jogadas na mesa"
+          aria-label={t("Últimas jogadas na mesa", "Recent table actions")}
         >
           {gs.action_records.slice(-3).map((rec, idx, arr) => {
             const c = rec[0]?.[0];
-            const palette = c ? PLAYER_COLOR_META[c] : null;
+            const palette = c ? colorMeta[c] : null;
             const globalIdx = gs.action_records.length - arr.length + idx;
             return (
               <div key={globalIdx} className="mini-action-log__row">
@@ -1554,7 +1664,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                   style={{ background: palette?.primary || "#94a3b8" }}
                 />
                 <span className="mini-action-log__text">
-                  {humanizeActionRecordPt(gs, rec)}
+                  {humanizeActionRecordPt(gs, rec, language)}
                 </span>
               </div>
             );
@@ -1580,21 +1690,27 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           }}
           style={{
             borderColor:
-              PLAYER_COLOR_META[chatPreview.color]?.primary || "#facc15",
+              colorMeta[chatPreview.color]?.primary || "#facc15",
           }}
         >
           <span
             className="game-chat-preview-toast__dot"
             style={{
               background:
-                PLAYER_COLOR_META[chatPreview.color]?.primary || "#facc15",
+                colorMeta[chatPreview.color]?.primary || "#facc15",
             }}
           />
           <span className="game-chat-preview-toast__sender">
             {chatPreview.sender_name}:
           </span>
           <span className="game-chat-preview-toast__body">
-            {parseTauntMessage(chatPreview.body, chatPreview.kind).displayText}
+            {
+              parseTauntMessage(
+                chatPreview.body,
+                chatPreview.kind,
+                language
+              ).displayText
+            }
           </span>
         </button>
       )}
@@ -1636,15 +1752,24 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         PaperProps={{ className: "catan-modal-paper" }}
       >
         <DialogTitle className="catan-modal-title">
-          🚪 Sair da Partida (Bot Assume)
+          {t("🚪 Sair da Partida (Bot Assume)", "🚪 Leave Match (Bot Takes Over)")}
         </DialogTitle>
         <DialogContent className="catan-modal-content">
-          <p style={{ margin: 0, color: "#cbd5e1", lineHeight: 1.5 }}>
-            Deseja sair e deixar um Bot jogar no seu lugar? Sua cor, peças e
-            cartas serão preservadas e você poderá clicar em{" "}
-            <strong>Retomar Meu Assento</strong> caso volte antes do fim da
-            partida.
-          </p>
+          {language === "en" ? (
+            <p style={{ margin: 0, color: "#cbd5e1", lineHeight: 1.5 }}>
+              Do you want to leave and let a Bot play in your place? Your color,
+              pieces, and cards will be preserved, and you can click{" "}
+              <strong>Reclaim My Seat</strong> if you return before the match
+              ends.
+            </p>
+          ) : (
+            <p style={{ margin: 0, color: "#cbd5e1", lineHeight: 1.5 }}>
+              Deseja sair e deixar um Bot jogar no seu lugar? Sua cor, peças e
+              cartas serão preservadas e você poderá clicar em{" "}
+              <strong>Retomar Meu Assento</strong> caso volte antes do fim da
+              partida.
+            </p>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
           <Button
@@ -1652,7 +1777,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             disabled={isAbandoning}
             sx={{ color: "#cbd5e1", textTransform: "none" }}
           >
-            Continuar Jogando
+            {t("Continuar Jogando", "Keep Playing")}
           </Button>
           <Button
             variant="contained"
@@ -1661,7 +1786,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             disabled={isAbandoning}
             sx={{ textTransform: "none", fontWeight: 700 }}
           >
-            {isAbandoning ? "Saindo..." : "Confirmar Saída"}
+            {isAbandoning
+              ? t("Saindo...", "Leaving...")
+              : t("Confirmar Saída", "Confirm Leave")}
           </Button>
         </DialogActions>
       </Dialog>

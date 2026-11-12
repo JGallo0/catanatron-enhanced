@@ -29,6 +29,7 @@ import type {
 } from "./api.types";
 import type { MapTemplate, MCTSProbabilities, PlayerAccount } from "./apiClient";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { tr } from "../i18n";
 import {
   AVATAR_UNLOCK_REQUIREMENTS,
   DEFAULT_GUEST_DISPLAY_NAME,
@@ -1599,7 +1600,7 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
     );
     const remaining = pIdx >= 0 ? (counts[pIdx] ?? 0) : 0;
     if (remaining <= 0 || held <= 0) {
-      throw new Error("Descarte inválido para o estado atual.");
+      throw new Error(tr("Descarte inválido para o estado atual.", "Invalid discard for the current game state."));
     }
     ps[`${k}_${discarded}_IN_HAND`] = held - 1;
     adjustLocalBankResource(state, discarded, 1);
@@ -1650,7 +1651,7 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
     }
     const drawn = drawFromDevDeck(state.development_listdeck);
     if (!drawn) {
-      throw new Error("Não há mais cartas de desenvolvimento no baralho.");
+      throw new Error(tr("Não há mais cartas de desenvolvimento no baralho.", "No more development cards left in the deck."));
     }
     ps[`${k}_SHEEP_IN_HAND`]--;
     ps[`${k}_WHEAT_IN_HAND`]--;
@@ -1728,7 +1729,7 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
   } else if (actionType === "OFFER_TRADE") {
     const value = action[2];
     if (!isValidLocalTradeOffer(state, color, value)) {
-      throw new Error("Proposta de troca inválida para o estado atual.");
+      throw new Error(tr("Proposta de troca inválida para o estado atual.", "Invalid trade offer for the current game state."));
     }
     state.is_resolving_trade = true;
     state.current_trade = [...value, state.current_turn_index];
@@ -3209,11 +3210,11 @@ export function localRegisterUser(options: {
     .replace(/[^a-z0-9_-]/g, "")
     .slice(0, 24);
   if (cleanUser.length < 2) {
-    throw new Error("Usuário deve ter pelo menos 2 caracteres.");
+    throw new Error(tr("Usuário deve ter pelo menos 2 caracteres.", "Username must be at least 2 characters long."));
   }
   const users = loadLocalUsers();
   if (users[cleanUser]) {
-    throw new Error("Este usuário já está cadastrado localmente.");
+    throw new Error(tr("Este usuário já está cadastrado localmente.", "This username is already registered locally."));
   }
   const display_name = (options.displayName || options.username).trim() || cleanUser;
   const cleanAvatar = filterUnlockedAvatarConfig(options.avatarConfig, 0);
@@ -3252,7 +3253,7 @@ export function localLoginUser(options: {
   const users = loadLocalUsers();
   const existing = users[cleanUser];
   if (!existing || existing.password !== options.password) {
-    throw new Error("Usuário ou senha incorretos.");
+    throw new Error(tr("Usuário ou senha incorretos.", "Invalid username or password."));
   }
   const rankMeta = localGetUserRankAndStats(existing.username);
   return {
@@ -3277,7 +3278,7 @@ export function localUpdateProfile(options: {
     .replace(/[^a-z0-9_-]/g, "")
     .slice(0, 24);
   if (!cleanUser) {
-    throw new Error("Usuário inválido.");
+    throw new Error(tr("Usuário inválido.", "Invalid username."));
   }
 
   const users = loadLocalUsers();
@@ -3314,7 +3315,10 @@ export function localUpdateProfile(options: {
       !isAvatarItemUnlocked(field as keyof AvatarConfig, val, wins)
     ) {
       const reqWins = rules[val];
-      const msg = `Este item requer ${reqWins} vitória(s) no Ranking para ser desbloqueado (você tem ${wins}).`;
+      const msg = tr(
+        `Este item requer ${reqWins} vitória(s) no Ranking para ser desbloqueado (você tem ${wins}).`,
+        `This item requires ${reqWins} Leaderboard win(s) to unlock (you have ${wins}).`
+      );
       const err = new Error(msg) as Error & {
         response?: { status: number; data: { description: string } };
       };
@@ -3989,7 +3993,7 @@ export function localCloseRoom(
   if (!stored) {
     markRoomClosedLocally(code);
     clearStoredRoomTokenLocal(code);
-    throw makeRoomHttpError(404, "Sala não encontrada.");
+    throw makeRoomHttpError(404, tr("Sala não encontrada.", "Room not found."));
   }
 
   const savedAcct = getSavedPlayerAccount();
@@ -4002,7 +4006,7 @@ export function localCloseRoom(
   const candidateTokens = resolveCandidateRoomTokens(code, token, savedAcct);
 
   if (!isLocalRoomHost(stored, candidateTokens, savedAcct, usedBrowserIdentity)) {
-    throw makeRoomHttpError(403, "Apenas o anfitrião pode encerrar esta sala.");
+    throw makeRoomHttpError(403, tr("Apenas o anfitrião pode encerrar esta sala.", "Only the host can close this room."));
   }
 
   const closedGameId = stored.game_id ?? null;
@@ -4028,12 +4032,15 @@ export function localLeaveRoom(
   const rooms = loadRoomsMap();
   const stored = rooms[code];
   if (!stored) {
-    throw makeRoomHttpError(404, "Sala não encontrada.");
+    throw makeRoomHttpError(404, tr("Sala não encontrada.", "Room not found."));
   }
   if (stored.status !== "WAITING") {
     throw makeRoomHttpError(
       400,
-      "A partida já foi iniciada. Peça ao anfitrião para encerrar a sala ou use Sair (Bot Assume) na mesa."
+      tr(
+        "A partida já foi iniciada. Peça ao anfitrião para encerrar a sala ou use Sair (Bot Assume) na mesa.",
+        "The match has already started. Ask the host to close the room or use Leave (AI Takes Over) at the table."
+      )
     );
   }
 
@@ -4049,7 +4056,10 @@ export function localLeaveRoom(
   if (isLocalRoomHost(stored, candidateTokens, savedAcct, usedBrowserIdentity)) {
     throw makeRoomHttpError(
       400,
-      "Você é o anfitrião desta sala. Use Encerrar Sala para fechá-la."
+      tr(
+        "Você é o anfitrião desta sala. Use Encerrar Sala para fechá-la.",
+        "You are the host of this room. Use Close Room to close it."
+      )
     );
   }
 
@@ -4077,7 +4087,7 @@ export function localLeaveRoom(
   }
 
   if (!released) {
-    throw makeRoomHttpError(403, "Você não ocupa nenhum assento nesta sala.");
+    throw makeRoomHttpError(403, tr("Você não ocupa nenhum assento nesta sala.", "You do not occupy any seat in this room."));
   }
 
   saveRoomsMap(rooms);
@@ -4144,7 +4154,7 @@ export function localJoinRoom(
   if (options.preferredColor) {
     const requested = stored.seats.find((s) => s.color === options.preferredColor);
     if (!requested) {
-      throw makeRoomHttpError(400, "Cor inválida");
+      throw makeRoomHttpError(400, tr("Cor inválida", "Invalid color"));
     }
     if (requested === currentSeat) {
       targetSeat = requested;
@@ -4155,7 +4165,7 @@ export function localJoinRoom(
     ) {
       targetSeat = requested;
     } else {
-      throw makeRoomHttpError(400, "Este assento não está livre.");
+      throw makeRoomHttpError(400, tr("Este assento não está livre.", "This seat is already taken."));
     }
   } else if (!targetSeat) {
     targetSeat = stored.seats.find(
@@ -4165,7 +4175,7 @@ export function localJoinRoom(
         !stored.seat_tokens?.[s.color]
     );
     if (!targetSeat) {
-      throw makeRoomHttpError(400, "Não há assentos livres nesta sala");
+      throw makeRoomHttpError(400, tr("Não há assentos livres nesta sala", "No open seats available in this room"));
     }
   }
 
@@ -4215,7 +4225,7 @@ export function localUpdateRoom(
   const rooms = loadRoomsMap();
   const stored = rooms[code];
   if (stored.status !== "WAITING") {
-    throw makeRoomHttpError(400, "A partida já foi iniciada.");
+    throw makeRoomHttpError(400, tr("A partida já foi iniciada.", "The match has already started."));
   }
 
   if (payload.config) {
@@ -4476,10 +4486,10 @@ export function localPostGameMessage(
 ): GameMessage {
   const trimmed = String(options.body || "").trim();
   if (!trimmed) {
-    throw new Error("A mensagem não pode ficar vazia.");
+    throw new Error(tr("A mensagem não pode ficar vazia.", "Message cannot be empty."));
   }
   if (trimmed.length > 240) {
-    throw new Error("Mensagem muito longa (máx. 240 caracteres).");
+    throw new Error(tr("Mensagem muito longa (máx. 240 caracteres).", "Message too long (max 240 characters)."));
   }
 
   const games = loadGamesMap();

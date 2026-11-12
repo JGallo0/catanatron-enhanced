@@ -9,7 +9,8 @@ import ACTIONS from "../actions";
 import { getHumanColor } from "../utils/stateUtils";
 import { type GameActionRecord, type GameState } from "../utils/api.types";
 import { isTabOrShift, type InteractionEvent } from "../utils/events";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 
 import "./LeftDrawer.scss";
 
@@ -58,10 +59,13 @@ function actionIcon(record: GameActionRecord): string {
 
 function PerspectiveToggle({ gameState }: { gameState: GameState }) {
   const { state, dispatch } = useContext(store);
+  const { language, t } = useLanguage();
   const humanColor = getHumanColor(gameState);
   if (!humanColor) {
     return null;
   }
+  const colorMeta = getPlayerColorMeta(language);
+  const colorLabel = colorMeta[humanColor]?.label || humanColor;
   const seated = state.perspective !== null;
   return (
     <Button
@@ -75,67 +79,94 @@ function PerspectiveToggle({ gameState }: { gameState: GameState }) {
       }
       title={
         seated
-          ? "Showing only what your seat can see"
-          : "Showing every hand, as a spectator"
+          ? t(
+              "Mostrando apenas o que seu assento pode ver",
+              "Showing only what your seat can see"
+            )
+          : t(
+              "Mostrando todas as mãos, como espectador",
+              "Showing every hand, as a spectator"
+            )
       }
     >
-      {seated ? `👁️ Visão: ${humanColor}` : "👁️ Espectador (Mãos Abertas)"}
+      {seated
+        ? t(`👁️ Visão: ${colorLabel}`, `👁️ View: ${colorLabel}`)
+        : t("👁️ Espectador (Mãos Abertas)", "👁️ Spectator (Open Hands)")}
     </Button>
   );
 }
 
 function DrawerContent({ gameState }: { gameState: GameState }) {
+  const { language, t } = useLanguage();
+  const colorMeta = getPlayerColorMeta(language);
+  const actionCount = gameState.action_records.length;
+
   return (
     <div className="left-drawer__container">
       <div className="left-drawer__top-bar">
         <div className="left-drawer__game-meta">
           <span className="left-drawer__meta-pill">
-            🏆 Meta: <strong>{gameState.game?.vps_to_win ?? 10} PV</strong>
+            🏆 {t("Meta:", "Goal:")}{" "}
+            <strong>
+              {gameState.game?.vps_to_win ?? 10} {t("PV", "VP")}
+            </strong>
           </span>
           <span className="left-drawer__meta-pill">
-            🔄 Turno: <strong>{gameState.num_turns ?? 0}</strong>
+            🔄 {t("Turno:", "Turn:")} <strong>{gameState.num_turns ?? 0}</strong>
           </span>
         </div>
         <PerspectiveToggle gameState={gameState} />
       </div>
 
       <div className="left-drawer__log-header">
-        <span>📜 Histórico de Jogadas</span>
-        <small>{gameState.action_records.length} ações</small>
+        <span>📜 {t("Histórico de Jogadas", "Action Log")}</span>
+        <small>
+          {actionCount}{" "}
+          {actionCount === 1 ? t("ação", "action") : t("ações", "actions")}
+        </small>
       </div>
 
       <div className="log">
-        {gameState.action_records
-          .slice()
-          .reverse()
-          .map((actionRecord, i) => {
-            const color = actionRecord[0][0];
-            const palette = PLAYER_COLOR_META[color];
-            return (
-              <div
-                key={i}
-                className={cn("action foreground", color, {
-                  "action--roll": actionRecord[0][1] === "ROLL",
-                  "action--end": actionRecord[0][1] === "END_TURN",
-                })}
-              >
-                <span
-                  className="action__dot"
-                  style={{ background: palette.primary }}
-                />
-                <span className="action__icon" aria-hidden="true">
-                  {actionIcon(actionRecord)}
-                </span>
-                <span className="action__text">
-                  {humanizeActionRecordPt(gameState, actionRecord)}
-                </span>
-              </div>
-            );
-          })}
+        {actionCount === 0 ? (
+          <div className="action" style={{ opacity: 0.72 }}>
+            <span className="action__text">
+              {t("Nenhuma jogada registrada ainda.", "No actions recorded yet.")}
+            </span>
+          </div>
+        ) : (
+          gameState.action_records
+            .slice()
+            .reverse()
+            .map((actionRecord, i) => {
+              const color = actionRecord[0][0];
+              const palette = colorMeta[color];
+              return (
+                <div
+                  key={i}
+                  className={cn("action foreground", color, {
+                    "action--roll": actionRecord[0][1] === "ROLL",
+                    "action--end": actionRecord[0][1] === "END_TURN",
+                  })}
+                >
+                  <span
+                    className="action__dot"
+                    style={{ background: palette.primary }}
+                  />
+                  <span className="action__icon" aria-hidden="true">
+                    {actionIcon(actionRecord)}
+                  </span>
+                  <span className="action__text">
+                    {humanizeActionRecordPt(gameState, actionRecord, language)}
+                  </span>
+                </div>
+              );
+            })
+        )}
       </div>
 
       <div className="left-drawer__footer">
-        Rule the Isle • Baseado em Catanatron (GPL-3.0)
+        Rule the Isle •{" "}
+        {t("Baseado em Catanatron (GPL-3.0)", "Powered by Catanatron (GPL-3.0)")}
       </div>
     </div>
   );

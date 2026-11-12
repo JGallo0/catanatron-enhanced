@@ -5,6 +5,7 @@ import { Button, Slider } from "@mui/material";
 import "./ReplayBox.scss";
 import { useState } from "react";
 import NumericTextInput from "./NumericTextInput";
+import { useLanguage } from "../i18n";
 
 type ReplayBoxProps = {
   stateIndex: number;
@@ -21,6 +22,7 @@ export default function ReplayBox({
   onNextMove,
   onSeekMove,
 }: ReplayBoxProps) {
+  const { t } = useLanguage();
   const [inputValue, setInputValue] = useState<string>(String(stateIndex));
 
   const commitInput = () => {
@@ -40,12 +42,13 @@ export default function ReplayBox({
 
   return (
     <div className="replay-box">
-      <h3>Replay da Partida</h3>
+      <h3>{t("Replay da Partida", "Match Replay")}</h3>
 
-      Jogada: {stateIndex} / {latestStateIndex}
+      {t("Jogada", "Move")}: {stateIndex} / {latestStateIndex}
 
       <Slider
         className="move-slider"
+        aria-label={t("Linha do tempo da partida", "Match move timeline")}
         min={0}
         max={latestStateIndex}
         step={1}
@@ -54,7 +57,7 @@ export default function ReplayBox({
       />
 
       <NumericTextInput
-        label="Ir para a jogada"
+        label={t("Ir para a jogada", "Go to move")}
         size="small"
         value={inputValue}
         onChange={setInputValue}
@@ -69,7 +72,7 @@ export default function ReplayBox({
           startIcon={<ArrowBackIos />}
           disabled={stateIndex === 0}
         >
-          Anterior
+          {t("Anterior", "Previous")}
         </Button>
 
         <Button
@@ -79,7 +82,7 @@ export default function ReplayBox({
           startIcon={<ArrowForwardIos />}
           disabled={stateIndex === latestStateIndex}
         >
-          Próxima
+          {t("Próxima", "Next")}
         </Button>
       </div>
     </div>

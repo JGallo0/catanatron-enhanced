@@ -8,7 +8,8 @@ import {
   type ResourceCard,
   type Tile as TileData,
 } from "../utils/api.types";
-import { DESERT_META, RESOURCE_META } from "../config/assetRegistry";
+import { getDesertMeta, getResourceMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 import {
   HarborPortSvg,
   ResourceIcon,
@@ -112,9 +113,10 @@ const Port = ({
   direction: Direction;
   size: number;
 }) => {
+  const { language, t } = useLanguage();
   const ratio = resource ? "2:1" : "3:1";
   const offset = calculatePortOffset(direction, size);
-  const meta = resource ? RESOURCE_META[resource] : null;
+  const meta = resource ? getResourceMeta(language)[resource] : null;
   const harborWidth = Math.max(54, Math.min(82, Math.round(size * 0.96)));
   const harborHeight = Math.round(harborWidth * 0.78);
   const bridgeLen = Math.max(20, Math.round(size * 0.44));
@@ -130,8 +132,8 @@ const Port = ({
       }}
       title={
         meta
-          ? `Porto Especializado ${ratio} (${meta.label})`
-          : "Porto Marítimo Geral 3:1 (Qualquer Recurso)"
+          ? t(`Porto ${ratio} (${meta.label})`, `${ratio} Port (${meta.label})`)
+          : t("Porto 3:1 (Qualquer recurso)", "3:1 Port (Any resource)")
       }
     >
       {/* Twin timber piers pointing perpendicularly to the coastal land edge */}
@@ -206,6 +208,7 @@ export default function Tile({
   isProducing = false,
   hasRobber = false,
 }: TileProps) {
+  const { language, t } = useLanguage();
   const [customImgLoaded, setCustomImgLoaded] = useState(false);
   const [extIndex, setExtIndex] = useState(0);
 
@@ -215,14 +218,16 @@ export default function Tile({
   const [x, y] = tilePixelVector(coordinate, size, centerX, centerY);
 
   const isLand = tile.type === "RESOURCE_TILE" || tile.type === "DESERT";
+  const resourceMetaMap = getResourceMeta(language);
+  const desertMeta = getDesertMeta(language);
   const resourceMeta =
-    tile.type === "RESOURCE_TILE" ? RESOURCE_META[tile.resource] : null;
+    tile.type === "RESOURCE_TILE" ? resourceMetaMap[tile.resource] : null;
 
   const customIllustrationUrl =
     tile.type === "RESOURCE_TILE"
       ? resourceMeta?.customTileIllustration
       : tile.type === "DESERT"
-        ? DESERT_META.customTileIllustration
+        ? desertMeta.customTileIllustration
         : undefined;
 
   const baseWithoutExt = customIllustrationUrl
@@ -354,7 +359,7 @@ export default function Tile({
       {flashing && (
         <div
           className="tile__robber-target-ring"
-          title="Mover Ladrão para cá"
+          title={t("Mover Ladrão para cá", "Move Robber here")}
         />
       )}
     </div>

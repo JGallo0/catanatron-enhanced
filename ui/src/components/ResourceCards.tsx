@@ -7,10 +7,11 @@ import {
   type ResourceCard,
 } from "../utils/api.types";
 import {
-  DEV_CARD_META,
+  getDevCardMeta,
+  getResourceMeta,
   type DevCardType,
-  RESOURCE_META,
 } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 import {
   CardArtIllustration,
   DevCardIcon,
@@ -24,34 +25,45 @@ const RESOURCES: ResourceCard[] = ["WOOD", "BRICK", "SHEEP", "WHEAT", "ORE"];
 
 const DEV_CARDS: {
   id: DevCardType;
-  code: string;
-  titleLabel: string;
-  ptLabel: string;
+  codePt: string;
+  codeEn: string;
+  shortPt: string;
+  shortEn: string;
 }[] = [
   {
     id: "VICTORY_POINT",
-    code: "PV",
-    titleLabel: "Victory Point",
-    ptLabel: "Ponto Vitória",
+    codePt: "PV",
+    codeEn: "VP",
+    shortPt: "Ponto Vitória",
+    shortEn: "Victory Point",
   },
-  { id: "KNIGHT", code: "CAV", titleLabel: "Knight", ptLabel: "Cavaleiro" },
+  {
+    id: "KNIGHT",
+    codePt: "CAV",
+    codeEn: "KNT",
+    shortPt: "Cavaleiro",
+    shortEn: "Knight",
+  },
   {
     id: "MONOPOLY",
-    code: "MON",
-    titleLabel: "Monopoly",
-    ptLabel: "Monopólio",
+    codePt: "MON",
+    codeEn: "MON",
+    shortPt: "Monopólio",
+    shortEn: "Monopoly",
   },
   {
     id: "YEAR_OF_PLENTY",
-    code: "FAR",
-    titleLabel: "Year of Plenty",
-    ptLabel: "Fartura",
+    codePt: "FAR",
+    codeEn: "YOP",
+    shortPt: "Fartura",
+    shortEn: "Year of Plenty",
   },
   {
     id: "ROAD_BUILDING",
-    code: "EST",
-    titleLabel: "Road Building",
-    ptLabel: "2 Estradas",
+    codePt: "EST",
+    codeEn: "RDB",
+    shortPt: "2 Estradas",
+    shortEn: "Road Building",
   },
 ];
 
@@ -70,6 +82,9 @@ export default function ResourceCards({
   interactiveDevCards?: boolean;
   playableDevCallbacks?: Partial<Record<DevCardType, () => void>>;
 }) {
+  const { language, t } = useLanguage();
+  const resourceMeta = getResourceMeta(language);
+  const devCardMeta = getDevCardMeta(language);
   const [inspectedDev, setInspectedDev] = useState<{
     id: DevCardType;
     anchorEl: HTMLElement | null;
@@ -104,12 +119,12 @@ export default function ResourceCards({
         "resource-cards--compact": compact,
         "resource-cards--deck": showEmptySlots,
       })}
-      title="Resource Cards"
+      title={t("Cartas de Recurso", "Resource Cards")}
     >
       {RESOURCES.map((res) => {
         const count = amount(res) ?? 0;
         if (count === 0 && !showEmptySlots) return null;
-        const meta = RESOURCE_META[res];
+        const meta = resourceMeta[res];
         const lower = res.toLowerCase();
 
         return (
@@ -170,10 +185,12 @@ export default function ResourceCards({
 
       <div className="separator" />
 
-      {DEV_CARDS.map(({ id, code, titleLabel, ptLabel }) => {
+      {DEV_CARDS.map(({ id, codePt, codeEn, shortPt, shortEn }) => {
         const count = amount(id) ?? 0;
         if (count === 0) return null;
-        const meta = DEV_CARD_META[id];
+        const meta = devCardMeta[id];
+        const shortName = language === "en" ? shortEn : shortPt;
+        const code = language === "en" ? codeEn : codePt;
         const playCallback = playableDevCallbacks?.[id];
         const canPlay = Boolean(interactiveDevCards && playCallback);
         const boughtThisTurnCount = Number(
@@ -194,7 +211,13 @@ export default function ResourceCards({
             tabIndex={interactiveDevCards ? 0 : undefined}
             aria-label={
               interactiveDevCards
-                ? `${meta.label} (${count})${canPlay ? " — Clique para jogar" : isNewlyBoughtOnly ? " — Nova (Próx. turno)" : " — +1 PV"}`
+                ? `${meta.label} (${count})${
+                    canPlay
+                      ? t(" — Clique para jogar", " — Click to play")
+                      : isNewlyBoughtOnly
+                        ? t(" — Nova (Próx. turno)", " — New (Next turn)")
+                        : t(" — +1 PV", " — +1 VP")
+                  }`
                 : undefined
             }
             onClick={
@@ -240,23 +263,26 @@ export default function ResourceCards({
             {id === "VICTORY_POINT" && (
               <span
                 className="resource-card-item__dev-badge resource-card-item__dev-badge--vp"
-                title="+1 Ponto de Vitória secreto"
+                title={t("+1 Ponto de Vitória secreto", "+1 secret Victory Point")}
               >
-                +1 PV
+                {t("+1 PV", "+1 VP")}
               </span>
             )}
             {isNewlyBoughtOnly && (
               <span
                 className="resource-card-item__dev-badge resource-card-item__dev-badge--locked"
-                title="Comprada neste turno — disponível no próximo turno"
+                title={t(
+                  "Comprada neste turno — disponível no próximo turno",
+                  "Bought this turn — available next turn"
+                )}
               >
-                Nova (Próx. turno)
+                {t("Nova (Próx. turno)", "New (Next turn)")}
               </span>
             )}
             {canPlay && (
               <span
                 className="resource-card-item__dev-badge resource-card-item__dev-badge--play"
-                title="Carta jogável neste turno"
+                title={t("Carta jogável neste turno", "Playable this turn")}
               >
                 ▶
               </span>
@@ -264,7 +290,10 @@ export default function ResourceCards({
             {showEmptySlots ? (
               <div
                 className="resource-card-item__deck-chrome"
-                title={`${count} ${titleLabel} Card(s)`}
+                title={t(
+                  `${count} carta(s) de ${meta.label}`,
+                  `${count} ${meta.label} Card(s)`
+                )}
               >
                 <div className="resource-card-item__top-row">
                   <span className="resource-card-item__crest">
@@ -272,12 +301,15 @@ export default function ResourceCards({
                   </span>
                   <span className="resource-card-item__qty-pill">{count}</span>
                 </div>
-                <div className="resource-card-item__ribbon">{ptLabel}</div>
+                <div className="resource-card-item__ribbon">{shortName}</div>
               </div>
             ) : (
               <div
                 className="resource-card-item__inner"
-                title={`${count} ${titleLabel} Card(s)`}
+                title={t(
+                  `${count} carta(s) de ${meta.label}`,
+                  `${count} ${meta.label} Card(s)`
+                )}
               >
                 <div className="resource-card-item__badge">
                   <DevCardIcon card={id} size={compact ? 15 : 18} />
@@ -331,7 +363,10 @@ export default function ResourceCards({
                     }}
                   >
                     {isNewlyBoughtOnly
-                      ? "🔒 Nova (Próx. turno): aguarde a próxima rodada para usar."
+                      ? t(
+                          "🔒 Nova (Próx. turno): aguarde a próxima rodada para usar.",
+                          "🔒 New (Next turn): wait until next turn to play."
+                        )
                       : meta.description}
                   </div>
                 </div>
@@ -357,7 +392,7 @@ export default function ResourceCards({
         inspectedDev.anchorEl &&
         (() => {
           const id = inspectedDev.id;
-          const meta = DEV_CARD_META[id];
+          const meta = devCardMeta[id];
           const playCallback = playableDevCallbacks?.[id];
           const canPlay = Boolean(playCallback);
           const count = amount(id) ?? 0;
@@ -381,7 +416,7 @@ export default function ResourceCards({
                 <div
                   className="dev-card-action-popover"
                   role="dialog"
-                  aria-label={`Carta ${meta.label}`}
+                  aria-label={t(`Carta ${meta.label}`, `${meta.label} Card`)}
                 >
                   <div className="dev-card-action-popover__art">
                     <CardArtIllustration cardType={id} />
@@ -391,12 +426,12 @@ export default function ResourceCards({
                     <p>{meta.description}</p>
                     {id === "VICTORY_POINT" && (
                       <span className="dev-card-action-popover__tag dev-card-action-popover__tag--vp">
-                        🏆 +1 Ponto de Vitória automático
+                        🏆 {t("+1 Ponto de Vitória automático", "+1 automatic Victory Point")}
                       </span>
                     )}
                     {isNewlyBoughtOnly && (
                       <span className="dev-card-action-popover__tag dev-card-action-popover__tag--locked">
-                        🔒 Nova (Próx. turno)
+                        🔒 {t("Nova (Próx. turno)", "New (Next turn)")}
                       </span>
                     )}
                     <div className="dev-card-action-popover__actions">
@@ -410,7 +445,7 @@ export default function ResourceCards({
                             playCallback();
                           }}
                         >
-                          ▶ Jogar Carta
+                          ▶ {t("Jogar Carta", "Play card")}
                         </button>
                       )}
                       <button
@@ -418,7 +453,7 @@ export default function ResourceCards({
                         className="dev-card-action-popover__close-btn"
                         onClick={() => setInspectedDev(null)}
                       >
-                        Fechar
+                        {t("Fechar", "Close")}
                       </button>
                     </div>
                   </div>
@@ -440,44 +475,52 @@ function FaceDownCards({
   developments: number;
   compact?: boolean;
 }) {
+  const { t } = useLanguage();
+
   return (
     <div
       className={`resource-cards ${compact ? "resource-cards--compact" : ""}`}
-      title="Resource Cards"
+      title={t("Cartas de Recurso", "Resource Cards")}
     >
       {resources !== 0 && (
         <div
           className="hidden-cards center-text card resource-card-item resource-card-item--facedown"
-          title={resources + " Resource Card(s), face down"}
+          title={t(
+            `${resources} carta(s) de recurso, virada(s) para baixo`,
+            `${resources} Resource Card(s), face down`
+          )}
         >
           <div className="resource-card-item__bg-art">
             <HybridIllustration
               src="/assets/illustrations/dev/card_back.webp"
-              alt="Verso da Carta"
+              alt={t("Verso da Carta", "Card Back")}
               fallback={null}
             />
           </div>
           <div className="resource-card-item__inner">
             <span className="resource-card-item__count">{resources}</span>
-            <span className="resource-card-item__label">REC</span>
+            <span className="resource-card-item__label">{t("REC", "RES")}</span>
           </div>
         </div>
       )}
       {developments !== 0 && (
         <div
           className="dev-cards center-text card resource-card-item resource-card-item--dev-facedown"
-          title={developments + " Development Card(s), face down"}
+          title={t(
+            `${developments} carta(s) de desenvolvimento, virada(s) para baixo`,
+            `${developments} Development Card(s), face down`
+          )}
         >
           <div className="resource-card-item__bg-art">
             <HybridIllustration
               src="/assets/illustrations/dev/card_back.webp"
-              alt="Verso da Carta"
+              alt={t("Verso da Carta", "Card Back")}
               fallback={null}
             />
           </div>
           <div className="resource-card-item__inner">
             <span className="resource-card-item__count">{developments}</span>
-            <span className="resource-card-item__label">DEV</span>
+            <span className="resource-card-item__label">{t("DEV", "DEV")}</span>
           </div>
         </div>
       )}

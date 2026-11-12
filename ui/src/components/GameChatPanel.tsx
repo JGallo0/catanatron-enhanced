@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import cn from "classnames";
 import type { Color, GameMessage } from "../utils/api.types";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
 import { parseTauntMessage } from "../config/tauntCatalog";
+import { getCurrentLanguage, useLanguage, type AppLanguage } from "../i18n";
 import "./GameChatPanel.scss";
 
 export const CHAT_QUICK_PHRASES = [
@@ -11,6 +12,19 @@ export const CHAT_QUICK_PHRASES = [
   "🎲 Bela rolagem!",
   "👏 Bela jogada!",
 ] as const;
+
+export const CHAT_QUICK_PHRASES_EN = [
+  "👋 Good luck!",
+  "🤝 Up for a trade?",
+  "🎲 Nice roll!",
+  "👏 Great move!",
+] as const;
+
+export function getChatQuickPhrases(
+  lang: AppLanguage = getCurrentLanguage()
+): readonly string[] {
+  return lang === "en" ? CHAT_QUICK_PHRASES_EN : CHAT_QUICK_PHRASES;
+}
 
 export type GameChatPanelProps = {
   open: boolean;
@@ -45,6 +59,7 @@ export default function GameChatPanel({
   errorMessage = null,
   onSendMessage,
 }: GameChatPanelProps) {
+  const { language, t } = useLanguage();
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -56,6 +71,8 @@ export default function GameChatPanel({
   if (!open) return null;
 
   const canWrite = Boolean(mySeatColor) && !replayMode;
+  const colorMeta = getPlayerColorMeta(language);
+  const quickPhrases = getChatQuickPhrases(language);
 
   const submitText = async (rawText: string) => {
     const clean = rawText.trim();
@@ -75,21 +92,23 @@ export default function GameChatPanel({
     <aside
       className="game-chat-panel"
       role="dialog"
-      aria-label="Bate-papo da Partida"
+      aria-label={t("Bate-papo da Partida", "Match Chat")}
     >
       <header className="game-chat-panel__header">
         <div className="game-chat-panel__title-group">
           <span className="game-chat-panel__icon" aria-hidden="true">
             💬
           </span>
-          <h2 className="game-chat-panel__title">Bate-papo da Mesa</h2>
+          <h2 className="game-chat-panel__title">
+            {t("Bate-papo da Mesa", "Table Chat")}
+          </h2>
         </div>
         <button
           type="button"
           className="game-chat-panel__close-btn"
           onClick={onClose}
-          aria-label="Fechar bate-papo"
-          title="Fechar bate-papo"
+          aria-label={t("Fechar bate-papo", "Close chat")}
+          title={t("Fechar bate-papo", "Close chat")}
         >
           ✕
         </button>
@@ -103,16 +122,18 @@ export default function GameChatPanel({
       >
         {messages.length === 0 ? (
           <p className="game-chat-panel__empty">
-            Nenhuma mensagem ainda. Cumprimente os jogadores ou combine uma
-            troca!
+            {t(
+              "Nenhuma mensagem ainda. Cumprimente os jogadores ou combine uma troca!",
+              "No messages yet. Say hello to the players or negotiate a trade!"
+            )}
           </p>
         ) : (
           messages.map((msg) => {
             const isMine = Boolean(mySeatColor && msg.color === mySeatColor);
-            const palette = PLAYER_COLOR_META[msg.color];
+            const palette = colorMeta[msg.color];
             const accentColor = palette?.primary || "#facc15";
             const timeStr = formatMessageTime(msg.created_at);
-            const parsed = parseTauntMessage(msg.body, msg.kind);
+            const parsed = parseTauntMessage(msg.body, msg.kind, language);
             const isTaunt = msg.kind === "TAUNT" || Boolean(parsed.taunt);
 
             return (
@@ -157,9 +178,9 @@ export default function GameChatPanel({
         <footer className="game-chat-panel__footer">
           <div
             className="game-chat-panel__quick-chips"
-            aria-label="Frases rápidas"
+            aria-label={t("Frases rápidas", "Quick phrases")}
           >
-            {CHAT_QUICK_PHRASES.map((phrase) => (
+            {quickPhrases.map((phrase) => (
               <button
                 key={phrase}
                 type="button"
@@ -175,25 +196,28 @@ export default function GameChatPanel({
             <input
               type="text"
               className="game-chat-panel__input"
-              placeholder="Escreva uma mensagem..."
+              placeholder={t("Escreva uma mensagem...", "Write a message...")}
               maxLength={240}
               value={draft}
               disabled={isSending}
               onChange={(e) => setDraft(e.target.value)}
-              aria-label="Mensagem de bate-papo"
+              aria-label={t("Mensagem de bate-papo", "Chat message")}
             />
             <button
               type="submit"
               className="game-chat-panel__send-btn"
               disabled={isSending || !draft.trim()}
             >
-              Enviar
+              {t("Enviar", "Send")}
             </button>
           </form>
         </footer>
       ) : (
         <footer className="game-chat-panel__readonly">
-          Modo espectador — bate-papo somente leitura.
+          {t(
+            "Modo espectador — bate-papo somente leitura.",
+            "Spectator mode — read-only chat."
+          )}
         </footer>
       )}
     </aside>

@@ -1,4 +1,5 @@
 import cn from "classnames";
+import { useLanguage } from "../i18n";
 import "./Dice3D.scss";
 
 export type Dice3DProps = {
@@ -74,6 +75,7 @@ export default function Dice3D({
   dieIndex = 0,
   variant = "stage",
 }: Dice3DProps) {
+  const { t } = useLanguage();
   const safeValue = Math.min(6, Math.max(1, Math.round(value || 1)));
   const faceTransform = TARGET_FACE_TRANSFORM[safeValue] || TARGET_FACE_TRANSFORM[1];
 
@@ -92,7 +94,11 @@ export default function Dice3D({
         } as React.CSSProperties
       }
       role="img"
-      aria-label={rolling ? "Dado em rotação" : `Dado ${safeValue}`}
+      aria-label={
+        rolling
+          ? t("Dado em rotação", "Rolling die")
+          : t(`Dado ${safeValue}`, `Die ${safeValue}`)
+      }
     >
       <span className="dice3d-tilt" aria-hidden="true">
         <span

@@ -7,11 +7,32 @@ import type {
   SeatAvatarMeta,
 } from "../utils/api.types";
 import { sanitizeAvatarConfig } from "./avatarCatalog";
+import { getCurrentLanguage, type AppLanguage } from "../i18n";
 
 export const OPEN_SEAT_LABEL = "Assento livre" as const;
+export const OPEN_SEAT_LABEL_EN = "Open seat" as const;
+
+export function getOpenSeatLabel(lang: AppLanguage = getCurrentLanguage()): string {
+  return lang === "en" ? OPEN_SEAT_LABEL_EN : OPEN_SEAT_LABEL;
+}
+
+export function localizeSeatLabel(
+  name?: string | null,
+  lang: AppLanguage = getCurrentLanguage()
+): string {
+  const clean = (name ?? "").trim();
+  if (isOpenSeatPlaceholderName(clean) || clean === OPEN_SEAT_LABEL_EN) {
+    return getOpenSeatLabel(lang);
+  }
+  if (clean === "Anfitrião" || clean === "Host") {
+    return lang === "en" ? "Host" : "Anfitrião";
+  }
+  return clean;
+}
 
 const LEGACY_OPEN_SEAT_PLACEHOLDERS = new Set([
   "Assento livre",
+  "Open seat",
   "Aguardando Amigo...",
   "Vaga Aberta",
   "Vaga para Amigo",
@@ -22,12 +43,14 @@ export function isOpenSeatPlaceholderName(name?: string | null): boolean {
   return LEGACY_OPEN_SEAT_PLACEHOLDERS.has((name ?? "").trim());
 }
 
-export const BOT_DIFFICULTY_OPTIONS: ReadonlyArray<{
+export type BotDifficultyOption = {
   value: BotDifficulty;
   label: string;
   description: string;
   playerKey: "W" | "F" | "CATANATRON";
-}> = [
+};
+
+export const BOT_DIFFICULTY_OPTIONS: ReadonlyArray<BotDifficultyOption> = [
   {
     value: "easy",
     label: "Fácil",
@@ -47,6 +70,33 @@ export const BOT_DIFFICULTY_OPTIONS: ReadonlyArray<{
     playerKey: "CATANATRON",
   },
 ];
+
+export const BOT_DIFFICULTY_OPTIONS_EN: ReadonlyArray<BotDifficultyOption> = [
+  {
+    value: "easy",
+    label: "Easy",
+    description: "Lighter, more casual plays",
+    playerKey: "W",
+  },
+  {
+    value: "medium",
+    label: "Medium",
+    description: "Balanced strategy at a brisk pace",
+    playerKey: "F",
+  },
+  {
+    value: "hard",
+    label: "Hard",
+    description: "Advanced strategy with look-ahead planning",
+    playerKey: "CATANATRON",
+  },
+];
+
+export function getBotDifficultyOptions(
+  lang: AppLanguage = getCurrentLanguage()
+): ReadonlyArray<BotDifficultyOption> {
+  return lang === "en" ? BOT_DIFFICULTY_OPTIONS_EN : BOT_DIFFICULTY_OPTIONS;
+}
 
 export function normalizeBotDifficulty(raw: unknown): BotDifficulty | null {
   if (typeof raw !== "string") return null;
@@ -76,17 +126,23 @@ export function difficultyFromPlayerKey(playerKey?: string | null): BotDifficult
   return "medium";
 }
 
-export function formatBotDifficultyLabel(difficulty?: BotDifficulty | null): string {
-  const found = BOT_DIFFICULTY_OPTIONS.find((d) => d.value === difficulty);
-  return found ? found.label : "Moderado";
+export function formatBotDifficultyLabel(
+  difficulty?: BotDifficulty | null,
+  lang: AppLanguage = getCurrentLanguage()
+): string {
+  const options = getBotDifficultyOptions(lang);
+  const found = options.find((d) => d.value === difficulty);
+  return found ? found.label : options[1].label;
 }
 
-export const BOT_SPEED_OPTIONS: ReadonlyArray<{
+export type BotSpeedOption = {
   value: BotSpeed;
   label: string;
   icon: string;
   description: string;
-}> = [
+};
+
+export const BOT_SPEED_OPTIONS: ReadonlyArray<BotSpeedOption> = [
   {
     value: "normal",
     label: "Normal",
@@ -107,6 +163,33 @@ export const BOT_SPEED_OPTIONS: ReadonlyArray<{
   },
 ];
 
+export const BOT_SPEED_OPTIONS_EN: ReadonlyArray<BotSpeedOption> = [
+  {
+    value: "normal",
+    label: "Normal",
+    icon: "🐢",
+    description: "Classic tabletop pace to follow every roll and move",
+  },
+  {
+    value: "fast",
+    label: "Fast",
+    icon: "⏩",
+    description: "Brisk transitions while keeping move highlights clear",
+  },
+  {
+    value: "turbo",
+    label: "Turbo",
+    icon: "⚡",
+    description: "Bots respond almost instantly for rapid matches",
+  },
+];
+
+export function getBotSpeedOptions(
+  lang: AppLanguage = getCurrentLanguage()
+): ReadonlyArray<BotSpeedOption> {
+  return lang === "en" ? BOT_SPEED_OPTIONS_EN : BOT_SPEED_OPTIONS;
+}
+
 export function normalizeBotSpeed(raw: unknown): BotSpeed | null {
   if (typeof raw !== "string") return null;
   const clean = raw.trim().toLowerCase();
@@ -116,8 +199,12 @@ export function normalizeBotSpeed(raw: unknown): BotSpeed | null {
   return null;
 }
 
-export function formatBotSpeedLabel(speed?: BotSpeed | null): string {
-  const found = BOT_SPEED_OPTIONS.find((s) => s.value === speed);
+export function formatBotSpeedLabel(
+  speed?: BotSpeed | null,
+  lang: AppLanguage = getCurrentLanguage()
+): string {
+  const options = getBotSpeedOptions(lang);
+  const found = options.find((s) => s.value === speed);
   return found ? found.label : "Normal";
 }
 
@@ -130,10 +217,29 @@ export const MAP_TEMPLATE_OPTIONS: ReadonlyArray<{
   { value: "TOURNAMENT", label: "Torneio (Mapa fixo)" },
 ];
 
-export function formatMapTemplateLabel(template?: string | null): string {
+export const MAP_TEMPLATE_OPTIONS_EN: ReadonlyArray<{
+  value: "BASE" | "MINI" | "TOURNAMENT";
+  label: string;
+}> = [
+  { value: "BASE", label: "Standard (Random Map)" },
+  { value: "MINI", label: "Mini" },
+  { value: "TOURNAMENT", label: "Tournament (Fixed Map)" },
+];
+
+export function getMapTemplateOptions(
+  lang: AppLanguage = getCurrentLanguage()
+): ReadonlyArray<{ value: "BASE" | "MINI" | "TOURNAMENT"; label: string }> {
+  return lang === "en" ? MAP_TEMPLATE_OPTIONS_EN : MAP_TEMPLATE_OPTIONS;
+}
+
+export function formatMapTemplateLabel(
+  template?: string | null,
+  lang: AppLanguage = getCurrentLanguage()
+): string {
   const clean = (template ?? "").trim().toUpperCase();
-  const match = MAP_TEMPLATE_OPTIONS.find((opt) => opt.value === clean);
-  return match ? match.label : clean || "Padrão (Mapa aleatório)";
+  const options = getMapTemplateOptions(lang);
+  const match = options.find((opt) => opt.value === clean);
+  return match ? match.label : clean || options[0].label;
 }
 
 export const OFFICIAL_BOT_NAMES = [

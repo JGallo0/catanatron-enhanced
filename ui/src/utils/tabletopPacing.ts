@@ -5,8 +5,9 @@ import type {
   ResourceCard,
 } from "./api.types";
 import { playerKey } from "./stateUtils";
-import { PLAYER_COLOR_META, RESOURCE_META } from "../config/assetRegistry";
+import { getPlayerColorMeta, getResourceMeta } from "../config/assetRegistry";
 import { resolvePlayerDisplayName } from "../config/botCatalog";
+import { getCurrentLanguage, type AppLanguage } from "../i18n";
 
 export type GameSpeed = "normal" | "fast" | "turbo";
 
@@ -314,7 +315,8 @@ export type BatchTransitionFX = {
 export function extractBatchTransitionFX(
   prevState: GameState | null,
   nextState: GameState,
-  mySeatColor: Color | null = null
+  mySeatColor: Color | null = null,
+  lang: AppLanguage = getCurrentLanguage()
 ): BatchTransitionFX {
   const prevLen = prevState?.action_records?.length ?? 0;
   const allRecords = nextState.action_records || [];
@@ -420,12 +422,15 @@ export function extractBatchTransitionFX(
 
   let robberEvent: RobberNoticeFX | null = null;
   if (latestRobberRecord && latestRobberRecord[0]) {
+    const colorMeta = getPlayerColorMeta(lang);
+    const resMeta = getResourceMeta(lang);
+    const en = lang === "en";
     const [action, result] = latestRobberRecord;
     const attackerColor = action[0];
     const attackerName = resolvePlayerDisplayName(
       nextState,
       attackerColor,
-      PLAYER_COLOR_META[attackerColor]?.label || attackerColor
+      colorMeta[attackerColor]?.label || attackerColor
     );
     const moveVal = Array.isArray(action[2]) ? action[2] : [];
     const rawVictim = moveVal[1] as Color | null | undefined;
@@ -434,7 +439,7 @@ export function extractBatchTransitionFX(
       ? resolvePlayerDisplayName(
           nextState,
           victimColor,
-          PLAYER_COLOR_META[victimColor]?.label || victimColor
+          colorMeta[victimColor]?.label || victimColor
         )
       : null;
     const stolenResource = (result ?? null) as ResourceCard | null;
@@ -447,27 +452,35 @@ export function extractBatchTransitionFX(
         victimColor: null,
         tone: "safe",
         message: spared
-          ? `🛡️ Você não foi roubado! (${attackerName} moveu o Ladrão)`
-          : `🥷 ${attackerName} moveu o Ladrão (ninguém foi roubado)`,
+          ? en
+            ? `🛡️ You were spared! (${attackerName} moved the Robber)`
+            : `🛡️ Você não foi roubado! (${attackerName} moveu o Ladrão)`
+          : en
+            ? `🥷 ${attackerName} moved the Robber (nobody was robbed)`
+            : `🥷 ${attackerName} moveu o Ladrão (ninguém foi roubado)`,
       };
     } else if (mySeatColor !== null && victimColor === mySeatColor) {
       robberEvent = {
         attackerColor,
         victimColor,
         tone: "victim",
-        message: `🥷 ${attackerName} roubou 1 carta de Você!`,
+        message: en
+          ? `🥷 ${attackerName} stole 1 card from You!`
+          : `🥷 ${attackerName} roubou 1 carta de Você!`,
       };
     } else if (
       mySeatColor !== null &&
       attackerColor === mySeatColor &&
       stolenResource
     ) {
-      const resLabel = RESOURCE_META[stolenResource]?.label || stolenResource;
+      const resLabel = resMeta[stolenResource]?.label || stolenResource;
       robberEvent = {
         attackerColor,
         victimColor,
         tone: "attacker",
-        message: `🥷 Você roubou 1× ${resLabel} de ${victimName}!`,
+        message: en
+          ? `🥷 You stole 1× ${resLabel} from ${victimName}!`
+          : `🥷 Você roubou 1× ${resLabel} de ${victimName}!`,
       };
     } else {
       const isObserverNotHit =
@@ -477,14 +490,19 @@ export function extractBatchTransitionFX(
         victimColor,
         tone: isObserverNotHit ? "safe" : "neutral",
         message: isObserverNotHit
-          ? `🥷 ${attackerName} roubou 1 carta de ${victimName} • Você não foi roubado!`
-          : `🥷 ${attackerName} roubou 1 carta de ${victimName}!`,
+          ? en
+            ? `🥷 ${attackerName} stole 1 card from ${victimName} • You were spared!`
+            : `🥷 ${attackerName} roubou 1 carta de ${victimName} • Você não foi roubado!`
+          : en
+            ? `🥷 ${attackerName} stole 1 card from ${victimName}!`
+            : `🥷 ${attackerName} roubou 1 carta de ${victimName}!`,
       };
     }
   }
 
   let turnHandoff: TurnHandoffFX | null = null;
   if (prevState && !nextState.winning_color) {
+    const colorMeta = getPlayerColorMeta(lang);
     const prevWasSub =
       prevState.current_prompt === "DISCARD" ||
       prevState.current_prompt === "DECIDE_TRADE" ||
@@ -506,7 +524,7 @@ export function extractBatchTransitionFX(
       const name = resolvePlayerDisplayName(
         nextState,
         nextColor,
-        PLAYER_COLOR_META[nextColor]?.label || nextColor
+        colorMeta[nextColor]?.label || nextColor
       );
       turnHandoff = {
         color: nextColor,

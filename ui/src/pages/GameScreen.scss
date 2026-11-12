@@ -170,6 +170,7 @@ main.catan-game-screen {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
   }
 
   &__bank-chip {
@@ -572,11 +573,11 @@ main.catan-game-screen {
   }
 }
 
-@media (max-width: 768px), (max-height: 520px) {
+@media (max-width: 768px), (max-height: 640px) {
   .game-left-dock {
     left: 6px;
     top: auto;
-    bottom: 84px;
+    bottom: 196px;
     transform: none;
     z-index: 44;
     flex-direction: row;
@@ -656,6 +657,12 @@ main.catan-game-screen {
       width: 36px;
       height: 36px;
     }
+
+    &__right {
+      .language-toggle--compact {
+        min-height: 36px;
+      }
+    }
   }
 
   .board-camera-controls {
@@ -717,6 +724,18 @@ main.catan-game-screen {
     &__sound-btn {
       width: 30px;
       height: 30px;
+    }
+
+    &__right {
+      .language-toggle--compact {
+        min-height: 30px;
+        padding: 2px 3px;
+
+        .language-toggle__btn {
+          padding: 3px 5px;
+          font-size: 0.64rem;
+        }
+      }
     }
   }
 

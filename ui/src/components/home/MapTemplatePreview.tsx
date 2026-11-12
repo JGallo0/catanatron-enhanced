@@ -1,4 +1,5 @@
 import type { MapTemplate } from "../../utils/apiClient";
+import { useLanguage, type AppLanguage } from "../../i18n";
 import "./MapTemplatePreview.scss";
 
 interface MapTemplatePreviewProps {
@@ -131,48 +132,79 @@ const PORT_COORDS: Array<[number, number]> = [
   [1.05, -2.95],
 ];
 
-const TEMPLATE_META: Record<
-  MapTemplate,
-  {
-    title: string;
-    subtitle: string;
-    chips: string[];
-    hexSize: number;
-    hexes: HexSpec[];
-    showPorts: boolean;
-  }
-> = {
-  BASE: {
-    title: "Ilha Clássica Sorteada",
-    subtitle: "Terrenos e números embaralhados a cada partida.",
-    chips: ["19 hexágonos", "9 portos", "Deserto aleatório"],
-    hexSize: 8.6,
-    hexes: BASE_HEXES,
-    showPorts: true,
-  },
-  MINI: {
-    title: "Arquipélago Compacto",
-    subtitle: "Disputa direta para sessões rápidas com menos turnos.",
-    chips: ["7 hexágonos", "Sem deserto", "Ritmo ágil"],
-    hexSize: 12.2,
-    hexes: MINI_HEXES,
-    showPorts: false,
-  },
-  TOURNAMENT: {
-    title: "Tabuleiro Fixo de Torneio",
-    subtitle: "Layout oficial idêntico e balanceado com deserto central.",
-    chips: ["19 hexágonos fixos", "Deserto no centro", "9 portos simétricos"],
-    hexSize: 8.6,
-    hexes: TOURNAMENT_HEXES,
-    showPorts: true,
-  },
+type TemplateMetaEntry = {
+  title: string;
+  subtitle: string;
+  chips: string[];
+  hexSize: number;
+  hexes: HexSpec[];
+  showPorts: boolean;
 };
+
+function getTemplateMeta(lang: AppLanguage): Record<MapTemplate, TemplateMetaEntry> {
+  if (lang === "en") {
+    return {
+      BASE: {
+        title: "Classic Shuffled Island",
+        subtitle: "Terrains and number tokens shuffled every match.",
+        chips: ["19 hexes", "9 harbors", "Random desert"],
+        hexSize: 8.6,
+        hexes: BASE_HEXES,
+        showPorts: true,
+      },
+      MINI: {
+        title: "Compact Archipelago",
+        subtitle: "Direct skirmish for quick sessions with fewer turns.",
+        chips: ["7 hexes", "No desert", "Fast pace"],
+        hexSize: 12.2,
+        hexes: MINI_HEXES,
+        showPorts: false,
+      },
+      TOURNAMENT: {
+        title: "Fixed Tournament Board",
+        subtitle: "Official balanced fixed layout with central desert.",
+        chips: ["19 fixed hexes", "Center desert", "9 symmetric harbors"],
+        hexSize: 8.6,
+        hexes: TOURNAMENT_HEXES,
+        showPorts: true,
+      },
+    };
+  }
+  return {
+    BASE: {
+      title: "Ilha Clássica Sorteada",
+      subtitle: "Terrenos e números embaralhados a cada partida.",
+      chips: ["19 hexágonos", "9 portos", "Deserto aleatório"],
+      hexSize: 8.6,
+      hexes: BASE_HEXES,
+      showPorts: true,
+    },
+    MINI: {
+      title: "Arquipélago Compacto",
+      subtitle: "Disputa direta para sessões rápidas com menos turnos.",
+      chips: ["7 hexágonos", "Sem deserto", "Ritmo ágil"],
+      hexSize: 12.2,
+      hexes: MINI_HEXES,
+      showPorts: false,
+    },
+    TOURNAMENT: {
+      title: "Tabuleiro Fixo de Torneio",
+      subtitle: "Layout oficial idêntico e balanceado com deserto central.",
+      chips: ["19 hexágonos fixos", "Deserto no centro", "9 portos simétricos"],
+      hexSize: 8.6,
+      hexes: TOURNAMENT_HEXES,
+      showPorts: true,
+    },
+  };
+}
 
 export default function MapTemplatePreview({
   template,
   compact = false,
 }: MapTemplatePreviewProps) {
-  const meta = TEMPLATE_META[template] ?? TEMPLATE_META.BASE;
+  const { language, t } = useLanguage();
+  const templateMeta = getTemplateMeta(language);
+  const meta = templateMeta[template] ?? templateMeta.BASE;
 
   return (
     <div
@@ -183,7 +215,10 @@ export default function MapTemplatePreview({
         className="map-template-preview__svg"
         viewBox="0 0 110 96"
         role="img"
-        aria-label={`Prévia do mapa ${meta.title}`}
+        aria-label={t(
+          `Prévia do mapa ${meta.title}`,
+          `${meta.title} map preview`
+        )}
       >
         <defs>
           <radialGradient id={`sea-${template}`} cx="50%" cy="48%" r="55%">

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, DialogContent, DialogTitle } from "@mui/material";
-import { PLAYER_COLOR_META } from "../../config/assetRegistry";
+import { getPlayerColorMeta } from "../../config/assetRegistry";
 import {
   formatMapTemplateLabel,
+  getOpenSeatLabel,
   isOfficialBotName,
-  OPEN_SEAT_LABEL,
+  localizeSeatLabel,
   pickBotNameDeterministic,
   resolveSeatAvatarProps,
 } from "../../config/botCatalog";
+import { useLanguage } from "../../i18n";
 import type { Color, RoomState } from "../../utils/api.types";
 import PlayerAvatar from "../PlayerAvatar";
 import "./OpenLobbyModal.scss";
@@ -37,6 +39,9 @@ export default function OpenLobbyModal({
   onCloseRoom,
   onLeaveRoom,
 }: OpenLobbyModalProps) {
+  const { language, t } = useLanguage();
+  const colorMeta = getPlayerColorMeta(language);
+  const openSeatLabel = getOpenSeatLabel(language);
   const [filter, setFilter] = useState<LobbyFilter>("all");
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [confirmingCloseCode, setConfirmingCloseCode] = useState<string | null>(
@@ -90,7 +95,7 @@ export default function OpenLobbyModal({
       PaperProps={{ className: "catan-modal-paper open-lobby-paper" }}
     >
       <DialogTitle className="open-lobby-header">
-        <span>🧭 Salas Abertas & Lobby Online</span>
+        <span>🧭 {t("Salas Abertas & Lobby Online", "Open Lobbies & Online Rooms")}</span>
         <div className="open-lobby-header__right">
           <Button
             size="small"
@@ -98,7 +103,7 @@ export default function OpenLobbyModal({
             className="open-lobby-refresh-btn"
             onClick={onRefresh}
           >
-            ↻ Atualizar
+            ↻ {t("Atualizar", "Refresh")}
           </Button>
           <Button
             size="small"
@@ -106,7 +111,7 @@ export default function OpenLobbyModal({
             className="home-modal-close-btn"
             onClick={onClose}
           >
-            Fechar
+            {t("Fechar", "Close")}
           </Button>
         </div>
       </DialogTitle>
@@ -121,7 +126,7 @@ export default function OpenLobbyModal({
             onKeyDown={(e) => {
               if (e.key === "Enter") handleJoinByCode();
             }}
-            placeholder="Código da sala (ex: K7M4P9)"
+            placeholder={t("Código da sala (ex: K7M4P9)", "Room code (e.g. K7M4P9)")}
             maxLength={10}
           />
           <Button
@@ -130,7 +135,7 @@ export default function OpenLobbyModal({
             disabled={cleanCode.length < 4}
             onClick={handleJoinByCode}
           >
-            Entrar com Código
+            {t("Entrar com Código", "Join with Code")}
           </Button>
         </div>
 
@@ -141,7 +146,7 @@ export default function OpenLobbyModal({
             className={`open-lobby-filter-pill ${filter === "all" ? "active" : ""}`}
             onClick={() => setFilter("all")}
           >
-            Todas ({rooms.length})
+            {t("Todas", "All")} ({rooms.length})
           </button>
           <button
             type="button"
@@ -149,7 +154,7 @@ export default function OpenLobbyModal({
             className={`open-lobby-filter-pill ${filter === "open" ? "active" : ""}`}
             onClick={() => setFilter("open")}
           >
-            Com Vagas ({openRooms.length})
+            {t("Com Vagas", "Open Seats")} ({openRooms.length})
           </button>
           <button
             type="button"
@@ -157,7 +162,7 @@ export default function OpenLobbyModal({
             className={`open-lobby-filter-pill ${filter === "mine" ? "active" : ""}`}
             onClick={() => setFilter("mine")}
           >
-            Minhas ({myRooms.length})
+            {t("Minhas", "Mine")} ({myRooms.length})
           </button>
         </div>
 
@@ -169,13 +174,18 @@ export default function OpenLobbyModal({
 
         {filteredRooms.length === 0 ? (
           <div className="open-lobby-empty">
-            <p>Nenhuma sala encontrada neste filtro no momento.</p>
+            <p>
+              {t(
+                "Nenhuma sala encontrada neste filtro no momento.",
+                "No rooms found for this filter right now."
+              )}
+            </p>
             <Button
               variant="contained"
               className="open-lobby-create-btn"
               onClick={onCreateRoomClick}
             >
-              🌐 Criar Nova Sala Online
+              🌐 {t("Criar Nova Sala Online", "Create New Online Room")}
             </Button>
           </div>
         ) : (
@@ -185,7 +195,7 @@ export default function OpenLobbyModal({
                 (s) => !s.is_bot && !s.claimed
               ).length;
               const myColorLabel = room.my_color
-                ? PLAYER_COLOR_META[room.my_color]?.label
+                ? colorMeta[room.my_color]?.label
                 : null;
 
               return (
@@ -204,31 +214,35 @@ export default function OpenLobbyModal({
                         }`}
                       >
                         {room.status === "WAITING"
-                          ? `Aberta (${openHumans} vaga${openHumans === 1 ? "" : "s"})`
-                          : "Em Andamento"}
+                          ? t(
+                              `Aberta (${openHumans} vaga${openHumans === 1 ? "" : "s"})`,
+                              `Open (${openHumans} seat${openHumans === 1 ? "" : "s"})`
+                            )
+                          : t("Em Andamento", "In Progress")}
                       </span>
                       {myColorLabel && (
                         <span className="open-lobby-my-seat">
-                          ★ Seu Assento: {myColorLabel}
+                          ★ {t("Seu Assento:", "Your Seat:")} {myColorLabel}
                         </span>
                       )}
                     </div>
                     <small className="open-lobby-card__rules">
-                      Mapa {formatMapTemplateLabel(room.config.map_template)} •{" "}
-                      {room.config.vps_to_win} PV
+                      {t("Mapa", "Map")}{" "}
+                      {formatMapTemplateLabel(room.config.map_template, language)} •{" "}
+                      {room.config.vps_to_win} {t("PV", "VP")}
                     </small>
                   </div>
 
                   <div className="open-lobby-card__bottom">
                     <div className="open-lobby-seats">
                       {room.seats.map((seat, seatIdx) => {
-                        const palette = PLAYER_COLOR_META[seat.color];
+                        const palette = colorMeta[seat.color];
                         const isOpen = !seat.is_bot && !seat.claimed;
                         const displayName = seat.is_bot
                           ? isOfficialBotName(seat.player_name)
                             ? seat.player_name
                             : pickBotNameDeterministic(seatIdx)
-                          : seat.player_name;
+                          : localizeSeatLabel(seat.player_name, language);
                         const avatarProps = !isOpen
                           ? resolveSeatAvatarProps({
                               color: seat.color,
@@ -274,7 +288,7 @@ export default function OpenLobbyModal({
                               </span>
                             )}
                             <span>
-                              {isOpen ? OPEN_SEAT_LABEL : displayName}
+                              {isOpen ? openSeatLabel : displayName}
                             </span>
                           </div>
                         );
@@ -287,7 +301,10 @@ export default function OpenLobbyModal({
                           <div
                             className="open-lobby-confirm-close"
                             role="group"
-                            aria-label={`Confirmar encerramento da sala ${room.room_code}`}
+                            aria-label={t(
+                              `Confirmar encerramento da sala ${room.room_code}`,
+                              `Confirm closing room ${room.room_code}`
+                            )}
                           >
                             <Button
                               size="small"
@@ -305,7 +322,10 @@ export default function OpenLobbyModal({
                                   setActionError(
                                     err?.response?.data?.description ||
                                       err?.message ||
-                                      "Não foi possível encerrar a sala."
+                                      t(
+                                        "Não foi possível encerrar a sala.",
+                                        "Could not close the room."
+                                      )
                                   );
                                 } finally {
                                   setClosingCode(null);
@@ -313,8 +333,8 @@ export default function OpenLobbyModal({
                               }}
                             >
                               {closingCode === room.room_code
-                                ? "Encerrando..."
-                                : "Confirmar"}
+                                ? t("Encerrando...", "Closing...")
+                                : t("Confirmar", "Confirm")}
                             </Button>
                             <Button
                               size="small"
@@ -323,7 +343,7 @@ export default function OpenLobbyModal({
                               disabled={closingCode === room.room_code}
                               onClick={() => setConfirmingCloseCode(null)}
                             >
-                              Cancelar
+                              {t("Cancelar", "Cancel")}
                             </Button>
                           </div>
                         ) : (
@@ -333,13 +353,16 @@ export default function OpenLobbyModal({
                             color="error"
                             className="open-lobby-close-room-btn"
                             disabled={Boolean(closingCode)}
-                            aria-label={`Encerrar sala ${room.room_code}`}
+                            aria-label={t(
+                              `Encerrar sala ${room.room_code}`,
+                              `Close room ${room.room_code}`
+                            )}
                             onClick={() => {
                               setActionError("");
                               setConfirmingCloseCode(room.room_code);
                             }}
                           >
-                            🗑️ Encerrar Sala
+                            🗑️ {t("Encerrar Sala", "Close Room")}
                           </Button>
                         )
                       )}
@@ -353,7 +376,10 @@ export default function OpenLobbyModal({
                             variant="outlined"
                             className="open-lobby-leave-room-btn"
                             disabled={Boolean(closingCode)}
-                            aria-label={`Sair da sala ${room.room_code}`}
+                            aria-label={t(
+                              `Sair da sala ${room.room_code}`,
+                              `Leave room ${room.room_code}`
+                            )}
                             onClick={async () => {
                               try {
                                 setClosingCode(room.room_code);
@@ -363,14 +389,17 @@ export default function OpenLobbyModal({
                                 setActionError(
                                   err?.response?.data?.description ||
                                     err?.message ||
-                                    "Não foi possível sair da sala."
+                                    t(
+                                      "Não foi possível sair da sala.",
+                                      "Could not leave the room."
+                                    )
                                 );
                               } finally {
                                 setClosingCode(null);
                               }
                             }}
                           >
-                            🚪 Sair da Sala
+                            🚪 {t("Sair da Sala", "Leave Room")}
                           </Button>
                         )}
 
@@ -389,9 +418,9 @@ export default function OpenLobbyModal({
                       >
                         {room.status === "IN_PROGRESS"
                           ? room.my_color
-                            ? "▶ Retomar"
-                            : "👁 Assistir"
-                          : "Entrar"}
+                            ? t("▶ Retomar", "▶ Resume")
+                            : t("👁 Assistir", "👁 Spectate")
+                          : t("Entrar", "Join")}
                       </Button>
                     </div>
                   </div>

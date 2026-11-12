@@ -25,29 +25,28 @@ import {
 } from "../../utils/apiClient";
 import {
   BOT_AVATAR_PROFILES,
-  BOT_DIFFICULTY_OPTIONS,
-  BOT_SPEED_OPTIONS,
   formatBotDifficultyLabel,
   formatBotSpeedLabel,
   formatMapTemplateLabel,
-  MAP_TEMPLATE_OPTIONS,
+  getBotDifficultyOptions,
+  getBotSpeedOptions,
+  getMapTemplateOptions,
+  getOpenSeatLabel,
+  localizeSeatLabel,
   OFFICIAL_BOT_NAMES,
   OPEN_SEAT_LABEL,
   playerKeyForDifficulty,
   type OfficialBotName,
 } from "../../config/botCatalog";
+import { getPlayerColorMeta } from "../../config/assetRegistry";
+import { localizeGuestDisplayName } from "../../config/avatarCatalog";
+import { useLanguage } from "../../i18n";
 import { getSavedGameSpeed, saveGameSpeed } from "../../utils/tabletopPacing";
 import PlayerAvatar from "../PlayerAvatar";
 import MapTemplatePreview from "./MapTemplatePreview";
 import "./MatchSetupModal.scss";
 
 const PLAYER_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"] as const;
-const COLOR_LABELS_PT: Record<(typeof PLAYER_COLORS)[number], string> = {
-  RED: "VERMELHO",
-  BLUE: "AZUL",
-  ORANGE: "LARANJA",
-  WHITE: "BRANCO",
-};
 
 export type MatchSetupMode = "solo" | "room" | null;
 
@@ -87,6 +86,13 @@ export default function MatchSetupModal({
   onGameCreated,
   onRoomCreated,
 }: MatchSetupModalProps) {
+  const { language, t } = useLanguage();
+  const colorMeta = getPlayerColorMeta(language);
+  const mapTemplateOptions = getMapTemplateOptions(language);
+  const botDifficultyOptions = getBotDifficultyOptions(language);
+  const botSpeedOptions = getBotSpeedOptions(language);
+  const openSeatLabel = getOpenSeatLabel(language);
+
   const [mapTemplate, setMapTemplate] = useState<MapTemplate>("BASE");
   const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>("medium");
   const [botSpeed, setBotSpeed] = useState<BotSpeed>(() =>
@@ -96,8 +102,12 @@ export default function MatchSetupModal({
   const [vpsToWin, setVpsToWin] = useState(10);
   const [discardLimit, setDiscardLimit] = useState(7);
   const [friendlyRobber, setFriendlyRobber] = useState(true);
-  const [hostName, setHostName] = useState(
-    () => account?.display_name || defaultHostName || "Anfitrião"
+  const [hostName, setHostName] = useState(() =>
+    account?.display_name ||
+    localizeGuestDisplayName(
+      localizeSeatLabel(defaultHostName || "Anfitrião", language),
+      language
+    )
   );
   const [seats, setSeats] = useState<SeatSelection[]>(() =>
     defaultSeatsForMode(mode)
@@ -117,11 +127,29 @@ export default function MatchSetupModal({
 
   useEffect(() => {
     if (!mode) return;
-    setHostName(account?.display_name || defaultHostName || "Anfitrião");
+    setHostName(
+      account?.display_name ||
+        localizeGuestDisplayName(
+          localizeSeatLabel(defaultHostName || "Anfitrião", language),
+          language
+        )
+    );
   }, [mode, account?.display_name, defaultHostName]);
 
-  const cleanHostLabel =
-    hostName.trim() || account?.display_name || defaultHostName || "Anfitrião";
+  useEffect(() => {
+    if (!mode || account) return;
+    setHostName((prev) =>
+      localizeGuestDisplayName(localizeSeatLabel(prev, language), language)
+    );
+  }, [mode, account, language]);
+
+  const cleanHostLabel = localizeGuestDisplayName(
+    localizeSeatLabel(
+      hostName.trim() || account?.display_name || defaultHostName || "Anfitrião",
+      language
+    ),
+    language
+  );
 
   const handleSeatChange = (index: number, value: SeatSelection) => {
     setSeats((current) => {
@@ -196,8 +224,7 @@ export default function MatchSetupModal({
     setSubmitting(true);
     setErrorMsg("");
     try {
-      const cleanName =
-        hostName.trim() || account?.display_name || defaultHostName || "Anfitrião";
+      const cleanName = cleanHostLabel;
       const botKey = playerKeyForDifficulty(botDifficulty);
 
       if (mode === "solo") {
@@ -268,17 +295,23 @@ export default function MatchSetupModal({
       setErrorMsg(
         err?.response?.data?.description ||
           (mode === "solo"
-            ? "Não foi possível iniciar a partida."
-            : "Não foi possível criar a sala online.")
+            ? t(
+                "Não foi possível iniciar a partida.",
+                "Could not start the match."
+              )
+            : t(
+                "Não foi possível criar a sala online.",
+                "Could not create the online room."
+              ))
       );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const selectedTemplateLabel = formatMapTemplateLabel(mapTemplate);
-  const selectedDifficultyLabel = formatBotDifficultyLabel(botDifficulty);
-  const selectedSpeedLabel = formatBotSpeedLabel(botSpeed);
+  const selectedTemplateLabel = formatMapTemplateLabel(mapTemplate, language);
+  const selectedDifficultyLabel = formatBotDifficultyLabel(botDifficulty, language);
+  const selectedSpeedLabel = formatBotSpeedLabel(botSpeed, language);
   const isRoom = mode === "room";
 
   return (
@@ -292,8 +325,14 @@ export default function MatchSetupModal({
       <DialogTitle className="match-setup-header">
         <span>
           {isRoom
-            ? "🌐 Criar Sala Online (Amigos & Bots)"
-            : "⚔️ Configurar Partida Rápida (Solo vs IA)"}
+            ? t(
+                "🌐 Criar Sala Online (Amigos & Bots)",
+                "🌐 Create Online Room (Friends & Bots)"
+              )
+            : t(
+                "⚔️ Configurar Partida Rápida (Solo vs IA)",
+                "⚔️ Quick Match Setup (Solo vs AI)"
+              )}
         </span>
         <Button
           size="small"
@@ -301,20 +340,22 @@ export default function MatchSetupModal({
           className="home-modal-close-btn"
           onClick={onClose}
         >
-          Fechar
+          {t("Fechar", "Close")}
         </Button>
       </DialogTitle>
 
       <DialogContent className="match-setup-body">
         {isRoom && (
           <div className="match-setup-host-field">
-            <label htmlFor="setup-host-name">Seu Apelido na Mesa</label>
+            <label htmlFor="setup-host-name">
+              {t("Seu Apelido na Mesa", "Your Table Nickname")}
+            </label>
             <input
               id="setup-host-name"
               type="text"
               value={hostName}
               onChange={(e) => setHostName(e.target.value)}
-              placeholder="Seu apelido na sala..."
+              placeholder={t("Seu apelido na sala...", "Your room nickname...")}
               maxLength={24}
             />
           </div>
@@ -323,9 +364,12 @@ export default function MatchSetupModal({
         <div className="match-setup-group">
           <div className="match-setup-group__header">
             <span className="match-setup-inline-title">
-              Modelo do Mapa
+              {t("Modelo do Mapa", "Map Template")}
               <Tooltip
-                title="Padrão sorteia terrenos e portos a cada partida; Mini usa apenas 7 terrenos para jogos rápidos; Torneio mantém o tabuleiro oficial fixo."
+                title={t(
+                  "Padrão sorteia terrenos e portos a cada partida; Mini usa apenas 7 terrenos para jogos rápidos; Torneio mantém o tabuleiro oficial fixo.",
+                  "Standard shuffles terrains and harbors every match; Mini uses only 7 terrains for quick games; Tournament keeps the official fixed board."
+                )}
                 arrow
                 enterTouchDelay={0}
                 leaveTouchDelay={3000}
@@ -333,7 +377,10 @@ export default function MatchSetupModal({
                 <IconButton
                   size="small"
                   className="match-setup-help-btn"
-                  aria-label="Ajuda sobre Modelo do Mapa"
+                  aria-label={t(
+                    "Ajuda sobre Modelo do Mapa",
+                    "Help about Map Template"
+                  )}
                 >
                   <HelpOutlineRoundedIcon fontSize="inherit" />
                 </IconButton>
@@ -342,7 +389,7 @@ export default function MatchSetupModal({
             <strong>{selectedTemplateLabel}</strong>
           </div>
           <div className="match-setup-templates">
-            {MAP_TEMPLATE_OPTIONS.map(({ value, label }) => (
+            {mapTemplateOptions.map(({ value, label }) => (
               <Button
                 key={value}
                 variant="contained"
@@ -362,7 +409,7 @@ export default function MatchSetupModal({
         <div className="match-setup-sliders-row">
           <div className="match-setup-compact-box">
             <div className="match-setup-group__header">
-              <span>Pontos para Vencer</span>
+              <span>{t("Pontos para Vencer", "Victory Points to Win")}</span>
               <strong>{vpsToWin}</strong>
             </div>
             <Slider
@@ -379,9 +426,12 @@ export default function MatchSetupModal({
           <div className="match-setup-compact-box">
             <div className="match-setup-group__header">
               <span className="match-setup-inline-title">
-                Limite de Cartas (Ladrão)
+                {t("Limite de Cartas (Ladrão)", "Hand Limit (Robber)")}
                 <Tooltip
-                  title="Ao sair 7 nos dados, jogadores com mais cartas que este limite descartam metade (arredondado para baixo)."
+                  title={t(
+                    "Ao sair 7 nos dados, jogadores com mais cartas que este limite descartam metade (arredondado para baixo).",
+                    "When a 7 is rolled, players holding more cards than this limit discard half (rounded down)."
+                  )}
                   arrow
                   enterTouchDelay={0}
                   leaveTouchDelay={3000}
@@ -389,7 +439,10 @@ export default function MatchSetupModal({
                   <IconButton
                     size="small"
                     className="match-setup-help-btn"
-                    aria-label="Ajuda sobre Limite de Cartas (Ladrão)"
+                    aria-label={t(
+                      "Ajuda sobre Limite de Cartas (Ladrão)",
+                      "Help about Hand Limit (Robber)"
+                    )}
                   >
                     <HelpOutlineRoundedIcon fontSize="inherit" />
                   </IconButton>
@@ -411,9 +464,12 @@ export default function MatchSetupModal({
           <div className="match-setup-compact-box match-setup-compact-box--switch">
             <div className="match-setup-group__header">
               <span className="match-setup-inline-title">
-                Ladrão Amigável
+                {t("Ladrão Amigável", "Friendly Robber")}
                 <Tooltip
-                  title="Impede colocar o Ladrão em terrenos de jogadores que tenham apenas 2 pontos de vitória."
+                  title={t(
+                    "Impede colocar o Ladrão em terrenos de jogadores que tenham apenas 2 pontos de vitória.",
+                    "Prevents placing the Robber on hexes bordering players who still have only 2 victory points."
+                  )}
                   arrow
                   enterTouchDelay={0}
                   leaveTouchDelay={3000}
@@ -421,13 +477,18 @@ export default function MatchSetupModal({
                   <IconButton
                     size="small"
                     className="match-setup-help-btn"
-                    aria-label="Ajuda sobre Ladrão Amigável"
+                    aria-label={t(
+                      "Ajuda sobre Ladrão Amigável",
+                      "Help about Friendly Robber"
+                    )}
                   >
                     <HelpOutlineRoundedIcon fontSize="inherit" />
                   </IconButton>
                 </Tooltip>
               </span>
-              <strong>{friendlyRobber ? "Ativo" : "Inativo"}</strong>
+              <strong>
+                {friendlyRobber ? t("Ativo", "Active") : t("Inativo", "Off")}
+              </strong>
             </div>
             <Checkbox
               className="match-setup-checkbox"
@@ -440,9 +501,12 @@ export default function MatchSetupModal({
         <div className="match-setup-group">
           <div className="match-setup-group__header">
             <span className="match-setup-inline-title">
-              Modo dos Dados
+              {t("Modo dos Dados", "Dice Mode")}
               <Tooltip
-                title="Padrão usa 2 dados clássicos (2d6). Equilibrados usa um baralho de 36 pares embaralhados, reembaralhando ao restarem 5 cartas."
+                title={t(
+                  "Padrão usa 2 dados clássicos (2d6). Equilibrados usa um baralho de 36 pares embaralhados, reembaralhando ao restarem 5 cartas.",
+                  "Standard uses 2 classic dice (2d6). Balanced uses a shuffled 36-pair deck, reshuffling when 5 cards remain."
+                )}
                 arrow
                 enterTouchDelay={0}
                 leaveTouchDelay={3000}
@@ -450,7 +514,10 @@ export default function MatchSetupModal({
                 <IconButton
                   size="small"
                   className="match-setup-help-btn"
-                  aria-label="Ajuda sobre Modo dos Dados"
+                  aria-label={t(
+                    "Ajuda sobre Modo dos Dados",
+                    "Help about Dice Mode"
+                  )}
                 >
                   <HelpOutlineRoundedIcon fontSize="inherit" />
                 </IconButton>
@@ -458,14 +525,14 @@ export default function MatchSetupModal({
             </span>
             <strong>
               {diceMode === "balanced"
-                ? "Equilibrados (Baralho 36)"
-                : "Padrão (2d6)"}
+                ? t("Equilibrados (Baralho 36)", "Balanced (36-Card Deck)")
+                : t("Padrão (2d6)", "Standard (2d6)")}
             </strong>
           </div>
           <div
             className="match-setup-dice-options"
             role="group"
-            aria-label="Modo dos Dados"
+            aria-label={t("Modo dos Dados", "Dice Mode")}
           >
             <Button
               variant="contained"
@@ -475,7 +542,7 @@ export default function MatchSetupModal({
                 diceMode === "random" ? "selected" : ""
               }`}
             >
-              🎲 Padrão (2d6)
+              🎲 {t("Padrão (2d6)", "Standard (2d6)")}
             </Button>
             <Button
               variant="contained"
@@ -485,7 +552,7 @@ export default function MatchSetupModal({
                 diceMode === "balanced" ? "selected" : ""
               }`}
             >
-              🎴 Equilibrados (Baralho 36)
+              🎴 {t("Equilibrados (Baralho 36)", "Balanced (36-Card Deck)")}
             </Button>
           </div>
         </div>
@@ -493,9 +560,12 @@ export default function MatchSetupModal({
         <div className="match-setup-group">
           <div className="match-setup-group__header">
             <span className="match-setup-inline-title">
-              Dificuldade dos Bots
+              {t("Dificuldade dos Bots", "Bot Difficulty")}
               <Tooltip
-                title="Define o nível estratégico de todos os bots da mesa: Fácil, Moderado ou Difícil."
+                title={t(
+                  "Define o nível estratégico de todos os bots da mesa: Fácil, Moderado ou Difícil.",
+                  "Sets the strategic level of all table bots: Easy, Medium, or Hard."
+                )}
                 arrow
                 enterTouchDelay={0}
                 leaveTouchDelay={3000}
@@ -503,7 +573,10 @@ export default function MatchSetupModal({
                 <IconButton
                   size="small"
                   className="match-setup-help-btn"
-                  aria-label="Ajuda sobre Dificuldade dos Bots"
+                  aria-label={t(
+                    "Ajuda sobre Dificuldade dos Bots",
+                    "Help about Bot Difficulty"
+                  )}
                 >
                   <HelpOutlineRoundedIcon fontSize="inherit" />
                 </IconButton>
@@ -514,9 +587,9 @@ export default function MatchSetupModal({
           <div
             className="match-setup-templates"
             role="group"
-            aria-label="Dificuldade dos Bots"
+            aria-label={t("Dificuldade dos Bots", "Bot Difficulty")}
           >
-            {BOT_DIFFICULTY_OPTIONS.map((opt) => (
+            {botDifficultyOptions.map((opt) => (
               <Button
                 key={opt.value}
                 variant="contained"
@@ -536,12 +609,18 @@ export default function MatchSetupModal({
         <div className="match-setup-group">
           <div className="match-setup-group__header">
             <span className="match-setup-inline-title">
-              Velocidade dos Bots
+              {t("Velocidade dos Bots", "Bot Speed")}
               <Tooltip
                 title={
                   isRoom
-                    ? "Define o ritmo das animações e jogadas dos bots para todos na sala online (definido antes de iniciar)."
-                    : "Define o ritmo inicial das animações e jogadas dos bots. No modo offline você também pode alterar a qualquer momento durante a partida."
+                    ? t(
+                        "Define o ritmo das animações e jogadas dos bots para todos na sala online (definido antes de iniciar).",
+                        "Sets bot animation and move pacing for everyone in the online room (locked before start)."
+                      )
+                    : t(
+                        "Define o ritmo inicial das animações e jogadas dos bots. No modo offline você também pode alterar a qualquer momento durante a partida.",
+                        "Sets initial bot animation and move pacing. In offline mode you can also adjust it anytime during the match."
+                      )
                 }
                 arrow
                 enterTouchDelay={0}
@@ -550,7 +629,10 @@ export default function MatchSetupModal({
                 <IconButton
                   size="small"
                   className="match-setup-help-btn"
-                  aria-label="Ajuda sobre Velocidade dos Bots"
+                  aria-label={t(
+                    "Ajuda sobre Velocidade dos Bots",
+                    "Help about Bot Speed"
+                  )}
                 >
                   <HelpOutlineRoundedIcon fontSize="inherit" />
                 </IconButton>
@@ -561,9 +643,9 @@ export default function MatchSetupModal({
           <div
             className="match-setup-templates"
             role="group"
-            aria-label="Velocidade dos Bots"
+            aria-label={t("Velocidade dos Bots", "Bot Speed")}
           >
-            {BOT_SPEED_OPTIONS.map((opt) => (
+            {botSpeedOptions.map((opt) => (
               <Button
                 key={opt.value}
                 variant="contained"
@@ -582,7 +664,7 @@ export default function MatchSetupModal({
 
         <div className="match-setup-group">
           <div className="match-setup-group__header">
-            <span>Jogadores na Mesa</span>
+            <span>{t("Jogadores na Mesa", "Players at Table")}</span>
             <strong>{seats.length}/4</strong>
           </div>
           <div className="match-setup-players">
@@ -597,18 +679,21 @@ export default function MatchSetupModal({
               return (
                 <div className="match-setup-player-row" key={`${colorKey}-${index}`}>
                   <div className="match-setup-player-meta">
-                    <span>Jogador {index + 1}</span>
+                    <span>{t(`Jogador ${index + 1}`, `Player ${index + 1}`)}</span>
                     <span
                       className={`match-setup-color-chip ${colorKey.toLowerCase()}`}
                     >
-                      {COLOR_LABELS_PT[colorKey]}
+                      {colorMeta[colorKey].label.toUpperCase()}
                     </span>
                   </div>
                   <Select
                     size="small"
                     fullWidth
                     SelectDisplayProps={{
-                      "aria-label": `Jogador ${index + 1}`,
+                      "aria-label": t(
+                        `Jogador ${index + 1}`,
+                        `Player ${index + 1}`
+                      ),
                     }}
                     value={displaySeatValue}
                     onChange={(event) =>
@@ -617,13 +702,15 @@ export default function MatchSetupModal({
                   >
                     <MenuItem value="HOST">
                       <span className="match-setup-select-option">
-                        <span>👤 {cleanHostLabel} (Você)</span>
+                        <span>
+                          👤 {cleanHostLabel} ({t("Você", "You")})
+                        </span>
                       </span>
                     </MenuItem>
                     {isRoom && (
                       <MenuItem value="OPEN">
                         <span className="match-setup-select-option">
-                          <span>🪑 {OPEN_SEAT_LABEL}</span>
+                          <span>🪑 {openSeatLabel}</span>
                         </span>
                       </MenuItem>
                     )}
@@ -647,7 +734,7 @@ export default function MatchSetupModal({
                             <span>{botName}</span>
                             {takenElsewhere && (
                               <span className="match-setup-option-hint">
-                                (na mesa)
+                                ({t("na mesa", "at table")})
                               </span>
                             )}
                           </span>
@@ -661,7 +748,7 @@ export default function MatchSetupModal({
                     disabled={!canRemove}
                     onClick={() => handleRemovePlayer(index)}
                   >
-                    Remover
+                    {t("Remover", "Remove")}
                   </Button>
                 </div>
               );
@@ -673,7 +760,7 @@ export default function MatchSetupModal({
             disabled={seats.length >= 4}
             onClick={handleAddPlayer}
           >
-            + Adicionar Jogador
+            {t("+ Adicionar Jogador", "+ Add Player")}
           </Button>
         </div>
 
@@ -686,7 +773,7 @@ export default function MatchSetupModal({
           className="match-setup-cancel-btn"
           onClick={onClose}
         >
-          Cancelar
+          {t("Cancelar", "Cancel")}
         </Button>
         <Button
           variant="contained"
@@ -697,10 +784,10 @@ export default function MatchSetupModal({
           onClick={handleSubmit}
         >
           {submitting
-            ? "Preparando mesa..."
+            ? t("Preparando mesa...", "Setting up table...")
             : isRoom
-              ? "🔗 Criar Sala e Gerar Link"
-              : "⚔️ Iniciar Partida"}
+              ? t("🔗 Criar Sala e Gerar Link", "🔗 Create Room & Generate Link")
+              : t("⚔️ Iniciar Partida", "⚔️ Start Match")}
         </Button>
       </DialogActions>
     </Dialog>

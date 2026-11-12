@@ -44,10 +44,12 @@ import {
   SettlementSvgPiece,
 } from "../components/icons/GameIcons";
 import {
-  BUILDING_COSTS,
-  PLAYER_COLOR_META,
-  RESOURCE_META,
+  getBuildingCosts,
+  getDevCardMeta,
+  getPlayerColorMeta,
+  getResourceMeta,
 } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import type {
@@ -97,6 +99,11 @@ export default function ActionsToolbar({
   const { gameId } = useParams();
   const { state, dispatch } = useContext(store);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
+  const { language, t } = useLanguage();
+  const buildingCosts = getBuildingCosts(language);
+  const devCardMeta = getDevCardMeta(language);
+  const playerColorMeta = getPlayerColorMeta(language);
+  const resourceMeta = getResourceMeta(language);
 
   const [resourceSelectorOpen, setResourceSelectorOpen] = useState(false);
   const [discardPlannerOpen, setDiscardPlannerOpen] = useState(false);
@@ -314,22 +321,22 @@ export default function ActionsToolbar({
 
   const useItems = [
     {
-      label: "⚔️ Cavaleiro (Mover Ladrão)",
+      label: `⚔️ ${devCardMeta.KNIGHT.label} (${t("Mover Ladrão", "Move Robber")})`,
       disabled: !playableDevCardTypes.has("PLAY_KNIGHT_CARD"),
       onClick: playKnightCard,
     },
     {
-      label: "👑 Monopólio",
+      label: `👑 ${devCardMeta.MONOPOLY.label}`,
       disabled: !playableDevCardTypes.has("PLAY_MONOPOLY"),
       onClick: () => dispatch({ type: ACTIONS.SET_IS_PLAYING_MONOPOLY }),
     },
     {
-      label: "🌾 Ano da Fartura (+2 Recursos)",
+      label: `🌾 ${devCardMeta.YEAR_OF_PLENTY.label} (${t("+2 Recursos", "+2 Resources")})`,
       disabled: !playableDevCardTypes.has("PLAY_YEAR_OF_PLENTY"),
       onClick: () => dispatch({ type: ACTIONS.SET_IS_PLAYING_YEAR_OF_PLENTY }),
     },
     {
-      label: "🛤️ Construção de Estradas (2 grátis)",
+      label: `🛤️ ${devCardMeta.ROAD_BUILDING.label} (${t("2 grátis", "2 free")})`,
       disabled: !playableDevCardTypes.has("PLAY_ROAD_BUILDING"),
       onClick: playRoadBuilding,
     },
@@ -372,8 +379,8 @@ export default function ActionsToolbar({
   const ctaConfig = useMemo(() => {
     if (isDecideTrade) {
       return {
-        label: "RESPONDER",
-        shortSub: "Proposta",
+        label: t("RESPONDER", "RESPOND"),
+        shortSub: t("Proposta", "Offer"),
         variant: "gold",
         icon: <AccountBalanceIcon />,
         onClick: () => setTradeDecisionMinimized(false),
@@ -381,8 +388,8 @@ export default function ActionsToolbar({
     }
     if (isDecideAcceptees) {
       return {
-        label: "CONFIRMAR",
-        shortSub: "Fechar Troca",
+        label: t("CONFIRMAR", "CONFIRM"),
+        shortSub: t("Fechar Troca", "Confirm Trade"),
         variant: "emerald",
         icon: <AccountBalanceIcon />,
         onClick: () => setTradeDecisionMinimized(false),
@@ -390,8 +397,11 @@ export default function ActionsToolbar({
     }
     if (isDiscard) {
       return {
-        label: "DESCARTAR",
-        shortSub: `${gameState.current_discard_count} cartas`,
+        label: t("DESCARTAR", "DISCARD"),
+        shortSub: t(
+          `${gameState.current_discard_count} cartas`,
+          `${gameState.current_discard_count} cards`
+        ),
         variant: "danger",
         icon: <PanToolAltIcon />,
         onClick: () => setDiscardPlannerOpen(true),
@@ -399,8 +409,8 @@ export default function ActionsToolbar({
     }
     if (isMoveRobber) {
       return {
-        label: "ROUBAR",
-        shortSub: "Mover Ladrão",
+        label: t("ROUBAR", "ROB"),
+        shortSub: t("Mover Ladrão", "Move Robber"),
         variant: "danger",
         icon: <GavelIcon />,
         onClick: () => dispatch({ type: ACTIONS.SET_IS_MOVING_ROBBER }),
@@ -408,8 +418,10 @@ export default function ActionsToolbar({
     }
     if (isPlayingYearOfPlenty || isPlayingMonopoly) {
       return {
-        label: "ESCOLHER",
-        shortSub: isPlayingMonopoly ? "Monopólio" : "Fartura",
+        label: t("ESCOLHER", "CHOOSE"),
+        shortSub: isPlayingMonopoly
+          ? t("Monopólio", "Monopoly")
+          : t("Fartura", "Plenty"),
         variant: "gold",
         icon: <AutoAwesomeIcon />,
         onClick: () => setResourceSelectorOpen(true),
@@ -417,16 +429,16 @@ export default function ActionsToolbar({
     }
     if (isRoll) {
       return {
-        label: "ROLAR DADOS",
-        shortSub: "Iniciar Turno",
+        label: t("ROLAR DADOS", "ROLL DICE"),
+        shortSub: t("Iniciar Turno", "Start Turn"),
         variant: "gold",
         icon: <CasinoIcon />,
         onClick: () => executeGameAction([humanColor, "ROLL", null]),
       };
     }
     return {
-      label: "PASSAR VEZ",
-      shortSub: "Encerrar",
+      label: t("PASSAR VEZ", "END TURN"),
+      shortSub: t("Encerrar", "End Turn"),
       variant: "emerald",
       icon: <NavigateNextIcon />,
       onClick: () => executeGameAction([humanColor, "END_TURN", null]),
@@ -443,16 +455,29 @@ export default function ActionsToolbar({
     dispatch,
     executeGameAction,
     humanColor,
+    t,
   ]);
 
   const activeBuildHint = isBuildingRoad
-    ? "Clique em uma aresta iluminada para construir sua Estrada (ou clique no botão novamente para cancelar)"
+    ? t(
+        "Clique em uma aresta iluminada para construir sua Estrada (ou clique no botão novamente para cancelar)",
+        "Click a highlighted edge to build your Road (or click the button again to cancel)"
+      )
     : isBuildingSettlement
-      ? "Clique em um vértice iluminado para fundar sua Aldeia (ou clique no botão novamente para cancelar)"
+      ? t(
+          "Clique em um vértice iluminado para fundar sua Aldeia (ou clique no botão novamente para cancelar)",
+          "Click a highlighted vertex to build your Settlement (or click the button again to cancel)"
+        )
       : isBuildingCity
-        ? "Clique em uma das suas Aldeias para evoluir para Cidade"
+        ? t(
+            "Clique em uma das suas Aldeias para evoluir para Cidade",
+            "Click one of your Settlements to upgrade to a City"
+          )
         : isRoadBuilding
-          ? `Estrada Gratuita (${state.freeRoadsAvailable} restante${state.freeRoadsAvailable === 1 ? "" : "s"}): clique em uma aresta iluminada`
+          ? t(
+              `Estrada Gratuita (${state.freeRoadsAvailable} restante${state.freeRoadsAvailable === 1 ? "" : "s"}): clique em uma aresta iluminada`,
+              `Free Road (${state.freeRoadsAvailable} remaining): click a highlighted edge`
+            )
           : null;
 
   const canRoad =
@@ -481,8 +506,19 @@ export default function ActionsToolbar({
         <div className="cu-console__actions">
           {isInteractiveTurn ? (
             <>
-              <div className="cu-build-strip" role="group" aria-label="Construções">
-                <Tooltip title="Construir Estrada (1 Madeira + 1 Argila) — Maior Estrada (+2 PV)" arrow placement="top">
+              <div
+                className="cu-build-strip"
+                role="group"
+                aria-label={t("Construções", "Builds")}
+              >
+                <Tooltip
+                  title={t(
+                    "Construir Estrada (1 Madeira + 1 Argila) — Maior Estrada (+2 PV)",
+                    "Build Road (1 Lumber + 1 Brick) — Longest Road (+2 VP)"
+                  )}
+                  arrow
+                  placement="top"
+                >
                   <span>
                     <button
                       type="button"
@@ -491,7 +527,9 @@ export default function ActionsToolbar({
                       })}
                       style={
                         humanColor
-                          ? ({ "--seat-color": PLAYER_COLOR_META[humanColor].primary } as React.CSSProperties)
+                          ? ({
+                              "--seat-color": playerColorMeta[humanColor].primary,
+                            } as React.CSSProperties)
                           : undefined
                       }
                       disabled={!canRoad}
@@ -506,13 +544,22 @@ export default function ActionsToolbar({
                       ) : (
                         <span className="cu-build-tile__piece cu-build-tile__piece--road" />
                       )}
-                      <span className="cu-build-tile__name">Estrada</span>
+                      <span className="cu-build-tile__name">
+                        {buildingCosts.ROAD.label}
+                      </span>
                       <span className="cu-build-tile__stock">{myRoadsLeft}</span>
                     </button>
                   </span>
                 </Tooltip>
 
-                <Tooltip title="Fundar Aldeia (1 Madeira + 1 Argila + 1 Lã + 1 Trigo) — +1 PV" arrow placement="top">
+                <Tooltip
+                  title={t(
+                    "Fundar Aldeia (1 Madeira + 1 Argila + 1 Lã + 1 Trigo) — +1 PV",
+                    "Build Settlement (1 Lumber + 1 Brick + 1 Wool + 1 Grain) — +1 VP"
+                  )}
+                  arrow
+                  placement="top"
+                >
                   <span>
                     <button
                       type="button"
@@ -529,13 +576,22 @@ export default function ActionsToolbar({
                           <SettlementSvgPiece color={humanColor} scale={0.95} />
                         </svg>
                       )}
-                      <span className="cu-build-tile__name">Aldeia</span>
+                      <span className="cu-build-tile__name">
+                        {buildingCosts.SETTLEMENT.label}
+                      </span>
                       <span className="cu-build-tile__stock">{mySettlementsLeft}</span>
                     </button>
                   </span>
                 </Tooltip>
 
-                <Tooltip title="Evoluir para Cidade (2 Trigos + 3 Minérios) — +2 PV & coleta em dobro" arrow placement="top">
+                <Tooltip
+                  title={t(
+                    "Evoluir para Cidade (2 Trigos + 3 Minérios) — +2 PV & coleta em dobro",
+                    "Upgrade to City (2 Grain + 3 Ore) — +2 VP & double yield"
+                  )}
+                  arrow
+                  placement="top"
+                >
                   <span>
                     <button
                       type="button"
@@ -552,13 +608,22 @@ export default function ActionsToolbar({
                           <CitySvgPiece color={humanColor} scale={0.88} />
                         </svg>
                       )}
-                      <span className="cu-build-tile__name">Cidade</span>
+                      <span className="cu-build-tile__name">
+                        {buildingCosts.CITY.label}
+                      </span>
                       <span className="cu-build-tile__stock">{myCitiesLeft}</span>
                     </button>
                   </span>
                 </Tooltip>
 
-                <Tooltip title="Comprar Carta de Desenvolvimento (1 Lã + 1 Trigo + 1 Minério)" arrow placement="top">
+                <Tooltip
+                  title={t(
+                    "Comprar Carta de Desenvolvimento (1 Lã + 1 Trigo + 1 Minério)",
+                    "Buy Development Card (1 Wool + 1 Grain + 1 Ore)"
+                  )}
+                  arrow
+                  placement="top"
+                >
                   <span>
                     <button
                       type="button"
@@ -569,7 +634,9 @@ export default function ActionsToolbar({
                       <span className="cu-build-tile__emoji" aria-hidden="true">
                         🃏
                       </span>
-                      <span className="cu-build-tile__name">Carta Dev</span>
+                      <span className="cu-build-tile__name">
+                        {t("Carta Dev", "Dev Card")}
+                      </span>
                       <span className="cu-build-tile__stock">+1</span>
                     </button>
                   </span>
@@ -590,7 +657,7 @@ export default function ActionsToolbar({
                   startIcon={<AccountBalanceIcon fontSize="small" />}
                   onClick={() => setTradeModalOpen(true)}
                 >
-                  Trocar
+                  {t("Trocar", "Trade")}
                 </Button>
 
                 <OptionsButton
@@ -600,18 +667,25 @@ export default function ActionsToolbar({
                   badgeCount={playableDevCardTypes.size}
                   items={useItems}
                 >
-                  Usar Carta
+                  {t("Usar Carta", "Use Card")}
                 </OptionsButton>
 
-                <Tooltip title="Tabela de Custos de Construção" arrow placement="top">
+                <Tooltip
+                  title={t(
+                    "Tabela de Custos de Construção",
+                    "Building Costs Guide"
+                  )}
+                  arrow
+                  placement="top"
+                >
                   <button
                     type="button"
                     className="cu-costs-icon-btn"
                     onClick={() => setCostsModalOpen(true)}
-                    aria-label="Custos"
+                    aria-label={t("Custos", "Costs")}
                   >
                     <MenuBookIcon fontSize="small" />
-                    <span>Custos</span>
+                    <span>{t("Custos", "Costs")}</span>
                   </button>
                 </Tooltip>
               </div>
@@ -621,7 +695,7 @@ export default function ActionsToolbar({
               <Prompt gameState={gameState} isBotThinking={isBotThinking} />
               {gameState.winning_color && (
                 <Link to="/" className="cu-victory-lobby-btn">
-                  🔄 Nova Partida / Lobby
+                  {t("🔄 Nova Partida / Lobby", "🔄 New Match / Lobby")}
                 </Link>
               )}
             </div>
@@ -642,9 +716,12 @@ export default function ActionsToolbar({
               className={cn("cu-hand-limit-pill", {
                 "is-over-limit": myResourceTotal > discardLimit,
               })}
-              title={`Total de cartas de recurso na mão: ${myResourceTotal}. Se tirar 7 nos dados acima de ${discardLimit}, descarta metade!`}
+              title={t(
+                `Total de cartas de recurso na mão: ${myResourceTotal}. Se tirar 7 nos dados acima de ${discardLimit}, descarta metade!`,
+                `Total resource cards in hand: ${myResourceTotal}. If a 7 is rolled above ${discardLimit}, discard half!`
+              )}
             >
-              <span>Mão</span>
+              <span>{t("Mão", "Hand")}</span>
               <strong>
                 {myResourceTotal}/{discardLimit}
               </strong>
@@ -665,8 +742,11 @@ export default function ActionsToolbar({
                 })}
                 title={
                   isRollingDice
-                    ? "Rolando dados..."
-                    : `Última rolagem: ${latestDice![0]} + ${latestDice![1]} = ${diceSum}`
+                    ? t("Rolando dados...", "Rolling dice...")
+                    : t(
+                        `Última rolagem: ${latestDice![0]} + ${latestDice![1]} = ${diceSum}`,
+                        `Last roll: ${latestDice![0]} + ${latestDice![1]} = ${diceSum}`
+                      )
                 }
               >
                 <div className="dice-widget-pill__faces">
@@ -750,11 +830,11 @@ export default function ActionsToolbar({
         PaperProps={{ className: "catan-modal-paper" }}
       >
         <DialogTitle className="catan-modal-title">
-          📋 Tabela de Custos de Construção
+          {t("📋 Tabela de Custos de Construção", "📋 Building Costs Guide")}
         </DialogTitle>
         <DialogContent className="catan-modal-content">
           <div className="costs-reference-list">
-            {Object.entries(BUILDING_COSTS).map(([itemKey, info]) => (
+            {Object.entries(buildingCosts).map(([itemKey, info]) => (
               <div key={itemKey} className="costs-reference-row">
                 <div className="costs-reference-row__title">
                   <strong>{info.label}</strong>
@@ -767,7 +847,7 @@ export default function ActionsToolbar({
                       <span
                         key={r}
                         className="costs-recipe-chip"
-                        title={`${qty}x ${RESOURCE_META[r].label}`}
+                        title={`${qty}× ${resourceMeta[r].label}`}
                       >
                         <ResourceIcon resource={r} size={16} />
                         <strong>×{qty}</strong>

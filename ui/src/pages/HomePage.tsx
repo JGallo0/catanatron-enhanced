@@ -19,11 +19,14 @@ import {
 import { saveGameSeat } from "../utils/seatStorage";
 import type { Color, RoomState } from "../utils/api.types";
 import {
-  AVATAR_FRAME_OPTIONS,
+  getFrameLabel,
   getGuestProfile,
+  localizeGuestDisplayName,
   resolveAvatarConfig,
   type GuestProfile,
 } from "../config/avatarCatalog";
+import { useLanguage } from "../i18n";
+import LanguageToggle from "../components/LanguageToggle";
 import LeaderboardModal from "../components/LeaderboardModal";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
@@ -37,6 +40,7 @@ import OpenLobbyModal from "../components/home/OpenLobbyModal";
 import "./HomePage.scss";
 
 export default function HomePage() {
+  const { language, t } = useLanguage();
   const [available, setAvailable] = useState<PlayerEntry[]>(DEFAULT_PLAYERS);
   const [account, setAccount] = useState<PlayerAccount | null>(() =>
     getSavedAccount()
@@ -157,9 +161,14 @@ export default function HomePage() {
   const resolvedFrame = account
     ? resolveAvatarConfig(account.avatar_config, account.username).frame
     : "wood";
-  const frameLabel =
-    AVATAR_FRAME_OPTIONS.find((f) => f.value === resolvedFrame)?.label ||
-    "Madeira de Colono";
+  const frameLabel = getFrameLabel(resolvedFrame, language);
+  const displayGuestName = localizeGuestDisplayName(
+    guestProfile.display_name,
+    language
+  );
+  const effectiveDefaultHostName = account
+    ? hostName
+    : localizeGuestDisplayName(hostName, language);
 
   return (
     <div className="home-page home-page--stage">
@@ -172,7 +181,7 @@ export default function HomePage() {
                 type="button"
                 className="home-identity-pill__avatar-btn"
                 onClick={handleOpenAvatarStudio}
-                title="Personalizar seu avatar"
+                title={t("Personalizar seu avatar", "Customize your avatar")}
               >
                 <PlayerAvatar
                   config={account.avatar_config}
@@ -192,29 +201,32 @@ export default function HomePage() {
                 type="button"
                 className="home-identity-pill__avatar-btn"
                 onClick={handleOpenAvatarStudio}
-                title="Personalizar avatar de visitante"
+                title={t(
+                  "Personalizar avatar de visitante",
+                  "Customize guest avatar"
+                )}
               >
                 <PlayerAvatar
                   config={
                     guestProfile.customized ? guestProfile.avatar_config : undefined
                   }
-                  username={guestProfile.display_name}
+                  username={displayGuestName}
                   size={56}
                 />
               </button>
               <div className="home-identity-pill__meta">
-                <strong>{guestProfile.display_name}</strong>
+                <strong>{displayGuestName}</strong>
                 <small>
                   {guestProfile.customized
-                    ? "Avatar personalizado (visitante)"
-                    : "Modo visitante"}
+                    ? t("Avatar personalizado (visitante)", "Custom avatar (guest)")
+                    : t("Modo visitante", "Guest mode")}
                 </small>
                 <button
                   type="button"
                   className="home-identity-pill__inline-link"
                   onClick={() => handleOpenAuth()}
                 >
-                  Entrar na conta →
+                  {t("Entrar na conta →", "Sign in →")}
                 </button>
               </div>
             </div>
@@ -224,24 +236,38 @@ export default function HomePage() {
         <div className="home-topbar__center">
           <h1 className="logo">Rule the Isle</h1>
           <p className="home-hero-subtitle">
-            Mãos Privadas no Multiplayer • Estratégia em Português
+            {t(
+              "Confrontos online entre amigos e offline com bots que não travam",
+              "Online matches with friends & offline games with bots that never stall"
+            )}
           </p>
         </div>
 
         <div className="home-topbar__right">
+          <LanguageToggle compact />
           {account ? (
             <div className="home-rank-pill">
               <div className="home-rank-pill__stats">
                 <span className="home-rank-pill__rank">
                   🏆{" "}
                   {typeof account.leaderboard_rank === "number"
-                    ? `#${account.leaderboard_rank} no Ranking`
-                    : "Ranking Ativo"}
+                    ? `#${account.leaderboard_rank} ${t("no Ranking", "Ranked")}`
+                    : t("Ranking Ativo", "Ranked Active")}
                 </span>
                 <small>
-                  {account.stats?.wins ?? 0} vitórias •{" "}
-                  {account.stats?.games_played ?? 0} partidas •{" "}
-                  {account.stats?.win_rate ?? 0}%
+                  {account.stats?.wins ?? 0}{" "}
+                  {t(
+                    (account.stats?.wins ?? 0) === 1 ? "vitória" : "vitórias",
+                    (account.stats?.wins ?? 0) === 1 ? "win" : "wins"
+                  )}{" "}
+                  • {account.stats?.games_played ?? 0}{" "}
+                  {t(
+                    (account.stats?.games_played ?? 0) === 1
+                      ? "partida"
+                      : "partidas",
+                    (account.stats?.games_played ?? 0) === 1 ? "match" : "matches"
+                  )}{" "}
+                  • {account.stats?.win_rate ?? 0}%
                 </small>
               </div>
               <Button
@@ -250,14 +276,21 @@ export default function HomePage() {
                 className="home-logout-btn"
                 onClick={handleLogout}
               >
-                Sair
+                {t("Sair", "Sign Out")}
               </Button>
             </div>
           ) : (
             <div className="home-rank-pill home-rank-pill--guest">
               <div className="home-rank-pill__stats">
-                <span className="home-rank-pill__rank">🏆 Ranking Global</span>
-                <small>Salve vitórias e desbloqueie molduras</small>
+                <span className="home-rank-pill__rank">
+                  🏆 {t("Ranking Global", "Global Ranking")}
+                </span>
+                <small>
+                  {t(
+                    "Salve vitórias e desbloqueie molduras",
+                    "Save wins & unlock frames"
+                  )}
+                </small>
               </div>
               <Button
                 size="small"
@@ -265,7 +298,7 @@ export default function HomePage() {
                 className="home-login-cta-btn"
                 onClick={() => handleOpenAuth()}
               >
-                👤 Entrar / Criar Conta
+                👤 {t("Entrar / Criar Conta", "Sign In / Sign Up")}
               </Button>
             </div>
           )}
@@ -277,20 +310,23 @@ export default function HomePage() {
 
       {/* Doca Inferior Flutuante com os 5 Modos Dedicados + Rodapé Legal */}
       <section className="home-dock-wrap">
-        <nav className="home-mode-dock" aria-label="Modos de jogo e perfil">
+        <nav
+          className="home-mode-dock"
+          aria-label={t("Modos de jogo e perfil", "Game modes and profile")}
+        >
           <Button
             variant="contained"
             className="home-dock-btn home-dock-btn--solo"
             onClick={() => setSetupMode("solo")}
           >
-            ⚔️ Partida Rápida (Solo/IA)
+            ⚔️ {t("Partida Rápida (Solo/IA)", "Quick Match (Solo/AI)")}
           </Button>
           <Button
             variant="contained"
             className="home-dock-btn home-dock-btn--room"
             onClick={() => setSetupMode("room")}
           >
-            🌐 Criar Sala Online
+            🌐 {t("Criar Sala Online", "Create Online Room")}
           </Button>
           <Button
             variant="outlined"
@@ -301,34 +337,41 @@ export default function HomePage() {
             }}
           >
             {activeRooms.length > 0
-              ? `🧭 Salas Abertas (${activeRooms.length})`
-              : "🧭 Salas Abertas"}
+              ? t(
+                  `🧭 Salas Abertas (${activeRooms.length})`,
+                  `🧭 Open Lobbies (${activeRooms.length})`
+                )
+              : t("🧭 Salas Abertas", "🧭 Open Lobbies")}
           </Button>
           <Button
             variant="outlined"
             className="home-dock-btn home-dock-btn--ranking"
             onClick={() => setLeaderboardOpen(true)}
           >
-            🏆 Ranking & Histórico
+            🏆 {t("Ranking & Histórico", "Ranking & History")}
           </Button>
           <Button
             variant="outlined"
             className="home-dock-btn home-dock-btn--avatar"
             onClick={handleOpenAvatarStudio}
           >
-            🎨 Personalizar Avatar
+            🎨 {t("Personalizar Avatar", "Customize Avatar")}
           </Button>
           <Button
             variant="outlined"
             className="home-dock-btn home-dock-btn--almanac"
             onClick={() => setAlmanacOpen(true)}
           >
-            📖 Almanaque
+            📖 {t("Almanaque", "Almanac")}
           </Button>
         </nav>
 
         <footer className="home-page__legal-footer">
-          <strong>Rule the Isle</strong> • Versão modificada em português baseada no motor{" "}
+          <strong>Rule the Isle</strong> •{" "}
+          {t(
+            "Versão modificada em português baseada no motor",
+            "Localized edition powered by the"
+          )}{" "}
           <a
             href="https://github.com/bcollazo/catanatron"
             target="_blank"
@@ -336,7 +379,10 @@ export default function HomePage() {
           >
             Catanatron
           </a>{" "}
-          (Bryan Collazo) • Licença GNU GPL-3.0
+          {t(
+            "(Bryan Collazo) • Licença GNU GPL-3.0",
+            "engine (Bryan Collazo) • GNU GPL-3.0 License"
+          )}
         </footer>
       </section>
 
@@ -356,7 +402,7 @@ export default function HomePage() {
         mode={setupMode}
         onClose={() => setSetupMode(null)}
         availablePlayers={available}
-        defaultHostName={hostName}
+        defaultHostName={effectiveDefaultHostName}
         account={account}
         onGameCreated={(gameId) => {
           setSetupMode(null);

@@ -2,32 +2,43 @@ import { useContext } from "react";
 import { isPlayersTurn } from "../utils/stateUtils";
 import { type GameState } from "../utils/api.types";
 import { store } from "../store";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
 import { resolvePlayerDisplayName } from "../config/botCatalog";
+import { getCurrentLanguage, useLanguage, type AppLanguage } from "../i18n";
 
 import "./Prompt.scss";
 
-export function humanizePrompt(currentPrompt: string): string {
+export function humanizePrompt(
+  currentPrompt: string,
+  lang: AppLanguage = getCurrentLanguage()
+): string {
+  const en = lang === "en";
   switch (currentPrompt) {
     case "ROLL":
-      return "SUA VEZ — ROLE OS DADOS";
+      return en ? "YOUR TURN — ROLL THE DICE" : "SUA VEZ — ROLE OS DADOS";
     case "PLAY_TURN":
-      return "SUA VEZ DE JOGAR";
+      return en ? "YOUR TURN TO PLAY" : "SUA VEZ DE JOGAR";
     case "BUILD_INITIAL_SETTLEMENT":
-      return "CONSTRUA SUA ALDEIA INICIAL";
+      return en
+        ? "BUILD YOUR INITIAL SETTLEMENT"
+        : "CONSTRUA SUA ALDEIA INICIAL";
     case "BUILD_INITIAL_ROAD":
-      return "CONSTRUA SUA ESTRADA INICIAL";
+      return en ? "BUILD YOUR INITIAL ROAD" : "CONSTRUA SUA ESTRADA INICIAL";
     case "MOVE_ROBBER":
-      return "MOVA O LADRÃO PARA UM TERRENO";
+      return en ? "MOVE THE ROBBER TO A TILE" : "MOVA O LADRÃO PARA UM TERRENO";
     case "DISCARD":
-      return "DESCARTE METADE DAS SUAS CARTAS";
+      return en
+        ? "DISCARD HALF OF YOUR CARDS"
+        : "DESCARTE METADE DAS SUAS CARTAS";
     case "DECIDE_TRADE":
-      return "DECIDA SOBRE A PROPOSTA DE TROCA";
+      return en
+        ? "DECIDE ON THE TRADE OFFER"
+        : "DECIDA SOBRE A PROPOSTA DE TROCA";
     case "DECIDE_ACCEPTEES":
-      return "ESCOLHA COM QUEM TROCAR";
+      return en ? "CHOOSE WHOM TO TRADE WITH" : "ESCOLHA COM QUEM TROCAR";
     default: {
       const prompt = currentPrompt.replaceAll("_", " ");
-      return `AÇÃO: ${prompt}`;
+      return en ? `ACTION: ${prompt}` : `AÇÃO: ${prompt}`;
     }
   }
 }
@@ -40,26 +51,34 @@ export default function Prompt({
   isBotThinking: boolean;
 }) {
   const { state } = useContext(store);
+  const { language, t } = useLanguage();
+  const colorMeta = getPlayerColorMeta(language);
   const activeName = resolvePlayerDisplayName(
     gameState,
     gameState.current_color,
-    PLAYER_COLOR_META[gameState.current_color].label
+    colorMeta[gameState.current_color].label
   );
 
   let prompt = "";
   if (isBotThinking) {
-    prompt = `🧭 ${activeName} pensando...`;
+    prompt = t(`🧭 ${activeName} pensando...`, `🧭 ${activeName} thinking...`);
   } else if (gameState.winning_color) {
     const winnerName = resolvePlayerDisplayName(
       gameState,
       gameState.winning_color,
-      PLAYER_COLOR_META[gameState.winning_color].label
+      colorMeta[gameState.winning_color].label
     );
-    prompt = `🏆 Fim de Jogo! Vitória de ${winnerName}!`;
+    prompt = t(
+      `🏆 Fim de Jogo! Vitória de ${winnerName}!`,
+      `🏆 Game Over! ${winnerName} wins!`
+    );
   } else if (isPlayersTurn(gameState, state.perspective)) {
-    prompt = humanizePrompt(gameState.current_prompt);
+    prompt = humanizePrompt(gameState.current_prompt, language);
   } else if (!gameState.bot_colors.includes(gameState.current_color)) {
-    prompt = `⏳ Aguardando jogada de ${activeName}...`;
+    prompt = t(
+      `⏳ Aguardando jogada de ${activeName}...`,
+      `⏳ Waiting for ${activeName}...`
+    );
   }
   return <div className="prompt">{prompt}</div>;
 }

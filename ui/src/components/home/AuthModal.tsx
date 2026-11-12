@@ -8,6 +8,7 @@ import {
   type PlayerAccount,
 } from "../../utils/apiClient";
 import GoogleSignInButton from "../GoogleSignInButton";
+import { useLanguage } from "../../i18n";
 import "./AuthModal.scss";
 
 export type AuthModalProps = {
@@ -25,6 +26,7 @@ export default function AuthModal({
   promptBanner,
   onAuthenticated,
 }: AuthModalProps) {
+  const { t } = useLanguage();
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [usernameInput, setUsernameInput] = useState("");
   const [displayNameInput, setDisplayNameInput] = useState("");
@@ -41,11 +43,13 @@ export default function AuthModal({
   const handleLogin = async () => {
     const cleanUsername = usernameInput.trim();
     if (!cleanUsername) {
-      setAuthError("Informe seu nome de usuário.");
+      setAuthError(
+        t("Informe seu nome de usuário.", "Enter your username.")
+      );
       return;
     }
     if (!passwordInput) {
-      setAuthError("Informe sua senha.");
+      setAuthError(t("Informe sua senha.", "Enter your password."));
       return;
     }
     setBusy(true);
@@ -59,7 +63,8 @@ export default function AuthModal({
       onClose();
     } catch (err: any) {
       setAuthError(
-        err?.response?.data?.description || "Usuário ou senha incorretos."
+        err?.response?.data?.description ||
+          t("Usuário ou senha incorretos.", "Invalid username or password.")
       );
     } finally {
       setBusy(false);
@@ -69,11 +74,21 @@ export default function AuthModal({
   const handleRegister = async () => {
     const cleanUsername = usernameInput.trim();
     if (cleanUsername.length < 2) {
-      setAuthError("O nome de usuário deve ter pelo menos 2 caracteres.");
+      setAuthError(
+        t(
+          "O nome de usuário deve ter pelo menos 2 caracteres.",
+          "Username must be at least 2 characters."
+        )
+      );
       return;
     }
     if (passwordInput.length < 4) {
-      setAuthError("A senha deve ter pelo menos 4 caracteres.");
+      setAuthError(
+        t(
+          "A senha deve ter pelo menos 4 caracteres.",
+          "Password must be at least 4 characters."
+        )
+      );
       return;
     }
     setBusy(true);
@@ -88,7 +103,8 @@ export default function AuthModal({
       onClose();
     } catch (err: any) {
       setAuthError(
-        err?.response?.data?.description || "Não foi possível cadastrar o usuário."
+        err?.response?.data?.description ||
+          t("Não foi possível cadastrar o usuário.", "Could not register account.")
       );
     } finally {
       setBusy(false);
@@ -106,13 +122,16 @@ export default function AuthModal({
       } catch (err: any) {
         setAuthError(
           err?.response?.data?.description ||
-            "Falha na autenticação com o Google."
+            t(
+              "Falha na autenticação com o Google.",
+              "Google authentication failed."
+            )
         );
       } finally {
         setBusy(false);
       }
     },
-    [onAuthenticated, onClose]
+    [onAuthenticated, onClose, t]
   );
 
   const handleSubmitKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -142,14 +161,14 @@ export default function AuthModal({
       PaperProps={{ className: "catan-modal-paper home-auth-paper" }}
     >
       <DialogTitle className="home-auth-header">
-        <span>👤 Identificação de Jogador</span>
+        <span>👤 {t("Identificação de Jogador", "Player Sign-In")}</span>
         <Button
           size="small"
           variant="outlined"
           className="home-modal-close-btn"
           onClick={onClose}
         >
-          Fechar
+          {t("Fechar", "Close")}
         </Button>
       </DialogTitle>
       <DialogContent className="home-auth-body">
@@ -158,10 +177,17 @@ export default function AuthModal({
         )}
 
         <p className="home-auth-subtitle">
-          Salve suas vitórias no Ranking Global, desbloqueie molduras exclusivas e jogue de qualquer dispositivo.
+          {t(
+            "Salve suas vitórias no Ranking Global, desbloqueie molduras exclusivas e jogue de qualquer dispositivo.",
+            "Save your wins to the Global Ranking, unlock exclusive frames, and play from any device."
+          )}
         </p>
 
-        <div className="home-auth-tabs" role="tablist" aria-label="Modo de acesso">
+        <div
+          className="home-auth-tabs"
+          role="tablist"
+          aria-label={t("Modo de acesso", "Access mode")}
+        >
           <button
             type="button"
             role="tab"
@@ -172,7 +198,7 @@ export default function AuthModal({
               setAuthError("");
             }}
           >
-            Entrar
+            {t("Entrar", "Sign In")}
           </button>
           <button
             type="button"
@@ -184,7 +210,7 @@ export default function AuthModal({
               setAuthError("");
             }}
           >
-            Criar Conta
+            {t("Criar Conta", "Create Account")}
           </button>
         </div>
 
@@ -195,7 +221,7 @@ export default function AuthModal({
             value={usernameInput}
             onChange={(e) => setUsernameInput(e.target.value)}
             onKeyDown={handleSubmitKeyDown}
-            placeholder="Usuário (ex: joao)"
+            placeholder={t("Usuário (ex: joao)", "Username (e.g. john)")}
             maxLength={24}
           />
           {authMode === "register" && (
@@ -205,7 +231,10 @@ export default function AuthModal({
               value={displayNameInput}
               onChange={(e) => setDisplayNameInput(e.target.value)}
               onKeyDown={handleSubmitKeyDown}
-              placeholder="Apelido na mesa (ex: João)"
+              placeholder={t(
+                "Apelido na mesa (ex: João)",
+                "Table nickname (e.g. John)"
+              )}
               maxLength={24}
             />
           )}
@@ -216,7 +245,9 @@ export default function AuthModal({
             onChange={(e) => setPasswordInput(e.target.value)}
             onKeyDown={handleSubmitKeyDown}
             placeholder={
-              authMode === "login" ? "Senha" : "Senha (mín 4 caracteres)"
+              authMode === "login"
+                ? t("Senha", "Password")
+                : t("Senha (mín 4 caracteres)", "Password (min 4 characters)")
             }
             maxLength={64}
           />
@@ -230,16 +261,16 @@ export default function AuthModal({
             onClick={authMode === "login" ? handleLogin : handleRegister}
           >
             {busy
-              ? "Aguarde..."
+              ? t("Aguarde...", "Please wait...")
               : authMode === "login"
-                ? "Entrar"
-                : "Criar Conta"}
+                ? t("Entrar", "Sign In")
+                : t("Criar Conta", "Create Account")}
           </Button>
         </div>
 
         <div className="home-auth-google">
           <div className="home-auth-divider">
-            <span>ou</span>
+            <span>{t("ou", "or")}</span>
           </div>
           {isGoogleReady ? (
             <GoogleSignInButton
@@ -272,11 +303,17 @@ export default function AuthModal({
                 </svg>
               </span>
               <div className="home-auth-google-unavailable__text">
-                <strong>Entrar com Google</strong>
+                <strong>{t("Entrar com Google", "Sign in with Google")}</strong>
                 <span>
-                  Indisponível neste servidor: configure{" "}
-                  <code>GOOGLE_CLIENT_ID</code> no <code>.env</code> ou Vercel para
-                  ativar.
+                  {t(
+                    "Indisponível neste servidor: configure",
+                    "Unavailable on this server: set"
+                  )}{" "}
+                  <code>GOOGLE_CLIENT_ID</code>{" "}
+                  {t(
+                    "no .env ou Vercel para ativar.",
+                    "in .env or Vercel to enable."
+                  )}
                 </span>
               </div>
             </div>

@@ -8,7 +8,8 @@ import {
   Typography,
 } from "@mui/material";
 import type { ResourceCard } from "../utils/api.types";
-import { RESOURCE_META } from "../config/assetRegistry";
+import { getResourceMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 import "./DiscardPlannerDialog.scss";
 
 type DiscardResourceCounts = Partial<Record<ResourceCard, number>>;
@@ -38,6 +39,8 @@ export default function DiscardPlannerDialog({
   discardResourceCounts,
   submitting = false,
 }: DiscardPlannerDialogProps) {
+  const { language, t } = useLanguage();
+  const resourceMeta = getResourceMeta(language);
   const [discardSelections, setDiscardSelections] = React.useState<
     ResourceCard[]
   >([]);
@@ -87,11 +90,17 @@ export default function DiscardPlannerDialog({
       fullWidth
     >
       <DialogTitle>
-        Descartar Recursos (Ladrão)
+        {t("Descartar Recursos (Ladrão)", "Discard Resources (Robber)")}
         <Typography variant="body2" className="discard-note">
           {selectedCount === 0
-            ? `Escolha ${remainingDiscardCount} carta${remainingDiscardCount === 1 ? "" : "s"} para descartar.`
-            : `${selectedCount} de ${remainingDiscardCount} selecionada${selectedCount === 1 ? "" : "s"}.`}
+            ? t(
+                `Escolha ${remainingDiscardCount} carta${remainingDiscardCount === 1 ? "" : "s"} para descartar.`,
+                `Select ${remainingDiscardCount} card${remainingDiscardCount === 1 ? "" : "s"} to discard.`
+              )
+            : t(
+                `${selectedCount} de ${remainingDiscardCount} selecionada${selectedCount === 1 ? "" : "s"}.`,
+                `${selectedCount} of ${remainingDiscardCount} selected.`
+              )}
         </Typography>
       </DialogTitle>
       <DialogContent>
@@ -106,7 +115,7 @@ export default function DiscardPlannerDialog({
                   onClick={() => removeDiscardSelection(resource)}
                   disabled={submitting}
                 >
-                  {RESOURCE_META[resource].label} ×{count}
+                  {resourceMeta[resource].label} ×{count}
                 </Button>
               ))}
             </div>
@@ -125,12 +134,13 @@ export default function DiscardPlannerDialog({
             >
               <Typography variant="body2">
                 <span className={`resource-name ${resource.toLowerCase()}`}>
-                  {RESOURCE_META[resource].label}
+                  {resourceMeta[resource].label}
                 </span>
                 <br />
                 <span className="resource-meta">
                   {selectedResourceCount(resource)}/
-                  {discardResourceCounts[resource]} selecionada(s)
+                  {discardResourceCounts[resource]}{" "}
+                  {t("selecionada(s)", "selected")}
                 </span>
               </Typography>
             </Button>
@@ -143,21 +153,21 @@ export default function DiscardPlannerDialog({
           className="clear-button"
           disabled={submitting || selectedCount === 0}
         >
-          Limpar
+          {t("Limpar", "Clear")}
         </Button>
         <Button
           onClick={onClose}
           className="cancel-button"
           disabled={submitting}
         >
-          Cancelar
+          {t("Cancelar", "Cancel")}
         </Button>
         <Button
           variant="contained"
           onClick={() => onConfirm(discardSelections)}
           disabled={submitting || selectedCount !== remainingDiscardCount}
         >
-          Confirmar
+          {t("Confirmar", "Confirm")}
         </Button>
       </DialogActions>
     </Dialog>

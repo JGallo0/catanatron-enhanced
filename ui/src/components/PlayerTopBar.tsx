@@ -4,7 +4,8 @@ import cn from "classnames";
 
 import "./PlayerTopBar.scss";
 import type { Color, GameState, ResourceCard } from "../utils/api.types";
-import { PLAYER_COLOR_META, RESOURCE_META } from "../config/assetRegistry";
+import { getPlayerColorMeta, getResourceMeta } from "../config/assetRegistry";
+import { useLanguage, type AppLanguage } from "../i18n";
 import {
   getGuestProfile,
   getSavedAccountAvatarSummary,
@@ -193,11 +194,12 @@ type PlayerSeatStats = {
 function computeSeatStats(
   gameState: GameState,
   color: Color,
-  perspective: Color | null
+  perspective: Color | null,
+  language: AppLanguage
 ): PlayerSeatStats {
   const key = playerKey(gameState, color);
   const ps = gameState.player_state;
-  const meta = PLAYER_COLOR_META[color];
+  const meta = getPlayerColorMeta(language)[color];
   const isBot = gameState.bot_colors.includes(color);
   const isTakenOver = isTakenOverSeat(gameState, color);
   const isActive = gameState.current_color === color;
@@ -307,30 +309,54 @@ export type ActivePortraitTaunt = {
   nonce: number;
 };
 
-function resolveTurnPhaseMicroIcon(gameState: GameState): {
+function resolveTurnPhaseMicroIcon(
+  gameState: GameState,
+  language: AppLanguage
+): {
   icon: string;
   label: string;
 } {
+  const en = language === "en";
   switch (gameState.current_prompt) {
     case "DISCARD":
-      return { icon: "⚠️", label: "Descartando cartas (7 nos dados)" };
+      return {
+        icon: "⚠️",
+        label: en
+          ? "Discarding cards (7 rolled)"
+          : "Descartando cartas (7 nos dados)",
+      };
     case "MOVE_ROBBER":
-      return { icon: "🥷", label: "Movendo o Ladrão" };
+      return {
+        icon: "🥷",
+        label: en ? "Moving the Robber" : "Movendo o Ladrão",
+      };
     case "DECIDE_TRADE":
     case "DECIDE_ACCEPTEES":
-      return { icon: "🤝", label: "Negociando troca" };
+      return {
+        icon: "🤝",
+        label: en ? "Negotiating trade" : "Negociando troca",
+      };
     case "BUILD_INITIAL_SETTLEMENT":
     case "BUILD_INITIAL_ROAD":
-      return { icon: "🏠", label: "Posicionamento inicial" };
+      return {
+        icon: "🏠",
+        label: en ? "Initial placement" : "Posicionamento inicial",
+      };
     case "PLAY_TURN": {
       const k = playerKey(gameState, gameState.current_color);
       const hasRolled = Boolean(gameState.player_state?.[`${k}_HAS_ROLLED`]);
       return hasRolled
-        ? { icon: "⏩", label: "Construindo / negociando" }
-        : { icon: "🎲", label: "Pronto para rolar os dados" };
+        ? {
+            icon: "⏩",
+            label: en ? "Building / trading" : "Construindo / negociando",
+          }
+        : {
+            icon: "🎲",
+            label: en ? "Ready to roll dice" : "Pronto para rolar os dados",
+          };
     }
     default:
-      return { icon: "🎲", label: "Jogador ativo" };
+      return { icon: "🎲", label: en ? "Active player" : "Jogador ativo" };
   }
 }
 
@@ -359,7 +385,9 @@ function PlayerCard({
   activeTaunt?: ActivePortraitTaunt;
   onInspect: (color: Color) => void;
 }) {
-  const meta = PLAYER_COLOR_META[seat.color];
+  const { language, t } = useLanguage();
+  const meta = getPlayerColorMeta(language)[seat.color];
+  const resourceMeta = getResourceMeta(language);
 
   return (
     <div className="cu-player-seat-slot">
@@ -377,12 +405,12 @@ function PlayerCard({
           } as React.CSSProperties
         }
         onClick={() => onInspect(seat.color)}
-        title={`${seat.name}${seat.isTakenOver ? " (Bot assumiu)" : ""} • Peças: ${seat.builtSettlements}/5 Aldeias, ${seat.builtCities}/4 Cidades, ${seat.builtRoads}/15 Estradas`}
+        title={`${seat.name}${seat.isTakenOver ? t(" (Bot assumiu)", " (Bot took over)") : ""} • ${t("Peças", "Pieces")}: ${seat.builtSettlements}/5 ${t("Aldeias", "Settlements")}, ${seat.builtCities}/4 ${t("Cidades", "Cities")}, ${seat.builtRoads}/15 ${t("Estradas", "Roads")}`}
       >
         <button
           type="button"
           className="cu-player-card__inspect-trigger"
-          aria-label={`Inspecionar ${seat.name}`}
+          aria-label={t(`Inspecionar ${seat.name}`, `Inspect ${seat.name}`)}
           aria-expanded={isInspected}
           onClick={(e) => {
             e.stopPropagation();
@@ -396,7 +424,10 @@ function PlayerCard({
             {seat.isActive && (
               <span
                 className="cu-player-card__turn-badge"
-                title={`Jogador Ativo — ${turnPhase.label}`}
+                title={t(
+                  `Jogador Ativo — ${turnPhase.label}`,
+                  `Active Player — ${turnPhase.label}`
+                )}
               >
                 <span aria-hidden="true">{turnPhase.icon}</span>
                 <TurnSpinSvg />
@@ -421,8 +452,8 @@ function PlayerCard({
             {isTradeProposer && (
               <span
                 className="cu-player-card__trade-sack"
-                title="Propôs uma troca"
-                aria-label="Proponente da troca"
+                title={t("Propôs uma troca", "Proposed a trade")}
+                aria-label={t("Proponente da troca", "Trade proposer")}
               >
                 💼
               </span>
@@ -449,9 +480,12 @@ function PlayerCard({
           {seat.isTakenOver && (
             <div
               className="cu-player-card__takeover-chip"
-              title="Jogador desconectou ou saiu — Bot IA assumiu o controle"
+              title={t(
+                "Jogador desconectou ou saiu — Bot IA assumiu o controle",
+                "Player disconnected or left — AI Bot took over"
+              )}
             >
-              🤖 Bot assumiu
+              🤖 {t("Bot assumiu", "Bot took over")}
             </div>
           )}
           {/* Row 1: Knights & Longest Road */}
@@ -461,7 +495,9 @@ function PlayerCard({
                 "cu-stat--awarded": seat.hasArmy,
               })}
               title={
-                seat.hasArmy ? "Maior Exército (+2 PV)" : "Cavaleiros Jogados"
+                seat.hasArmy
+                  ? t("Maior Exército (+2 PV)", "Largest Army (+2 VP)")
+                  : t("Cavaleiros Jogados", "Knights Played")
               }
             >
               <span className="cu-stat__num">{seat.knights}</span>
@@ -472,7 +508,7 @@ function PlayerCard({
                     awardType="army"
                     size={14}
                     className="cu-award-star"
-                    label="Maior Exército"
+                    label={t("Maior Exército", "Largest Army")}
                   />
                 )}
               </span>
@@ -482,7 +518,9 @@ function PlayerCard({
                 "cu-stat--awarded": seat.hasRoad,
               })}
               title={
-                seat.hasRoad ? "Maior Estrada (+2 PV)" : "Sequência de Estrada"
+                seat.hasRoad
+                  ? t("Maior Estrada (+2 PV)", "Longest Road (+2 VP)")
+                  : t("Sequência de Estrada", "Longest Road Length")
               }
             >
               <span className="cu-stat__num">{seat.roadLength}</span>
@@ -493,7 +531,7 @@ function PlayerCard({
                     awardType="road"
                     size={14}
                     className="cu-award-star"
-                    label="Maior Estrada"
+                    label={t("Maior Estrada", "Longest Road")}
                   />
                 )}
               </span>
@@ -508,8 +546,11 @@ function PlayerCard({
               })}
               title={
                 seat.resources > discardLimit
-                  ? `Atenção: ${seat.resources}/${discardLimit} cartas! Perderá metade se rolar 7.`
-                  : "Cartas de Recurso na mão"
+                  ? t(
+                      `Atenção: ${seat.resources}/${discardLimit} cartas! Perderá metade se rolar 7.`,
+                      `Warning: ${seat.resources}/${discardLimit} cards! Will lose half if a 7 is rolled.`
+                    )
+                  : t("Cartas de Recurso na mão", "Resource Cards in hand")
               }
             >
               <span className="cu-stat__num">{seat.resources}</span>
@@ -519,7 +560,7 @@ function PlayerCard({
               className={cn("cu-stat cu-stat--devcards", {
                 "cu-stat--recent": isRecentDev,
               })}
-              title="Cartas de Desenvolvimento na mão"
+              title={t("Cartas de Desenvolvimento na mão", "Dev Cards in hand")}
             >
               <span className="cu-stat__num">{seat.devCards}</span>
               <DevCardStatSvg />
@@ -528,7 +569,10 @@ function PlayerCard({
 
           {/* Row 3: Victory Points + Built Pieces Summary */}
           <div className="cu-stat-row cu-stat-row--vp">
-            <div className="cu-stat cu-stat--vp" title="Victory Points">
+            <div
+              className="cu-stat cu-stat--vp"
+              title={t("Pontos de Vitória", "Victory Points")}
+            >
               <span className="cu-stat__num cu-stat__num--vp">{seat.vps}</span>
               <TrophyStatSvg />
             </div>
@@ -536,13 +580,19 @@ function PlayerCard({
             {(seat.hasArmy || seat.hasRoad) && (
               <div className="cu-mobile-award-badges" aria-hidden="true">
                 {seat.hasArmy && (
-                  <span className="cu-mobile-award-badges__item" title="Maior Exército">
+                  <span
+                    className="cu-mobile-award-badges__item"
+                    title={t("Maior Exército", "Largest Army")}
+                  >
                     <SwordStatSvg />
                     <AwardStarSvg size={11} className="cu-award-star" />
                   </span>
                 )}
                 {seat.hasRoad && (
-                  <span className="cu-mobile-award-badges__item" title="Maior Estrada">
+                  <span
+                    className="cu-mobile-award-badges__item"
+                    title={t("Maior Estrada", "Longest Road")}
+                  >
                     <RoadStatSvg />
                     <AwardStarSvg size={11} className="cu-award-star" />
                   </span>
@@ -552,25 +602,37 @@ function PlayerCard({
 
             <div
               className="cu-pieces-mini"
-              title={`Peças no mapa: ${seat.builtSettlements}/5 Aldeias · ${seat.builtCities}/4 Cidades · ${seat.builtRoads}/15 Estradas`}
+              title={t(
+                `Peças no mapa: ${seat.builtSettlements}/5 Aldeias · ${seat.builtCities}/4 Cidades · ${seat.builtRoads}/15 Estradas`,
+                `Pieces on board: ${seat.builtSettlements}/5 Settlements · ${seat.builtCities}/4 Cities · ${seat.builtRoads}/15 Roads`
+              )}
             >
               <span
                 className="cu-piece-chip"
-                title={`${seat.builtSettlements} Aldeia(s) construída(s) (${seat.settlementsLeft} restante(s))`}
+                title={t(
+                  `${seat.builtSettlements} Aldeia(s) construída(s) (${seat.settlementsLeft} restante(s))`,
+                  `${seat.builtSettlements} Settlement(s) built (${seat.settlementsLeft} left)`
+                )}
               >
                 <MiniSettlementIcon />
                 <span>{seat.builtSettlements}</span>
               </span>
               <span
                 className="cu-piece-chip"
-                title={`${seat.builtCities} Cidade(s) construída(s) (${seat.citiesLeft} restante(s))`}
+                title={t(
+                  `${seat.builtCities} Cidade(s) construída(s) (${seat.citiesLeft} restante(s))`,
+                  `${seat.builtCities} City/Cities built (${seat.citiesLeft} left)`
+                )}
               >
                 <MiniCityIcon />
                 <span>{seat.builtCities}</span>
               </span>
               <span
                 className="cu-piece-chip"
-                title={`${seat.builtRoads} Estrada(s) construída(s) (${seat.roadsLeft} restante(s))`}
+                title={t(
+                  `${seat.builtRoads} Estrada(s) construída(s) (${seat.roadsLeft} restante(s))`,
+                  `${seat.builtRoads} Road(s) built (${seat.roadsLeft} left)`
+                )}
               >
                 <MiniRoadIcon />
                 <span>{seat.builtRoads}</span>
@@ -595,11 +657,11 @@ function PlayerCard({
         <div className="cu-player-seat-slot__fx" aria-live="polite">
           {vpItems.map((vp) => (
             <div key={vp.id} className="cu-float-vp-badge">
-              🏆 +{vp.delta} PV
+              🏆 +{vp.delta} {t("PV", "VP")}
             </div>
           ))}
           {yieldItems.map((y) => {
-            const rMeta = RESOURCE_META[y.resource];
+            const rMeta = resourceMeta[y.resource];
             return (
               <div
                 key={y.id}
@@ -617,10 +679,13 @@ function PlayerCard({
           {discardDrops.length > 0 && (
             <div
               className="cu-discard-drop-row"
-              aria-label={`${seat.name} descartou ${discardDrops.map((d) => RESOURCE_META[d.resource]?.label || d.resource).join(", ")}`}
+              aria-label={t(
+                `${seat.name} descartou ${discardDrops.map((d) => resourceMeta[d.resource]?.label || d.resource).join(", ")}`,
+                `${seat.name} discarded ${discardDrops.map((d) => resourceMeta[d.resource]?.label || d.resource).join(", ")}`
+              )}
             >
               {discardDrops.map((drop, idx) => {
-                const rMeta = RESOURCE_META[drop.resource];
+                const rMeta = resourceMeta[drop.resource];
                 return (
                   <div
                     key={drop.id}
@@ -631,7 +696,10 @@ function PlayerCard({
                         animationDelay: `${Math.min(idx, 5) * 90}ms`,
                       } as React.CSSProperties
                     }
-                    title={`Descartou ${rMeta?.label || drop.resource}`}
+                    title={t(
+                      `Descartou ${rMeta?.label || drop.resource}`,
+                      `Discarded ${rMeta?.label || drop.resource}`
+                    )}
                   >
                     <ResourceIcon resource={drop.resource} size={15} />
                     <span className="cu-discard-card-drop__label">
@@ -668,23 +736,25 @@ export default function PlayerTopBar({
   activeTaunts?: Partial<Record<Color, ActivePortraitTaunt>>;
 }) {
   const { state } = useContext(store);
+  const { language, t } = useLanguage();
   const [inspectedColor, setInspectedColor] = useState<Color | null>(null);
 
+  const colorMeta = getPlayerColorMeta(language);
   const discardLimit = gameState.game?.discard_limit ?? 7;
-  const turnPhase = resolveTurnPhaseMicroIcon(gameState);
+  const turnPhase = resolveTurnPhaseMicroIcon(gameState, language);
   const tradeProposerColor = gameState.is_resolving_trade
     ? gameState.colors[gameState.current_turn_index] ?? null
     : null;
 
   const seats = gameState.colors.map((color) =>
-    computeSeatStats(gameState, color, state.perspective)
+    computeSeatStats(gameState, color, state.perspective, language)
   );
   const inspectedSeat =
     seats.find((s) => s.color === inspectedColor) ?? null;
 
   return (
     <>
-      <header className="cu-player-top-bar" aria-label="Jogadores">
+      <header className="cu-player-top-bar" aria-label={t("Jogadores", "Players")}>
         {seats.map((seat) => (
           <PlayerCard
             key={seat.color}
@@ -727,10 +797,10 @@ export default function PlayerTopBar({
                     <span
                       className="cu-inspect-tag"
                       style={{
-                        borderColor: PLAYER_COLOR_META[inspectedSeat.color].primary,
+                        borderColor: colorMeta[inspectedSeat.color].primary,
                       }}
                     >
-                      {PLAYER_COLOR_META[inspectedSeat.color].label}
+                      {colorMeta[inspectedSeat.color].label}
                     </span>
                     <span
                       className={cn("cu-inspect-tag", {
@@ -738,14 +808,14 @@ export default function PlayerTopBar({
                       })}
                     >
                       {inspectedSeat.isTakenOver
-                        ? "Substituto IA"
+                        ? t("Substituto IA", "AI Substitute")
                         : inspectedSeat.isBot
-                          ? "Bot IA"
-                          : "Jogador"}
+                          ? t("Bot IA", "AI Bot")
+                          : t("Jogador", "Player")}
                     </span>
                     {inspectedSeat.isActive && (
                       <span className="cu-inspect-tag cu-inspect-tag--active">
-                        Vez atual
+                        {t("Vez atual", "Current turn")}
                       </span>
                     )}
                   </div>
@@ -757,15 +827,17 @@ export default function PlayerTopBar({
                 className="cu-player-inspect-close"
                 onClick={() => setInspectedColor(null)}
               >
-                Fechar
+                {t("Fechar", "Close")}
               </Button>
             </DialogTitle>
 
             <DialogContent className="cu-player-inspect-body">
               <div className="cu-inspect-stats-grid">
                 <div className="cu-inspect-stat-box cu-inspect-stat-box--vp">
-                  <span>Pontos de Vitória</span>
-                  <strong>🏆 {inspectedSeat.vps} PV</strong>
+                  <span>{t("Pontos de Vitória", "Victory Points")}</span>
+                  <strong>
+                    🏆 {inspectedSeat.vps} {t("PV", "VP")}
+                  </strong>
                 </div>
                 <div
                   className={cn("cu-inspect-stat-box", {
@@ -773,11 +845,11 @@ export default function PlayerTopBar({
                       inspectedSeat.resources > discardLimit,
                   })}
                 >
-                  <span>Cartas de Recurso</span>
+                  <span>{t("Cartas de Recurso", "Resource Cards")}</span>
                   <strong>🃏 {inspectedSeat.resources}</strong>
                 </div>
                 <div className="cu-inspect-stat-box">
-                  <span>Cartas Dev</span>
+                  <span>{t("Cartas Dev", "Dev Cards")}</span>
                   <strong>📜 {inspectedSeat.devCards}</strong>
                 </div>
                 <div
@@ -785,10 +857,12 @@ export default function PlayerTopBar({
                     "cu-inspect-stat-box--award": inspectedSeat.hasArmy,
                   })}
                 >
-                  <span>Cavaleiros</span>
+                  <span>{t("Cavaleiros", "Knights")}</span>
                   <strong>
                     ⚔️ {inspectedSeat.knights}
-                    {inspectedSeat.hasArmy ? " • Maior Exército" : ""}
+                    {inspectedSeat.hasArmy
+                      ? t(" • Maior Exército", " • Largest Army")
+                      : ""}
                   </strong>
                 </div>
                 <div
@@ -796,31 +870,39 @@ export default function PlayerTopBar({
                     "cu-inspect-stat-box--award": inspectedSeat.hasRoad,
                   })}
                 >
-                  <span>Maior Estrada</span>
+                  <span>{t("Maior Estrada", "Longest Road")}</span>
                   <strong>
-                    🛤️ {inspectedSeat.roadLength} segmentos
-                    {inspectedSeat.hasRoad ? " • +2 PV Ativo" : ""}
+                    🛤️ {inspectedSeat.roadLength} {t("segmentos", "segments")}
+                    {inspectedSeat.hasRoad
+                      ? t(" • +2 PV Ativo", " • +2 VP Active")
+                      : ""}
                   </strong>
                 </div>
               </div>
 
               <div className="cu-inspect-pieces-card">
-                <h4>Peças no Tabuleiro</h4>
+                <h4>{t("Peças no Tabuleiro", "Board Pieces")}</h4>
                 <div className="cu-inspect-pieces-row">
                   <div>
-                    <small>Aldeias</small>
+                    <small>{t("Aldeias", "Settlements")}</small>
                     <strong>{inspectedSeat.builtSettlements}/5</strong>
-                    <span>{inspectedSeat.settlementsLeft} rest.</span>
+                    <span>
+                      {inspectedSeat.settlementsLeft} {t("rest.", "left")}
+                    </span>
                   </div>
                   <div>
-                    <small>Cidades</small>
+                    <small>{t("Cidades", "Cities")}</small>
                     <strong>{inspectedSeat.builtCities}/4</strong>
-                    <span>{inspectedSeat.citiesLeft} rest.</span>
+                    <span>
+                      {inspectedSeat.citiesLeft} {t("rest.", "left")}
+                    </span>
                   </div>
                   <div>
-                    <small>Estradas</small>
+                    <small>{t("Estradas", "Roads")}</small>
                     <strong>{inspectedSeat.builtRoads}/15</strong>
-                    <span>{inspectedSeat.roadsLeft} rest.</span>
+                    <span>
+                      {inspectedSeat.roadsLeft} {t("rest.", "left")}
+                    </span>
                   </div>
                 </div>
               </div>

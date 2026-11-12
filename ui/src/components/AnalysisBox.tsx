@@ -8,7 +8,8 @@ import {
 } from "../utils/apiClient";
 import { useParams } from "react-router-dom";
 import type { Color } from "../utils/api.types";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 
 import "./AnalysisBox.scss";
 import { store } from "../store";
@@ -20,6 +21,8 @@ type AnalysisBoxProps = {
 export default function AnalysisBox({ stateIndex }: AnalysisBoxProps) {
   const { gameId } = useParams();
   const { state } = useContext(store);
+  const { language, t } = useLanguage();
+  const colorMeta = getPlayerColorMeta(language);
   const [mctsResults, setMctsResults] = useState<MCTSProbabilities | undefined>(
     undefined
   );
@@ -36,7 +39,7 @@ export default function AnalysisBox({ stateIndex }: AnalysisBoxProps) {
       if (result.success) {
         setMctsResults(result.probabilities);
       } else {
-        setError(result.error || "Falha na análise");
+        setError(result.error || t("Falha na análise", "Analysis failed"));
       }
     } catch (err) {
       console.error("MCTS Analysis failed:", err);
@@ -45,7 +48,7 @@ export default function AnalysisBox({ stateIndex }: AnalysisBoxProps) {
       } else if (typeof err === "string") {
         setError(err);
       } else {
-        setError("Ocorreu um erro inesperado");
+        setError(t("Ocorreu um erro inesperado", "An unexpected error occurred"));
       }
     } finally {
       setLoading(false);
@@ -55,7 +58,7 @@ export default function AnalysisBox({ stateIndex }: AnalysisBoxProps) {
   return (
     <div className="analysis-box">
       <div className="analysis-header">
-        <h3>Chances de Vitória (IA MCTS)</h3>
+        <h3>{t("Chances de Vitória (IA MCTS)", "Win Probabilities (MCTS AI)")}</h3>
         <Button
           variant="contained"
           color="primary"
@@ -65,7 +68,7 @@ export default function AnalysisBox({ stateIndex }: AnalysisBoxProps) {
             loading ? <CircularProgress size={20} /> : <AssessmentIcon />
           }
         >
-          {loading ? "Calculando..." : "Analisar"}
+          {loading ? t("Calculando...", "Calculating...") : t("Analisar", "Analyze")}
         </Button>
       </div>
 
@@ -79,7 +82,7 @@ export default function AnalysisBox({ stateIndex }: AnalysisBoxProps) {
               className={`probability-row ${color.toLowerCase()}`}
             >
               <span className="player-color">
-                {PLAYER_COLOR_META[color as Color]?.label || color}
+                {colorMeta[color as Color]?.label || color}
               </span>
               <span className="probability-bar">
                 <div

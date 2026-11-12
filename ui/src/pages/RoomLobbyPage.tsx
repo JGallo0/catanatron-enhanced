@@ -19,17 +19,23 @@ import {
   type PlayerAccount,
 } from "../utils/apiClient";
 import type { Color, RoomState } from "../utils/api.types";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
-import { getGuestProfile, type GuestProfile } from "../config/avatarCatalog";
+import { getPlayerColorMeta } from "../config/assetRegistry";
+import {
+  getGuestProfile,
+  localizeGuestDisplayName,
+  type GuestProfile,
+} from "../config/avatarCatalog";
 import {
   BOT_AVATAR_PROFILES,
-  BOT_DIFFICULTY_OPTIONS,
-  BOT_SPEED_OPTIONS,
   difficultyFromPlayerKey,
   formatBotDifficultyLabel,
   formatBotSpeedLabel,
   formatMapTemplateLabel,
+  getBotDifficultyOptions,
+  getBotSpeedOptions,
+  getOpenSeatLabel,
   isOfficialBotName,
+  localizeSeatLabel,
   normalizeBotSpeed,
   OFFICIAL_BOT_NAMES,
   OPEN_SEAT_LABEL,
@@ -38,6 +44,8 @@ import {
   playerKeyForDifficulty,
   resolveSeatAvatarProps,
 } from "../config/botCatalog";
+import { useLanguage } from "../i18n";
+import LanguageToggle from "../components/LanguageToggle";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
 import MapTemplatePreview from "../components/home/MapTemplatePreview";
@@ -70,6 +78,12 @@ function saveStoredToken(roomCode: string, token: string) {
 export { getSavedGameSeat, saveGameSeat };
 
 export default function RoomLobbyPage() {
+  const { language, t } = useLanguage();
+  const colorMeta = getPlayerColorMeta(language);
+  const botDifficultyOptions = getBotDifficultyOptions(language);
+  const botSpeedOptions = getBotSpeedOptions(language);
+  const openSeatLabel = getOpenSeatLabel(language);
+
   const { roomCode = "" } = useParams();
   const navigate = useNavigate();
 
@@ -78,8 +92,10 @@ export default function RoomLobbyPage() {
     const saved = getSavedAccount();
     if (saved?.display_name) return saved.display_name;
     const guest = getGuestProfile();
-    if (guest.customized && guest.display_name) return guest.display_name;
-    return localStorage.getItem("catan_player_name") || "Jogador";
+    if (guest.customized && guest.display_name) {
+      return localizeGuestDisplayName(guest.display_name, language);
+    }
+    return localStorage.getItem("catan_player_name") || t("Jogador", "Player");
   });
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -131,10 +147,10 @@ export default function RoomLobbyPage() {
       }
       setError(
         err?.response?.data?.description ||
-          "Sala não encontrada ou encerrada."
+          t("Sala não encontrada ou encerrada.", "Room not found or closed.")
       );
     }
-  }, [roomCode, roomGone, closingRoom, navigate]);
+  }, [roomCode, roomGone, closingRoom, navigate, t]);
 
   useEffect(() => {
     if (!roomCode || roomGone || closingRoom) return;
@@ -163,7 +179,7 @@ export default function RoomLobbyPage() {
     roomEpochRef.current += 1;
     try {
       setError("");
-      const cleanName = playerName.trim() || "Amigo";
+      const cleanName = playerName.trim() || t("Amigo", "Friend");
       localStorage.setItem("catan_player_name", cleanName);
       const res = await joinRoom(roomCode, {
         playerName: cleanName,
@@ -175,7 +191,10 @@ export default function RoomLobbyPage() {
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          "Não foi possível ocupar este assento."
+          t(
+            "Não foi possível ocupar este assento.",
+            "Could not claim this seat."
+          )
       );
     }
   };
@@ -202,7 +221,10 @@ export default function RoomLobbyPage() {
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          "Não foi possível alterar a dificuldade dos bots."
+          t(
+            "Não foi possível alterar a dificuldade dos bots.",
+            "Could not update bot difficulty."
+          )
       );
     }
   };
@@ -229,7 +251,10 @@ export default function RoomLobbyPage() {
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          "Não foi possível alterar a velocidade dos bots."
+          t(
+            "Não foi possível alterar a velocidade dos bots.",
+            "Could not update bot speed."
+          )
       );
     }
   };
@@ -248,7 +273,10 @@ export default function RoomLobbyPage() {
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          "Não foi possível alterar o modo dos dados."
+          t(
+            "Não foi possível alterar o modo dos dados.",
+            "Could not update dice mode."
+          )
       );
     }
   };
@@ -314,7 +342,7 @@ export default function RoomLobbyPage() {
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          "Não foi possível atualizar o assento."
+          t("Não foi possível atualizar o assento.", "Could not update seat.")
       );
     }
   };
@@ -354,7 +382,7 @@ export default function RoomLobbyPage() {
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          "Não foi possível adicionar um assento."
+          t("Não foi possível adicionar um assento.", "Could not add a seat.")
       );
     }
   };
@@ -381,7 +409,7 @@ export default function RoomLobbyPage() {
     } catch (err: any) {
       setError(
         err?.response?.data?.description ||
-          "Não foi possível remover o assento."
+          t("Não foi possível remover o assento.", "Could not remove the seat.")
       );
     }
   };
@@ -398,7 +426,8 @@ export default function RoomLobbyPage() {
     } catch (err: any) {
       setStarting(false);
       setError(
-        err?.response?.data?.description || "Erro ao iniciar a partida."
+        err?.response?.data?.description ||
+          t("Erro ao iniciar a partida.", "Failed to start match.")
       );
     }
   };
@@ -422,7 +451,7 @@ export default function RoomLobbyPage() {
       setError(
         err?.response?.data?.description ||
           err?.message ||
-          "Não foi possível encerrar a sala."
+          t("Não foi possível encerrar a sala.", "Could not close the room.")
       );
     }
   };
@@ -444,7 +473,7 @@ export default function RoomLobbyPage() {
       setError(
         err?.response?.data?.description ||
           err?.message ||
-          "Não foi possível sair da sala."
+          t("Não foi possível sair da sala.", "Could not leave the room.")
       );
     }
   };
@@ -466,21 +495,34 @@ export default function RoomLobbyPage() {
       <div className="room-lobby-card">
         <div className="room-lobby-header">
           <Link to="/" className="room-lobby-back">
-            ← Voltar
+            ← {t("Voltar", "Back")}
           </Link>
           <div className="room-lobby-title-group">
-            <h1>Sala Privada #{roomCode.toUpperCase()}</h1>
+            <h1>
+              {t(
+                `Sala Privada #${roomCode.toUpperCase()}`,
+                `Private Room #${roomCode.toUpperCase()}`
+              )}
+            </h1>
             <p>
-              Envie o link abaixo para seus amigos entrarem no {OPEN_SEAT_LABEL} ou escolha os bots da mesa
+              {t(
+                `Envie o link abaixo para seus amigos entrarem no ${openSeatLabel} ou escolha os bots da mesa`,
+                `Share the link below so friends can join an ${openSeatLabel}, or pick table bots`
+              )}
             </p>
           </div>
-          {room && room.is_host && (
-            <div className="room-lobby-header__actions">
-              {confirmCloseOpen ? (
+          <div className="room-lobby-header__actions">
+            <LanguageToggle compact />
+            {room &&
+              room.is_host &&
+              (confirmCloseOpen ? (
                 <div
                   className="room-lobby-confirm-close"
                   role="group"
-                  aria-label={`Confirmar encerramento da sala ${room.room_code}`}
+                  aria-label={t(
+                    `Confirmar encerramento da sala ${room.room_code}`,
+                    `Confirm closing room ${room.room_code}`
+                  )}
                 >
                   <Button
                     size="small"
@@ -490,7 +532,9 @@ export default function RoomLobbyPage() {
                     disabled={closingRoom}
                     onClick={handleCloseRoom}
                   >
-                    {closingRoom ? "Encerrando..." : "Confirmar"}
+                    {closingRoom
+                      ? t("Encerrando...", "Closing...")
+                      : t("Confirmar", "Confirm")}
                   </Button>
                   <Button
                     size="small"
@@ -499,7 +543,7 @@ export default function RoomLobbyPage() {
                     disabled={closingRoom}
                     onClick={() => setConfirmCloseOpen(false)}
                   >
-                    Cancelar
+                    {t("Cancelar", "Cancel")}
                   </Button>
                 </div>
               ) : (
@@ -510,16 +554,13 @@ export default function RoomLobbyPage() {
                   className="room-lobby-close-btn"
                   onClick={() => setConfirmCloseOpen(true)}
                 >
-                  🗑️ Encerrar Sala
+                  🗑️ {t("Encerrar Sala", "Close Room")}
                 </Button>
-              )}
-            </div>
-          )}
-          {room &&
-            !room.is_host &&
-            room.my_color &&
-            room.status === "WAITING" && (
-              <div className="room-lobby-header__actions">
+              ))}
+            {room &&
+              !room.is_host &&
+              room.my_color &&
+              room.status === "WAITING" && (
                 <Button
                   size="small"
                   variant="outlined"
@@ -527,10 +568,12 @@ export default function RoomLobbyPage() {
                   disabled={leavingRoom}
                   onClick={handleLeaveRoom}
                 >
-                  {leavingRoom ? "Saindo..." : "🚪 Sair da Sala"}
+                  {leavingRoom
+                    ? t("Saindo...", "Leaving...")
+                    : t("🚪 Sair da Sala", "🚪 Leave Room")}
                 </Button>
-              </div>
-            )}
+              )}
+          </div>
         </div>
 
         {error && <div className="room-lobby-error">{error}</div>}
@@ -540,7 +583,9 @@ export default function RoomLobbyPage() {
             {/* Shareable Link Box */}
             <div className="invite-link-box">
               <div className="invite-link-box__url">
-                <span className="invite-link-box__badge">LINK DE CONVITE</span>
+                <span className="invite-link-box__badge">
+                  {t("LINK DE CONVITE", "INVITE LINK")}
+                </span>
                 <code>{inviteUrl}</code>
               </div>
               <Button
@@ -548,19 +593,23 @@ export default function RoomLobbyPage() {
                 className="invite-copy-btn"
                 onClick={handleCopyInvite}
               >
-                {copied ? "✅ Link Copiado!" : "📋 Copiar Link"}
+                {copied
+                  ? t("✅ Link Copiado!", "✅ Link Copied!")
+                  : t("📋 Copiar Link", "📋 Copy Link")}
               </Button>
             </div>
 
             {/* Player Name Input & Quick Claim */}
             <div className="guest-identity-bar">
-              <label htmlFor="player-nickname-input">Seu Nome na Mesa:</label>
+              <label htmlFor="player-nickname-input">
+                {t("Seu Nome na Mesa:", "Your Table Name:")}
+              </label>
               <input
                 id="player-nickname-input"
                 type="text"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Digite seu apelido..."
+                placeholder={t("Digite seu apelido...", "Enter your nickname...")}
                 maxLength={24}
               />
               <Button
@@ -570,8 +619,11 @@ export default function RoomLobbyPage() {
                 onClick={() => handleClaimSeat(room.my_color ?? undefined)}
               >
                 {room.my_color
-                  ? `Atualizar Nome (${PLAYER_COLOR_META[room.my_color].label})`
-                  : "🪑 Ocupar Assento Livre"}
+                  ? t(
+                      `Atualizar Nome (${colorMeta[room.my_color].label})`,
+                      `Update Name (${colorMeta[room.my_color].label})`
+                    )
+                  : t("🪑 Ocupar Assento Livre", "🪑 Claim Open Seat")}
               </Button>
               <Button
                 variant="outlined"
@@ -579,22 +631,22 @@ export default function RoomLobbyPage() {
                 className="identity-avatar-btn"
                 onClick={() => setAvatarStudioOpen(true)}
               >
-                🎨 Editar Meu Avatar
+                🎨 {t("Editar Meu Avatar", "Edit My Avatar")}
               </Button>
             </div>
 
             {/* Bot Difficulty Selector (Single Global Room Setting) */}
             <div className="lobby-difficulty-bar">
               <div className="lobby-difficulty-bar__header">
-                <span>Dificuldade dos Bots</span>
-                <strong>{formatBotDifficultyLabel(roomDifficulty)}</strong>
+                <span>{t("Dificuldade dos Bots", "Bot Difficulty")}</span>
+                <strong>{formatBotDifficultyLabel(roomDifficulty, language)}</strong>
               </div>
               <div
                 className="lobby-difficulty-bar__options"
                 role="group"
-                aria-label="Dificuldade dos Bots"
+                aria-label={t("Dificuldade dos Bots", "Bot Difficulty")}
               >
-                {BOT_DIFFICULTY_OPTIONS.map((opt) => (
+                {botDifficultyOptions.map((opt) => (
                   <Button
                     key={opt.value}
                     variant="contained"
@@ -617,9 +669,12 @@ export default function RoomLobbyPage() {
             <div className="lobby-speed-bar">
               <div className="lobby-speed-bar__header">
                 <span className="lobby-inline-title">
-                  Velocidade dos Bots
+                  {t("Velocidade dos Bots", "Bot Speed")}
                   <Tooltip
-                    title="Define o ritmo das animações e jogadas dos bots durante toda esta partida online. Depois de iniciada, não poderá ser alterada."
+                    title={t(
+                      "Define o ritmo das animações e jogadas dos bots durante toda esta partida online. Depois de iniciada, não poderá ser alterada.",
+                      "Sets bot animation and move pacing for this entire online match. Cannot be changed once started."
+                    )}
                     arrow
                     enterTouchDelay={0}
                     leaveTouchDelay={3000}
@@ -627,20 +682,23 @@ export default function RoomLobbyPage() {
                     <IconButton
                       size="small"
                       className="lobby-help-btn"
-                      aria-label="Ajuda sobre Velocidade dos Bots"
+                      aria-label={t(
+                        "Ajuda sobre Velocidade dos Bots",
+                        "Help about Bot Speed"
+                      )}
                     >
                       <HelpOutlineRoundedIcon fontSize="inherit" />
                     </IconButton>
                   </Tooltip>
                 </span>
-                <strong>{formatBotSpeedLabel(roomBotSpeed)}</strong>
+                <strong>{formatBotSpeedLabel(roomBotSpeed, language)}</strong>
               </div>
               <div
                 className="lobby-speed-bar__options"
                 role="group"
-                aria-label="Velocidade dos Bots"
+                aria-label={t("Velocidade dos Bots", "Bot Speed")}
               >
-                {BOT_SPEED_OPTIONS.map((opt) => (
+                {botSpeedOptions.map((opt) => (
                   <Button
                     key={opt.value}
                     variant="contained"
@@ -663,9 +721,12 @@ export default function RoomLobbyPage() {
             <div className="lobby-dice-bar">
               <div className="lobby-dice-bar__header">
                 <span className="lobby-inline-title">
-                  Modo dos Dados
+                  {t("Modo dos Dados", "Dice Mode")}
                   <Tooltip
-                    title="Padrão usa 2 dados clássicos (2d6). Equilibrados usa um baralho de 36 pares embaralhados, reembaralhando ao restarem 5 cartas."
+                    title={t(
+                      "Padrão usa 2 dados clássicos (2d6). Equilibrados usa um baralho de 36 pares embaralhados, reembaralhando ao restarem 5 cartas.",
+                      "Standard uses 2 classic dice (2d6). Balanced uses a shuffled 36-pair deck, reshuffling when 5 cards remain."
+                    )}
                     arrow
                     enterTouchDelay={0}
                     leaveTouchDelay={3000}
@@ -673,7 +734,10 @@ export default function RoomLobbyPage() {
                     <IconButton
                       size="small"
                       className="lobby-help-btn"
-                      aria-label="Ajuda sobre Modo dos Dados"
+                      aria-label={t(
+                        "Ajuda sobre Modo dos Dados",
+                        "Help about Dice Mode"
+                      )}
                     >
                       <HelpOutlineRoundedIcon fontSize="inherit" />
                     </IconButton>
@@ -681,14 +745,14 @@ export default function RoomLobbyPage() {
                 </span>
                 <strong>
                   {roomDiceMode === "balanced"
-                    ? "Equilibrados (Baralho 36)"
-                    : "Padrão (2d6)"}
+                    ? t("Equilibrados (Baralho 36)", "Balanced (36-Card Deck)")
+                    : t("Padrão (2d6)", "Standard (2d6)")}
                 </strong>
               </div>
               <div
                 className="lobby-dice-bar__options"
                 role="group"
-                aria-label="Modo dos Dados"
+                aria-label={t("Modo dos Dados", "Dice Mode")}
               >
                 <Button
                   variant="contained"
@@ -700,7 +764,7 @@ export default function RoomLobbyPage() {
                   }`}
                   onClick={() => handleDiceModeChange("random")}
                 >
-                  🎲 Padrão (2d6)
+                  🎲 {t("Padrão (2d6)", "Standard (2d6)")}
                 </Button>
                 <Button
                   variant="contained"
@@ -712,7 +776,7 @@ export default function RoomLobbyPage() {
                   }`}
                   onClick={() => handleDiceModeChange("balanced")}
                 >
-                  🎴 Equilibrados (Baralho 36)
+                  🎴 {t("Equilibrados (Baralho 36)", "Balanced (36-Card Deck)")}
                 </Button>
               </div>
             </div>
@@ -720,15 +784,23 @@ export default function RoomLobbyPage() {
             {/* Seats List */}
             <div className="lobby-seats-section">
               <div className="lobby-seats-header">
-                <span>Assentos da Partida ({room.seats.length}/4)</span>
+                <span>
+                  {t(
+                    `Assentos da Partida (${room.seats.length}/4)`,
+                    `Match Seats (${room.seats.length}/4)`
+                  )}
+                </span>
                 <small>
-                  Deixe em {OPEN_SEAT_LABEL} para amigos entrarem pelo link ou selecione um perfil de bot
+                  {t(
+                    `Deixe em ${openSeatLabel} para amigos entrarem pelo link ou selecione um perfil de bot`,
+                    `Leave as ${openSeatLabel} for friends to join via link, or pick a bot profile`
+                  )}
                 </small>
               </div>
 
               <div className="lobby-seats-grid">
                 {room.seats.map((seat, idx) => {
-                  const palette = PLAYER_COLOR_META[seat.color];
+                  const palette = colorMeta[seat.color];
                   const isOpenHuman =
                     seat.player_key === "HUMAN" && !seat.claimed;
                   const displaySeatName = seat.is_bot
@@ -736,8 +808,11 @@ export default function RoomLobbyPage() {
                       ? seat.player_name
                       : pickBotNameDeterministic(idx)
                     : isOpenHuman
-                      ? OPEN_SEAT_LABEL
-                      : seat.player_name;
+                      ? openSeatLabel
+                      : localizeGuestDisplayName(
+                          localizeSeatLabel(seat.player_name, language),
+                          language
+                        );
                   const resolvedAvatar = !isOpenHuman
                     ? resolveSeatAvatarProps({
                         color: seat.color,
@@ -804,9 +879,12 @@ export default function RoomLobbyPage() {
                           <strong>{palette.label}</strong>
                           <small>
                             {seat.is_me
-                              ? `★ Seu Assento (${displaySeatName})`
+                              ? t(
+                                  `★ Seu Assento (${displaySeatName})`,
+                                  `★ Your Seat (${displaySeatName})`
+                                )
                               : isOpenHuman
-                                ? `🔓 ${OPEN_SEAT_LABEL}`
+                                ? `🔓 ${openSeatLabel}`
                                 : displaySeatName}
                           </small>
                         </div>
@@ -817,7 +895,10 @@ export default function RoomLobbyPage() {
                           size="small"
                           fullWidth
                           SelectDisplayProps={{
-                            "aria-label": `Assento ${palette.label}`,
+                            "aria-label": t(
+                              `Assento ${palette.label}`,
+                              `${palette.label} Seat`
+                            ),
                           }}
                           disabled={!canEditSeat}
                           value={selectValue}
@@ -830,14 +911,14 @@ export default function RoomLobbyPage() {
                               <span className="lobby-select-option">
                                 <span>
                                   👤 {displaySeatName}
-                                  {seat.is_me ? " (Você)" : ""}
+                                  {seat.is_me ? t(" (Você)", " (You)") : ""}
                                 </span>
                               </span>
                             </MenuItem>
                           ) : (
                             <MenuItem value="HUMAN">
                               <span className="lobby-select-option">
-                                <span>🪑 {OPEN_SEAT_LABEL}</span>
+                                <span>🪑 {openSeatLabel}</span>
                               </span>
                             </MenuItem>
                           )}
@@ -845,7 +926,10 @@ export default function RoomLobbyPage() {
                           {!seat.is_bot && seat.claimed && !seat.is_me && (
                             <MenuItem value="RELEASE_HUMAN">
                               <span className="lobby-select-option">
-                                <span>🪑 {OPEN_SEAT_LABEL} (Liberar vaga)</span>
+                                <span>
+                                  🪑 {openSeatLabel} (
+                                  {t("Liberar vaga", "Release seat")})
+                                </span>
                               </span>
                             </MenuItem>
                           )}
@@ -873,7 +957,7 @@ export default function RoomLobbyPage() {
                                   <span>{botName}</span>
                                   {takenElsewhere && (
                                     <span className="lobby-option-hint">
-                                      (na mesa)
+                                      ({t("na mesa", "at table")})
                                     </span>
                                   )}
                                 </span>
@@ -893,7 +977,7 @@ export default function RoomLobbyPage() {
                               className="claim-seat-btn"
                               onClick={() => handleClaimSeat(seat.color)}
                             >
-                              Sentar Aqui
+                              {t("Sentar Aqui", "Take Seat")}
                             </Button>
                           )}
                         {room.is_host &&
@@ -905,7 +989,7 @@ export default function RoomLobbyPage() {
                               className="remove-seat-btn"
                               onClick={() => handleRemoveSeat(idx)}
                             >
-                              Remover
+                              {t("Remover", "Remove")}
                             </Button>
                           )}
                       </div>
@@ -920,7 +1004,10 @@ export default function RoomLobbyPage() {
                   className="add-seat-btn"
                   onClick={handleAddSeat}
                 >
-                  + Adicionar Jogador ou Bot ({room.seats.length}/4)
+                  {t(
+                    `+ Adicionar Jogador ou Bot (${room.seats.length}/4)`,
+                    `+ Add Player or Bot (${room.seats.length}/4)`
+                  )}
                 </Button>
               )}
             </div>
@@ -930,28 +1017,46 @@ export default function RoomLobbyPage() {
 
             <div className="lobby-rules-summary">
               <span>
-                🗺️ Mapa:{" "}
-                <strong>{formatMapTemplateLabel(room.config.map_template)}</strong>
-              </span>
-              <span>
-                🤖 Bots:{" "}
-                <strong>{formatBotDifficultyLabel(roomDifficulty)}</strong>
-              </span>
-              <span>
-                ⚡ Velocidade:{" "}
-                <strong>{formatBotSpeedLabel(roomBotSpeed)}</strong>
-              </span>
-              <span>
-                🎲 Dados:{" "}
+                🗺️ {t("Mapa", "Map")}:{" "}
                 <strong>
-                  {roomDiceMode === "balanced" ? "Equilibrados" : "Padrão (2d6)"}
+                  {formatMapTemplateLabel(room.config.map_template, language)}
                 </strong>
               </span>
-              <span>🏆 Vitória: <strong>{room.config.vps_to_win} PV</strong></span>
-              <span>🃏 Limite Descarte: <strong>{room.config.discard_limit} cartas</strong></span>
               <span>
-                🥷 Ladrão Amigável:{" "}
-                <strong>{room.config.friendly_robber ? "Ativo" : "Desativado"}</strong>
+                🤖 {t("Bots", "Bots")}:{" "}
+                <strong>{formatBotDifficultyLabel(roomDifficulty, language)}</strong>
+              </span>
+              <span>
+                ⚡ {t("Velocidade", "Speed")}:{" "}
+                <strong>{formatBotSpeedLabel(roomBotSpeed, language)}</strong>
+              </span>
+              <span>
+                🎲 {t("Dados", "Dice")}:{" "}
+                <strong>
+                  {roomDiceMode === "balanced"
+                    ? t("Equilibrados", "Balanced")
+                    : t("Padrão (2d6)", "Standard (2d6)")}
+                </strong>
+              </span>
+              <span>
+                🏆 {t("Vitória", "Victory")}:{" "}
+                <strong>
+                  {room.config.vps_to_win} {t("PV", "VP")}
+                </strong>
+              </span>
+              <span>
+                🃏 {t("Limite Descarte", "Discard Limit")}:{" "}
+                <strong>
+                  {room.config.discard_limit} {t("cartas", "cards")}
+                </strong>
+              </span>
+              <span>
+                🥷 {t("Ladrão Amigável", "Friendly Robber")}:{" "}
+                <strong>
+                  {room.config.friendly_robber
+                    ? t("Ativo", "Active")
+                    : t("Desativado", "Disabled")}
+                </strong>
               </span>
             </div>
 
@@ -962,8 +1067,11 @@ export default function RoomLobbyPage() {
               onClick={handleStartGame}
             >
               {starting
-                ? "Iniciando Partida..."
-                : "🚀 Iniciar Partida (Todos na Sala entram juntos)"}
+                ? t("Iniciando Partida...", "Starting Match...")
+                : t(
+                    "🚀 Iniciar Partida (Todos na Sala entram juntos)",
+                    "🚀 Start Match (Everyone in Room joins together)"
+                  )}
             </Button>
           </>
         )}

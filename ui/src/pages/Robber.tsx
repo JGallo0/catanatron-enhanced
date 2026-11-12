@@ -4,6 +4,7 @@ import {
   type CubeCoordinate,
 } from "../utils/coordinates";
 import { HybridIllustration } from "../components/icons/GameIcons";
+import { useLanguage } from "../i18n";
 
 type RobberProps = {
   center: [number, number];
@@ -12,6 +13,7 @@ type RobberProps = {
 };
 
 export default function Robber({ center, size, coordinate }: RobberProps) {
+  const { t } = useLanguage();
   const [centerX, centerY] = center;
   const w = SQRT3 * size;
   const [tileX, tileY] = tilePixelVector(coordinate, size, centerX, centerY);
@@ -23,7 +25,11 @@ export default function Robber({ center, size, coordinate }: RobberProps) {
   return (
     <div
       className="robber number-token"
-      title="O Ladrão (Bloqueia a produção deste hexágono)"
+      title={t(
+        "O Ladrão (Bloqueia a produção deste hexágono)",
+        "The Robber (Blocks production on this hex)"
+      )}
+      aria-label={t("O Ladrão", "The Robber")}
       style={{
         left: x,
         top: y,
@@ -35,7 +41,7 @@ export default function Robber({ center, size, coordinate }: RobberProps) {
     >
       <HybridIllustration
         src="/assets/illustrations/ui/robber.webp"
-        alt="O Ladrão"
+        alt={t("O Ladrão", "The Robber")}
         className="robber__custom-art"
         fallback={
           <svg

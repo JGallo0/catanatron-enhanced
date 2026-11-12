@@ -2,9 +2,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, test, expect } from "vitest";
 import App from "./App";
+import { setLanguage } from "./i18n";
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
+  setLanguage("pt");
 });
 
 test("renders A2 scenic home stage and opens Quick Match setup modal in Portuguese", async () => {
@@ -12,7 +15,11 @@ test("renders A2 scenic home stage and opens Quick Match setup modal in Portugue
   render(<App />);
 
   expect(screen.getByRole("heading", { name: /Rule the Isle/i })).toBeInTheDocument();
-  expect(screen.getByText(/Mãos Privadas no Multiplayer/i)).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      /Confrontos online entre amigos e offline com bots que não travam/i
+    )
+  ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Partida Rápida/i })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Criar Sala Online/i })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Salas Abertas/i })).toBeInTheDocument();

@@ -2,6 +2,7 @@ import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import type { GameState } from "../utils/api.types";
 import { humanizeActionRecordPt } from "../utils/promptUtils";
+import { getCurrentLanguage, tr } from "../i18n";
 
 // No types exported from notistack;
 type SnackbarKey = string | number;
@@ -11,7 +12,7 @@ export const snackbarActions =
     <>
       <IconButton
         size="small"
-        aria-label="fechar"
+        aria-label={tr("fechar", "close")}
         color="inherit"
         onClick={() => closeSnackbar(key)}
       >
@@ -30,10 +31,13 @@ export function dispatchSnackbar(
 ) {
   const latestRecord = gameState.action_records.slice(-1)[0];
   if (!latestRecord) return;
-  enqueueSnackbar(humanizeActionRecordPt(gameState, latestRecord), {
-    action: snackbarActions(closeSnackbar),
-    onClick: () => {
-      closeSnackbar();
-    },
-  });
+  enqueueSnackbar(
+    humanizeActionRecordPt(gameState, latestRecord, getCurrentLanguage()),
+    {
+      action: snackbarActions(closeSnackbar),
+      onClick: () => {
+        closeSnackbar();
+      },
+    }
+  );
 }

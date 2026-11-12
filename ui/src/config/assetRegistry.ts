@@ -4,6 +4,7 @@ import type {
   ResourceCard,
   VictoryPointCard,
 } from "../utils/api.types";
+import { getCurrentLanguage, type AppLanguage } from "../i18n";
 import brickTileSvg from "../assets/tile_brick.svg";
 import desertTileSvg from "../assets/tile_desert.svg";
 import grainTileSvg from "../assets/tile_wheat.svg";
@@ -245,3 +246,131 @@ export const BUILDING_COSTS: Record<
     recipe: { SHEEP: 1, WHEAT: 1, ORE: 1 },
   },
 };
+
+export const RESOURCE_META_EN: Record<ResourceCard, ResourceMeta> = {
+  WOOD: {
+    ...RESOURCE_META.WOOD,
+    label: "Lumber",
+    shortLabel: "LUM",
+    terrainName: "Forest",
+  },
+  BRICK: {
+    ...RESOURCE_META.BRICK,
+    label: "Brick",
+    shortLabel: "BRK",
+    terrainName: "Hills",
+  },
+  SHEEP: {
+    ...RESOURCE_META.SHEEP,
+    label: "Wool",
+    shortLabel: "WOL",
+    terrainName: "Pasture",
+  },
+  WHEAT: {
+    ...RESOURCE_META.WHEAT,
+    label: "Grain",
+    shortLabel: "GRN",
+    terrainName: "Fields",
+  },
+  ORE: {
+    ...RESOURCE_META.ORE,
+    label: "Ore",
+    shortLabel: "ORE",
+    terrainName: "Mountains",
+  },
+};
+
+export const DESERT_META_EN = {
+  ...DESERT_META,
+  label: "Desert",
+  terrainName: "Desert",
+};
+
+export const DEV_CARD_META_EN: Record<DevCardType, DevCardMeta> = {
+  KNIGHT: {
+    ...DEV_CARD_META.KNIGHT,
+    label: "Knight",
+    description:
+      "Move the Robber to another hex and steal 1 resource from an adjacent player. Counts toward Largest Army (3+ = 2 VP).",
+  },
+  VICTORY_POINT: {
+    ...DEV_CARD_META.VICTORY_POINT,
+    label: "Victory Point",
+    description: "Grants +1 hidden Victory Point immediately.",
+  },
+  ROAD_BUILDING: {
+    ...DEV_CARD_META.ROAD_BUILDING,
+    label: "Road Building",
+    description: "Immediately build 2 free roads on the board.",
+  },
+  YEAR_OF_PLENTY: {
+    ...DEV_CARD_META.YEAR_OF_PLENTY,
+    label: "Year of Plenty",
+    description: "Immediately take any 2 resource cards from the bank.",
+  },
+  MONOPOLY: {
+    ...DEV_CARD_META.MONOPOLY,
+    label: "Monopoly",
+    description:
+      "Choose 1 resource type. All other players must give you every card of that type in their hand.",
+  },
+};
+
+export const PLAYER_COLOR_META_EN: Record<Color, PlayerColorMeta> = {
+  RED: { ...PLAYER_COLOR_META.RED, label: "Red" },
+  BLUE: { ...PLAYER_COLOR_META.BLUE, label: "Blue" },
+  ORANGE: { ...PLAYER_COLOR_META.ORANGE, label: "Orange" },
+  WHITE: { ...PLAYER_COLOR_META.WHITE, label: "White" },
+};
+
+export const BUILDING_COSTS_EN: Record<
+  "ROAD" | "SETTLEMENT" | "CITY" | "DEV_CARD",
+  { label: string; vps: string; recipe: Partial<Record<ResourceCard, number>> }
+> = {
+  ROAD: {
+    label: "Road",
+    vps: "Longest Road = 2 VP",
+    recipe: { WOOD: 1, BRICK: 1 },
+  },
+  SETTLEMENT: {
+    label: "Settlement",
+    vps: "+1 VP",
+    recipe: { WOOD: 1, BRICK: 1, SHEEP: 1, WHEAT: 1 },
+  },
+  CITY: {
+    label: "City",
+    vps: "+2 VP",
+    recipe: { WHEAT: 2, ORE: 3 },
+  },
+  DEV_CARD: {
+    label: "Development Card",
+    vps: "Special / +1 VP",
+    recipe: { SHEEP: 1, WHEAT: 1, ORE: 1 },
+  },
+};
+
+export function getResourceMeta(
+  lang: AppLanguage = getCurrentLanguage()
+): Record<ResourceCard, ResourceMeta> {
+  return lang === "en" ? RESOURCE_META_EN : RESOURCE_META;
+}
+
+export function getDesertMeta(lang: AppLanguage = getCurrentLanguage()) {
+  return lang === "en" ? DESERT_META_EN : DESERT_META;
+}
+
+export function getDevCardMeta(
+  lang: AppLanguage = getCurrentLanguage()
+): Record<DevCardType, DevCardMeta> {
+  return lang === "en" ? DEV_CARD_META_EN : DEV_CARD_META;
+}
+
+export function getPlayerColorMeta(
+  lang: AppLanguage = getCurrentLanguage()
+): Record<Color, PlayerColorMeta> {
+  return lang === "en" ? PLAYER_COLOR_META_EN : PLAYER_COLOR_META;
+}
+
+export function getBuildingCosts(lang: AppLanguage = getCurrentLanguage()) {
+  return lang === "en" ? BUILDING_COSTS_EN : BUILDING_COSTS;
+}

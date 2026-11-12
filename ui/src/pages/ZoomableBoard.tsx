@@ -30,9 +30,10 @@ import type {
   MoveRobberAction,
   TileCoordinate,
 } from "../utils/api.types";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
 import { resolvePlayerDisplayName } from "../config/botCatalog";
 import { dispatchSnackbar } from "../components/Snackbar";
+import { useLanguage } from "../i18n";
 
 function buildNodeActions(state: CatanState) {
   if (!state.gameState) throw new Error("GameState is not ready!");
@@ -103,13 +104,13 @@ type PendingPlacement =
       kind: "node";
       nodeId: number;
       action: GameAction;
-      label: string;
+      buildType: "CITY" | "SETTLEMENT";
     }
   | {
       kind: "edge";
       edgeId: string;
       action: GameAction;
-      label: string;
+      buildType: "ROAD";
     };
 
 function loadSavedConfirmPlacement(): boolean {
@@ -127,6 +128,8 @@ export default function ZoomableBoard({
 }: ZoomableBoardProps) {
   const { gameId } = useParams();
   const { state, dispatch } = useContext(store);
+  const { language, t } = useLanguage();
+  const colorMeta = getPlayerColorMeta(language);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const { width, height } = useWindowSize();
   const theme = useTheme();
@@ -221,10 +224,7 @@ export default function ZoomableBoard({
         kind: "node",
         nodeId: id,
         action,
-        label:
-          action[1] === "BUILD_CITY"
-            ? "Confirmar melhoria para Cidade?"
-            : "Confirmar construção de Aldeia?",
+        buildType: action[1] === "BUILD_CITY" ? "CITY" : "SETTLEMENT",
       });
     },
     [confirmPlacement, pendingPlacement, executePlacementAction]
@@ -246,7 +246,7 @@ export default function ZoomableBoard({
         kind: "edge",
         edgeId: normId,
         action,
-        label: "Confirmar construção de Estrada?",
+        buildType: "ROAD",
       });
     },
     [confirmPlacement, pendingPlacement, executePlacementAction]
@@ -348,8 +348,8 @@ export default function ZoomableBoard({
                 type="button"
                 className="camera-btn"
                 onClick={() => zoomIn()}
-                title="Aproximar (Zoom In)"
-                aria-label="Zoom In"
+                title={t("Aproximar (Zoom +)", "Zoom +")}
+                aria-label={t("Zoom +", "Zoom +")}
               >
                 <ZoomInIcon fontSize="small" />
               </button>
@@ -357,8 +357,8 @@ export default function ZoomableBoard({
                 type="button"
                 className="camera-btn"
                 onClick={() => zoomOut()}
-                title="Afastar (Zoom Out)"
-                aria-label="Zoom Out"
+                title={t("Afastar (Zoom -)", "Zoom -")}
+                aria-label={t("Zoom -", "Zoom -")}
               >
                 <ZoomOutIcon fontSize="small" />
               </button>
@@ -366,8 +366,8 @@ export default function ZoomableBoard({
                 type="button"
                 className="camera-btn"
                 onClick={() => resetTransform()}
-                title="Centralizar Tabuleiro"
-                aria-label="Reset View"
+                title={t("Centralizar tabuleiro", "Center board")}
+                aria-label={t("Centralizar tabuleiro", "Center board")}
               >
                 <CenterFocusStrongIcon fontSize="small" />
               </button>
@@ -380,10 +380,19 @@ export default function ZoomableBoard({
                   onClick={handleToggleConfirmPlacement}
                   title={
                     confirmPlacement
-                      ? "Confirmação em 2 cliques: Ativa (clique para voltar a 1 clique)"
-                      : "Ativar confirmação antes de construir (2 cliques)"
+                      ? t(
+                          "Confirmação em 2 cliques: Ativa (clique para voltar a 1 clique)",
+                          "2-click build confirm: On (click to switch to 1-click)"
+                        )
+                      : t(
+                          "Ativar confirmação antes de construir (2 cliques)",
+                          "Enable 2-click build confirmation"
+                        )
                   }
-                  aria-label="Confirmar jogada em 2 cliques"
+                  aria-label={t(
+                    "Confirmar jogada em 2 cliques",
+                    "2-click build confirm"
+                  )}
                   aria-pressed={confirmPlacement}
                 >
                   <CheckIcon fontSize="small" />
@@ -426,10 +435,26 @@ export default function ZoomableBoard({
               <div
                 className="placement-confirm-bar"
                 role="region"
-                aria-label="Confirmar posicionamento no tabuleiro"
+                aria-label={t(
+                  "Confirmar posicionamento no tabuleiro",
+                  "Confirm board placement"
+                )}
               >
                 <span className="placement-confirm-bar__label">
-                  {pendingPlacement.label}
+                  {pendingPlacement.buildType === "CITY"
+                    ? t(
+                        "Confirmar melhoria para Cidade?",
+                        "Confirm City upgrade?"
+                      )
+                    : pendingPlacement.buildType === "SETTLEMENT"
+                      ? t(
+                          "Confirmar construção de Aldeia?",
+                          "Confirm Settlement build?"
+                        )
+                      : t(
+                          "Confirmar construção de Estrada?",
+                          "Confirm Road build?"
+                        )}
                 </span>
                 <div className="placement-confirm-bar__actions">
                   <button
@@ -437,14 +462,14 @@ export default function ZoomableBoard({
                     className="placement-confirm-btn placement-confirm-btn--confirm"
                     onClick={() => executePlacementAction(pendingPlacement.action)}
                   >
-                    ✓ Confirmar
+                    ✓ {t("Confirmar", "Confirm")}
                   </button>
                   <button
                     type="button"
                     className="placement-confirm-btn placement-confirm-btn--cancel"
                     onClick={() => setPendingPlacement(null)}
                   >
-                    ✕ Cancelar
+                    ✕ {t("Cancelar", "Cancel")}
                   </button>
                 </div>
               </div>
@@ -462,21 +487,24 @@ export default function ZoomableBoard({
         }}
       >
         <DialogTitle className="catan-modal-title">
-          Escolha de Quem Roubar 1 Recurso
+          {t(
+            "Escolha de Quem Roubar 1 Recurso",
+            "Choose Who to Steal 1 Resource From"
+          )}
         </DialogTitle>
         <DialogContent className="catan-modal-content">
           <div className="victim-selector-grid">
             {pendingRobberActions.map((action, idx) => {
               const rawVictim = action[2][1];
               const victimColor = rawVictim ? (rawVictim as Color) : undefined;
-              const meta = victimColor ? PLAYER_COLOR_META[victimColor] : null;
+              const meta = victimColor ? colorMeta[victimColor] : null;
               const victimName = victimColor
                 ? resolvePlayerDisplayName(
                     gameState,
                     victimColor,
                     meta?.label ?? victimColor
                   )
-                : "Ninguém";
+                : t("Ninguém", "Nobody");
               const pKey = victimColor
                 ? playerKey(gameState, victimColor)
                 : null;
@@ -506,7 +534,13 @@ export default function ZoomableBoard({
                   />
                   <div className="victim-card-btn__info">
                     <strong>{victimName}</strong>
-                    <span>{numCards} carta(s) na mão</span>
+                    <span>
+                      {numCards}{" "}
+                      {t(
+                        "carta(s) na mão",
+                        numCards === 1 ? "card in hand" : "cards in hand"
+                      )}
+                    </span>
                   </div>
                 </button>
               );

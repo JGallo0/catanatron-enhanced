@@ -7,6 +7,7 @@ import Fade from "@mui/material/Fade";
 
 import HomePage from "./pages/HomePage";
 import { StateProvider } from "./store";
+import { I18nProvider, useLanguage } from "./i18n";
 
 import "./App.scss";
 
@@ -14,11 +15,14 @@ const GameScreen = lazy(() => import("./pages/GameScreen"));
 const RoomLobbyPage = lazy(() => import("./pages/RoomLobbyPage"));
 const ReplayScreen = lazy(() => import("./pages/ReplayScreen"));
 
-const RouteFallback = () => (
-  <div className="route-loading-fallback" role="status" aria-live="polite">
-    Carregando ilha...
-  </div>
-);
+const RouteFallback = () => {
+  const { t } = useLanguage();
+  return (
+    <div className="route-loading-fallback" role="status" aria-live="polite">
+      {t("Carregando ilha...", "Loading island...")}
+    </div>
+  );
+};
 
 const theme = createTheme({
   palette: {
@@ -33,7 +37,8 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
+    <I18nProvider>
+      <ThemeProvider theme={theme}>
       <StateProvider>
         <SnackbarProvider
           classes={{ containerRoot: "snackbar-container" }}
@@ -62,6 +67,7 @@ function App() {
         </SnackbarProvider>
       </StateProvider>
     </ThemeProvider>
+    </I18nProvider>
   );
 }
 

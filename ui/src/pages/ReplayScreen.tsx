@@ -13,6 +13,7 @@ import { getState } from "../utils/apiClient";
 import AnalysisBox from "../components/AnalysisBox";
 import { Divider } from "@mui/material";
 import ReplayBox from "../components/ReplayBox";
+import LanguageToggle from "../components/LanguageToggle";
 
 function ReplayScreen() {
   const { gameId } = useParams();
@@ -58,7 +59,20 @@ function ReplayScreen() {
 
   return (
     <main className="catan-replay-screen">
-      <h1 className="logo">Rule the Isle</h1>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "6px 16px 0",
+          gap: 12,
+        }}
+      >
+        <h1 className="logo" style={{ margin: 0 }}>
+          Rule the Isle
+        </h1>
+        <LanguageToggle compact />
+      </div>
       <ZoomableBoard replayMode={true} />
       <LeftDrawer />
       <RightDrawer>

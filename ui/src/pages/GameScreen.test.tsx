@@ -17,6 +17,7 @@ import {
   setPerspective,
 } from "../utils/apiClient";
 import { dispatchSnackbar } from "../components/Snackbar";
+import { setLanguage } from "../i18n";
 import { makeGameState } from "../test/fixtures";
 import GameScreen from "./GameScreen";
 
@@ -103,6 +104,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  setLanguage("pt");
   vi.useRealTimers();
 });
 
@@ -113,7 +115,7 @@ test("loads a persisted API state into the real gameplay controls", async () => 
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "ROLAR DADOS" })).toBeEnabled();
-  expect(screen.getAllByTitle("Victory Points").length).toBeGreaterThan(0);
+  expect(screen.getAllByTitle("Pontos de Vitória").length).toBeGreaterThan(0);
   expect(screen.getByTestId("state-index")).toHaveTextContent("12");
   expect(getState).toHaveBeenCalledWith("game-123", undefined);
   expect(setPerspective).toHaveBeenCalledWith(null);
@@ -817,4 +819,26 @@ test("locks dock speed to room bot_speed in online matches while keeping offline
 
   fireEvent.click(lockedBtn);
   expect(localStorage.getItem("catan_game_speed_v1")).toBe("normal");
+});
+
+test("switches active match HUD, actions toolbar, and top bar cleanly to English when EN toggle is clicked", async () => {
+  vi.mocked(getState).mockResolvedValue(baseState);
+
+  renderGameScreen();
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "ROLAR DADOS" })).toBeInTheDocument();
+
+  const enBtn = screen.getByRole("button", { name: "EN" });
+  fireEvent.click(enBtn);
+
+  expect(localStorage.getItem("catan_language_v1")).toBe("en");
+  expect(screen.getByRole("button", { name: "ROLL DICE" })).toBeInTheDocument();
+  expect(screen.getAllByTitle("Victory Points").length).toBeGreaterThan(0);
+  expect(
+    screen.getByRole("navigation", { name: /Match shortcuts/i })
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "PT" }));
+  expect(screen.getByRole("button", { name: "ROLAR DADOS" })).toBeInTheDocument();
 });

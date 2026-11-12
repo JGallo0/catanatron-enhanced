@@ -1,3 +1,5 @@
+import { getCurrentLanguage, type AppLanguage } from "../i18n";
+
 export type TauntTone =
   | "rally"
   | "warm"
@@ -13,6 +15,8 @@ export type TauntDefinition = {
   emoji: string;
   label: string;
   bubbleText: string;
+  labelEn?: string;
+  bubbleTextEn?: string;
   tone: TauntTone;
 };
 
@@ -25,6 +29,8 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
     emoji: "⚔️",
     label: "Boa Guerra!",
     bubbleText: "⚔️ Boa guerra a todos!",
+    labelEn: "Good War!",
+    bubbleTextEn: "⚔️ May fortune favor the bold!",
     tone: "rally",
   },
   {
@@ -32,6 +38,8 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
     emoji: "👋",
     label: "Saudação",
     bubbleText: "👋 Saudações, navegantes!",
+    labelEn: "Greeting",
+    bubbleTextEn: "👋 Ahoy, fellow settlers!",
     tone: "warm",
   },
   {
@@ -39,6 +47,8 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
     emoji: "🤝",
     label: "Bora Trocar?",
     bubbleText: "🤝 Alguém topa uma troca?",
+    labelEn: "Trade?",
+    bubbleTextEn: "🤝 Anyone up for a trade?",
     tone: "trade",
   },
   {
@@ -46,6 +56,8 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
     emoji: "🤔",
     label: "Pensando...",
     bubbleText: "🤔 Hmm... calculando jogada!",
+    labelEn: "Thinking...",
+    bubbleTextEn: "🤔 Hmm... plotting my next move!",
     tone: "think",
   },
   {
@@ -53,6 +65,8 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
     emoji: "😡",
     label: "Ladrão!",
     bubbleText: "😡 Esse ladrão vai ter troco!",
+    labelEn: "Robber!",
+    bubbleTextEn: "😡 That robber will pay for this!",
     tone: "anger",
   },
   {
@@ -60,6 +74,8 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
     emoji: "🧐",
     label: "Olho Vivo!",
     bubbleText: "🧐 De olho nessa sua estrada!",
+    labelEn: "Watching You!",
+    bubbleTextEn: "🧐 Keeping an eye on that road!",
     tone: "watch",
   },
   {
@@ -67,6 +83,8 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
     emoji: "🍻",
     label: "Brinde!",
     bubbleText: "🍻 Um brinde à ilha!",
+    labelEn: "Cheers!",
+    bubbleTextEn: "🍻 A toast to the island!",
     tone: "cheer",
   },
   {
@@ -74,6 +92,8 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
     emoji: "👑",
     label: "Rumo à Coroa",
     bubbleText: "👑 A ilha já tem dono!",
+    labelEn: "To the Crown",
+    bubbleTextEn: "👑 The island already has a ruler!",
     tone: "crown",
   },
 ];
@@ -82,8 +102,30 @@ const TAUNT_BY_ID = new Map<string, TauntDefinition>(
   TAUNT_CATALOG.map((item) => [item.id, item])
 );
 
-export function getTauntById(id: string): TauntDefinition | null {
-  return TAUNT_BY_ID.get(id) ?? null;
+export function localizeTaunt(
+  taunt: TauntDefinition,
+  lang: AppLanguage = getCurrentLanguage()
+): TauntDefinition {
+  if (lang !== "en") return taunt;
+  return {
+    ...taunt,
+    label: taunt.labelEn ?? taunt.label,
+    bubbleText: taunt.bubbleTextEn ?? taunt.bubbleText,
+  };
+}
+
+export function getTauntCatalog(
+  lang: AppLanguage = getCurrentLanguage()
+): TauntDefinition[] {
+  return TAUNT_CATALOG.map((item) => localizeTaunt(item, lang));
+}
+
+export function getTauntById(
+  id: string,
+  lang: AppLanguage = getCurrentLanguage()
+): TauntDefinition | null {
+  const found = TAUNT_BY_ID.get(id);
+  return found ? localizeTaunt(found, lang) : null;
 }
 
 export function encodeTauntBody(tauntId: string): string {
@@ -93,27 +135,41 @@ export function encodeTauntBody(tauntId: string): string {
 
 export function parseTauntMessage(
   body: string,
-  kind?: string
+  kind?: string,
+  lang: AppLanguage = getCurrentLanguage()
 ): { taunt: TauntDefinition | null; displayText: string } {
   const trimmed = (body || "").trim();
   const match = /^\[TAUNT:([a-z0-9_]+)\]\s*(.*)$/i.exec(trimmed);
   if (match) {
-    const found = TAUNT_BY_ID.get(match[1].toLowerCase()) ?? null;
-    const clean = (match[2] || found?.bubbleText || trimmed).trim();
+    const raw = TAUNT_BY_ID.get(match[1].toLowerCase()) ?? null;
+    const found = raw ? localizeTaunt(raw, lang) : null;
+    const clean =
+      lang === "en" && found
+        ? found.bubbleText
+        : (match[2] || found?.bubbleText || trimmed).trim();
     return { taunt: found, displayText: clean };
   }
   if (kind === "TAUNT") {
-    const byText =
+    const rawMatch =
       TAUNT_CATALOG.find(
-        (t) => t.bubbleText === trimmed || t.label === trimmed || trimmed.startsWith(t.emoji)
+        (t) =>
+          t.bubbleText === trimmed ||
+          t.label === trimmed ||
+          t.bubbleTextEn === trimmed ||
+          t.labelEn === trimmed ||
+          trimmed.startsWith(t.emoji)
       ) ?? {
         id: "saudacao",
         emoji: "🎭",
-        label: "Provocação",
+        label: lang === "en" ? "Taunt" : "Provocação",
         bubbleText: trimmed,
         tone: "cheer" as const,
       };
-    return { taunt: byText, displayText: trimmed };
+    const byText = localizeTaunt(rawMatch, lang);
+    return {
+      taunt: byText,
+      displayText: lang === "en" ? byText.bubbleText : trimmed,
+    };
   }
   return { taunt: null, displayText: body };
 }

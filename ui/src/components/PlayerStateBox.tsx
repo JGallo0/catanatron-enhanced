@@ -3,7 +3,8 @@ import cn from "classnames";
 import "./PlayerStateBox.scss";
 import { type Color, type PlayerState } from "../utils/api.types";
 import ResourceCards from "./ResourceCards";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 import {
   AwardStarSvg,
   CitySvgPiece,
@@ -27,6 +28,7 @@ export default function PlayerStateBox({
   isBot?: boolean;
   customName?: string;
 }) {
+  const { language, t } = useLanguage();
   const actualVps =
     playerState[`${playerKey}_ACTUAL_VICTORY_POINTS`] ??
     playerState[`${playerKey}_VICTORY_POINTS`];
@@ -42,7 +44,7 @@ export default function PlayerStateBox({
   const builtCities = Math.max(0, 4 - citiesLeft);
   const builtRoads = Math.max(0, 15 - roadsLeft);
 
-  const colorMeta = PLAYER_COLOR_META[color];
+  const colorMeta = getPlayerColorMeta(language)[color];
   const displayName = customName || colorMeta.label;
 
   return (
@@ -65,10 +67,12 @@ export default function PlayerStateBox({
           />
           <span className="player-state-box__name">{displayName}</span>
           <span className="player-state-box__role-badge">
-            {isBot ? "BOT" : "HUMANO"}
+            {isBot ? "BOT" : t("HUMANO", "HUMAN")}
           </span>
           {isCurrentTurn && (
-            <span className="player-state-box__turn-pill">vez atual</span>
+            <span className="player-state-box__turn-pill">
+              {t("vez atual", "current turn")}
+            </span>
           )}
         </div>
 
@@ -76,10 +80,10 @@ export default function PlayerStateBox({
           className={cn("victory-points center-text", {
             bold: actualVps >= 10,
           })}
-          title="Victory Points"
+          title={t("Pontos de Vitória", "Victory Points")}
         >
           <span className="victory-points__num">{actualVps}</span>
-          <small>PV</small>
+          <small>{t("PV", "VP")}</small>
         </div>
       </div>
 
@@ -91,11 +95,17 @@ export default function PlayerStateBox({
 
       <div
         className="player-pieces-strip"
-        title={`Peças de ${displayName}: ${builtSettlements} Aldeias no mapa (${settlementsLeft} restantes), ${builtCities} Cidades no mapa (${citiesLeft} restantes), ${builtRoads} Estradas no mapa (${roadsLeft} restantes)`}
+        title={t(
+          `Peças de ${displayName}: ${builtSettlements} Aldeias no mapa (${settlementsLeft} restantes), ${builtCities} Cidades no mapa (${citiesLeft} restantes), ${builtRoads} Estradas no mapa (${roadsLeft} restantes)`,
+          `${displayName}'s pieces: ${builtSettlements} Settlements on board (${settlementsLeft} left), ${builtCities} Cities on board (${citiesLeft} left), ${builtRoads} Roads on board (${roadsLeft} left)`
+        )}
       >
         <div
           className="player-piece-badge"
-          title={`Aldeias construídas: ${builtSettlements} (Restam ${settlementsLeft} no estoque)`}
+          title={t(
+            `Aldeias construídas: ${builtSettlements} (Restam ${settlementsLeft} no estoque)`,
+            `Settlements built: ${builtSettlements} (${settlementsLeft} left in supply)`
+          )}
         >
           <svg
             width="24"
@@ -107,13 +117,16 @@ export default function PlayerStateBox({
           </svg>
           <div className="player-piece-badge__text">
             <strong>{builtSettlements}/5</strong>
-            <small>Aldeias</small>
+            <small>{t("Aldeias", "Settlements")}</small>
           </div>
         </div>
 
         <div
           className="player-piece-badge"
-          title={`Cidades construídas: ${builtCities} (Restam ${citiesLeft} no estoque)`}
+          title={t(
+            `Cidades construídas: ${builtCities} (Restam ${citiesLeft} no estoque)`,
+            `Cities built: ${builtCities} (${citiesLeft} left in supply)`
+          )}
         >
           <svg
             width="24"
@@ -125,20 +138,23 @@ export default function PlayerStateBox({
           </svg>
           <div className="player-piece-badge__text">
             <strong>{builtCities}/4</strong>
-            <small>Cidades</small>
+            <small>{t("Cidades", "Cities")}</small>
           </div>
         </div>
 
         <div
           className="player-piece-badge"
-          title={`Estradas construídas: ${builtRoads} (Restam ${roadsLeft} no estoque)`}
+          title={t(
+            `Estradas construídas: ${builtRoads} (Restam ${roadsLeft} no estoque)`,
+            `Roads built: ${builtRoads} (${roadsLeft} left in supply)`
+          )}
         >
           <span className="player-piece-badge__road-svg" aria-hidden="true">
             <RoadSvgPiece color={color} />
           </span>
           <div className="player-piece-badge__text">
             <strong>{builtRoads}/15</strong>
-            <small>Estradas</small>
+            <small>{t("Estradas", "Roads")}</small>
           </div>
         </div>
       </div>
@@ -151,8 +167,11 @@ export default function PlayerStateBox({
           })}
           title={
             hasArmy
-              ? "Knights Played — Maior Exército (+2 PV)"
-              : "Knights Played"
+              ? t(
+                  "Cavaleiros Jogados — Maior Exército (+2 PV)",
+                  "Knights Played — Largest Army (+2 VP)"
+                )
+              : t("Cavaleiros Jogados", "Knights Played")
           }
         >
           <SwordStatSvg />
@@ -161,10 +180,12 @@ export default function PlayerStateBox({
             <AwardStarSvg
               size={13}
               className="score-pill__star"
-              label="Maior Exército"
+              label={t("Maior Exército", "Largest Army")}
             />
           )}
-          <small>{hasArmy ? "Maior Exército" : "Cavaleiros"}</small>
+          <small>
+            {hasArmy ? t("Maior Exército", "Largest Army") : t("Cavaleiros", "Knights")}
+          </small>
         </div>
 
         <div
@@ -173,7 +194,12 @@ export default function PlayerStateBox({
             "score-pill--award": hasRoad,
           })}
           title={
-            hasRoad ? "Longest Road — Maior Estrada (+2 PV)" : "Longest Road"
+            hasRoad
+              ? t(
+                  "Maior Estrada (+2 PV)",
+                  "Longest Road (+2 VP)"
+                )
+              : t("Sequência de Estrada", "Longest Road")
           }
         >
           <RoadStatSvg />
@@ -182,10 +208,12 @@ export default function PlayerStateBox({
             <AwardStarSvg
               size={13}
               className="score-pill__star"
-              label="Maior Estrada"
+              label={t("Maior Estrada", "Longest Road")}
             />
           )}
-          <small>{hasRoad ? "Maior Estrada" : "Seq. Estrada"}</small>
+          <small>
+            {hasRoad ? t("Maior Estrada", "Longest Road") : t("Seq. Estrada", "Road Length")}
+          </small>
         </div>
       </div>
     </div>

@@ -25,12 +25,15 @@ import {
   getAvatarItemRequirement,
   getGuestProfile,
   isAvatarItemUnlocked,
+  localizeAvatarOption,
+  localizeGuestDisplayName,
   randomizeUnlockedAvatar,
   resolveAvatarConfig,
   saveGuestProfile,
   type AvatarOption,
   type GuestProfile,
 } from "../config/avatarCatalog";
+import { useLanguage } from "../i18n";
 import PlayerAvatar from "./PlayerAvatar";
 import "./AvatarStudioModal.scss";
 
@@ -70,10 +73,13 @@ export default function AvatarStudioModal({
   onSaved?: (updated: PlayerAccount) => void;
   onGuestSaved?: (saved: GuestProfile) => void;
 }) {
+  const { language, t } = useLanguage();
   const [tab, setTab] = useState<StudioTab>("face");
   const initialGuest = account ? null : guestProfile ?? getGuestProfile();
   const [displayName, setDisplayName] = useState(
-    account ? account.display_name : initialGuest!.display_name
+    account
+      ? account.display_name
+      : localizeGuestDisplayName(initialGuest!.display_name, language)
   );
   const [draftConfig, setDraftConfig] = useState<AvatarConfig>(() =>
     account
@@ -94,11 +100,11 @@ export default function AvatarStudioModal({
       setDraftConfig(safeResolveConfig(account.avatar_config, account.username));
     } else {
       const g = guestProfile ?? getGuestProfile();
-      setDisplayName(g.display_name);
+      setDisplayName(localizeGuestDisplayName(g.display_name, language));
       setDraftConfig(safeResolveConfig(g.avatar_config, g.display_name));
     }
     setErrorMsg("");
-  }, [open, account, guestProfile]);
+  }, [open, account, guestProfile, language]);
 
   const setField = <K extends keyof AvatarConfig>(
     field: K,
@@ -116,14 +122,15 @@ export default function AvatarStudioModal({
     <div className="avatar-section-block">
       <h4>{title}</h4>
       <div className="avatar-options-grid">
-        {options.map((opt) => {
+        {options.map((rawOpt) => {
+          const opt = localizeAvatarOption(rawOpt, language);
           const req = getAvatarItemRequirement(field, opt.value);
           const unlocked = isAvatarItemUnlocked(field, opt.value, wins);
           const remaining = Math.max(0, req - wins);
           const lockCopy =
             remaining === 1
-              ? "Falta 1 vitória"
-              : `Faltam ${remaining} vitórias`;
+              ? t("Falta 1 vitória", "1 more win needed")
+              : t(`Faltam ${remaining} vitórias`, `${remaining} more wins needed`);
           const isSelected = draftConfig[field] === opt.value;
 
           return (
@@ -132,7 +139,9 @@ export default function AvatarStudioModal({
               type="button"
               disabled={!unlocked}
               aria-label={
-                unlocked ? opt.label : `${opt.label} (Bloqueado: ${lockCopy})`
+                unlocked
+                  ? opt.label
+                  : `${opt.label} (${t("Bloqueado", "Locked")}: ${lockCopy})`
               }
               className={`avatar-option-btn ${isSelected ? "selected" : ""} ${
                 !unlocked ? "locked" : ""
@@ -169,7 +178,9 @@ export default function AvatarStudioModal({
   const handleSave = async () => {
     const cleanName = displayName.trim();
     if (!cleanName) {
-      setErrorMsg("Informe um apelido na mesa.");
+      setErrorMsg(
+        t("Informe um apelido na mesa.", "Please enter a table nickname.")
+      );
       return;
     }
     if (!account) {
@@ -195,7 +206,7 @@ export default function AvatarStudioModal({
         err?.response?.data?.description ||
           err?.response?.data?.error ||
           err?.message ||
-          "Não foi possível salvar seu perfil."
+          t("Não foi possível salvar seu perfil.", "Could not save your profile.")
       );
     } finally {
       setSaving(false);
@@ -211,14 +222,14 @@ export default function AvatarStudioModal({
       PaperProps={{ className: "avatar-studio-paper" }}
     >
       <DialogTitle className="avatar-studio-header">
-        <span>🎨 Personalizar Avatar & Perfil</span>
+        <span>🎨 {t("Personalizar Avatar & Perfil", "Customize Avatar & Profile")}</span>
         <Button
           size="small"
           variant="outlined"
           className="avatar-studio-close-btn"
           onClick={onClose}
         >
-          Fechar
+          {t("Fechar", "Close")}
         </Button>
       </DialogTitle>
 
@@ -227,30 +238,38 @@ export default function AvatarStudioModal({
         <div className="avatar-studio-preview-col">
           <PlayerAvatar
             config={draftConfig}
-            username={account?.username || displayName || "visitante"}
+            username={account?.username || displayName || t("visitante", "guest")}
             size={120}
             showFrameLabel
           />
 
           {isGuest ? (
             <div className="avatar-studio-stats-pill avatar-studio-stats-pill--guest">
-              🧭 Visitante • Salvo neste navegador (entre na conta para liberar molduras do ranking)
+              🧭{" "}
+              {t(
+                "Visitante • Salvo neste navegador (entre na conta para liberar molduras do ranking)",
+                "Guest • Saved in this browser (sign in to unlock ranking frames)"
+              )}
             </div>
           ) : (
             <div className="avatar-studio-stats-pill">
-              🏆 {wins} {wins === 1 ? "vitória" : "vitórias"} • {winRate}% aproveitamento
+              🏆 {wins}{" "}
+              {t(wins === 1 ? "vitória" : "vitórias", wins === 1 ? "win" : "wins")}{" "}
+              • {winRate}% {t("aproveitamento", "win rate")}
             </div>
           )}
 
           <div className="avatar-studio-name-field">
-            <label htmlFor="studio-display-name">Apelido na Mesa</label>
+            <label htmlFor="studio-display-name">
+              {t("Apelido na Mesa", "Table Nickname")}
+            </label>
             <input
               id="studio-display-name"
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               maxLength={32}
-              placeholder="Seu apelido na partida"
+              placeholder={t("Seu apelido na partida", "Your in-game nickname")}
             />
           </div>
 
@@ -260,11 +279,13 @@ export default function AvatarStudioModal({
             className="avatar-studio-random-btn"
             onClick={() => setDraftConfig(randomizeUnlockedAvatar(wins))}
           >
-            🎲 Aleatório
+            🎲 {t("Aleatório", "Randomize")}
           </Button>
 
           <div className="avatar-studio-presets">
-            <span className="avatar-studio-presets__title">Modelos Prontos</span>
+            <span className="avatar-studio-presets__title">
+              {t("Modelos Prontos", "Ready Presets")}
+            </span>
             <div className="avatar-studio-presets__grid">
               {AVATAR_PRESETS.map((preset) => (
                 <button
@@ -285,7 +306,7 @@ export default function AvatarStudioModal({
                     username={preset.id}
                     size={34}
                   />
-                  <span>{preset.label}</span>
+                  <span>{language === "en" ? preset.labelEn : preset.label}</span>
                 </button>
               ))}
             </div>
@@ -301,42 +322,74 @@ export default function AvatarStudioModal({
             scrollButtons="auto"
             className="avatar-studio-tabs"
           >
-            <Tab value="face" label="Rosto" />
-            <Tab value="hair" label="Cabelo & Barba" />
-            <Tab value="accessories" label="Acessórios" />
-            <Tab value="outfit" label="Traje & Fundo" />
-            <Tab value="frames" label="🏆 Molduras" />
+            <Tab value="face" label={t("Rosto", "Face")} />
+            <Tab value="hair" label={t("Cabelo & Barba", "Hair & Beard")} />
+            <Tab value="accessories" label={t("Acessórios", "Accessories")} />
+            <Tab value="outfit" label={t("Traje & Fundo", "Outfit & Background")} />
+            <Tab value="frames" label={t("🏆 Molduras", "🏆 Frames")} />
           </Tabs>
 
           <div className="avatar-studio-sections">
             {tab === "face" && (
               <>
-                {renderOptionGrid("Tom de Pele", "skin", AVATAR_SKIN_OPTIONS)}
-                {renderOptionGrid("Expressão & Olhos", "eyes", AVATAR_EYES_OPTIONS)}
+                {renderOptionGrid(t("Tom de Pele", "Skin Tone"), "skin", AVATAR_SKIN_OPTIONS)}
+                {renderOptionGrid(
+                  t("Expressão & Olhos", "Expression & Eyes"),
+                  "eyes",
+                  AVATAR_EYES_OPTIONS
+                )}
               </>
             )}
 
             {tab === "hair" && (
               <>
-                {renderOptionGrid("Estilo de Cabelo", "hair", AVATAR_HAIR_OPTIONS)}
-                {renderOptionGrid("Cor do Cabelo", "hairColor", AVATAR_HAIR_COLOR_OPTIONS)}
-                {renderOptionGrid("Barba & Bigode", "beard", AVATAR_BEARD_OPTIONS)}
+                {renderOptionGrid(
+                  t("Estilo de Cabelo", "Hair Style"),
+                  "hair",
+                  AVATAR_HAIR_OPTIONS
+                )}
+                {renderOptionGrid(
+                  t("Cor do Cabelo", "Hair Color"),
+                  "hairColor",
+                  AVATAR_HAIR_COLOR_OPTIONS
+                )}
+                {renderOptionGrid(
+                  t("Barba & Bigode", "Beard & Mustache"),
+                  "beard",
+                  AVATAR_BEARD_OPTIONS
+                )}
               </>
             )}
 
             {tab === "accessories" &&
-              renderOptionGrid("Chapéus & Coroas", "hat", AVATAR_HAT_OPTIONS)}
+              renderOptionGrid(
+                t("Chapéus & Coroas", "Hats & Crowns"),
+                "hat",
+                AVATAR_HAT_OPTIONS
+              )}
 
             {tab === "outfit" && (
               <>
-                {renderOptionGrid("Traje", "outfit", AVATAR_OUTFIT_OPTIONS)}
-                {renderOptionGrid("Cor do Traje", "outfitColor", AVATAR_OUTFIT_COLOR_OPTIONS)}
-                {renderOptionGrid("Cenário de Fundo", "background", AVATAR_BACKGROUND_OPTIONS)}
+                {renderOptionGrid(t("Traje", "Outfit"), "outfit", AVATAR_OUTFIT_OPTIONS)}
+                {renderOptionGrid(
+                  t("Cor do Traje", "Outfit Color"),
+                  "outfitColor",
+                  AVATAR_OUTFIT_COLOR_OPTIONS
+                )}
+                {renderOptionGrid(
+                  t("Cenário de Fundo", "Background"),
+                  "background",
+                  AVATAR_BACKGROUND_OPTIONS
+                )}
               </>
             )}
 
             {tab === "frames" &&
-              renderOptionGrid("Molduras por Mérito no Ranking", "frame", AVATAR_FRAME_OPTIONS)}
+              renderOptionGrid(
+                t("Molduras por Mérito no Ranking", "Merit Frames"),
+                "frame",
+                AVATAR_FRAME_OPTIONS
+              )}
           </div>
 
           {errorMsg && <div className="avatar-studio-error">{errorMsg}</div>}
@@ -349,7 +402,7 @@ export default function AvatarStudioModal({
           className="avatar-studio-cancel-btn"
           onClick={onClose}
         >
-          Cancelar
+          {t("Cancelar", "Cancel")}
         </Button>
         <Button
           variant="contained"
@@ -357,7 +410,11 @@ export default function AvatarStudioModal({
           disabled={saving}
           onClick={handleSave}
         >
-          {saving ? "Salvando..." : account ? "💾 Salvar Perfil" : "💾 Salvar Avatar"}
+          {saving
+            ? t("Salvando...", "Saving...")
+            : account
+              ? t("💾 Salvar Perfil", "💾 Save Profile")
+              : t("💾 Salvar Avatar", "💾 Save Avatar")}
         </Button>
       </DialogActions>
     </Dialog>

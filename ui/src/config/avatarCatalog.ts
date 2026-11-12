@@ -11,136 +11,151 @@ import type {
   AvatarOutfitColor,
   AvatarSkin,
 } from "../utils/api.types";
+import { getCurrentLanguage, type AppLanguage } from "../i18n";
 
 export type AvatarOption<T extends string = string> = {
   value: T;
   label: string;
+  labelEn?: string;
   swatch?: string;
   secondarySwatch?: string;
   requiredWins?: number;
   subtitle?: string;
+  subtitleEn?: string;
 };
 
 export const AVATAR_SKIN_OPTIONS: AvatarOption<AvatarSkin>[] = [
-  { value: "porcelain", label: "Porcelana", swatch: "#fbe2d1", secondarySwatch: "#e7b99e" },
-  { value: "fair", label: "Clara", swatch: "#f3cfb3", secondarySwatch: "#d8a47f" },
-  { value: "warm", label: "Dourada", swatch: "#e4b287", secondarySwatch: "#c58958" },
-  { value: "tan", label: "Bronzeada", swatch: "#c98b5b", secondarySwatch: "#a46539" },
-  { value: "brown", label: "Castanha", swatch: "#995c37", secondarySwatch: "#764021" },
-  { value: "deep", label: "Ébano", swatch: "#633722", secondarySwatch: "#432111" },
+  { value: "porcelain", label: "Porcelana", labelEn: "Porcelain", swatch: "#fbe2d1", secondarySwatch: "#e7b99e" },
+  { value: "fair", label: "Clara", labelEn: "Fair", swatch: "#f3cfb3", secondarySwatch: "#d8a47f" },
+  { value: "warm", label: "Dourada", labelEn: "Warm", swatch: "#e4b287", secondarySwatch: "#c58958" },
+  { value: "tan", label: "Bronzeada", labelEn: "Tan", swatch: "#c98b5b", secondarySwatch: "#a46539" },
+  { value: "brown", label: "Castanha", labelEn: "Brown", swatch: "#995c37", secondarySwatch: "#764021" },
+  { value: "deep", label: "Ébano", labelEn: "Deep", swatch: "#633722", secondarySwatch: "#432111" },
 ];
 
 export const AVATAR_EYES_OPTIONS: AvatarOption<AvatarEyes>[] = [
-  { value: "calm", label: "Sereno" },
-  { value: "cheerful", label: "Sorriso" },
-  { value: "sharp", label: "Estrategista" },
-  { value: "wise", label: "Sábio" },
+  { value: "calm", label: "Sereno", labelEn: "Calm" },
+  { value: "cheerful", label: "Sorriso", labelEn: "Cheerful" },
+  { value: "sharp", label: "Estrategista", labelEn: "Strategist" },
+  { value: "wise", label: "Sábio", labelEn: "Wise" },
 ];
 
 export const AVATAR_HAIR_OPTIONS: AvatarOption<AvatarHair>[] = [
-  { value: "none", label: "Careca" },
-  { value: "short", label: "Curto" },
-  { value: "wavy", label: "Ondulado" },
-  { value: "bun", label: "Coque" },
-  { value: "braids", label: "Tranças" },
-  { value: "curly", label: "Cacheado" },
-  { value: "long", label: "Longo" },
+  { value: "none", label: "Careca", labelEn: "Bald" },
+  { value: "short", label: "Curto", labelEn: "Short" },
+  { value: "wavy", label: "Ondulado", labelEn: "Wavy" },
+  { value: "bun", label: "Coque", labelEn: "Bun" },
+  { value: "braids", label: "Tranças", labelEn: "Braids" },
+  { value: "curly", label: "Cacheado", labelEn: "Curly" },
+  { value: "long", label: "Longo", labelEn: "Long" },
 ];
 
 export const AVATAR_HAIR_COLOR_OPTIONS: AvatarOption<AvatarHairColor>[] = [
-  { value: "brown", label: "Castanho", swatch: "#5a3821", secondarySwatch: "#3b2313" },
-  { value: "black", label: "Preto", swatch: "#1f242d", secondarySwatch: "#0d1117" },
-  { value: "blonde", label: "Loiro", swatch: "#eab308", secondarySwatch: "#a16207" },
-  { value: "red", label: "Ruivo", swatch: "#c2410c", secondarySwatch: "#7c2d12" },
-  { value: "silver", label: "Prateado", swatch: "#cbd5e1", secondarySwatch: "#64748b" },
-  { value: "navy", label: "Marinho", swatch: "#1e40af", secondarySwatch: "#1e3a8a" },
+  { value: "brown", label: "Castanho", labelEn: "Brown", swatch: "#5a3821", secondarySwatch: "#3b2313" },
+  { value: "black", label: "Preto", labelEn: "Black", swatch: "#1f242d", secondarySwatch: "#0d1117" },
+  { value: "blonde", label: "Loiro", labelEn: "Blonde", swatch: "#eab308", secondarySwatch: "#a16207" },
+  { value: "red", label: "Ruivo", labelEn: "Auburn", swatch: "#c2410c", secondarySwatch: "#7c2d12" },
+  { value: "silver", label: "Prateado", labelEn: "Silver", swatch: "#cbd5e1", secondarySwatch: "#64748b" },
+  { value: "navy", label: "Marinho", labelEn: "Navy", swatch: "#1e40af", secondarySwatch: "#1e3a8a" },
 ];
 
 export const AVATAR_BEARD_OPTIONS: AvatarOption<AvatarBeard>[] = [
-  { value: "none", label: "Sem Barba" },
-  { value: "goatee", label: "Cavanhaque" },
-  { value: "full", label: "Barba Cheia" },
-  { value: "mustache", label: "Bigode" },
+  { value: "none", label: "Sem Barba", labelEn: "Clean-Shaven" },
+  { value: "goatee", label: "Cavanhaque", labelEn: "Goatee" },
+  { value: "full", label: "Barba Cheia", labelEn: "Full Beard" },
+  { value: "mustache", label: "Bigode", labelEn: "Mustache" },
 ];
 
 export const AVATAR_HAT_OPTIONS: AvatarOption<AvatarHat>[] = [
-  { value: "none", label: "Sem Chapéu", requiredWins: 0 },
-  { value: "captain", label: "Tricórnio de Capitão", requiredWins: 0 },
-  { value: "explorer", label: "Chapéu Explorador", requiredWins: 0 },
-  { value: "bandana", label: "Bandana Marítima", requiredWins: 0 },
-  { value: "helm", label: "Elmo de Ferro", requiredWins: 0 },
+  { value: "none", label: "Sem Chapéu", labelEn: "No Hat", requiredWins: 0 },
+  { value: "captain", label: "Tricórnio de Capitão", labelEn: "Captain's Tricorne", requiredWins: 0 },
+  { value: "explorer", label: "Chapéu Explorador", labelEn: "Explorer Hat", requiredWins: 0 },
+  { value: "bandana", label: "Bandana Marítima", labelEn: "Sea Bandana", requiredWins: 0 },
+  { value: "helm", label: "Elmo de Ferro", labelEn: "Iron Helm", requiredWins: 0 },
   {
     value: "crown_gold",
     label: "Coroa Dourada do Soberano",
+    labelEn: "Sovereign Golden Crown",
     requiredWins: 7,
     subtitle: "Prestígio Real",
+    subtitleEn: "Royal Prestige",
   },
 ];
 
 export const AVATAR_OUTFIT_OPTIONS: AvatarOption<AvatarOutfit>[] = [
-  { value: "settler", label: "Túnica de Colono" },
-  { value: "captain", label: "Casaco de Capitão" },
-  { value: "armor", label: "Armadura Medieval" },
-  { value: "merchant", label: "Manto de Mercador" },
+  { value: "settler", label: "Túnica de Colono", labelEn: "Settler Tunic" },
+  { value: "captain", label: "Casaco de Capitão", labelEn: "Captain Coat" },
+  { value: "armor", label: "Armadura Medieval", labelEn: "Medieval Armor" },
+  { value: "merchant", label: "Manto de Mercador", labelEn: "Merchant Cloak" },
 ];
 
 export const AVATAR_OUTFIT_COLOR_OPTIONS: AvatarOption<AvatarOutfitColor>[] = [
-  { value: "crimson", label: "Carmesim", swatch: "#dc2626", secondarySwatch: "#7f1d1d" },
-  { value: "royal", label: "Azul Real", swatch: "#2563eb", secondarySwatch: "#1e3a8a" },
-  { value: "emerald", label: "Esmeralda", swatch: "#059669", secondarySwatch: "#064e3b" },
-  { value: "amber", label: "Âmbar", swatch: "#d97706", secondarySwatch: "#78350f" },
-  { value: "slate", label: "Ardósia", swatch: "#475569", secondarySwatch: "#1e293b" },
+  { value: "crimson", label: "Carmesim", labelEn: "Crimson", swatch: "#dc2626", secondarySwatch: "#7f1d1d" },
+  { value: "royal", label: "Azul Real", labelEn: "Royal Blue", swatch: "#2563eb", secondarySwatch: "#1e3a8a" },
+  { value: "emerald", label: "Esmeralda", labelEn: "Emerald", swatch: "#059669", secondarySwatch: "#064e3b" },
+  { value: "amber", label: "Âmbar", labelEn: "Amber", swatch: "#d97706", secondarySwatch: "#78350f" },
+  { value: "slate", label: "Ardósia", labelEn: "Slate", swatch: "#475569", secondarySwatch: "#1e293b" },
 ];
 
 export const AVATAR_BACKGROUND_OPTIONS: AvatarOption<AvatarBackground>[] = [
-  { value: "ocean", label: "Oceano", swatch: "#0e4d7a", secondarySwatch: "#06213c" },
-  { value: "sunset", label: "Pôr do Sol", swatch: "#ea580c", secondarySwatch: "#581c87" },
-  { value: "forest", label: "Floresta", swatch: "#15803d", secondarySwatch: "#052e16" },
-  { value: "mountain", label: "Montanhas", swatch: "#334155", secondarySwatch: "#0f172a" },
-  { value: "gold", label: "Campos de Trigo", swatch: "#ca8a04", secondarySwatch: "#713f12" },
-  { value: "crimson", label: "Fortaleza", swatch: "#991b1b", secondarySwatch: "#450a0a" },
+  { value: "ocean", label: "Oceano", labelEn: "Ocean", swatch: "#0e4d7a", secondarySwatch: "#06213c" },
+  { value: "sunset", label: "Pôr do Sol", labelEn: "Sunset", swatch: "#ea580c", secondarySwatch: "#581c87" },
+  { value: "forest", label: "Floresta", labelEn: "Forest", swatch: "#15803d", secondarySwatch: "#052e16" },
+  { value: "mountain", label: "Montanhas", labelEn: "Mountains", swatch: "#334155", secondarySwatch: "#0f172a" },
+  { value: "gold", label: "Campos de Trigo", labelEn: "Wheat Fields", swatch: "#ca8a04", secondarySwatch: "#713f12" },
+  { value: "crimson", label: "Fortaleza", labelEn: "Fortress", swatch: "#991b1b", secondarySwatch: "#450a0a" },
 ];
 
 export const AVATAR_FRAME_OPTIONS: AvatarOption<AvatarFrame>[] = [
   {
     value: "wood",
     label: "Madeira de Colono",
+    labelEn: "Settler Wood",
     swatch: "#925d30",
     secondarySwatch: "#5a3618",
     requiredWins: 0,
     subtitle: "Inicial",
+    subtitleEn: "Starter",
   },
   {
     value: "bronze",
     label: "Bronze de Navegador",
+    labelEn: "Navigator Bronze",
     swatch: "#d97736",
     secondarySwatch: "#7c3b15",
     requiredWins: 1,
     subtitle: "1 Vitória",
+    subtitleEn: "1 Win",
   },
   {
     value: "silver",
     label: "Prata da Guilda",
+    labelEn: "Guild Silver",
     swatch: "#e2e8f0",
     secondarySwatch: "#64748b",
     requiredWins: 3,
     subtitle: "3 Vitórias",
+    subtitleEn: "3 Wins",
   },
   {
     value: "gold",
     label: "Ouro Real",
+    labelEn: "Royal Gold",
     swatch: "#facc15",
     secondarySwatch: "#b45309",
     requiredWins: 5,
     subtitle: "5 Vitórias",
+    subtitleEn: "5 Wins",
   },
   {
     value: "imperial",
     label: "Imperial da Ilha",
+    labelEn: "Isle Imperial",
     swatch: "#10b981",
     secondarySwatch: "#facc15",
     requiredWins: 10,
     subtitle: "10 Vitórias",
+    subtitleEn: "10 Wins",
   },
 ];
 
@@ -167,6 +182,7 @@ export const AVATAR_UNLOCK_REQUIREMENTS: Partial<
 export type AvatarPreset = {
   id: string;
   label: string;
+  labelEn: string;
   config: AvatarConfig;
 };
 
@@ -174,6 +190,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   {
     id: "sea_captain",
     label: "Capitão dos Mares",
+    labelEn: "Sea Captain",
     config: {
       skin: "warm",
       eyes: "sharp",
@@ -190,6 +207,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   {
     id: "isle_botanist",
     label: "Guardiã da Floresta",
+    labelEn: "Forest Warden",
     config: {
       skin: "fair",
       eyes: "cheerful",
@@ -206,6 +224,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   {
     id: "forge_sentinel",
     label: "Sentinela da Serra",
+    labelEn: "Mountain Sentinel",
     config: {
       skin: "tan",
       eyes: "sharp",
@@ -222,6 +241,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   {
     id: "amber_broker",
     label: "Mercador do Porto",
+    labelEn: "Harbor Merchant",
     config: {
       skin: "warm",
       eyes: "wise",
@@ -238,6 +258,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   {
     id: "crimson_mason",
     label: "Mestre Construtora",
+    labelEn: "Master Builder",
     config: {
       skin: "brown",
       eyes: "calm",
@@ -254,6 +275,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   {
     id: "sunset_cartographer",
     label: "Cartógrafo do Poente",
+    labelEn: "Sunset Cartographer",
     config: {
       skin: "deep",
       eyes: "cheerful",
@@ -268,6 +290,48 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
   },
 ];
+
+export function localizeAvatarOption<T extends string>(
+  opt: AvatarOption<T>,
+  lang: AppLanguage = getCurrentLanguage()
+): AvatarOption<T> {
+  if (lang !== "en") return opt;
+  return {
+    ...opt,
+    label: opt.labelEn ?? opt.label,
+    subtitle: opt.subtitleEn ?? opt.subtitle,
+  };
+}
+
+export function getFrameLabel(
+  frame: AvatarFrame,
+  lang: AppLanguage = getCurrentLanguage()
+): string {
+  const found = AVATAR_FRAME_OPTIONS.find((f) => f.value === frame);
+  if (!found) return lang === "en" ? "Settler Wood" : "Madeira de Colono";
+  return lang === "en" ? found.labelEn ?? found.label : found.label;
+}
+
+export function getDefaultGuestDisplayName(
+  lang: AppLanguage = getCurrentLanguage()
+): string {
+  return lang === "en" ? "Island Explorer" : DEFAULT_GUEST_DISPLAY_NAME;
+}
+
+export function localizeGuestDisplayName(
+  name: string,
+  lang: AppLanguage = getCurrentLanguage()
+): string {
+  const trimmed = name.trim();
+  if (
+    !trimmed ||
+    trimmed === DEFAULT_GUEST_DISPLAY_NAME ||
+    trimmed === "Island Explorer"
+  ) {
+    return getDefaultGuestDisplayName(lang);
+  }
+  return name;
+}
 
 export function getAvatarItemRequirement(
   field: keyof AvatarConfig,

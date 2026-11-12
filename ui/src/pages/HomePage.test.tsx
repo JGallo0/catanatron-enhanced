@@ -1,10 +1,11 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitForElementToBeRemoved } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import HomePage from "./HomePage";
 import { saveGuestProfile } from "../config/avatarCatalog";
+import { setLanguage } from "../i18n";
 import {
   DEFAULT_PLAYERS,
   fetchCurrentAccount,
@@ -32,6 +33,7 @@ vi.mock("../utils/apiClient", async (importOriginal) => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  setLanguage("pt");
 });
 
 const loggedAccount: PlayerAccount = {
@@ -163,5 +165,102 @@ describe("HomePage A2 Stage", () => {
       await screen.findByText(/Almanaque & Regras — Rule the Isle/i)
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Fechar almanaque/i }));
+  }, 15000);
+
+  test("LanguageToggle switches HomePage, MatchSetupModal, and AlmanacModal between PT and EN cleanly", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    );
+
+    // Default PT state
+    expect(
+      screen.getByText(
+        /Confrontos online entre amigos e offline com bots que não travam/i
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText("Explorador da Ilha")).toBeInTheDocument();
+    expect(screen.getByText(/Modo visitante/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ranking Global/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Versão modificada em português baseada no motor/i)
+    ).toBeInTheDocument();
+
+    // Switch to EN
+    const enBtn = screen.getByRole("button", { name: /^EN$/i });
+    await user.click(enBtn);
+    expect(enBtn).toHaveAttribute("aria-pressed", "true");
+
+    expect(
+      screen.getByText(
+        /Online matches with friends & offline games with bots that never stall/i
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText("Island Explorer")).toBeInTheDocument();
+    expect(screen.getByText(/Guest mode/i)).toBeInTheDocument();
+    expect(screen.getByText(/Global Ranking/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Localized edition powered by the/i)
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("button", { name: /Quick Match \(Solo\/AI\)/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Create Online Room/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Open Lobbies/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Ranking & History/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Customize Avatar/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Almanac/i })).toBeInTheDocument();
+
+    // MatchSetupModal in EN
+    await user.click(
+      screen.getByRole("button", { name: /Quick Match \(Solo\/AI\)/i })
+    );
+    expect(
+      await screen.findByText(/Quick Match Setup \(Solo vs AI\)/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Map Template/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Standard \(Random Map\)/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Players at Table/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Close$/i }));
+    await waitForElementToBeRemoved(() => screen.queryByRole("dialog"));
+
+    // AlmanacModal in EN
+    await user.click(await screen.findByRole("button", { name: /Almanac/i }));
+    expect(
+      await screen.findByText(/Almanac & Rules — Rule the Isle/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Settlement")).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /Buildings & Trade/i })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Close almanac/i }));
+    await waitForElementToBeRemoved(() => screen.queryByRole("dialog"));
+
+    // Switch back to PT
+    const ptBtn = await screen.findByRole("button", { name: /^PT$/i });
+    await user.click(ptBtn);
+    expect(ptBtn).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByText(
+        /Confrontos online entre amigos e offline com bots que não travam/i
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText("Explorador da Ilha")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Partida Rápida \(Solo\/IA\)/i })
+    ).toBeInTheDocument();
   }, 15000);
 });

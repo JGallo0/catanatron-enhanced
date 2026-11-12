@@ -9,7 +9,8 @@ import {
 } from "@mui/material";
 import "./ResourceSelector.scss";
 import type { ResourceCard } from "../utils/api.types";
-import { RESOURCE_META } from "../config/assetRegistry";
+import { getResourceMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 
 type SelectorOption = ResourceCard | ResourceCard[];
 
@@ -36,6 +37,8 @@ export default function ResourceSelector({
   onSelect,
   mode,
 }: ResourceSelectorProps) {
+  const { language, t } = useLanguage();
+  const resourceMeta = getResourceMeta(language);
   const isSingleResourceOption = (
     option: SelectorOption
   ): option is ResourceCard => !Array.isArray(option);
@@ -73,7 +76,7 @@ export default function ResourceSelector({
 
   const getResourceSpan = (resource: ResourceCard) => (
     <span className={`resource-name ${resource.toLowerCase()}`}>
-      {RESOURCE_META[resource].label}
+      {resourceMeta[resource].label}
     </span>
   );
 
@@ -108,8 +111,14 @@ export default function ResourceSelector({
     >
       <DialogTitle>
         {mode === "monopoly"
-          ? "Escolha o Recurso para Monopolizar"
-          : "Escolha 2 Recursos (Ano da Fartura)"}
+          ? t(
+              "Escolha o Recurso para Monopolizar",
+              "Choose Resource to Monopolize"
+            )
+          : t(
+              "Escolha 2 Recursos (Ano da Fartura)",
+              "Choose 2 Resources (Year of Plenty)"
+            )}
       </DialogTitle>
       <DialogContent>
         <div className="resource-grid">
@@ -129,7 +138,7 @@ export default function ResourceSelector({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} className="cancel-button">
-          Cancelar
+          {t("Cancelar", "Cancel")}
         </Button>
       </DialogActions>
     </Dialog>

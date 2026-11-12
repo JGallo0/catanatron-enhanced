@@ -1,6 +1,7 @@
 import cn from "classnames";
 import type { Color } from "../utils/api.types";
-import { PLAYER_COLOR_META } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 import Dice3D from "./Dice3D";
 import "./DiceRollOverlay.scss";
 
@@ -19,12 +20,13 @@ export default function DiceRollOverlay({
   rollerName,
   rollerColor,
 }: DiceRollOverlayProps) {
+  const { language, t } = useLanguage();
   if (!open || !dice) return null;
 
   const sum = dice[0] + dice[1];
   const isHot = !rolling && (sum === 6 || sum === 8);
   const isSeven = !rolling && sum === 7;
-  const palette = PLAYER_COLOR_META[rollerColor];
+  const palette = getPlayerColorMeta(language)[rollerColor];
 
   return (
     <div
@@ -101,10 +103,10 @@ export default function DiceRollOverlay({
       <div className="tabletop-dice-stage__footer">
         {rolling ? (
           <span className="tabletop-dice-stage__status-rolling">
-            🎲 Rolando...
+            {t("🎲 Rolando...", "🎲 Rolling...")}
           </span>
         ) : isSeven ? (
-          <strong>⚔️ Total 7 — Ladrão!</strong>
+          <strong>{t("⚔️ Total 7 — Ladrão!", "⚔️ Total 7 — Robber!")}</strong>
         ) : (
           <strong>✦ Total {sum} ✦</strong>
         )}

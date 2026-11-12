@@ -9,8 +9,10 @@ import type {
 } from "../utils/api.types";
 import {
   AVATAR_FRAME_OPTIONS,
+  getFrameLabel,
   resolveAvatarConfig,
 } from "../config/avatarCatalog";
+import { useLanguage } from "../i18n";
 import "./PlayerAvatar.scss";
 
 const SKIN_PALETTE: Record<AvatarSkin, { base: string; shade: string; blush: string }> = {
@@ -64,6 +66,7 @@ export default function PlayerAvatar({
   className?: string;
   showFrameLabel?: boolean;
 }) {
+  const { language, t } = useLanguage();
   const uid = useId().replace(/:/g, "");
   const rawResolved = resolveAvatarConfig(config, username);
   const resolved: AvatarConfig = {
@@ -95,9 +98,7 @@ export default function PlayerAvatar({
   const hair = HAIR_PALETTE[resolved.hairColor];
   const outfit = OUTFIT_PALETTE[resolved.outfitColor];
   const bg = BG_PALETTE[resolved.background];
-  const frameLabel =
-    AVATAR_FRAME_OPTIONS.find((f) => f.value === resolved.frame)?.label ||
-    "Madeira de Colono";
+  const frameLabel = getFrameLabel(resolved.frame, language);
 
   const clipId = `pa-clip-${uid}`;
   const bgGradId = `pa-bg-${uid}`;
@@ -123,7 +124,11 @@ export default function PlayerAvatar({
           height={size}
           className="player-avatar__svg"
           role="img"
-          aria-label={username ? `Avatar de ${username}` : "Avatar do jogador"}
+          aria-label={
+            username
+              ? t(`Avatar de ${username}`, `${username}'s avatar`)
+              : t("Avatar do jogador", "Player avatar")
+          }
         >
           <defs>
             <clipPath id={clipId}>

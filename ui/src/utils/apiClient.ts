@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { API_URL } from "../configuration";
+import { tr } from "../i18n";
 import {
   getCustomGuestAvatarPayload,
   getGuestProfile,
@@ -292,7 +293,7 @@ export async function updateProfile(payload: {
   avatarConfig?: Partial<AvatarConfig>;
 }): Promise<PlayerAccount> {
   const saved = getSavedAccount();
-  if (!saved?.auth_token) throw new Error("Não autenticado");
+  if (!saved?.auth_token) throw new Error(tr("Não autenticado", "Not authenticated"));
   try {
     const response = await axios.patch<PlayerAccount>(
       `${API_URL}/api/auth/profile`,

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLanguage } from "../i18n";
 
 declare global {
   interface Window {
@@ -25,6 +26,7 @@ export default function GoogleSignInButton({
   clientId: string;
   onCredential: (credential: string) => void;
 }) {
+  const { language, t } = useLanguage();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const onCredentialRef = useRef(onCredential);
   onCredentialRef.current = onCredential;
@@ -57,7 +59,7 @@ export default function GoogleSignInButton({
         size: "large",
         text: "signin_with",
         shape: "pill",
-        locale: "pt_BR",
+        locale: language === "en" ? "en" : "pt_BR",
         width: measuredWidth,
       });
     };
@@ -107,12 +109,15 @@ export default function GoogleSignInButton({
     return () => {
       cancelled = true;
     };
-  }, [clientId]);
+  }, [clientId, language]);
 
   if (loadFailed) {
     return (
       <div className="home-auth-google-error" role="status">
-        Não foi possível carregar o script do Google neste navegador. Use usuário e senha acima ou libere{" "}
+        {t(
+          "Não foi possível carregar o script do Google neste navegador. Use usuário e senha acima ou libere",
+          "Could not load Google script in this browser. Use username & password above or allow"
+        )}{" "}
         <code>accounts.google.com</code>.
       </div>
     );

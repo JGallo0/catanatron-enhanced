@@ -15,7 +15,8 @@ import type {
   ResourceCard,
   TradeOfferTuple,
 } from "../utils/api.types";
-import { PLAYER_COLOR_META, RESOURCE_META } from "../config/assetRegistry";
+import { getPlayerColorMeta, getResourceMeta } from "../config/assetRegistry";
+import { useLanguage } from "../i18n";
 import {
   resolvePlayerDisplayName,
   resolveSeatAvatarProps,
@@ -70,6 +71,9 @@ export default function TradeModal({
   canOfferDomesticTrade = false,
   onExecuteTrade,
 }: TradeModalProps) {
+  const { language, t } = useLanguage();
+  const resourceMeta = getResourceMeta(language);
+  const colorMeta = getPlayerColorMeta(language);
   const [activeTab, setActiveTab] = useState<TradeTab>("player");
   const [offerCounts, setOfferCounts] = useState<number[]>([0, 0, 0, 0, 0]);
   const [askCounts, setAskCounts] = useState<number[]>([0, 0, 0, 0, 0]);
@@ -136,7 +140,7 @@ export default function TradeModal({
         const name = resolvePlayerDisplayName(
           gameState,
           color,
-          PLAYER_COLOR_META[color]?.label || color
+          colorMeta[color]?.label || color
         );
         return {
           color,
@@ -151,7 +155,7 @@ export default function TradeModal({
           }),
         };
       });
-  }, [gameState, effectiveColor]);
+  }, [gameState, effectiveColor, colorMeta]);
 
   useEffect(() => {
     if (open) {
@@ -246,7 +250,12 @@ export default function TradeModal({
         onClose();
       } catch (err) {
         setTradeError(
-          err instanceof Error ? err.message : "Não foi possível concluir a troca."
+          err instanceof Error
+            ? err.message
+            : t(
+                "Não foi possível concluir a troca.",
+                "Could not complete the trade."
+              )
         );
       } finally {
         setSubmitting(false);
@@ -262,7 +271,12 @@ export default function TradeModal({
       onClose();
     } catch (err) {
       setTradeError(
-        err instanceof Error ? err.message : "Não foi possível enviar a proposta."
+        err instanceof Error
+          ? err.message
+          : t(
+              "Não foi possível enviar a proposta.",
+              "Could not send the trade offer."
+            )
       );
     } finally {
       setSubmitting(false);
@@ -282,14 +296,21 @@ export default function TradeModal({
       }}
     >
       <DialogTitle className="catan-modal-title">
-        <span>⚖️ Central de Negociação</span>
+        <span>⚖️ {t("Central de Negociação", "Trade Center")}</span>
         <small className="catan-modal-subtitle">
-          Proponha trocas diretas com jogadores ou negocie com o Banco & Portos
+          {t(
+            "Proponha trocas diretas com jogadores ou negocie com o Banco & Portos",
+            "Propose direct trades with players or trade with the Bank & Ports"
+          )}
         </small>
       </DialogTitle>
 
       <DialogContent className="catan-modal-content">
-        <div className="trade-tabs" role="tablist" aria-label="Tipo de negociação">
+        <div
+          className="trade-tabs"
+          role="tablist"
+          aria-label={t("Tipo de negociação", "Trade type")}
+        >
           <button
             type="button"
             role="tab"
@@ -300,7 +321,7 @@ export default function TradeModal({
               setActiveTab("player");
             }}
           >
-            🤝 Entre Jogadores
+            🤝 {t("Entre Jogadores", "Offer to Players")}
           </button>
           <button
             type="button"
@@ -312,7 +333,7 @@ export default function TradeModal({
               setActiveTab("maritime");
             }}
           >
-            ⚓ Porto & Banco
+            ⚓ {t("Porto & Banco", "Bank / Port")}
           </button>
         </div>
 
@@ -325,7 +346,10 @@ export default function TradeModal({
         {activeTab === "player" ? (
           <div className="trade-workbench">
             {opponents.length > 0 && (
-              <div className="trade-partners-strip" aria-label="Adversários na mesa">
+              <div
+                className="trade-partners-strip"
+                aria-label={t("Adversários na mesa", "Opponents at the table")}
+              >
                 {opponents.map((opp) => (
                   <div
                     key={opp.color}
@@ -338,7 +362,11 @@ export default function TradeModal({
                     />
                     <strong>{opp.name}</strong>
                     <span>
-                      ({opp.cardCount} {opp.cardCount === 1 ? "carta" : "cartas"})
+                      ({opp.cardCount}{" "}
+                      {opp.cardCount === 1
+                        ? t("carta", "card")
+                        : t("cartas", "cards")}
+                      )
                     </span>
                   </div>
                 ))}
@@ -347,15 +375,24 @@ export default function TradeModal({
 
             {opponents.length > 0 && !anyOpponentHasCards && (
               <div className="trade-p2p-warning">
-                Nenhum adversário tem cartas na mão agora. Você ainda pode enviar a
-                proposta ou usar a aba <strong>Porto &amp; Banco</strong>.
+                {t(
+                  "Nenhum adversário tem cartas na mão agora. Você ainda pode enviar a proposta ou usar a aba",
+                  "No opponent has cards in hand right now. You can still send an offer or use the"
+                )}{" "}
+                <strong>{t("Porto & Banco", "Bank / Port")}</strong>
+                {t("!", " tab!")}
               </div>
             )}
 
             {/* Step 1: Offer from Hand */}
             <div className="trade-section">
               <div className="trade-section__header">
-                <span>1. Você Oferece da sua Mão</span>
+                <span>
+                  {t(
+                    "1. Você Oferece da sua Mão",
+                    "1. You Offer from Your Hand"
+                  )}
+                </span>
                 {(totalOffer > 0 || totalAsk > 0) && (
                   <button
                     type="button"
@@ -365,13 +402,13 @@ export default function TradeModal({
                       setAskCounts([0, 0, 0, 0, 0]);
                     }}
                   >
-                    Limpar proposta
+                    {t("Limpar proposta", "Clear offer")}
                   </button>
                 )}
               </div>
               <div className="trade-resource-grid">
                 {RESOURCE_ORDER.map((res, idx) => {
-                  const meta = RESOURCE_META[res];
+                  const meta = resourceMeta[res];
                   const inHand =
                     Number(playerState?.[`${playerKey}_${res}_IN_HAND`]) || 0;
                   const qty = offerCounts[idx];
@@ -387,13 +424,16 @@ export default function TradeModal({
                       <ResourceIcon resource={res} size={28} />
                       <span className="trade-res-card__name">{meta.label}</span>
                       <span className="trade-res-card__hand">
-                        Na mão: <strong>{inHand}</strong>
+                        {t("Na mão:", "In hand:")} <strong>{inHand}</strong>
                       </span>
                       <div className="trade-stepper">
                         <button
                           type="button"
                           className="trade-stepper__btn"
-                          aria-label={`Remover oferta de ${meta.label}`}
+                          aria-label={t(
+                            `Remover oferta de ${meta.label}`,
+                            `Decrease ${meta.label} offer`
+                          )}
                           disabled={qty <= 0 || submitting}
                           onClick={() => adjustOffer(idx, -1)}
                         >
@@ -408,7 +448,10 @@ export default function TradeModal({
                         <button
                           type="button"
                           className="trade-stepper__btn"
-                          aria-label={`Adicionar oferta de ${meta.label}`}
+                          aria-label={t(
+                            `Adicionar oferta de ${meta.label}`,
+                            `Increase ${meta.label} offer`
+                          )}
                           disabled={qty >= inHand || submitting}
                           onClick={() => adjustOffer(idx, 1)}
                         >
@@ -426,16 +469,21 @@ export default function TradeModal({
               {totalOffer > 0 && totalAsk > 0 ? (
                 <div className="trade-summary-pill">
                   <span>
-                    Oferece: <strong>{formatTradeBundlePt(offerCounts)}</strong>
+                    {t("Oferece:", "You offer:")}{" "}
+                    <strong>{formatTradeBundlePt(offerCounts, language)}</strong>
                   </span>
                   <span className="trade-summary-pill__arrow">➔</span>
                   <span>
-                    Pede: <strong>{formatTradeBundlePt(askCounts)}</strong>
+                    {t("Pede:", "You receive:")}{" "}
+                    <strong>{formatTradeBundlePt(askCounts, language)}</strong>
                   </span>
                 </div>
               ) : (
                 <span>
-                  Escolha ao menos 1 recurso para oferecer e 1 para pedir
+                  {t(
+                    "Escolha ao menos 1 recurso para oferecer e 1 para pedir",
+                    "Choose at least 1 resource to offer and 1 to receive"
+                  )}
                 </span>
               )}
             </div>
@@ -443,11 +491,13 @@ export default function TradeModal({
             {/* Step 2: Ask from Table */}
             <div className="trade-section">
               <div className="trade-section__header">
-                <span>2. Você Pede em Troca</span>
+                <span>
+                  {t("2. Você Pede em Troca", "2. You Request in Return")}
+                </span>
               </div>
               <div className="trade-resource-grid">
                 {RESOURCE_ORDER.map((res, idx) => {
-                  const meta = RESOURCE_META[res];
+                  const meta = resourceMeta[res];
                   const qty = askCounts[idx];
 
                   return (
@@ -461,13 +511,18 @@ export default function TradeModal({
                       <ResourceIcon resource={res} size={28} />
                       <span className="trade-res-card__name">{meta.label}</span>
                       <span className="trade-res-card__hand">
-                        {offerCounts[idx] > 0 ? "Em oferta" : "Pedir"}
+                        {offerCounts[idx] > 0
+                          ? t("Em oferta", "Offering")
+                          : t("Pedir", "Request")}
                       </span>
                       <div className="trade-stepper">
                         <button
                           type="button"
                           className="trade-stepper__btn"
-                          aria-label={`Remover pedido de ${meta.label}`}
+                          aria-label={t(
+                            `Remover pedido de ${meta.label}`,
+                            `Decrease ${meta.label} request`
+                          )}
                           disabled={qty <= 0 || submitting}
                           onClick={() => adjustAsk(idx, -1)}
                         >
@@ -482,7 +537,10 @@ export default function TradeModal({
                         <button
                           type="button"
                           className="trade-stepper__btn"
-                          aria-label={`Adicionar pedido de ${meta.label}`}
+                          aria-label={t(
+                            `Adicionar pedido de ${meta.label}`,
+                            `Increase ${meta.label} request`
+                          )}
                           disabled={qty >= 9 || submitting}
                           onClick={() => adjustAsk(idx, 1)}
                         >
@@ -497,30 +555,34 @@ export default function TradeModal({
           </div>
         ) : availableGiveResources.length === 0 ? (
           <div className="trade-maritime-empty">
-            Você ainda não possui cartas suficientes para trocar com o banco (4:1) ou
-            com seus portos. Tente enviar uma proposta na aba{" "}
-            <strong>Entre Jogadores</strong>!
+            {t(
+              "Você ainda não possui cartas suficientes para trocar com o banco (4:1) ou com seus portos. Tente enviar uma proposta na aba",
+              "You don't have enough cards yet to trade with the bank (4:1) or your ports. Try sending an offer on the"
+            )}{" "}
+            <strong>{t("Entre Jogadores", "Offer to Players")}</strong>
+            {t("!", " tab!")}
           </div>
         ) : (
           <div className="trade-workbench">
             {/* Step 1: Resource to Give */}
             <div className="trade-section">
               <div className="trade-section__header">
-                <span>1. Você Entrega</span>
+                <span>{t("1. Você Entrega", "1. You Give")}</span>
                 {selectedGive && activeRate && (
                   <span className="trade-rate-badge">
-                    Taxa ativa: <strong>{activeRate}:1</strong>{" "}
+                    {t("Taxa ativa:", "Active rate:")}{" "}
+                    <strong>{activeRate}:1</strong>{" "}
                     {activeRate === 2
-                      ? "(Porto Especializado)"
+                      ? t("(Porto Especializado)", "(Specialized Port)")
                       : activeRate === 3
-                        ? "(Porto 3:1)"
-                        : "(Banco)"}
+                        ? t("(Porto 3:1)", "(3:1 Port)")
+                        : t("(Banco)", "(Bank)")}
                   </span>
                 )}
               </div>
               <div className="trade-resource-grid">
                 {RESOURCE_ORDER.map((res) => {
-                  const meta = RESOURCE_META[res];
+                  const meta = resourceMeta[res];
                   const inHand = playerState[`${playerKey}_${res}_IN_HAND`] ?? 0;
                   const option = parsedTrades[res];
                   const disabled = !option;
@@ -555,7 +617,7 @@ export default function TradeModal({
                       <ResourceIcon resource={res} size={32} />
                       <span className="trade-res-card__name">{meta.label}</span>
                       <span className="trade-res-card__hand">
-                        Na mão: <strong>{inHand}</strong>
+                        {t("Na mão:", "In hand:")} <strong>{inHand}</strong>
                       </span>
                     </button>
                   );
@@ -568,28 +630,35 @@ export default function TradeModal({
               {selectedGive && selectedReceive && activeRate ? (
                 <div className="trade-summary-pill">
                   <span>
-                    Entregar <strong>{activeRate}x</strong>{" "}
-                    {RESOURCE_META[selectedGive].label}
+                    {t("Entregar", "Give")} <strong>{activeRate}x</strong>{" "}
+                    {resourceMeta[selectedGive].label}
                   </span>
                   <span className="trade-summary-pill__arrow">➔</span>
                   <span>
-                    Receber <strong>1x</strong>{" "}
-                    {RESOURCE_META[selectedReceive].label}
+                    {t("Receber", "Receive")} <strong>1x</strong>{" "}
+                    {resourceMeta[selectedReceive].label}
                   </span>
                 </div>
               ) : (
-                <span>Selecione os recursos da troca</span>
+                <span>
+                  {t(
+                    "Selecione os recursos da troca",
+                    "Select resources to trade"
+                  )}
+                </span>
               )}
             </div>
 
             {/* Step 2: Resource to Receive */}
             <div className="trade-section">
               <div className="trade-section__header">
-                <span>2. Você Recebe (1 Carta)</span>
+                <span>
+                  {t("2. Você Recebe (1 Carta)", "2. You Receive (1 Card)")}
+                </span>
               </div>
               <div className="trade-resource-grid">
                 {RESOURCE_ORDER.map((res) => {
-                  const meta = RESOURCE_META[res];
+                  const meta = resourceMeta[res];
                   const inHand = playerState[`${playerKey}_${res}_IN_HAND`] ?? 0;
                   const canReceive =
                     !!selectedGive &&
@@ -612,7 +681,7 @@ export default function TradeModal({
                       <ResourceIcon resource={res} size={32} />
                       <span className="trade-res-card__name">{meta.label}</span>
                       <span className="trade-res-card__hand">
-                        Na mão: <strong>{inHand}</strong>
+                        {t("Na mão:", "In hand:")} <strong>{inHand}</strong>
                       </span>
                     </button>
                   );
@@ -629,7 +698,7 @@ export default function TradeModal({
           disabled={submitting}
           className="catan-btn-secondary"
         >
-          Cancelar
+          {t("Cancelar", "Cancel")}
         </Button>
         <Button
           variant="contained"
@@ -641,8 +710,8 @@ export default function TradeModal({
           className="catan-btn-primary"
         >
           {activeTab === "player"
-            ? "Enviar Proposta à Mesa"
-            : "Confirmar Troca"}
+            ? t("Enviar Proposta à Mesa", "Send Offer")
+            : t("Confirmar Troca", "Confirm Trade")}
         </Button>
       </DialogActions>
     </Dialog>
