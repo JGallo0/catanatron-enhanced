@@ -244,7 +244,6 @@ export default function HomePage() {
         </div>
 
         <div className="home-topbar__right">
-          <LanguageToggle compact />
           {account ? (
             <div className="home-rank-pill">
               <div className="home-rank-pill__stats">
@@ -302,6 +301,7 @@ export default function HomePage() {
               </Button>
             </div>
           )}
+          <LanguageToggle compact />
         </div>
       </header>
 
