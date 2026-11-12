@@ -42,12 +42,15 @@ Este documento consolida **todo o histórico, arquitetura, decisões de design e
   - [`TradeModal.tsx`](ui/src/components/TradeModal.tsx) & [`TradeOfferDecisionDialog.tsx`](ui/src/components/TradeOfferDecisionDialog.tsx): Bancada unificada com abas **🤝 Entre Jogadores** (negociação doméstica em 3 etapas `OFFER_TRADE` → `DECIDE_TRADE` → `DECIDE_ACCEPTEES`) e **⚓ Porto & Banco** (`4:1`, `3:1`, `2:1`).
   - [`GameScreen.tsx`](ui/src/pages/GameScreen.tsx), [`GameScreen.scss`](ui/src/pages/GameScreen.scss), [`tabletopPacing.ts`](ui/src/utils/tabletopPacing.ts), [`MatchIntroOverlay.tsx`](ui/src/components/MatchIntroOverlay.tsx), [`DiceRollOverlay.tsx`](ui/src/components/DiceRollOverlay.tsx) & [`Dice3D.tsx`](ui/src/components/Dice3D.tsx): Dock vertical esquerdo (`z-index: 44`, clicável), apresentação inicial `"Boa Guerra"` de `10s` (`INTRO_SPLASH_MS = 10000`) com botão *Zarpar para a Ilha*, velocidades `Normal (4x)` / `Rápida (1x)` / `Turbo (0.5x)` com ações dos bots dobradas, banner de transição `"Vez de <Jogador>"` (`3s`, `TURN_TRANSITION_MS = 3000`), dados **3D CSS `preserve-3d`** (`Dice3D`) com duração de rolagem dobrada, pílula de desfecho do Ladrão (`.game-robber-notice`), mini-histórico flutuante (`.mini-action-log`), coordenador `?bot_only=1`, heartbeat `10s`, **`🚪 Sair (Bot Assume)`** e **`↩️ Retomar Meu Assento`**.
 - **Lobby, Mapas, Dificuldade Única, Contas e Motor Local Fallback:**
-  - [`HomePage.tsx`](ui/src/pages/HomePage.tsx) & [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx): Tela inicial A2 com `lobby_hero.webp` em alta resolução, modais em `ui/src/components/home/` ([`AuthModal.tsx`](ui/src/components/home/AuthModal.tsx), [`MatchSetupModal.tsx`](ui/src/components/home/MatchSetupModal.tsx), [`OpenLobbyModal.tsx`](ui/src/components/home/OpenLobbyModal.tsx), [`MapTemplatePreview.tsx`](ui/src/components/home/MapTemplatePreview.tsx)), seletor único de dificuldade (`Fácil`, `Moderado`, `Difícil`), perfis oficiais de bots na mesa (`Creitu`, `Felire`, `Guiri`, `Jaó`, `Angeleri`), vaga explícita **`Assento livre`** preenchida pelo nome de quem entrar, mapas **Padrão (Mapa aleatório)** / **Mini** / **Torneio (Mapa fixo)**, modo de dados **Clássico** vs **Equilibrado** (`balanced`) e encerramento/saída de salas abertas.
-  - [`ui/src/utils/apiClient.ts`](ui/src/utils/apiClient.ts) & [`ui/src/utils/localEngine.ts`](ui/src/utils/localEngine.ts): Cliente de API com fallback automático offline (`localEngine.ts`), incluindo paridade completa de chat/provocações, dados equilibrados, descarte/anti-hoarding dos bots, encerramento de salas e dificuldade única.
+  - [`HomePage.tsx`](ui/src/pages/HomePage.tsx) & [`RoomLobbyPage.tsx`](ui/src/pages/RoomLobbyPage.tsx): Tela inicial A2 com `lobby_hero.webp` em alta resolução, palco central interativo em 3D (Home) e 4 Hero Cards verticais em 3D (Sala), modais em `ui/src/components/home/` ([`AuthModal.tsx`](ui/src/components/home/AuthModal.tsx), [`MatchSetupModal.tsx`](ui/src/components/home/MatchSetupModal.tsx), [`OpenLobbyModal.tsx`](ui/src/components/home/OpenLobbyModal.tsx), [`MapTemplatePreview.tsx`](ui/src/components/home/MapTemplatePreview.tsx)), seletor único de dificuldade (`Fácil`, `Moderado`, `Difícil`), perfis oficiais de bots na mesa (`Creitu`, `Felire`, `Guiri`, `Jaó`, `Angeleri`), vaga explícita **`Assento livre`** preenchida pelo nome de quem entrar, mapas **Padrão (Mapa aleatório)** / **Mini** / **Torneio (Mapa fixo)**, modo de dados **Clássico** vs **Equilibrado** (`balanced`) e encerramento/saída de salas abertas.
+- **Avatar 3D Modular WebGL (`ui/src/components/avatar3d/`, `ui/scripts/` & `docs/AVATAR_3D_ASSET_GUIDE.md`):**
+  - Motor Three.js ([`sceneComposer.ts`](ui/src/components/avatar3d/sceneComposer.ts), [`materialTint.ts`](ui/src/components/avatar3d/materialTint.ts), [`Avatar3DCanvas.tsx`](ui/src/components/avatar3d/Avatar3DCanvas.tsx)): composição modular em 9 sockets (`socket_torso`, `socket_legs`, `socket_cape`, `socket_mount`, `socket_pedestal`, `socket_head`, `socket_hand_r`, `socket_back`, `socket_shoulder_l`) + `faceSlot` 3D paramétrico (`eyeStyle`, `browStyle`, `noseStyle`, `mouthStyle`) e proporções corporais dinâmicas (`bodyType`), recoloração em tempo real via materiais nomeados (`mat_skin`, `mat_hair`, `mat_eyes`, `mat_primary`, `mat_secondary`, `mat_metal`, `mat_mount`) e captura síncrona de retrato `256×256` WebP (`portraitSnapshot`) com fallback transparente para [`PlayerAvatar.tsx`](ui/src/components/PlayerAvatar.tsx).
+  - Pipeline de 55 ativos `.glb` (`ui/public/assets/models/avatars/`) gerados e validados por [`build_starter_3d_assets.mjs`](ui/scripts/build_starter_3d_assets.mjs) & [`verify_starter_3d_assets.mjs`](ui/scripts/verify_starter_3d_assets.mjs).
+  - [`ui/src/utils/apiClient.ts`](ui/src/utils/apiClient.ts) & [`ui/src/utils/localEngine.ts`](ui/src/utils/localEngine.ts): Cliente de API com fallback automático offline (`localEngine.ts`), incluindo paridade completa de avatar V2 + direitos VIP (`entitlements`), chat/provocações, dados equilibrados, descarte/anti-hoarding dos bots, encerramento de salas e dificuldade única.
 
 ### Backend (`api/` e `catanatron/`) — Flask + Vercel Python Serverless
 - **[`vercel.json`](vercel.json) & [`api/index.py`](api/index.py):** Entrada Serverless Python (`3.12` via `.python-version`) na Vercel que roteia `/api/*` para o Flask (`catanatron.web`).
-- **[`catanatron/catanatron/web/api.py`](catanatron/catanatron/web/api.py) & [`models.py`](catanatron/catanatron/web/models.py)** *(espelhados identicamente em `api/catanatron/web/` para a Vercel)*: Endpoints REST para jogos (`/api/games`, `/actions?bot_only=1`, `/heartbeat`, `/abandon`, `/reclaim`, `/messages`), salas (`/api/rooms`, `/close`, `/leave`, `/join`, `/start`), autenticação/perfil (`/api/auth/register`, `/api/auth/login`, `/api/auth/google`, `/api/auth/me`, `/api/auth/profile`) com exposição de `leaderboard_rank` no ranking global, histórico de partidas, seeds CSPRNG (`secrets.randbits(63)`), suporte a dados equilibrados (`dice_mode = "balanced"`), dificuldade única (`easy`/`medium`/`hard`), encerramento seguro de salas por anfitrião/token e análise MCTS.
+- **[`catanatron/catanatron/web/api.py`](catanatron/catanatron/web/api.py) & [`models.py`](catanatron/catanatron/web/models.py)** *(espelhados identicamente em `api/catanatron/web/` para a Vercel)*: Endpoints REST para jogos (`/api/games`, `/actions?bot_only=1`, `/heartbeat`, `/abandon`, `/reclaim`, `/messages`), salas (`/api/rooms`, `/close`, `/leave`, `/join`, `/start`), autenticação/perfil (`/api/auth/register`, `/api/auth/login`, `/api/auth/google`, `/api/auth/me`, `/api/auth/profile`) com catálogo V2 de avatar, tabela `user_entitlements`, validação HTTP `403 locked_items` por vitórias/SKUs VIP e exposição de `leaderboard_rank` no ranking global, histórico de partidas, seeds CSPRNG (`secrets.randbits(63)`), suporte a dados equilibrados (`dice_mode = "balanced"`), dificuldade única (`easy`/`medium`/`hard`), encerramento seguro de salas por anfitrião/token e análise MCTS.
 - **Motor Anti-Hoarding & Regras (`catanatron/catanatron/apply_action.py`, `game.py`, `state.py`, `serialization.py`, `players/`):** Baralho de dados equilibrados (36 combinações com reembaralhamento em `<= 5` restantes), avaliação anti-acúmulo de cartas nos bots (`search.py`, `value.py`, `tree_search_utils.py`, `weighted_random.py`) e priorização de descarte/uso em mãos acima de 7 cartas.
 
 ---
@@ -61,18 +64,22 @@ cd catanatron-enhanced
 
 # Ou, se já clonado anteriormente:
 git fetch origin
-git checkout main && git pull origin main
-# (Nota: `main` e `layout-topbar` ficam sincronizados no GitHub; a Vercel publica automaticamente o push em `origin/main`)
+git checkout layout-topbar && git pull origin layout-topbar
+# (Nota: `layout-topbar` possui o preview ativo na Vercel do Bloco 9 — Avatar 3D Modular — antes de mesclar para `main`)
 
 # 2. Instalar dependências do frontend e rodar servidor de desenvolvimento
 cd ui
 npm install
 npm start
 
-# 3. Rodar verificação completa do frontend (typecheck + Vitest + build)
+# 3. Rodar verificação completa do frontend (ativos 3D + typecheck + Vitest + build)
+npm run verify:avatars3d
 npx tsc --noEmit
 npx vitest run
 npm run build
+
+# 3b. (Se editar `ui/scripts/build_starter_3d_assets.mjs`) Regerar os 55 .glb iniciais:
+npm run build:avatars3d && npm run verify:avatars3d
 
 # 4. (Opcional) Rodar suíte de testes Python do backend web + regras de troca + anti-hoarding + dados
 cd ..
@@ -139,11 +146,12 @@ Salve as imagens geradas nas pastas dentro de `ui/public/assets/illustrations/` 
 22. **`lobby_hero.webp` — Banner de Fundo da Tela Inicial (`1920×1080`, atualizado com `panoramic_view.jpg` em alta resolução)**
 23. **`ocean_backdrop.webp` — Paisagem Marítima Panorâmica do Tabuleiro (`1376×768`, pôr do sol, ondas, ilhas distantes, castelo, farol e embarcações)**
 
-### E. Sistema de Avatares SVG 100% Originais (`ui/src/config/avatarCatalog.ts` & `ui/src/components/PlayerAvatar.tsx`)
-Os retratos legados `.webp` herdados do Catan Universe foram completamente aposentados e removidos da interface em favor do compositor vetorial próprio em camadas (`<PlayerAvatar />`), garantindo:
-- **Prioridade do Avatar Interativo:** Jogadores logados (`USER`) e visitantes com perfil salvo no navegador (`catan_guest_profile_v1`, `customized: true`) exibem automaticamente suas escolhas customizadas em todo o app (Home, Lobby, Mesa e Modal de Negociação).
-- **Predefinições Originais ("Modelos Prontos"):** 6 arquétipos harmônicos com a identidade de *Rule the Isle* (`Capitania Dourada`, `Navegador Atlântico`, `Forja da Montanha`, `Guardia da Floresta`, `Mercador Real` e `Pioneiro Livre`).
-- **Avatares e Nomes Oficiais de Bots (`botCatalog.ts` & `models.py`):** Perfis SVG distintos pareados com o elenco oficial da mesa (**`Creitu`**, **`Felire`**, **`Guiri`**, **`Jaó`** e **`Angeleri`**), atribuídos sem repetição na mesa e sem rótulos de cor ou prefixos artificiais (`IA (...)` / `Bot ...`).
+### E. Sistema de Avatares 3D Modulares + Retratos WebP/SVG (`Avatar3DCanvas.tsx` & `PlayerAvatar.tsx`)
+Os retratos legados `.webp` herdados do Catan Universe foram completamente aposentados e substituídos por um sistema duplo em camadas:
+- **Palco 3D Interativo ([`Avatar3DCanvas.tsx`](ui/src/components/avatar3d/Avatar3DCanvas.tsx) + [`AvatarStudioModal.tsx`](ui/src/components/AvatarStudioModal.tsx)):** Exibido no Estúdio 3D, no palco central da Tela Inicial e nos 4 Hero Cards verticais da Sala Multiplayer, com rotação `360°`, câmera **Corpo Inteiro / Rosto**, `55` modelos `.glb` modulares em `ui/public/assets/models/avatars/`, traços faciais 3D paramétricos e **7 canais de cor livre** (`Cores Livres`) sem multiplicar arquivos `.glb`.
+- **Retrato 2D de Alta Performance ([`PlayerAvatar.tsx`](ui/src/components/PlayerAvatar.tsx)):** Prioriza automaticamente o `portraitSnapshot` WebP (`<= 64 KB`) capturado do 3D quando salvo no perfil, com fallback vetorial V2 e molduras de mérito (`wood`, `bronze`, `silver`, `gold`, `imperial`, `vip_dragon`).
+- **Predefinições Originais ("6 Arquétipos da Ilha"):** `Capitão dos Mares`, `Guardiã da Floresta`, `Sentinela da Serra`, `Mercador do Porto`, `Mestre Construtora` e `Cartógrafo do Poente`.
+- **Avatares e Nomes Oficiais de Bots (`botCatalog.ts` & `models.py`):** Perfis distintos pareados com o elenco oficial da mesa (**`Creitu`**, **`Felire`**, **`Guiri`**, **`Jaó`** e **`Angeleri`**), atribuídos sem repetição na mesa e sem rótulos de cor ou prefixos artificiais (`IA (...)` / `Bot ...`).
 
 ---
 
@@ -264,6 +272,13 @@ Os retratos legados `.webp` herdados do Catan Universe foram completamente apose
   - **Bateria de Testes e Build Verificada (Bloco 8):**
     - Backend: **113/113 passando** (`pytest`, incluindo `test_room_bot_speed_pre_match_config_and_game_exposure` e paridade `api/catanatron/`).
     - Frontend: `npx tsc --noEmit` (**0 erros**), **32 arquivos / 164 testes passando** (`vitest`) e `npm run build` concluído (`1.118` módulos, `37.98s`).
+- **Bloco 9 Concluído (branch `layout-topbar`): Sistema de Avatares 3D Modulares WebGL, Estúdio 3D com Cores Livres & Preparação de Monetização VIP:**
+  - **Especificação & Plano:** Documentados em [`docs/superpowers/specs/2026-11-12-avatar-3d-monetization-design.md`](docs/superpowers/specs/2026-11-12-avatar-3d-monetization-design.md), [`docs/superpowers/plans/2026-11-12-avatar-3d-monetization.md`](docs/superpowers/plans/2026-11-12-avatar-3d-monetization.md) e [`docs/AVATAR_3D_ASSET_GUIDE.md`](docs/AVATAR_3D_ASSET_GUIDE.md).
+  - **Backend V2 & Entitlements (`catanatron/web/` + espelho `api/catanatron/web/`):** Catálogo V2 com `20` slots, tabela `user_entitlements`, validação de `portraitSnapshot` WebP/PNG (`<= 64 KB`), exposição de `entitlements` em `/api/auth/me` e trava HTTP `403 locked_items` no `PATCH /api/auth/profile` para itens conquistáveis por vitórias e SKUs VIP não possuídos.
+  - **Pipeline 3D Modular (`build_starter_3d_assets.mjs` & `verify_starter_3d_assets.mjs`):** `55/55` arquivos `.glb` verificados cobrindo corpos, cabeças, cabelos, barbas, trajes, pernas/botas, capas, chapéus, itens de mão, acessórios de costas, mascotes, montarias e pedestais com materiais reservados (`mat_*`) para coloração dinâmica em tempo real.
+  - **Engine Three.js & Retrato 2D (`Avatar3DCanvas.tsx`, `sceneComposer.ts`, `materialTint.ts`, `PlayerAvatar.tsx`):** Carregamento e cache glTF em `9` sockets + `faceSlot` dinâmico (olhos, sobrancelhas, nariz, boca com material próprio `mat_lips` e cicatriz `mat_scar`, escala corporal em `bodyType`) + auras em partículas (`sun_motes`, `sea_mist`, `imperial_flame`), `capturePortraitSnapshot()` (`256×256` WebP) e prioridade ao snapshot no `<PlayerAvatar />` com moldura `vip_dragon` e fallback SVG V2.
+  - **Estúdio 3D & Palcos (`AvatarStudioModal.tsx`, `HomePage.tsx`, `RoomLobbyPage.tsx`):** Estúdio com palco 3D fixo durante a rolagem (`.avatar-studio-preview-pinned`), câmera **Corpo Inteiro / Rosto**, `7` abas modulares, `7` canais de cor em **Cores Livres** + `<input type="color">`, filtros (`Todos`, `Desbloqueados`, `👑 VIP`), fluxo **Modo Provador (Try-On VIP)** antes de salvar, palco 3D interativo na Home e 4 Hero Cards 3D na Sala Multiplayer.
+  - **Verificação e Ajustes em Produção Preview (commits até `e4d2c65`):** `55/55` GLBs verificados, `npx tsc --noEmit` limpo, suíte Vitest + `npm run build` concluídos (`ui/dist/`), além de validação ao vivo em WebGL (`http://localhost:3000`, `1280×800`, 0 erros JS/WebGL) confirmando preview imóvel na rolagem e troca visual em todas as variações faciais e corporais; publicado em `origin/layout-topbar` para o preview da Vercel.
 
 ---
 
@@ -290,5 +305,7 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 5. ~~**Bloco 6 — Bots Anti-Hoarding, Encerramento de Salas, Dificuldade Única, Dados Equilibrados, Chat & Provocações**~~ *(Concluído)*
 6. ~~**Bloco 7 — Oceano ao Pôr do Sol, Portos Ilustrados, Dados 3D, Peças Artesanais, Ritmo 10s/3s/2x & Dock Vertical**~~ *(Concluído e publicado em `main` + `layout-topbar`)*
 7. ~~**Bloco 8 — Otimização Vite (1.118 módulos) & Velocidade dos Bots (Offline Permanente / Online Pré-Partida Travada)**~~ *(Concluído e publicado em `main` + `layout-topbar`)*
-8. **Testes Reais Multiplayer + Produção (PC / Celular):** Conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase, validar chat `/messages`, provocações, encerramento de salas e partidas multiplayer reais entre PC e celular na URL da Vercel.
-8. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.
+8. ~~**Bloco 9 — Avatar 3D Modular WebGL, Estúdio 3D (Cores Livres + 55 GLBs) & Estrutura VIP (`layout-topbar`)**~~ *(Concluído e publicado no preview `layout-topbar`, aguardando aprovação para merge em `main`)*
+9. **Promover `layout-topbar` -> `main` & Testes Reais Multiplayer (PC / Celular):** Validar o preview da Vercel (`catanatron-enhanced-git-layout-topbar-jgallo0s-projects.vercel.app`), mesclar `layout-topbar` para `main`, conferir `GOOGLE_CLIENT_ID` e `DATABASE_URL` na Vercel/Supabase e testar partidas reais entre PC e celular.
+10. **Loja VIP & Checkout (Stripe / Pix):** Conectar os SKUs `vip_*` do catálogo ao checkout e gravação de `user_entitlements`, além de permitir substituição opcional de `.glb` iniciais por modelos refinados no Blender seguindo [`docs/AVATAR_3D_ASSET_GUIDE.md`](docs/AVATAR_3D_ASSET_GUIDE.md).
+11. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.
