@@ -12,6 +12,7 @@ import uuid
 from flask import Response, Blueprint, current_app, jsonify, abort, request
 from werkzeug.exceptions import HTTPException
 
+from catanatron.web.avatar_catalog import AVATAR_CATALOG_ITEMS
 from catanatron.web.models import (
     BOT_AVATAR_BY_NAME,
     BOT_DIFFICULTY_TO_KEY,
@@ -20,6 +21,7 @@ from catanatron.web.models import (
     OFFICIAL_BOT_NAMES,
     OPEN_SEAT_NAME,
     SEAT_COLORS,
+    LockedAvatarItemsError,
     StoredGame,
     StoredRoom,
     _load_avatars_by_username,
@@ -88,6 +90,21 @@ def handle_http_exception(exc: HTTPException):
             }
         ),
         exc.code or 500,
+    )
+
+
+@bp.app_errorhandler(LockedAvatarItemsError)
+def handle_locked_avatar_items(exc: LockedAvatarItemsError):
+    return (
+        jsonify(
+            {
+                "code": 403,
+                "name": "Forbidden",
+                "description": exc.message,
+                "locked_items": exc.locked_items,
+            }
+        ),
+        403,
     )
 
 
@@ -376,6 +393,11 @@ def get_health_endpoint():
             "ephemeral_vercel_sqlite": bool(is_vercel and backend == "sqlite"),
         }
     )
+
+
+@bp.route("/avatar/catalog", methods=("GET",))
+def get_avatar_catalog_endpoint():
+    return jsonify({"version": 2, "items": AVATAR_CATALOG_ITEMS})
 
 
 @bp.route("/auth/config", methods=("GET",))

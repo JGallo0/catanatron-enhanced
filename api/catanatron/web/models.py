@@ -43,6 +43,15 @@ from sqlalchemy.orm import Session
 from flask_sqlalchemy import SQLAlchemy
 from flask import abort
 
+from catanatron.web.avatar_catalog import (
+    AVATAR_CATALOG_ITEMS,
+    AVATAR_UNLOCK_REQUIREMENTS,
+    AVATAR_VALID_VALUES,
+    filter_unlocked_avatar_config,
+    find_locked_avatar_items,
+    sanitize_avatar_config,
+)
+
 metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
@@ -50,24 +59,6 @@ SEAT_COLORS = ["RED", "BLUE", "ORANGE", "WHITE"]
 SESSION_TTL_SECONDS = 90 * 24 * 60 * 60
 TAKEOVER_TIMEOUT_SECONDS = 45
 TAKEOVER_BOT_SPEC = "CATANATRON"
-
-AVATAR_VALID_VALUES: dict[str, tuple[str, ...]] = {
-    "skin": ("porcelain", "fair", "warm", "tan", "brown", "deep"),
-    "eyes": ("calm", "cheerful", "sharp", "wise"),
-    "hair": ("none", "short", "wavy", "bun", "braids", "curly", "long"),
-    "hairColor": ("brown", "black", "blonde", "red", "silver", "navy"),
-    "beard": ("none", "goatee", "full", "mustache"),
-    "hat": ("none", "captain", "explorer", "bandana", "helm", "crown_gold"),
-    "outfit": ("settler", "captain", "armor", "merchant"),
-    "outfitColor": ("crimson", "royal", "emerald", "amber", "slate"),
-    "background": ("ocean", "sunset", "forest", "mountain", "gold", "crimson"),
-    "frame": ("wood", "bronze", "silver", "gold", "imperial"),
-}
-
-AVATAR_UNLOCK_REQUIREMENTS: dict[str, dict[str, int]] = {
-    "frame": {"bronze": 1, "silver": 3, "gold": 5, "imperial": 10},
-    "hat": {"crown_gold": 7},
-}
 
 OFFICIAL_BOT_NAMES: tuple[str, ...] = (
     "Creitu",
@@ -216,36 +207,12 @@ def pick_bot_names(
     return chosen
 
 
-def sanitize_avatar_config(raw: dict | None) -> dict[str, str]:
-    if not isinstance(raw, dict):
-        return {}
-    sanitized: dict[str, str] = {}
-    for field, allowed in AVATAR_VALID_VALUES.items():
-        val = raw.get(field)
-        if isinstance(val, str) and val in allowed:
-            sanitized[field] = val
-    return sanitized
-
-
-def filter_unlocked_avatar_config(
-    raw: dict | None, wins: int = 0
-) -> dict[str, str]:
-    """Sanitize avatar config and silently drop items above current win count."""
-    clean = sanitize_avatar_config(raw)
-    unlocked: dict[str, str] = {}
-    for field, val in clean.items():
-        required = AVATAR_UNLOCK_REQUIREMENTS.get(field, {}).get(val, 0)
-        if wins >= required:
-            unlocked[field] = val
-    return unlocked
-
-
-def _load_avatars_by_username(usernames: list[str]) -> dict[str, dict[str, str]]:
+def _load_avatars_by_username(usernames: list[str]) -> dict[str, dict]:
     clean = sorted({u for u in usernames if isinstance(u, str) and u})
     if not clean:
         return {}
     users = db.session.query(StoredUser).filter(StoredUser.username.in_(clean)).all()
-    by_user: dict[str, dict[str, str]] = {}
+    by_user: dict[str, dict] = {}
     for u in users:
         try:
             parsed = json.loads(u.avatar_json or "{}")
@@ -341,6 +308,24 @@ class StoredSession(Base):
         nullable=False,
         default=lambda: int(time.time()) + SESSION_TTL_SECONDS,
     )
+
+
+class StoredUserEntitlement(Base):
+    """Cosmetic item unlocked/purchased by a registered user."""
+
+    __tablename__ = "user_entitlements"
+    __table_args__ = (
+        UniqueConstraint("username", "item_key", name="uq_user_entitlement_item"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(
+        String(32), ForeignKey("users.username"), index=True, nullable=False
+    )
+    item_key = Column(String(96), nullable=False)
+    source = Column(String(24), nullable=False, default="STORE")
+    transaction_ref = Column(String(128), nullable=True)
+    granted_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
 
 
 class StoredMatch(Base):
@@ -1173,6 +1158,60 @@ def revoke_session_token(token: str | None, session_param=None) -> bool:
     return True
 
 
+class LockedAvatarItemsError(Exception):
+    """Raised when a user tries to equip locked earnable or VIP avatar items."""
+
+    def __init__(self, locked_items: list[dict], message: str):
+        super().__init__(message)
+        self.locked_items = locked_items
+        self.message = message
+
+
+def get_user_entitlements(username: str, session=None) -> list[str]:
+    sess = session or db.session
+    clean = _normalize_username(username)
+    if not clean:
+        return []
+    rows = (
+        sess.query(StoredUserEntitlement.item_key)
+        .filter_by(username=clean)
+        .order_by(StoredUserEntitlement.item_key.asc())
+        .all()
+    )
+    return sorted({row.item_key for row in rows if row.item_key})
+
+
+def grant_user_entitlement(
+    username: str,
+    item_key: str,
+    source: str = "STORE",
+    transaction_ref: str | None = None,
+    session=None,
+) -> StoredUserEntitlement:
+    sess = session or db.session
+    clean_user = _normalize_username(username)
+    clean_key = str(item_key or "").strip()[:96]
+    if not clean_user or not clean_key:
+        raise ValueError("username and item_key are required")
+    existing = (
+        sess.query(StoredUserEntitlement)
+        .filter_by(username=clean_user, item_key=clean_key)
+        .first()
+    )
+    if existing is not None:
+        return existing
+    row = StoredUserEntitlement(
+        username=clean_user,
+        item_key=clean_key,
+        source=str(source or "STORE").strip().upper()[:24] or "STORE",
+        transaction_ref=str(transaction_ref).strip()[:128] if transaction_ref else None,
+        granted_at=int(time.time()),
+    )
+    sess.add(row)
+    sess.commit()
+    return row
+
+
 def serialize_user(user: StoredUser, stats: dict | None = None) -> dict:
     try:
         avatar_cfg = json.loads(user.avatar_json or "{}")
@@ -1183,6 +1222,7 @@ def serialize_user(user: StoredUser, stats: dict | None = None) -> dict:
         "display_name": user.display_name,
         "has_google": bool(user.google_sub),
         "avatar_config": sanitize_avatar_config(avatar_cfg),
+        "entitlements": get_user_entitlements(user.username),
     }
     if stats is not None:
         payload["stats"] = stats
@@ -1257,19 +1297,35 @@ def update_user_profile(
             existing_cfg = {}
         incoming_cfg = sanitize_avatar_config(avatar_config)
         merged_cfg = {**existing_cfg, **incoming_cfg}
+        if "colors" in existing_cfg or "colors" in incoming_cfg:
+            merged_colors = {
+                **(existing_cfg.get("colors") or {}),
+                **(incoming_cfg.get("colors") or {}),
+            }
+            if merged_colors:
+                merged_cfg["colors"] = merged_colors
+        if "portraitSnapshot" in avatar_config and "portraitSnapshot" not in incoming_cfg:
+            merged_cfg.pop("portraitSnapshot", None)
 
         wins = get_user_stats(user.username)["wins"]
-        for field, rules in AVATAR_UNLOCK_REQUIREMENTS.items():
-            chosen = merged_cfg.get(field)
-            if chosen in rules and wins < rules[chosen]:
-                required = rules[chosen]
-                abort(
-                    403,
-                    description=(
-                        f"Este item requer {required} vitória(s) no Ranking para ser "
-                        f"desbloqueado (você tem {wins})."
-                    ),
+        entitlements = set(get_user_entitlements(user.username))
+        locked = find_locked_avatar_items(
+            merged_cfg, wins=wins, entitlements=entitlements
+        )
+        if locked:
+            first = locked[0]
+            if first["tier"] == "earnable":
+                required = first["required_wins"]
+                msg = (
+                    f"Este item requer {required} vitória(s) no Ranking para ser "
+                    f"desbloqueado (você tem {wins})."
                 )
+            else:
+                msg = (
+                    "Este item é exclusivo VIP e requer desbloqueio na conta "
+                    "para ser equipado."
+                )
+            raise LockedAvatarItemsError(locked, msg)
         user.avatar_json = json.dumps(merged_cfg)
 
     if display_name is not None and str(display_name).strip():
