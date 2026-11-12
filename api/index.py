@@ -1,9 +1,10 @@
-import json
 import os
 import re
 import sys
 import traceback
 from urllib.parse import parse_qsl, urlencode
+
+from flask import Flask, jsonify
 
 # Ensure the local catanatron package directory is highest-priority in Vercel Python runtime
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,40 +20,34 @@ def _redact_secrets(text: str) -> str:
     return re.sub(r"://([^:@/\s]+):([^@/\s]+)@", r"://\1:***@", text or "")
 
 
-def _make_startup_error_app(exc: Exception):
+def _make_startup_error_app(exc: Exception) -> Flask:
     traceback.print_exc()
     err_type = type(exc).__name__
     err_msg = _redact_secrets(str(exc))
+    err_app = Flask(__name__)
 
-    def _error_wsgi(environ, start_response):
-        payload = json.dumps(
+    @err_app.route(
+        "/",
+        defaults={"subpath": ""},
+        methods=("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"),
+    )
+    @err_app.route(
+        "/<path:subpath>",
+        methods=("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"),
+    )
+    def _startup_failed(subpath):
+        resp = jsonify(
             {
                 "ok": False,
                 "error": err_type,
                 "description": err_msg,
             }
-        ).encode("utf-8")
-        start_response(
-            "500 Internal Server Error",
-            [
-                ("Content-Type", "application/json; charset=utf-8"),
-                ("Content-Length", str(len(payload))),
-                ("Cache-Control", "no-store"),
-            ],
         )
-        return [payload]
+        resp.status_code = 500
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
-    return _error_wsgi
-
-
-_STARTUP_OK = True
-try:
-    from catanatron.web import create_app
-
-    app = create_app()
-except Exception as startup_exc:
-    _STARTUP_OK = False
-    app = _make_startup_error_app(startup_exc)
+    return err_app
 
 
 class _VercelRoutingMiddleware:
@@ -100,5 +95,15 @@ class _VercelRoutingMiddleware:
         return self.wsgi_app(environ, start_response)
 
 
-if _STARTUP_OK:
-    app.wsgi_app = _VercelRoutingMiddleware(app.wsgi_app)
+def _build_app() -> Flask:
+    try:
+        from catanatron.web import create_app
+
+        application = create_app()
+        application.wsgi_app = _VercelRoutingMiddleware(application.wsgi_app)
+        return application
+    except Exception as startup_exc:
+        return _make_startup_error_app(startup_exc)
+
+
+app = _build_app()
