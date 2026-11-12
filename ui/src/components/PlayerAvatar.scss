@@ -14,7 +14,8 @@
     background: linear-gradient(145deg, #a66c38, #5c3718);
     box-shadow:
       0 3px 10px rgba(0, 0, 0, 0.55),
-      inset 0 1px 1px rgba(255, 255, 255, 0.28);
+      inset 0 1px 1px rgba(255, 255, 255, 0.28),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.35);
     overflow: hidden;
     flex-shrink: 0;
   }
@@ -22,18 +23,28 @@
   &--frame-wood &__frame {
     background: linear-gradient(145deg, #a66d3b 0%, #734620 55%, #472910 100%);
     border: 1.5px solid #c68b54;
+    box-shadow:
+      0 3px 10px rgba(0, 0, 0, 0.52),
+      inset 0 1px 1px rgba(255, 237, 213, 0.25),
+      inset 0 0 0 1.5px rgba(45, 24, 10, 0.55);
   }
 
   &--frame-bronze &__frame {
     background: linear-gradient(145deg, #f09c5a 0%, #b45309 55%, #6d2e07 100%);
     border: 1.5px solid #fdba74;
-    box-shadow: 0 3px 12px rgba(217, 119, 6, 0.45);
+    box-shadow:
+      0 3px 12px rgba(217, 119, 6, 0.45),
+      inset 0 1px 1px rgba(255, 255, 255, 0.35),
+      inset 0 0 0 1.5px rgba(92, 37, 8, 0.6);
   }
 
   &--frame-silver &__frame {
     background: linear-gradient(145deg, #f8fafc 0%, #94a3b8 50%, #475569 100%);
     border: 1.5px solid #f1f5f9;
-    box-shadow: 0 3px 14px rgba(148, 163, 184, 0.5);
+    box-shadow:
+      0 3px 14px rgba(148, 163, 184, 0.5),
+      inset 0 1px 2px rgba(255, 255, 255, 0.6),
+      inset 0 0 0 1.5px rgba(51, 65, 85, 0.55);
   }
 
   &--frame-gold &__frame {
@@ -41,7 +52,8 @@
     border: 2px solid #fef9c3;
     box-shadow:
       0 0 14px rgba(250, 204, 21, 0.55),
-      inset 0 1px 2px rgba(255, 255, 255, 0.65);
+      inset 0 1px 2px rgba(255, 255, 255, 0.65),
+      inset 0 0 0 1.5px rgba(120, 53, 15, 0.6);
   }
 
   &--frame-imperial &__frame {
@@ -50,16 +62,44 @@
     border: 2px solid #fde047;
     box-shadow:
       0 0 16px rgba(16, 185, 129, 0.55),
-      0 0 24px rgba(250, 204, 21, 0.45);
+      0 0 24px rgba(250, 204, 21, 0.45),
+      inset 0 0 0 1.5px rgba(6, 78, 59, 0.65);
     animation: player-avatar-imperial-pulse 3.2s ease-in-out infinite;
   }
 
-  &__svg {
+  &--frame-vip_dragon &__frame {
+    padding: 4px;
+    background: conic-gradient(
+      from 35deg,
+      #f59e0b 0deg,
+      #991b1b 70deg,
+      #fde047 140deg,
+      #7f1d1d 215deg,
+      #f59e0b 285deg,
+      #fef08a 330deg,
+      #f59e0b 360deg
+    );
+    border: 2px solid #fde68a;
+    box-shadow:
+      0 0 0 1.5px rgba(127, 29, 29, 0.9),
+      0 0 18px rgba(220, 38, 38, 0.62),
+      0 0 28px rgba(245, 158, 11, 0.52),
+      inset 0 1px 2px rgba(254, 249, 195, 0.75),
+      inset 0 0 0 2px rgba(127, 29, 29, 0.85);
+    animation: player-avatar-vip-dragon-pulse 2.8s ease-in-out infinite;
+  }
+
+  &__svg,
+  &__snapshot {
     display: block;
     width: 100%;
     height: 100%;
     border-radius: 50%;
     background: #0f172a;
+  }
+
+  &__snapshot {
+    object-fit: cover;
   }
 
   &__frame-label {
@@ -73,6 +113,13 @@
     letter-spacing: 0.02em;
     white-space: nowrap;
   }
+
+  &--frame-vip_dragon &__frame-label {
+    color: #fef3c7;
+    background: linear-gradient(135deg, rgba(127, 29, 29, 0.92), rgba(15, 23, 42, 0.92));
+    border-color: rgba(245, 158, 11, 0.65);
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.35);
+  }
 }
 
 @keyframes player-avatar-imperial-pulse {
@@ -80,11 +127,33 @@
   100% {
     box-shadow:
       0 0 14px rgba(16, 185, 129, 0.5),
-      0 0 22px rgba(250, 204, 21, 0.4);
+      0 0 22px rgba(250, 204, 21, 0.4),
+      inset 0 0 0 1.5px rgba(6, 78, 59, 0.65);
   }
   50% {
     box-shadow:
       0 0 20px rgba(16, 185, 129, 0.8),
-      0 0 30px rgba(250, 204, 21, 0.7);
+      0 0 30px rgba(250, 204, 21, 0.7),
+      inset 0 0 0 1.5px rgba(6, 78, 59, 0.65);
+  }
+}
+
+@keyframes player-avatar-vip-dragon-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1.5px rgba(127, 29, 29, 0.9),
+      0 0 16px rgba(220, 38, 38, 0.58),
+      0 0 26px rgba(245, 158, 11, 0.46),
+      inset 0 1px 2px rgba(254, 249, 195, 0.75),
+      inset 0 0 0 2px rgba(127, 29, 29, 0.85);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px rgba(153, 27, 27, 0.95),
+      0 0 24px rgba(239, 68, 68, 0.82),
+      0 0 34px rgba(250, 204, 21, 0.72),
+      inset 0 1px 2px rgba(254, 249, 195, 0.9),
+      inset 0 0 0 2px rgba(127, 29, 29, 0.85);
   }
 }
