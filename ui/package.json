@@ -18,6 +18,7 @@
     "react-spinners": "^0.17.0",
     "react-zoom-pan-pinch": "^3.7.0",
     "sass": "^1.89.0",
+    "three": "^0.187.0",
     "typescript": "^5.8.3"
   },
   "engines": {
@@ -27,7 +28,9 @@
   "scripts": {
     "start": "vite",
     "build": "vite build",
-    "test": "vitest"
+    "test": "vitest",
+    "build:avatars3d": "node scripts/build_starter_3d_assets.mjs",
+    "verify:avatars3d": "node scripts/verify_starter_3d_assets.mjs"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -50,6 +53,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@tsconfig/vite-react": "^6.3.5",
     "@types/react-dom": "^19.1.6",
+    "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "^4.5.0",
     "@vitest/coverage-v8": "^3.1.4",
     "jsdom": "^26.1.0",
