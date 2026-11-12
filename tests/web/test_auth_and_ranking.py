@@ -566,9 +566,19 @@ def test_health_endpoint_and_database_url_normalization(app, client, monkeypatch
         '"postgres://user:pass@db.example.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1&channel_binding=require"',
     )
     resolved = _resolve_database_url("sqlite:////tmp/fallback.db")
-    assert resolved.startswith("postgresql://user:pass@db.example.com:6543/postgres?")
+    assert (
+        resolved.startswith("postgresql+psycopg2://user:pass@db.example.com:6543/postgres?")
+        or resolved.startswith("postgresql+psycopg://user:pass@db.example.com:6543/postgres?")
+        or resolved.startswith("postgresql://user:pass@db.example.com:6543/postgres?")
+    )
     assert "sslmode=require" in resolved
     assert "pgbouncer" not in resolved
     assert "connection_limit" not in resolved
     assert "channel_binding" not in resolved
+
+    from sqlalchemy import create_engine
+
+    engine = create_engine(resolved)
+    assert engine.dialect.name == "postgresql"
+    engine.dispose()
 

@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import tempfile
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -92,6 +93,11 @@ def _resolve_database_url(default_sqlite: str) -> str:
     if raw.startswith("postgres://"):
         raw = raw.replace("postgres://", "postgresql://", 1)
     if raw.startswith("postgresql://"):
+        if importlib.util.find_spec("psycopg2") is not None:
+            raw = raw.replace("postgresql://", "postgresql+psycopg2://", 1)
+        elif importlib.util.find_spec("psycopg") is not None:
+            raw = raw.replace("postgresql://", "postgresql+psycopg://", 1)
+    if raw.startswith("postgresql"):
         parsed = urlparse(raw)
         if parsed.query:
             filtered = [
@@ -129,14 +135,19 @@ def create_app(test_config=None):
     effective_uri = (
         (test_config or {}).get("SQLALCHEMY_DATABASE_URI") or database_url
     )
-    is_postgres = str(effective_uri).startswith("postgresql://")
+    effective_str = str(effective_uri)
+    is_postgres = effective_str.startswith("postgresql")
     is_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
+    pg_connect_args: dict[str, object] = {"connect_timeout": 10}
+    if "+psycopg://" in effective_str:
+        pg_connect_args["prepare_threshold"] = None
 
     engine_options = (
         {
             "pool_pre_ping": True,
             "pool_recycle": 300,
-            "connect_args": {"connect_timeout": 10},
+            "connect_args": pg_connect_args,
         }
         if is_postgres
         else {}
@@ -152,7 +163,7 @@ def create_app(test_config=None):
     if test_config is not None:
         app.config.update(test_config)
         final_uri = str(app.config.get("SQLALCHEMY_DATABASE_URI") or "")
-        final_pg = final_uri.startswith("postgresql://")
+        final_pg = final_uri.startswith("postgresql")
         app.config["CATAN_DB_BACKEND"] = "postgresql" if final_pg else "sqlite"
         app.config["CATAN_DB_PERSISTENT"] = bool(final_pg or not is_vercel)
 

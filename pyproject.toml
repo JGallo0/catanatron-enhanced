@@ -25,6 +25,7 @@ dependencies = [
     "flask_sqlalchemy",
     "sqlalchemy",
     "psycopg2-binary",
+    "psycopg[binary]",
     "gunicorn",
 ]
 
@@ -37,6 +38,7 @@ web = [
     "flask_sqlalchemy",
     "sqlalchemy",
     "psycopg2-binary",
+    "psycopg[binary]",
 ]
 dev = [
     "black==25.11.0",
