@@ -19,6 +19,8 @@ import {
 import PlayerAvatar from "../PlayerAvatar";
 import { applyAvatarMaterials } from "./materialTint";
 import {
+  MOUNT_PROFILES,
+  applyAvatarCombinationAndPose,
   clearAvatarGltfCache,
   clearGroupChildren,
   createAuraEffect,
@@ -57,6 +59,11 @@ const CAMERA_PRESETS = {
     position: [0.34, 1.18, 3.65] as const,
     target: [0, 0.88, 0] as const,
   },
+  mountedFull: {
+    fov: 38,
+    position: [1.35, 1.46, 4.35] as const,
+    target: [0.02, 1.04, 0.04] as const,
+  },
   portrait: {
     fov: 32,
     position: [0.11, 1.61, 0.86] as const,
@@ -85,12 +92,45 @@ function getBackgroundSwatches(bgId: string): {
   };
 }
 
+function resolvePortraitCameraCoords(mountId: string): {
+  fov: number;
+  position: [number, number, number];
+  target: [number, number, number];
+} {
+  const mp = mountId && mountId !== "none" ? MOUNT_PROFILES[mountId] : undefined;
+  if (!mp) {
+    return {
+      fov: CAMERA_PRESETS.portrait.fov,
+      position: [...CAMERA_PRESETS.portrait.position],
+      target: [...CAMERA_PRESETS.portrait.target],
+    };
+  }
+  const yaw = mp.turnY + 0.12;
+  const dist = 0.87;
+  return {
+    fov: CAMERA_PRESETS.portrait.fov,
+    position: [
+      Math.sin(yaw) * dist,
+      CAMERA_PRESETS.portrait.position[1] + mp.riderY,
+      mp.riderZ + Math.cos(yaw) * dist,
+    ],
+    target: [0, CAMERA_PRESETS.portrait.target[1] + mp.riderY, mp.riderZ],
+  };
+}
+
 function applyCameraPreset(
   camera: THREE.PerspectiveCamera,
   controls: OrbitControls | null,
-  focus: "full" | "portrait"
+  focus: "full" | "portrait",
+  mountId: string = "none"
 ): void {
-  const preset = CAMERA_PRESETS[focus];
+  const isMounted = Boolean(mountId && mountId !== "none" && MOUNT_PROFILES[mountId]);
+  const preset =
+    focus === "portrait"
+      ? resolvePortraitCameraCoords(mountId)
+      : isMounted
+        ? CAMERA_PRESETS.mountedFull
+        : CAMERA_PRESETS.full;
   camera.fov = preset.fov;
   camera.position.set(
     preset.position[0],
@@ -183,7 +223,7 @@ export const Avatar3DCanvas = forwardRef<
         const prevBackground = scene.background;
 
         try {
-          const portraitPreset = CAMERA_PRESETS.portrait;
+          const portraitPreset = resolvePortraitCameraCoords(resolved.mount);
           camera.fov = portraitPreset.fov;
           camera.aspect = 1;
           camera.position.set(
@@ -241,7 +281,7 @@ export const Avatar3DCanvas = forwardRef<
         }
       },
     }),
-    [webglFailed, bgSwatches.secondary]
+    [webglFailed, bgSwatches.secondary, resolved.mount]
   );
 
   // Initialize Three.js WebGLRenderer, Scene, Lights, Camera, Controls, RAF, ResizeObserver
@@ -297,12 +337,12 @@ export const Avatar3DCanvas = forwardRef<
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.minDistance = 0.7;
-    controls.maxDistance = 5.2;
+    controls.maxDistance = 6.2;
     controls.minPolarAngle = Math.PI * 0.22;
     controls.maxPolarAngle = Math.PI * 0.52;
     controls.enableZoom = interactive && mode === "studio";
     controls.enabled = interactive;
-    applyCameraPreset(camera, controls, cameraFocus);
+    applyCameraPreset(camera, controls, cameraFocus, resolved.mount);
 
     rendererRef.current = renderer;
     sceneRef.current = scene;
@@ -368,8 +408,8 @@ export const Avatar3DCanvas = forwardRef<
     if (!camera || !controls) return;
     controls.enabled = interactive;
     controls.enableZoom = interactive && mode === "studio";
-    applyCameraPreset(camera, controls, cameraFocus);
-  }, [cameraFocus, interactive, mode]);
+    applyCameraPreset(camera, controls, cameraFocus, resolved.mount);
+  }, [cameraFocus, interactive, mode, resolved.mount]);
 
   // Compose/update modular parts, aura, and material colors
   useEffect(() => {
@@ -388,6 +428,7 @@ export const Avatar3DCanvas = forwardRef<
       if (faceChanged) {
         updateAvatarBodyProportions(rig, resolved.bodyType);
         updateAvatarFacialFeatures(rig, resolved);
+        applyAvatarCombinationAndPose(rig, resolved);
         lastFaceKeyRef.current = faceSignature;
       }
       if (auraChanged) {

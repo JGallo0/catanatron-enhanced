@@ -92,6 +92,48 @@ export const AVATAR_MODEL_MANIFEST = [
   { relPath: "pedestals/obsidian_crown.glb", allOf: ["mat_secondary", "mat_metal"] },
 ];
 
+const REQUIRED_ARTICULATED_NODES_BY_PREFIX = {
+  "bodies/": [
+    "rig_hips",
+    "rig_torso",
+    "rig_thigh_l",
+    "rig_calf_l",
+    "rig_foot_l",
+    "rig_hand_l",
+    "rig_hand_r",
+    "sculpted_hand_l",
+    "sculpted_hand_r",
+  ],
+  "outfits/": [
+    "rig_hips",
+    "rig_torso",
+    "rig_skirt_front",
+    "rig_skirt_back",
+    "rig_shoulder_l",
+    "rig_forearm_r",
+  ],
+  "legs/": [
+    "rig_hips",
+    "rig_thigh_l",
+    "rig_calf_l",
+    "rig_foot_l",
+    "rig_thigh_r",
+    "rig_calf_r",
+    "rig_foot_r",
+  ],
+  "capes/": ["rig_cape_collar", "rig_cape_drape"],
+  "hair/": ["hair_crown_mass", "hair_lower_flow"],
+};
+
+const REQUIRED_SPECIFIC_NODES = {
+  "pets/owl.glb": ["owl_facial_disc", "owl_ear_tuft_1"],
+  "pets/parrot.glb": ["parrot_upper_bill", "parrot_long_tail_0"],
+  "pets/falcon.glb": ["falcon_brow_1", "falcon_wing_1"],
+  "mounts/snow_wolf.glb": ["wolf_fang_1", "wolf_paw_fl", "wolf_ruff_spike_0"],
+  "mounts/royal_stag.glb": ["antler_beam_1", "antler_brow_tine_1", "antler_crown_fork_1"],
+  "mounts/imperial_griffin.glb": ["griffin_beak", "mount_wing_l", "griffin_talon_fl"],
+};
+
 function normalizeMaterialKey(name) {
   return String(name || "")
     .trim()
@@ -211,6 +253,29 @@ function verifyGlbFile(entry) {
       return {
         ok: false,
         error: `Missing at least one material from [${entry.anyOf.join(", ")}] (found: ${rawMatNames.join(", ") || "none"})`,
+      };
+    }
+  }
+
+  const nodeNames = new Set((gltf.nodes || []).map((n) => n?.name).filter(Boolean));
+  for (const [prefix, reqNodes] of Object.entries(REQUIRED_ARTICULATED_NODES_BY_PREFIX)) {
+    if (entry.relPath.startsWith(prefix)) {
+      const missingNodes = reqNodes.filter((n) => !nodeNames.has(n));
+      if (missingNodes.length > 0) {
+        return {
+          ok: false,
+          error: `Missing required articulated node(s): ${missingNodes.join(", ")}`,
+        };
+      }
+    }
+  }
+  const exactReq = REQUIRED_SPECIFIC_NODES[entry.relPath];
+  if (exactReq) {
+    const missingExact = exactReq.filter((n) => !nodeNames.has(n));
+    if (missingExact.length > 0) {
+      return {
+        ok: false,
+        error: `Missing required species node(s): ${missingExact.join(", ")}`,
       };
     }
   }

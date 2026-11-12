@@ -21,7 +21,7 @@ ui/public/assets/models/avatars/
 ├── props_hand/   # Adereços de mão direita (spyglass, scroll, royal_scepter, sun_rapier)
 ├── props_back/   # Adereços de costas (explorer_pack, sheathed_sword, imperial_shield)
 ├── pets/         # Mascotes de ombro esquerdo (owl, parrot, falcon)
-├── mounts/       # Montarias atrás-direita (island_horse, snow_wolf, royal_stag, imperial_griffin)
+├── mounts/       # Montarias centralizadas com sela e estribos para montada real (island_horse, snow_wolf, royal_stag, imperial_griffin)
 └── pedestals/    # Bases hexagonais (stone_wood, runic_gold, obsidian_crown)
 ```
 
@@ -51,10 +51,10 @@ As peças são divididas entre **Espaço do Rig/Mundo** (exportadas já posicion
 | `socket_torso` (`bodies/`, `outfits/`) | Mundo / Rig | `(0, 0, 0)` | Pés em `Y = 0`; tronco/ombros entre `Y = 0.92..1.42`; pescoço termina em `Y = 1.48`. |
 | `socket_legs` (`legs/`) | Mundo / Rig | `(0, 0, 0)` | Solas das botas apoiadas exatamente em `Y = 0.00`, cobrindo até a cintura em `Y = 0.95`. |
 | `socket_cape` (`capes/`) | Mundo / Rig | `(0, 0, 0)` | Ombros em `Y = 1.41`, caída pelas costas ao longo de `Z = -0.16` até `Y = 0.35..0.52`. |
-| `socket_mount` (`mounts/`) | Mundo / Rig | `(0.42, 0, -0.42)` | Patas/cascos em `Y = 0.00`, posicionada atrás à direita (`X = +0.42, Z = -0.42`) dentro do raio do pedestal (`0.85 m`). |
+| `socket_mount` (`mounts/`) | Mundo / Rig | `(0, 0, 0)` | Patas/cascos em `Y = 0.00`, centralizada no pedestal (`pedestals/` escalado automaticamente) com sela/rédeas/estribos para o `riderPivot` articulado montar sobre o dorso; possui pivôs opcionais `mount_neck_pivot`, `mount_tail_pivot`, `mount_wing_l/r`. |
 | `socket_pedestal` (`pedestals/`) | Mundo / Rig | `(0, 0, 0)` | Plinto hexagonal escalonado de `Y = -0.16` até `Y = 0.00` (topo exatamente em `Y = 0`), raio `~0.85 m`. |
 | `socket_head` (`heads/`) | Local `(0, 0, 0)` | `(0, 1.46, 0)` | Base do pescoço em `(0, 0, 0)`; centro da cabeça em `(0, 0.12, 0)`; topo do crânio em `Y = 0.25`. |
-| `socket_head` (`hair/`, `beards/`) | Local `(0, 0, 0)` | `(0, 1.46, 0)` | Modelados em torno da cabeça centrada em `(0, 0.12, 0)` sem invadir o rosto (`Z > 0.09`). |
+| `socket_head` (`hair/`, `beards/`) | Local `(0, 0, 0)` | `(0, 1.46, 0)` | Cabelos divididos nos grupos `hair_crown_mass` (recolhido sob chapéus/elmos) e `hair_lower_flow` (mechas abaixo da aba); barbas contornam o maxilar sem invadir `Z > 0.09`. |
 | `socket_head` (`hats/`) | Local `(0, 0, 0)` | `(0, 1.46, 0)` | Apoiados no topo da cabeça ao redor de `(0, 0.22, 0)`. |
 | `socket_hand_r` (`props_hand/`) | Local `(0, 0, 0)` | `(-0.36, 0.88, 0.12)` | Ponto da empunhadura (cabo/pegada) em `(0, 0, 0)`, estendendo-se para `+Y` / `+Z`. |
 | `socket_back` (`props_back/`) | Local `(0, 0, 0)` | `(0, 1.15, -0.17)` | Centro de fixação na mochila/escudo/bainha em `(0, 0, 0)`, voltado para `-Z`. |
@@ -134,7 +134,8 @@ Abra o **Blender (4.x+)** e prepare o arquivo para o motor do *Rule the Isle*:
    - Aplique transformações: **`Ctrl + A` → `All Transforms`**.
 4. **Ajustar Origem / Pivô (*Socket*):**
    - Posicione o cursor 3D (`Shift + S`) no ponto de encaixe correto da Seção 2 (ex.: pés no `(0,0,0)` para corpo/botas/montaria; empunhadura no `(0,0,0)` para arma de mão; garras no `(0,0,0)` para pet de ombro).
-   - Com o objeto selecionado: `Right Click → Set Origin → Origin to 3D Cursor`, depois mova o objeto para `(0, 0, 0)` (exceto `mounts/`, cuja âncora deve ficar em `(0.42, 0, -0.42)` no espaço glTF!).
+   - Com o objeto selecionado: `Right Click → Set Origin → Origin to 3D Cursor`, depois mova o objeto para `(0, 0, 0)` (incluindo `mounts/`, cuja âncora centrada em `(0, 0, 0)` permite o encaixe articulado do cavaleiro sobre a sela!).
+   - Para roupas, corpos e pernas personalizados acompanharem a articulação de montaria, mantenha a hierarquia canônica de nós (`rig_hips`, `rig_torso`, `rig_skirt_front/back`, `rig_shoulder_l/r`, `rig_upper_arm_l/r`, `rig_forearm_l/r`, `rig_hand_l/r`, `rig_thigh_l/r`, `rig_calf_l/r`, `rig_foot_l/r`, além de `rig_cape_collar` -> `rig_cape_drape` em capas).
 5. **Otimizar malha (se pesada):**
    - Adicione modificador **Decimate** (`Collapse`, ex. ratio `0.25–0.5`) para manter cada peça leve (`<= 8.000` a `15.000` triângulos, idealmente `< 500 KB` por `.glb`). Aplique o modificador.
 6. **Configurar Materiais `mat_*`:**
