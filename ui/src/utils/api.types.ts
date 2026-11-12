@@ -167,7 +167,104 @@ export type AvatarOutfitColor = "crimson" | "royal" | "emerald" | "amber" | "sla
 export type AvatarBackground = "ocean" | "sunset" | "forest" | "mountain" | "gold" | "crimson";
 export type AvatarFrame = "wood" | "bronze" | "silver" | "gold" | "imperial";
 
-export type AvatarConfig = {
+export type AvatarColors = {
+  skin: string;
+  hair: string;
+  eyes: string;
+  outfitPrimary: string;
+  outfitSecondary: string;
+  outfitTrim: string;
+  mount: string;
+};
+
+export type AvatarBodyType = "athletic" | "sturdy" | "slender";
+export type AvatarHeadShape = "oval" | "square" | "heart" | "chiseled";
+export type AvatarEyeStyle = "noble" | "fierce" | "wise" | "cheerful" | "calm" | "sharp";
+export type AvatarBrowStyle = "arched" | "thick" | "calm" | "scarred";
+export type AvatarNoseStyle = "straight" | "aquiline" | "broad" | "button";
+export type AvatarMouthStyle = "confident" | "smile" | "serious" | "smirk";
+
+export type AvatarItemTier = "free" | "earnable" | "vip";
+export type AvatarItemRarity = "common" | "rare" | "epic" | "legendary";
+
+export type AvatarItemSlot =
+  | "bodyType"
+  | "headShape"
+  | "eyeStyle"
+  | "browStyle"
+  | "noseStyle"
+  | "mouthStyle"
+  | "hair"
+  | "beard"
+  | "outfit"
+  | "legsBoots"
+  | "cape"
+  | "hat"
+  | "handProp"
+  | "backProp"
+  | "pet"
+  | "mount"
+  | "pedestal"
+  | "aura"
+  | "background"
+  | "frame";
+
+export type AvatarCatalogEntry = {
+  slot: AvatarItemSlot;
+  id: string;
+  label: string;
+  labelEn: string;
+  tier: AvatarItemTier;
+  rarity: AvatarItemRarity;
+  requiredWins: number;
+  sku?: string | null;
+  priceBrlCents?: number | null;
+  modelPath?: string | null;
+  swatch?: string;
+  secondarySwatch?: string;
+  subtitle?: string;
+  subtitleEn?: string;
+};
+
+export type LockedAvatarItem = {
+  slot: AvatarItemSlot;
+  id: string;
+  tier: AvatarItemTier;
+  required_wins: number;
+  sku?: string | null;
+};
+
+export type AvatarConfigV2 = {
+  version: 2;
+  bodyType: AvatarBodyType;
+  headShape: AvatarHeadShape;
+  eyeStyle: AvatarEyeStyle;
+  browStyle: AvatarBrowStyle;
+  noseStyle: AvatarNoseStyle;
+  mouthStyle: AvatarMouthStyle;
+  hair: string;
+  beard: string;
+  outfit: string;
+  legsBoots: string;
+  cape: string;
+  hat: string;
+  handProp: string;
+  backProp: string;
+  pet: string;
+  mount: string;
+  pedestal: string;
+  aura: string;
+  background: AvatarBackground;
+  frame: string;
+  colors: AvatarColors;
+  portraitSnapshot?: string;
+  skin?: AvatarSkin;
+  eyes?: AvatarEyes;
+  hairColor?: AvatarHairColor;
+  outfitColor?: AvatarOutfitColor;
+};
+
+export type AvatarConfigV1 = {
   skin: AvatarSkin;
   eyes: AvatarEyes;
   hair: AvatarHair;
@@ -179,6 +276,33 @@ export type AvatarConfig = {
   background: AvatarBackground;
   frame: AvatarFrame;
 };
+
+export type AvatarConfig = {
+  skin: AvatarSkin;
+  eyes: AvatarEyes;
+  hair: string;
+  hairColor: AvatarHairColor;
+  beard: string;
+  hat: string;
+  outfit: string;
+  outfitColor: AvatarOutfitColor;
+  background: AvatarBackground;
+  frame: string;
+} & Partial<
+  Omit<
+    AvatarConfigV2,
+    | "skin"
+    | "eyes"
+    | "hair"
+    | "hairColor"
+    | "beard"
+    | "hat"
+    | "outfit"
+    | "outfitColor"
+    | "background"
+    | "frame"
+  >
+>;
 
 export type SeatAvatarMeta = {
   seat_kind: "USER" | "GUEST" | "BOT";

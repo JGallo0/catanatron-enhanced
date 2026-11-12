@@ -1,6 +1,7 @@
 import type {
   AccountStats,
   ActiveTradeTuple,
+  AvatarColors,
   AvatarConfig,
   BotDifficulty,
   BotSpeed,
@@ -16,6 +17,7 @@ import type {
   GameNode,
   GameState,
   LeaderboardEntry,
+  LockedAvatarItem,
   MatchParticipant,
   MatchRecord,
   PlacedTile,
@@ -31,11 +33,10 @@ import type { MapTemplate, MCTSProbabilities, PlayerAccount } from "./apiClient"
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { tr } from "../i18n";
 import {
-  AVATAR_UNLOCK_REQUIREMENTS,
   DEFAULT_GUEST_DISPLAY_NAME,
   filterUnlockedAvatarConfig,
+  findLockedAvatarItems,
   getGuestProfile,
-  isAvatarItemUnlocked,
   sanitizeAvatarConfig,
 } from "../config/avatarCatalog";
 import {
@@ -3169,6 +3170,7 @@ type LocalUserRecord = {
   display_name: string;
   password: string;
   avatar_config?: Partial<AvatarConfig>;
+  entitlements?: string[];
 };
 
 function loadLocalUsers(): Record<string, LocalUserRecord> {
@@ -3231,6 +3233,7 @@ export function localRegisterUser(options: {
     display_name,
     password: options.password,
     avatar_config: cleanAvatar,
+    entitlements: [],
   };
   try {
     localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
@@ -3243,6 +3246,7 @@ export function localRegisterUser(options: {
     display_name,
     auth_token: `local_${cleanUser}_${safeBase64(cleanUser)}`,
     avatar_config: cleanAvatar,
+    entitlements: [],
     stats: rankMeta.stats,
     leaderboard_rank: rankMeta.leaderboard_rank,
     is_new: true,
@@ -3265,6 +3269,9 @@ export function localLoginUser(options: {
     display_name: existing.display_name,
     auth_token: `local_${cleanUser}_${safeBase64(cleanUser)}`,
     avatar_config: sanitizeAvatarConfig(existing.avatar_config),
+    entitlements: Array.isArray(existing.entitlements)
+      ? [...existing.entitlements]
+      : [],
     stats: rankMeta.stats,
     leaderboard_rank: rankMeta.leaderboard_rank,
     is_new: false,
@@ -3293,38 +3300,65 @@ export function localUpdateProfile(options: {
       avatar_config: savedMatches
         ? sanitizeAvatarConfig(saved.avatar_config)
         : {},
+      entitlements:
+        savedMatches && Array.isArray(saved.entitlements)
+          ? [...saved.entitlements]
+          : [],
     };
   }
 
   const existingAvatar = sanitizeAvatarConfig(existing.avatar_config);
   const incomingAvatar = sanitizeAvatarConfig(options.avatarConfig || {});
+  const mergedColors =
+    existingAvatar.colors || incomingAvatar.colors
+      ? ({
+          ...(existingAvatar.colors || {}),
+          ...(incomingAvatar.colors || {}),
+        } as AvatarColors)
+      : undefined;
   const mergedAvatar: Partial<AvatarConfig> = {
     ...existingAvatar,
     ...incomingAvatar,
+    ...(mergedColors ? { colors: mergedColors } : {}),
   };
+  if (
+    options.avatarConfig &&
+    "portraitSnapshot" in options.avatarConfig &&
+    !incomingAvatar.portraitSnapshot
+  ) {
+    delete mergedAvatar.portraitSnapshot;
+  }
 
   const statsEntry = localGetLeaderboard().find((e) => e.username === cleanUser);
   const wins = statsEntry?.wins ?? 0;
+  const entitlements = Array.isArray(existing.entitlements)
+    ? [...existing.entitlements]
+    : [];
 
-  for (const [field, rules] of Object.entries(AVATAR_UNLOCK_REQUIREMENTS)) {
-    const val = (mergedAvatar as Record<string, string | undefined>)[field];
-    if (
-      val &&
-      rules &&
-      val in rules &&
-      !isAvatarItemUnlocked(field as keyof AvatarConfig, val, wins)
-    ) {
-      const reqWins = rules[val];
-      const msg = tr(
-        `Este item requer ${reqWins} vitória(s) no Ranking para ser desbloqueado (você tem ${wins}).`,
-        `This item requires ${reqWins} Leaderboard win(s) to unlock (you have ${wins}).`
-      );
-      const err = new Error(msg) as Error & {
-        response?: { status: number; data: { description: string } };
+  const lockedItems = findLockedAvatarItems(mergedAvatar, wins, entitlements);
+  if (lockedItems.length > 0) {
+    const first = lockedItems[0];
+    const msg =
+      first.tier === "vip"
+        ? tr(
+            `Item exclusivo VIP (${first.slot}:${first.id}) ainda não adquirido.`,
+            `Exclusive VIP item (${first.slot}:${first.id}) is not owned yet.`
+          )
+        : tr(
+            `Este item requer ${first.required_wins} vitória(s) no Ranking para ser desbloqueado (você tem ${wins}).`,
+            `This item requires ${first.required_wins} Leaderboard win(s) to unlock (you have ${wins}).`
+          );
+    const err = new Error(msg) as Error & {
+      response?: {
+        status: number;
+        data: { description: string; locked_items: LockedAvatarItem[] };
       };
-      err.response = { status: 403, data: { description: msg } };
-      throw err;
-    }
+    };
+    err.response = {
+      status: 403,
+      data: { description: msg, locked_items: lockedItems },
+    };
+    throw err;
   }
 
   const nextDisplay =
@@ -3336,6 +3370,7 @@ export function localUpdateProfile(options: {
     ...existing,
     display_name: nextDisplay,
     avatar_config: mergedAvatar,
+    entitlements,
   };
   try {
     localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
@@ -3347,6 +3382,7 @@ export function localUpdateProfile(options: {
           ...saved,
           display_name: nextDisplay,
           avatar_config: mergedAvatar,
+          entitlements,
           leaderboard_rank: statsEntry?.rank ?? saved.leaderboard_rank ?? null,
         })
       );
@@ -3360,6 +3396,7 @@ export function localUpdateProfile(options: {
     display_name: nextDisplay,
     auth_token: `local_${cleanUser}_${safeBase64(cleanUser)}`,
     avatar_config: mergedAvatar,
+    entitlements,
     leaderboard_rank: statsEntry?.rank ?? null,
     stats: statsEntry
       ? {

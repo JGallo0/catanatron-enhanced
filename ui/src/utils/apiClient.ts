@@ -18,6 +18,7 @@ import type {
   GameMessageKind,
   GameState,
   LeaderboardEntry,
+  LockedAvatarItem,
   MatchRecord,
   RoomState,
 } from "./api.types";
@@ -77,10 +78,26 @@ export type PlayerAccount = {
   auth_token: string;
   has_google?: boolean;
   avatar_config?: Partial<AvatarConfig>;
+  entitlements?: string[];
   stats?: AccountStats;
   leaderboard_rank?: number | null;
   is_new?: boolean;
 };
+
+export function extractLockedAvatarItems(err: unknown): LockedAvatarItem[] {
+  const raw = (err as { response?: { data?: { locked_items?: unknown } } })
+    ?.response?.data?.locked_items;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (item): item is LockedAvatarItem =>
+      Boolean(
+        item &&
+          typeof item === "object" &&
+          typeof (item as LockedAvatarItem).slot === "string" &&
+          typeof (item as LockedAvatarItem).id === "string"
+      )
+  );
+}
 
 export type AuthConfig = {
   google_enabled: boolean;

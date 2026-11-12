@@ -8,7 +8,7 @@ import {
   Tab,
   Tabs,
 } from "@mui/material";
-import type { AvatarConfig } from "../utils/api.types";
+import type { AvatarConfig, AvatarConfigV1 } from "../utils/api.types";
 import { updateProfile, type PlayerAccount } from "../utils/apiClient";
 import {
   AVATAR_BACKGROUND_OPTIONS,
@@ -106,18 +106,18 @@ export default function AvatarStudioModal({
     setErrorMsg("");
   }, [open, account, guestProfile, language]);
 
-  const setField = <K extends keyof AvatarConfig>(
+  const setField = <K extends keyof AvatarConfigV1>(
     field: K,
-    value: AvatarConfig[K]
+    value: AvatarConfigV1[K]
   ) => {
     if (!isAvatarItemUnlocked(field, value, wins)) return;
     setDraftConfig((prev) => ({ ...prev, [field]: value }));
   };
 
-  const renderOptionGrid = <K extends keyof AvatarConfig>(
+  const renderOptionGrid = <K extends keyof AvatarConfigV1>(
     title: string,
     field: K,
-    options: readonly AvatarOption<AvatarConfig[K]>[]
+    options: readonly AvatarOption<AvatarConfigV1[K]>[]
   ) => (
     <div className="avatar-section-block">
       <h4>{title}</h4>
