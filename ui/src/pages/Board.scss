@@ -251,38 +251,38 @@
     display: block;
     background: radial-gradient(
       circle,
-      rgba(254, 240, 138, 0.92) 0%,
-      rgba(234, 179, 8, 0.68) 55%,
-      rgba(15, 23, 42, 0.25) 100%
+      #fef08a 0%,
+      #f59e0b 68%,
+      #b45309 100%
     );
-    border: 2.5px solid #ffffff;
+    border: 1.6px solid #ffffff;
     border-radius: 999px;
     box-shadow:
-      0 0 0 2px rgba(15, 23, 42, 0.75),
-      0 0 12px rgba(250, 204, 21, 0.95);
-    animation: pulse-dot 1.2s ease-in-out infinite;
+      0 0 0 1.5px rgba(15, 23, 42, 0.85),
+      0 0 8px rgba(250, 204, 21, 0.8);
+    animation: pulse-dot 1.3s ease-in-out infinite;
     transition: transform 0.15s ease, background 0.15s ease;
   }
 
   &:hover:after {
-    background: #fef08a;
-    border-color: #ef4444;
-    transform: scale(1.28);
+    background: #fde047;
+    border-color: #38bdf8;
+    transform: scale(1.32);
     box-shadow:
       0 0 0 2px #0f172a,
-      0 0 18px rgba(250, 204, 21, 1);
+      0 0 14px rgba(250, 204, 21, 1);
   }
 }
 
 @keyframes pulse-dot {
   0% {
-    transform: scale(0.76);
+    transform: scale(0.78);
   }
   50% {
     transform: scale(1.02);
   }
   100% {
-    transform: scale(0.76);
+    transform: scale(0.78);
   }
 }
 
@@ -292,14 +292,14 @@
 }
 
 .node .pulse {
-  width: 52%;
-  height: 52%;
+  width: 14px;
+  height: 14px;
 }
 
 @media (max-width: 768px), (pointer: coarse) {
   .node .pulse {
-    width: 68%;
-    height: 68%;
+    width: 17px;
+    height: 17px;
   }
 
   .edge .pulse {

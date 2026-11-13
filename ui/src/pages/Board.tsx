@@ -20,7 +20,7 @@ import "./Board.scss";
  * Computes optimal hex size based on available canvas dimensions.
  */
 function computeDefaultSize(divWidth: number, divHeight: number): number {
-  const numLevels = 8.3; // 3 land rings + outer illustrated harbor ring + ocean clearance
+  const numLevels = 6.7; // 3 land rings + outer illustrated harbor ring (calibrated to Print 2 framing)
   const maxSizeThatRespectsHeight = (4 * divHeight) / (3 * numLevels + 1) / 2;
   const correspondingWidth = SQRT3 * maxSizeThatRespectsHeight;
   if (numLevels * correspondingWidth < divWidth) {
@@ -122,17 +122,20 @@ export default function Board({
     isCompactHeight ? 220 : 300,
     canvasHeight - verticalSafetyMargin
   );
-  const margin = isMobile ? 12 : 24;
+  const margin = isMobile ? 8 : 12;
 
   const size = computeDefaultSize(
     availableCanvasWidth - margin,
     availableCanvasHeight - margin
   );
 
-  // Optical center: centered right in the middle of the available safe sea area between top and bottom HUDs
+  // Optical center calibrated to Print 2:
+  // Nudged slightly down (+22px on desktop, +8px on mobile) so the top harbor ships
+  // sit comfortably below the prompt banner while the bottom harbor ships clear the console dock
+  const verticalOffset = isCompactHeight ? 4 : isMobile ? 8 : 22;
   const center: [number, number] = [
     canvasWidth / 2,
-    topHudClearance + availableCanvasHeight / 2,
+    topHudClearance + availableCanvasHeight / 2 + verticalOffset,
   ];
 
   const lastRolledSum = useMemo(() => getLastRolledSum(gameState), [gameState]);
