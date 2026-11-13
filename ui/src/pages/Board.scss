@@ -319,20 +319,20 @@
 .placement-confirm-bar {
   position: fixed;
   left: 50%;
-  bottom: 98px;
+  bottom: 130px;
   transform: translateX(-50%);
   z-index: 39;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(12px);
-  border: 1.5px solid rgba(52, 211, 153, 0.72);
+  background: rgba(10, 20, 34, 0.96);
+  backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(52, 211, 153, 0.8);
   box-shadow:
-    0 14px 30px rgba(0, 0, 0, 0.72),
-    0 0 20px rgba(16, 185, 129, 0.25);
+    0 14px 32px rgba(0, 0, 0, 0.75),
+    0 0 20px rgba(16, 185, 129, 0.3);
 
   &__label {
     font-size: 0.82rem;
@@ -383,7 +383,7 @@
 
 @media (max-width: 768px) {
   .placement-confirm-bar {
-    bottom: 122px;
+    bottom: 145px;
     max-width: 94vw;
     padding: 6px 10px;
     gap: 8px;
