@@ -325,9 +325,10 @@ Os retratos legados `.webp` herdados do Catan Universe foram completamente apose
     - **Cidades (+25% em `CitySvgPiece`):** Fortaleza imponente com duas torres, ameias (crenellations), estandarte no topo e contorno reforçado. Escala visual ampliada no nó (`size * 0.90`).
     - **Estradas (+25% de espessura em `RoadSvgPiece`):** Viga chanfrada com 22px de altura (18px em mobile), deck iluminado, chanfros 3D e sulcos divisórios de alto contraste.
     - **Sombra Projetada Tátil (`Board.scss`):** Filtro multi-ângulo `drop-shadow` que faz todas as peças saltarem fisicamente do mapa em qualquer um dos 5 biomas de terreno.
-  - **Enquadramento Seguro do Tabuleiro ("Safe-Area All-in-View" em [`Board.tsx`](ui/src/pages/Board.tsx)):**
-    - Corrigido o corte da ilha e dos portos ao iniciar a partida. O cálculo de tamanho passa a deduzir a área útil ocupada pela barra superior (~108px) e pelo console inferior (~128px): `availableCanvasHeight = canvasHeight - 236px`.
-    - Ajustado o fator de níveis de `7.0` para **`8.3`**, garantindo que todos os 19 hexágonos de terra e **todos os 9 navios de portos com suas placas 2:1 e 3:1 fiquem 100% visíveis** dentro da tela com 40px de respiro confortável no mar.
+  - **Enquadramento Padrão Calibrado ao Print 2 & Vértices Mais Discretos ([`Board.tsx`](ui/src/pages/Board.tsx) & [`Board.scss`](ui/src/pages/Board.scss)):**
+    - **Visual Padrão Ampliado (+24% em `Board.tsx`):** `numLevels` ajustado para **`6.7`**, fazendo o tabuleiro abrir por padrão exatamente na escala ampliada do Print 2 (equivalente a 1 clique de zoom in).
+    - **Posicionamento Vertical Nudged (+22px):** Centro vertical deslocado sutilmente para baixo para deixar ~30px de mar abaixo da barra de jogadores/banner de fase e ~15px de mar acima do console inferior, enquadrando 100% da ilha e dos 9 portos com presença imponente.
+    - **Vértices Pulsantes Refinados (-50% de diâmetro em `Board.scss`):** Os discos dourados de vértices disponíveis (`.node .pulse`) foram reduzidos de ~26px para **`14px`** (17px em touch mobile) com borda branca fina de 1.6px e glow concentrado. A área de clique permanece ampla e confortável no nó (`38-56px`), mas os 54 cruzamentos ficam visualmente elegantes, limpos e sem poluição visual sobre os biomas.
     - Ponto central vertical (`center[1]`) calibrado no centro geométrico exato entre as duas barras flutuantes. O botão "Centralizar tabuleiro" da câmera restaura instantaneamente essa visão panorâmica completa.
   - **Validação de Testes e Build:** 28 testes passando nas suítes principais de tela e tabuleiro (`Board`, `ZoomableBoard`, `GameScreen`), TypeScript sem erros (`tsc --noEmit`) e build de produção Vite concluído em 16s.
 
