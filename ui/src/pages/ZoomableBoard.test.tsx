@@ -144,7 +144,7 @@ describe("ZoomableBoard robber victim selector", () => {
     ]);
   });
 
-  test("executes placement immediately in 1 click by default, and requires 2 clicks when Confirmar jogada is enabled", async () => {
+  test("requires confirmation before placement by default (Catan Universe style), and supports 1-click when toggled off", async () => {
     const buildableState = makeGameState({
       is_initial_build_phase: true,
       current_color: "BLUE",
@@ -183,10 +183,54 @@ describe("ZoomableBoard robber victim selector", () => {
     const toggleBtn = await screen.findByRole("button", {
       name: /Confirmar jogada em 2 cliques/i,
     });
-    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
+    // Default is now ENABLED for player safety (Catan Universe behavior)
+    expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
 
     const buildableNode = container.querySelector(".node--buildable") as HTMLElement;
     expect(buildableNode).toBeTruthy();
+
+    // 1st click on node opens provisional ghost preview and confirmation dock without executing
+    await act(async () => {
+      fireEvent.click(buildableNode);
+    });
+    expect(postAction).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/Confirmar construção de Aldeia\?/i)
+    ).toBeInTheDocument();
+    expect(container.querySelector(".node--pending")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Confirmar Construção/i })
+    ).toBeInTheDocument();
+
+    // Cancel clears confirmation bar and ghost preview
+    fireEvent.click(screen.getByRole("button", { name: /✕ Cancelar/i }));
+    expect(
+      screen.queryByText(/Confirmar construção de Aldeia\?/i)
+    ).not.toBeInTheDocument();
+    expect(postAction).not.toHaveBeenCalled();
+
+    // 1st click then Catan Universe green check button executes postAction
+    fireEvent.click(buildableNode);
+    expect(
+      screen.getByText(/Confirmar construção de Aldeia\?/i)
+    ).toBeInTheDocument();
+    const cuConfirmBtn = screen.getByRole("button", { name: /Confirmar Construção/i });
+    await act(async () => {
+      fireEvent.click(cuConfirmBtn);
+    });
+    expect(postAction).toHaveBeenCalledTimes(1);
+    expect(postAction).toHaveBeenCalledWith("game-123", [
+      "BLUE",
+      "BUILD_SETTLEMENT",
+      0,
+    ]);
+
+    vi.clearAllMocks();
+
+    // Toggle OFF to switch to instant 1-click
+    fireEvent.click(toggleBtn);
+    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
+    expect(localStorage.getItem(CONFIRM_PLACEMENT_STORAGE_KEY)).toBe("0");
 
     await act(async () => {
       fireEvent.click(buildableNode);
@@ -198,52 +242,7 @@ describe("ZoomableBoard robber victim selector", () => {
       0,
     ]);
 
-    vi.clearAllMocks();
-
-    fireEvent.click(toggleBtn);
-    expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
-    expect(localStorage.getItem(CONFIRM_PLACEMENT_STORAGE_KEY)).toBe("1");
-
-    // 1st click opens confirmation bar without calling postAction
-    fireEvent.click(buildableNode);
-    expect(postAction).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(/Confirmar construção de Aldeia\?/i)
-    ).toBeInTheDocument();
-    expect(container.querySelector(".node--pending")).toBeTruthy();
-
-    // Cancel clears confirmation bar
-    fireEvent.click(screen.getByRole("button", { name: /✕ Cancelar/i }));
-    expect(
-      screen.queryByText(/Confirmar construção de Aldeia\?/i)
-    ).not.toBeInTheDocument();
-    expect(postAction).not.toHaveBeenCalled();
-
-    // 1st click then Confirm executes postAction
-    fireEvent.click(buildableNode);
-    expect(
-      screen.getByText(/Confirmar construção de Aldeia\?/i)
-    ).toBeInTheDocument();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /✓ Confirmar/i }));
-    });
-    expect(postAction).toHaveBeenCalledTimes(1);
-    expect(postAction).toHaveBeenCalledWith("game-123", [
-      "BLUE",
-      "BUILD_SETTLEMENT",
-      0,
-    ]);
-
     unmount();
-
-    // Remount keeps persisted setting
-    const secondMount = renderSeeded();
-    expect(
-      await screen.findByRole("button", {
-        name: /Confirmar jogada em 2 cliques/i,
-      })
-    ).toHaveAttribute("aria-pressed", "true");
-    secondMount.unmount();
   });
 
   test("ZoomableBoard provides smooth zoom controls and reset camera buttons", () => {

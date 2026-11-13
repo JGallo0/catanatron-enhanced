@@ -11,6 +11,7 @@ import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import CenterFocusStrongIcon from "@mui/icons-material/CenterFocusStrong";
 import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
 import cn from "classnames";
 import { useSnackbar } from "notistack";
 
@@ -115,9 +116,10 @@ type PendingPlacement =
 
 function loadSavedConfirmPlacement(): boolean {
   try {
-    return localStorage.getItem(CONFIRM_PLACEMENT_STORAGE_KEY) === "1";
+    const saved = localStorage.getItem(CONFIRM_PLACEMENT_STORAGE_KEY);
+    return saved === null ? true : saved === "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -342,6 +344,9 @@ export default function ZoomableBoard({
             "board-confirm-toggle",
             "placement-confirm-bar",
             "placement-confirm-btn",
+            "cu-placement-confirm-dock",
+            "cu-confirm-btn",
+            "cu-cancel-btn",
           ],
         }}
       >
@@ -432,51 +437,87 @@ export default function ZoomableBoard({
                     ? pendingPlacement.edgeId
                     : null
                 }
+                pendingColor={
+                  pendingPlacement ? (gameState.current_player as Color) : null
+                }
+                pendingBuilding={
+                  pendingPlacement?.kind === "node"
+                    ? pendingPlacement.buildType
+                    : null
+                }
               />
             </TransformComponent>
 
             {pendingPlacement && !replayMode && (
-              <div
-                className="placement-confirm-bar"
-                role="region"
-                aria-label={t(
-                  "Confirmar posicionamento no tabuleiro",
-                  "Confirm board placement"
-                )}
-              >
-                <span className="placement-confirm-bar__label">
-                  {pendingPlacement.buildType === "CITY"
-                    ? t(
-                        "Confirmar melhoria para Cidade?",
-                        "Confirm City upgrade?"
-                      )
-                    : pendingPlacement.buildType === "SETTLEMENT"
+              <>
+                <div
+                  className="placement-confirm-bar"
+                  role="region"
+                  aria-label={t(
+                    "Confirmar posicionamento no tabuleiro",
+                    "Confirm board placement"
+                  )}
+                >
+                  <span className="placement-confirm-bar__label">
+                    {pendingPlacement.buildType === "CITY"
                       ? t(
-                          "Confirmar construção de Aldeia?",
-                          "Confirm Settlement build?"
+                          "Confirmar melhoria para Cidade?",
+                          "Confirm City upgrade?"
                         )
-                      : t(
-                          "Confirmar construção de Estrada?",
-                          "Confirm Road build?"
-                        )}
-                </span>
-                <div className="placement-confirm-bar__actions">
+                      : pendingPlacement.buildType === "SETTLEMENT"
+                        ? t(
+                            "Confirmar construção de Aldeia?",
+                            "Confirm Settlement build?"
+                          )
+                        : t(
+                            "Confirmar construção de Estrada?",
+                            "Confirm Road build?"
+                          )}
+                  </span>
+                  <div className="placement-confirm-bar__actions">
+                    <button
+                      type="button"
+                      className="placement-confirm-btn placement-confirm-btn--confirm"
+                      onClick={() => executePlacementAction(pendingPlacement.action)}
+                    >
+                      ✓ {t("Confirmar", "Confirm")}
+                    </button>
+                    <button
+                      type="button"
+                      className="placement-confirm-btn placement-confirm-btn--cancel"
+                      onClick={() => setPendingPlacement(null)}
+                    >
+                      ✕ {t("Cancelar", "Cancel")}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Catan Universe Prominent Confirmation Dock (Right Margin) */}
+                <div
+                  className="cu-placement-confirm-dock"
+                  role="dialog"
+                  aria-label={t("Confirmar jogada", "Confirm move")}
+                >
                   <button
                     type="button"
-                    className="placement-confirm-btn placement-confirm-btn--confirm"
+                    className="cu-confirm-btn"
                     onClick={() => executePlacementAction(pendingPlacement.action)}
+                    title={t("Confirmar Construção [✔]", "Confirm Build [✔]")}
+                    aria-label={t("Confirmar Construção", "Confirm Build")}
                   >
-                    ✓ {t("Confirmar", "Confirm")}
+                    <CheckIcon fontSize="large" className="cu-confirm-btn__icon" />
                   </button>
                   <button
                     type="button"
-                    className="placement-confirm-btn placement-confirm-btn--cancel"
+                    className="cu-cancel-btn"
                     onClick={() => setPendingPlacement(null)}
+                    title={t("Cancelar jogada", "Cancel move")}
+                    aria-label={t("Cancelar jogada", "Cancel move")}
                   >
-                    ✕ {t("Cancelar", "Cancel")}
+                    <CloseIcon fontSize="small" />
                   </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         )}
