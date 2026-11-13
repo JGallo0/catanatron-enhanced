@@ -189,12 +189,12 @@ describe("TradeOfferDecisionDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /Contrapropor/i }));
     expect(screen.getByText(/Sugerir Contraproposta/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Aumentar oferta de Lã"));
+    fireEvent.click(screen.getByLabelText("Aumentar oferta de Ovelha"));
     fireEvent.click(screen.getByRole("button", { name: /Enviar Contraproposta/i }));
 
     await waitFor(() => {
       expect(onSendChatMessage).toHaveBeenCalledWith(
-        expect.stringMatching(/Contraproposta para Creitu:.*1[×x] Lã.*1[×x] Madeira/i)
+        expect.stringMatching(/Contraproposta para Creitu:.*1[×x] Ovelha.*1[×x] Madeira/i)
       );
       expect(onExecuteAction).toHaveBeenCalledWith([
         "BLUE",

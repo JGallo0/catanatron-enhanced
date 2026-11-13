@@ -162,18 +162,18 @@
     z-index: 2;
   }
 
-  // Sandy beach coastline around each hex (Catan Universe style)
+  // Subtle golden beach seam around each hex
   &__bevel-outer {
     fill: none;
-    stroke: #fde68a;
-    stroke-width: 3.4;
-    opacity: 0.92;
+    stroke: rgba(245, 158, 11, 0.45);
+    stroke-width: 1.4;
+    opacity: 0.85;
   }
 
   &__bevel-inner {
     fill: none;
-    stroke: rgba(120, 53, 15, 0.55);
-    stroke-width: 1.6;
+    stroke: rgba(120, 53, 15, 0.25);
+    stroke-width: 0.8;
   }
 
   &--producing .tile__bevel-outer {

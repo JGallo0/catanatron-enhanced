@@ -3,7 +3,6 @@ import {
   tilePixelVector,
   type CubeCoordinate,
 } from "../utils/coordinates";
-import { HybridIllustration } from "../components/icons/GameIcons";
 import { useLanguage } from "../i18n";
 
 type RobberProps = {
@@ -17,14 +16,15 @@ export default function Robber({ center, size, coordinate }: RobberProps) {
   const [centerX, centerY] = center;
   const w = SQRT3 * size;
   const [tileX, tileY] = tilePixelVector(coordinate, size, centerX, centerY);
-  const [deltaX, deltaY] = [-w * 0.28, -size * 0.08];
+  const [deltaX, deltaY] = [-w * 0.22, -size * 0.12];
   const x = tileX + deltaX;
   const y = tileY + deltaY;
-  const pieceSize = Math.max(34, Math.min(54, Math.round(size * 0.62)));
+  const pawnWidth = Math.max(30, Math.min(50, Math.round(size * 0.58)));
+  const pawnHeight = Math.round(pawnWidth * 1.35);
 
   return (
     <div
-      className="robber number-token"
+      className="robber robber-pawn"
       title={t(
         "O Ladrão (Bloqueia a produção deste hexágono)",
         "The Robber (Blocks production on this hex)"
@@ -33,50 +33,99 @@ export default function Robber({ center, size, coordinate }: RobberProps) {
       style={{
         left: x,
         top: y,
-        width: pieceSize,
-        height: pieceSize,
-        padding: 2,
-        overflow: "hidden",
+        width: pawnWidth,
+        height: pawnHeight,
       }}
     >
-      <HybridIllustration
-        src="/assets/illustrations/ui/robber.webp"
-        alt={t("O Ladrão", "The Robber")}
-        className="robber__custom-art"
-        fallback={
-          <svg
-            viewBox="0 0 40 44"
-            width={pieceSize * 0.85}
-            height={pieceSize * 0.92}
-            className="robber__svg"
-            aria-hidden="true"
-          >
-            <ellipse cx="20" cy="39" rx="14" ry="4" fill="rgba(0,0,0,0.55)" />
-            {/* Hooded Bandit Pawn Silhouette */}
-            <path
-              d="M10 37 C10 26, 13 21, 16 18 C13 15, 13 8, 20 5 C27 8, 27 15, 24 18 C27 21, 30 26, 30 37 Z"
-              fill="#1E293B"
-              stroke="#94A3B8"
-              strokeWidth="2.2"
-              strokeLinejoin="round"
-            />
-            {/* Glowing Bandit Eyes */}
-            <circle cx="17.5" cy="12.5" r="1.5" fill="#F43F5E" />
-            <circle cx="22.5" cy="12.5" r="1.5" fill="#F43F5E" />
-            {/* Base rim */}
-            <rect
-              x="8"
-              y="35"
-              width="24"
-              height="4"
-              rx="2"
-              fill="#0F172A"
-              stroke="#64748B"
-              strokeWidth="1.5"
-            />
-          </svg>
-        }
-      />
+      <svg
+        viewBox="0 0 40 54"
+        width={pawnWidth}
+        height={pawnHeight}
+        className="robber__svg-piece"
+        aria-hidden="true"
+      >
+        <defs>
+          {/* Soft ground contact shadow */}
+          <radialGradient id="robberShadow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(0,0,0,0.75)" />
+            <stop offset="60%" stopColor="rgba(0,0,0,0.35)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+          </radialGradient>
+          {/* Black wooden lacquer body gradient */}
+          <linearGradient id="robberBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#1e2530" />
+            <stop offset="25%" stopColor="#3a4556" />
+            <stop offset="60%" stopColor="#111620" />
+            <stop offset="100%" stopColor="#080b10" />
+          </linearGradient>
+          {/* Spherical head highlight */}
+          <radialGradient id="robberHeadGrad" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stopColor="#4b5563" />
+            <stop offset="35%" stopColor="#1f2937" />
+            <stop offset="85%" stopColor="#111827" />
+            <stop offset="100%" stopColor="#030712" />
+          </radialGradient>
+          {/* Base bevel */}
+          <linearGradient id="robberBaseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#1f2937" />
+            <stop offset="30%" stopColor="#4b5563" />
+            <stop offset="70%" stopColor="#111827" />
+            <stop offset="100%" stopColor="#030712" />
+          </linearGradient>
+        </defs>
+
+        {/* Ground shadow on hex */}
+        <ellipse cx="20" cy="50" rx="16" ry="4" fill="url(#robberShadow)" />
+
+        {/* Base Rim */}
+        <ellipse
+          cx="20"
+          cy="46"
+          rx="13"
+          ry="3.5"
+          fill="url(#robberBaseGrad)"
+          stroke="#374151"
+          strokeWidth="0.8"
+        />
+
+        {/* Conical Trunk / Body */}
+        <path
+          d="M9.5 45 C10 32, 14 26, 15 22 L25 22 C26 26, 30 32, 30.5 45 Z"
+          fill="url(#robberBodyGrad)"
+          stroke="#374151"
+          strokeWidth="0.8"
+        />
+
+        {/* Collar / Neck Ring */}
+        <ellipse
+          cx="20"
+          cy="22"
+          rx="6"
+          ry="1.6"
+          fill="#4b5563"
+          stroke="#1f2937"
+          strokeWidth="0.8"
+        />
+
+        {/* Spherical Head */}
+        <circle
+          cx="20"
+          cy="14"
+          r="8.5"
+          fill="url(#robberHeadGrad)"
+          stroke="#374151"
+          strokeWidth="0.8"
+        />
+
+        {/* Soft Specular Pin Highlight */}
+        <ellipse
+          cx="17.5"
+          cy="11.5"
+          rx="2.5"
+          ry="1.8"
+          fill="rgba(255,255,255,0.25)"
+        />
+      </svg>
       <span className="sr-only">R</span>
     </div>
   );

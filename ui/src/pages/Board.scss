@@ -81,25 +81,20 @@
   }
 }
 
-// ===== Robber Pawn
+// ===== Robber Pawn (Classic Catan Universe black wooden pin)
 .robber {
   position: absolute;
   z-index: 9;
   transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 35% 30%,
-    rgba(51, 65, 85, 0.94),
-    rgba(15, 23, 42, 0.98)
-  );
-  border: 2.5px solid #f43f5e;
-  box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.8),
-    0 0 12px rgba(244, 63, 94, 0.5);
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.75));
   transition: left 0.35s cubic-bezier(0.22, 1, 0.36, 1),
     top 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }

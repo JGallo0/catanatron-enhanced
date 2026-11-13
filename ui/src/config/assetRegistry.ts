@@ -60,8 +60,8 @@ export const RESOURCE_META: Record<ResourceCard, ResourceMeta> = {
   },
   SHEEP: {
     id: "SHEEP",
-    label: "Lã",
-    shortLabel: "LÃ",
+    label: "Ovelha",
+    shortLabel: "OVE",
     terrainName: "Pastagem",
     primaryColor: "#365314",
     secondaryColor: "#65A30D",

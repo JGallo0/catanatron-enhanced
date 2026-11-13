@@ -214,19 +214,19 @@
 /* Palco Central com o Herói 3D sobre a Arte da Ilha */
 .home-stage-window {
   flex: 1 1 auto;
-  min-height: 260px;
+  min-height: 360px;
   display: flex;
   align-items: flex-end;
-  justify-content: center;
-  padding: 6px 0 8px;
+  justify-content: flex-start;
+  padding: 6px 0 12px clamp(24px, 8vw, 130px);
   background: transparent;
   pointer-events: none;
 }
 
 .home-hero-stage {
   position: relative;
-  width: min(100%, 420px);
-  height: clamp(260px, 45vh, 430px);
+  width: min(100%, 630px);
+  height: clamp(390px, 64vh, 645px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -337,9 +337,17 @@
   }
 
   &--room {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(96, 165, 250, 0.75) !important;
+    background: linear-gradient(135deg, #0d4661 0%, #072d42 100%) !important;
+    color: #f0fdfa !important;
+    border: 1px solid rgba(56, 189, 248, 0.65) !important;
+    box-shadow:
+      0 8px 22px rgba(2, 6, 23, 0.72),
+      0 4px 16px rgba(13, 70, 97, 0.4) !important;
+
+    &:hover {
+      background: linear-gradient(135deg, #10597d 0%, #093752 100%) !important;
+      border-color: rgba(56, 189, 248, 0.9) !important;
+    }
   }
 
   &--lobby {

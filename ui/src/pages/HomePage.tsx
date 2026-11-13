@@ -332,7 +332,7 @@ export default function HomePage() {
                   <PlayerAvatar
                     config={activeHeroConfig}
                     username={effectiveHeroUsername}
-                    size={136}
+                    size={204}
                     testId="home-hero-stage-suspense"
                   />
                 </div>
@@ -345,7 +345,7 @@ export default function HomePage() {
                 backgroundMode="transparent"
                 cameraFocus="full"
                 interactive={true}
-                fallbackSize={136}
+                fallbackSize={204}
                 fallbackTestId="home-hero-stage-fallback"
               />
             </Suspense>

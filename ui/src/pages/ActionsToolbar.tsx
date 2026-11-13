@@ -34,6 +34,7 @@ import Prompt from "../components/Prompt";
 import ResourceCards from "../components/ResourceCards";
 import ResourceSelector from "../components/ResourceSelector";
 import DiscardPlannerDialog from "../components/DiscardPlannerDialog";
+import DevCardDrawOverlay from "../components/DevCardDrawOverlay";
 import TradeModal from "../components/TradeModal";
 import TradeOfferDecisionDialog from "../components/TradeOfferDecisionDialog";
 import Dice3D from "../components/Dice3D";
@@ -48,6 +49,7 @@ import {
   getDevCardMeta,
   getPlayerColorMeta,
   getResourceMeta,
+  type DevCardType,
 } from "../config/assetRegistry";
 import { useLanguage } from "../i18n";
 import { store } from "../store";
@@ -110,6 +112,7 @@ export default function ActionsToolbar({
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [tradeDecisionMinimized, setTradeDecisionMinimized] = useState(false);
   const [costsModalOpen, setCostsModalOpen] = useState(false);
+  const [drawnDevCard, setDrawnDevCard] = useState<DevCardType | null>(null);
   const { isSubmitting, submitDiscardBatch } = useDiscardBatchSubmission();
 
   const {
@@ -292,8 +295,58 @@ export default function ActionsToolbar({
   }, [humanColor, executeGameAction]);
 
   const buyDevCard = useCallback(async () => {
-    await executeGameAction([humanColor, "BUY_DEVELOPMENT_CARD", null]);
-  }, [humanColor, executeGameAction]);
+    if (!resolvedGameId || !humanColor) return;
+    const nextState = await postAction(resolvedGameId, [
+      humanColor,
+      "BUY_DEVELOPMENT_CARD",
+      null,
+    ]);
+    dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+    dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+
+    // Identify which dev card was drawn by the human player
+    const latestRecord =
+      nextState.action_records[nextState.action_records.length - 1];
+    let cardType: DevCardType | null = null;
+    if (
+      latestRecord &&
+      latestRecord[0][1] === "BUY_DEVELOPMENT_CARD" &&
+      latestRecord[0][0] === humanColor &&
+      latestRecord[1]
+    ) {
+      cardType = latestRecord[1] as DevCardType;
+    } else {
+      const devTypes: DevCardType[] = [
+        "KNIGHT",
+        "VICTORY_POINT",
+        "MONOPOLY",
+        "YEAR_OF_PLENTY",
+        "ROAD_BUILDING",
+      ];
+      for (const dt of devTypes) {
+        const prevCount =
+          gameState.player_state[`${humanKey}_${dt}_IN_HAND`] ?? 0;
+        const nextCount =
+          nextState.player_state[`${humanKey}_${dt}_IN_HAND`] ?? 0;
+        if (nextCount > prevCount) {
+          cardType = dt;
+          break;
+        }
+      }
+    }
+
+    if (cardType) {
+      setDrawnDevCard(cardType);
+    }
+  }, [
+    resolvedGameId,
+    humanColor,
+    humanKey,
+    gameState.player_state,
+    dispatch,
+    enqueueSnackbar,
+    closeSnackbar,
+  ]);
 
   const playableDevCallbacks = useMemo(() => {
     if (!isInteractiveTurn || isPlayingDevCard) return undefined;
@@ -561,7 +614,7 @@ export default function ActionsToolbar({
 
                 <Tooltip
                   title={t(
-                    "Fundar Aldeia (1 Madeira + 1 Argila + 1 Lã + 1 Trigo) — +1 PV",
+                    "Fundar Aldeia (1 Madeira + 1 Argila + 1 Ovelha + 1 Trigo) — +1 PV",
                     "Build Settlement (1 Lumber + 1 Brick + 1 Wool + 1 Grain) — +1 VP"
                   )}
                   arrow
@@ -625,7 +678,7 @@ export default function ActionsToolbar({
 
                 <Tooltip
                   title={t(
-                    "Comprar Carta de Desenvolvimento (1 Lã + 1 Trigo + 1 Minério)",
+                    "Comprar Carta de Desenvolvimento (1 Ovelha + 1 Trigo + 1 Minério)",
                     "Buy Development Card (1 Wool + 1 Grain + 1 Ore)"
                   )}
                   arrow
@@ -887,6 +940,11 @@ export default function ActionsToolbar({
         remainingDiscardCount={gameState.current_discard_count}
         discardResourceCounts={getDiscardResourceCounts()}
         submitting={isSubmitting}
+      />
+
+      <DevCardDrawOverlay
+        card={drawnDevCard}
+        onComplete={() => setDrawnDevCard(null)}
       />
     </div>
   );

@@ -1,80 +1,50 @@
 .tabletop-dice-stage {
   position: fixed;
-  top: 52%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 50%;
+  right: clamp(16px, 5vw, 96px);
+  left: auto;
+  transform: translateY(-50%);
   z-index: 46;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  min-width: 244px;
-  padding: 14px 24px 13px;
-  border-radius: 18px;
-  /* Carved walnut/mahogany wooden frame trimmed in brass */
-  background:
-    radial-gradient(circle at 50% 0%, rgba(250, 204, 21, 0.14), transparent 62%),
-    linear-gradient(175deg, #4a2613 0%, #2a1308 58%, #180b04 100%);
-  border: 2.5px solid var(--roller-color, #d97706);
-  box-shadow:
-    0 22px 48px rgba(0, 0, 0, 0.82),
-    0 0 0 2px rgba(217, 119, 6, 0.45),
-    inset 0 1px 0 rgba(254, 240, 138, 0.32),
-    inset 0 -3px 8px rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(8px);
-  animation: tabletop-dice-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  gap: 12px;
+  min-width: 0;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  animation: tabletop-dice-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+
+  @media (max-width: 820px) {
+    top: 40%;
+    right: 14px;
+  }
 
   &.is-hot {
-    box-shadow:
-      0 22px 48px rgba(0, 0, 0, 0.85),
-      0 0 0 2px #facc15,
-      0 0 32px rgba(250, 204, 21, 0.45),
-      inset 0 1px 0 rgba(254, 240, 138, 0.45);
+    /* Subtle warm aura */
   }
 
   &.is-seven {
-    background:
-      radial-gradient(circle at 50% 20%, rgba(220, 38, 38, 0.24), transparent 65%),
-      linear-gradient(175deg, #451212 0%, #240909 60%, #140404 100%);
-    box-shadow:
-      0 22px 48px rgba(0, 0, 0, 0.86),
-      0 0 0 2px #ef4444,
-      0 0 36px rgba(239, 68, 68, 0.55),
-      inset 0 1px 0 rgba(254, 202, 202, 0.3);
+    /* Subtle robber aura */
   }
 
   &__rivet {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #fef08a, #b45309);
-    border: 1px solid #451a03;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
-
-    &--tl {
-      top: 7px;
-      left: 7px;
-    }
-    &--tr {
-      top: 7px;
-      right: 7px;
-    }
-    &--bl {
-      bottom: 7px;
-      left: 7px;
-    }
-    &--br {
-      bottom: 7px;
-      right: 7px;
-    }
+    display: none;
   }
 
   &__header {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 7px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: rgba(11, 23, 38, 0.82);
+    border: 1px solid rgba(254, 240, 138, 0.35);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
     font-family: "Cinzel", "Outfit", serif;
     font-size: 0.84rem;
     font-weight: 800;
@@ -97,31 +67,43 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px 30px 18px;
-    border-radius: 14px;
-    background: radial-gradient(circle at 50% 42%, #1e4d3a 0%, #0f2c22 72%, #071913 100%);
-    border: 1.5px solid rgba(217, 119, 6, 0.55);
-    box-shadow:
-      inset 0 6px 14px rgba(0, 0, 0, 0.72),
-      inset 0 0 0 1px rgba(254, 240, 138, 0.14);
+    padding: 16px 22px;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
     overflow: visible;
   }
 
   &.is-seven &__tray {
-    background: radial-gradient(circle at 50% 42%, #5b1818 0%, #310b0b 75%, #1c0505 100%);
-    border-color: rgba(248, 113, 113, 0.55);
+    background: transparent !important;
+    border-color: transparent !important;
   }
 
   &__felt-ring {
     position: absolute;
-    inset: 4px;
-    border-radius: 10px;
-    border: 1px dashed rgba(253, 230, 138, 0.25);
+    inset: -10px -18px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(56, 189, 248, 0.4);
+    background: radial-gradient(ellipse at center, rgba(14, 165, 233, 0.18) 0%, rgba(3, 105, 161, 0.08) 55%, transparent 75%);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
     pointer-events: none;
+    transition: transform 0.4s ease, border-color 0.4s ease;
+  }
+
+  &.is-hot &__felt-ring {
+    border-color: rgba(250, 204, 21, 0.55);
+    background: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.2) 0%, transparent 70%);
+    box-shadow: 0 0 24px rgba(250, 204, 21, 0.35);
+  }
+
+  &.is-seven &__felt-ring {
+    border-color: rgba(239, 68, 68, 0.55);
+    background: radial-gradient(ellipse at center, rgba(239, 68, 68, 0.2) 0%, transparent 70%);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.4);
   }
 
   &.is-settled &__felt-ring {
-    animation: dice-tray-shockwave 0.45s ease-out;
+    animation: sea-water-ripple 0.6s ease-out;
   }
 
   &__faces {
@@ -148,11 +130,12 @@
   }
 
   &__shadow {
-    width: 44px;
-    height: 10px;
-    margin-top: 8px;
+    width: 48px;
+    height: 12px;
+    margin-top: 6px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(0, 0, 0, 0.74) 0%, transparent 72%);
+    background: radial-gradient(ellipse at center, rgba(3, 20, 36, 0.8) 0%, rgba(6, 40, 65, 0.45) 50%, transparent 74%);
+    filter: blur(1.5px);
   }
 
   &.is-rolling &__die--first {
@@ -180,6 +163,14 @@
   }
 
   &__footer {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 18px;
+    border-radius: 999px;
+    background: rgba(11, 23, 38, 0.88);
+    border: 1.5px solid rgba(250, 204, 21, 0.55);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55), 0 0 16px rgba(250, 204, 21, 0.2);
+    backdrop-filter: blur(8px);
     font-family: "Cinzel", "Outfit", serif;
     font-size: 0.94rem;
     font-weight: 800;
@@ -197,18 +188,31 @@
   }
 
   &.is-seven &__footer {
+    border-color: rgba(239, 68, 68, 0.7);
     color: #fca5a5;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55), 0 0 20px rgba(239, 68, 68, 0.35);
   }
 }
 
 @keyframes tabletop-dice-enter {
   from {
     opacity: 0;
-    transform: translate(-50%, -42%) scale(0.84);
+    transform: translateY(-42%) scale(0.88);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translateY(-50%) scale(1);
+  }
+}
+
+@keyframes sea-water-ripple {
+  0% {
+    transform: scale(0.85);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0.2;
   }
 }
 
