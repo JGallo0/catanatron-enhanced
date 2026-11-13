@@ -11,6 +11,7 @@ const TEST_COLORS: AvatarColors = {
   outfitSecondary: "#1e3a8a",
   outfitTrim: "#facc15",
   mount: "#854d0e",
+  backpack: "#065f46",
 };
 
 const ALT_COLORS: AvatarColors = {
@@ -21,6 +22,7 @@ const ALT_COLORS: AvatarColors = {
   outfitSecondary: "#78350f",
   outfitTrim: "#38bdf8",
   mount: "#e2e8f0",
+  backpack: "#7f1d1d",
 };
 
 function expectMaterialHex(mat: THREE.Material, hex: string): void {
@@ -37,7 +39,7 @@ describe("materialTint", () => {
     expect(normalizeMaterialName("mat_sclera.002")).toBe("mat_sclera");
   });
 
-  test("applies all 7 reserved material channels across Standard, Physical, Basic, and array materials", () => {
+  test("applies all 8 reserved material channels including independent mat_backpack", () => {
     const group = new THREE.Group();
 
     const matSkin = new THREE.MeshStandardMaterial({ name: "mat_skin", color: "#ffffff" });
@@ -47,13 +49,15 @@ describe("materialTint", () => {
     const matSecondary = new THREE.MeshStandardMaterial({ name: "mat_secondary.003", color: "#ffffff" });
     const matMetal = new THREE.MeshStandardMaterial({ name: "mat_metal", color: "#ffffff" });
     const matMount = new THREE.MeshStandardMaterial({ name: "mat_mount", color: "#ffffff" });
+    const matBackpack = new THREE.MeshStandardMaterial({ name: "MAT_BACKPACK.001", color: "#ffffff" });
 
     const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(), matSkin);
     const headMesh = new THREE.Mesh(new THREE.BoxGeometry(), [matHair, matEyes]);
     const coatMesh = new THREE.Mesh(new THREE.BoxGeometry(), [matPrimary, matSecondary, matMetal]);
     const mountMesh = new THREE.Mesh(new THREE.BoxGeometry(), matMount);
+    const packMesh = new THREE.Mesh(new THREE.BoxGeometry(), matBackpack);
 
-    group.add(bodyMesh, headMesh, coatMesh, mountMesh);
+    group.add(bodyMesh, headMesh, coatMesh, mountMesh, packMesh);
     applyAvatarMaterials(group, TEST_COLORS);
 
     expectMaterialHex(bodyMesh.material as THREE.Material, TEST_COLORS.skin);
@@ -68,6 +72,8 @@ describe("materialTint", () => {
     expectMaterialHex(coatMats[2], TEST_COLORS.outfitTrim);
 
     expectMaterialHex(mountMesh.material as THREE.Material, TEST_COLORS.mount);
+    expectMaterialHex(packMesh.material as THREE.Material, TEST_COLORS.backpack!);
+    expect(TEST_COLORS.backpack).not.toBe(TEST_COLORS.outfitPrimary);
   });
 
   test("leaves non-reserved materials such as mat_sclera, mat_pupil, and mat_fixed_stone untouched", () => {

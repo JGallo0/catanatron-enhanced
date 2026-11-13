@@ -13,6 +13,7 @@ AVATAR_COLOR_FIELDS: tuple[str, ...] = (
     "outfitSecondary",
     "outfitTrim",
     "mount",
+    "backpack",
 )
 
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}\Z")

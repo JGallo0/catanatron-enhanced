@@ -3,7 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import AvatarStudioModal from "./AvatarStudioModal";
+import AvatarStudioModal, {
+  COLOR_CHANNEL_CAMERA_FOCUS,
+  SLOT_CAMERA_FOCUS,
+} from "./AvatarStudioModal";
+import { AVATAR_CATALOG_SLOTS, AVATAR_COLOR_SWATCHES } from "../config/avatarCatalog";
 import PlayerAvatar from "./PlayerAvatar";
 import { updateProfile } from "../utils/apiClient";
 import type { PlayerAccount } from "../utils/apiClient";
@@ -319,7 +323,7 @@ describe("AvatarStudioModal", () => {
     expect(screen.getByRole("button", { name: /Imperial da Ilha/i })).not.toHaveTextContent(/🔒/);
   }, 20000);
 
-  test("live custom color swatches and hex color pickers update and save all 7 color channels", async () => {
+  test("live custom color swatches and hex color pickers update and save all 8 color channels including independent backpack", async () => {
     const user = userEvent.setup();
     vi.mocked(updateProfile).mockResolvedValue(baseAccount);
 
@@ -332,9 +336,12 @@ describe("AvatarStudioModal", () => {
       />
     );
 
-    // Click curated swatch for outfitPrimary (Esmeralda)
+    // Click curated swatch for outfitPrimary (Esmeralda) and backpack (Verde Mata) independently
     await user.click(
       screen.getByRole("button", { name: /Roupa Principal: Esmeralda/i })
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Mochila: Verde Mata/i })
     );
 
     // Use <input type="color"> custom hex pickers for trim & mount
@@ -351,12 +358,76 @@ describe("AvatarStudioModal", () => {
       avatarConfig: expect.objectContaining({
         colors: expect.objectContaining({
           outfitPrimary: "#059669",
+          backpack: "#065f46",
           outfitTrim: "#12ab34",
           mount: "#abcdef",
         }),
       }),
     });
   }, 15000);
+
+  test("automatically switches viewport camera between portrait and full body for every selectable slot and color channel", async () => {
+    const user = userEvent.setup();
+
+    for (const slot of AVATAR_CATALOG_SLOTS) {
+      expect(["full", "portrait"]).toContain(SLOT_CAMERA_FOCUS[slot]);
+    }
+    for (const key of Object.keys(AVATAR_COLOR_SWATCHES) as Array<
+      keyof typeof AVATAR_COLOR_SWATCHES
+    >) {
+      expect(["full", "portrait"]).toContain(COLOR_CHANNEL_CAMERA_FOCUS[key]);
+    }
+
+    render(
+      <AvatarStudioModal
+        open={true}
+        onClose={vi.fn()}
+        account={baseAccount}
+        onSaved={vi.fn()}
+      />
+    );
+
+    const wrapper = await screen.findByTestId("studio-3d-wrapper");
+    expect(wrapper).toHaveAttribute("data-camera-focus", "full");
+
+    // Nose -> portrait
+    await user.click(screen.getByRole("button", { name: /Aquilino/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "portrait");
+
+    // Body type (in the same Body & Face tab!) -> full body
+    await user.click(screen.getByRole("button", { name: /Robusto/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "full");
+
+    // Hair -> portrait
+    await user.click(screen.getByRole("tab", { name: /Cabelo & Barba/i }));
+    await user.click(screen.getByRole("button", { name: /Tranças/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "portrait");
+
+    // Main outfit -> full body
+    await user.click(screen.getByRole("tab", { name: /Vestimenta/i }));
+    await user.click(screen.getByRole("button", { name: /Armadura Medieval/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "full");
+
+    // Hat -> portrait, then Explorer Backpack (same Gear & Props tab!) -> full body
+    await user.click(screen.getByRole("tab", { name: /Adereços/i }));
+    await user.click(screen.getByRole("button", { name: /Tricórnio de Capitão/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "portrait");
+    await user.click(screen.getByRole("button", { name: /Mochila de Explorador/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "full");
+
+    // Color channels: Eyes -> portrait, then Backpack color -> full body
+    await user.click(screen.getByRole("button", { name: /Olhos: Esmeralda/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "portrait");
+    await user.click(screen.getByRole("button", { name: /Mochila: Azul Náutico/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "full");
+
+    // Skin color -> portrait, Mount -> full body
+    await user.click(screen.getByRole("button", { name: /Pele: Dourada/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "portrait");
+    await user.click(screen.getByRole("tab", { name: /Montarias & Pets/i }));
+    await user.click(screen.getByRole("button", { name: /Corcel da Ilha/i }));
+    expect(wrapper).toHaveAttribute("data-camera-focus", "full");
+  }, 20000);
 
   test("Option A Try-On VIP flow: allows live preview of locked VIP items, opens lock dialog on save, and strips only locked slots while preserving unlocked + colors", async () => {
     const user = userEvent.setup();

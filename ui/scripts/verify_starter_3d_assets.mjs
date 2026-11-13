@@ -71,7 +71,7 @@ export const AVATAR_MODEL_MANIFEST = [
   { relPath: "props_hand/sun_rapier.glb", allOf: ["mat_metal", "mat_secondary"] },
 
   // props_back/
-  { relPath: "props_back/explorer_pack.glb", allOf: ["mat_primary", "mat_secondary", "mat_metal"] },
+  { relPath: "props_back/explorer_pack.glb", allOf: ["mat_backpack", "mat_secondary", "mat_metal"] },
   { relPath: "props_back/sheathed_sword.glb", allOf: ["mat_primary", "mat_secondary", "mat_metal"] },
   { relPath: "props_back/imperial_shield.glb", allOf: ["mat_primary", "mat_secondary", "mat_metal"] },
 

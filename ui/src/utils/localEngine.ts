@@ -749,44 +749,82 @@ function buildSeatViewsFromMeta(
   return { seatNames, seatAvatars, takenOverColors, seatTakeover };
 }
 
+let cachedGamesMap: Record<string, StoredLocalGame> | null = null;
+let lastStorageRaw: string | null = null;
+
+export function localResetEngineCache(): void {
+  cachedGamesMap = null;
+  lastStorageRaw = null;
+}
+
 function loadGamesMap(): Record<string, StoredLocalGame> {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(GAMES_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    raw = typeof localStorage !== "undefined" ? localStorage.getItem(GAMES_STORAGE_KEY) : null;
   } catch {
-    return {};
+    raw = null;
+  }
+
+  // If storage was emptied externally (e.g. tests calling localStorage.clear())
+  if (!raw) {
+    if (cachedGamesMap && Object.keys(cachedGamesMap).length > 0) {
+      cachedGamesMap = {};
+      lastStorageRaw = null;
+    }
+    if (!cachedGamesMap) cachedGamesMap = {};
+    return cachedGamesMap;
+  }
+
+  // Fast path: storage unchanged since our last write or parse
+  if (cachedGamesMap && raw === lastStorageRaw) {
+    return cachedGamesMap;
+  }
+
+  try {
+    cachedGamesMap = JSON.parse(raw);
+    lastStorageRaw = raw;
+    return cachedGamesMap!;
+  } catch {
+    cachedGamesMap = {};
+    lastStorageRaw = null;
+    return cachedGamesMap;
   }
 }
 
-// Number of most recent state snapshots kept per game. Each snapshot is a full
-// board state (tens of KB); keeping all of them blew past the ~5 MB
-// localStorage quota around turn ~55, which silently stopped saving and froze
-// the bots. Older entries become `null` (indices are preserved).
-const MAX_PERSISTED_SNAPSHOTS = 8;
+// In local storage, keep at most 1 snapshot per game to keep memory and stringification minimal
+const MAX_PERSISTED_SNAPSHOTS = 1;
 
-function compactGame(game: StoredLocalGame, keep: number) {
-  const cut = game.history.length - keep;
-  for (let i = 0; i < cut; i++) {
-    game.history[i] = null as unknown as GameState;
+function compactGame(game: StoredLocalGame, keep = 1) {
+  if (game.history && game.history.length > keep) {
+    game.history = game.history.slice(-keep);
   }
 }
 
-function saveGamesMap(map: Record<string, StoredLocalGame>) {
+function saveGamesMap(
+  map: Record<string, StoredLocalGame>,
+  _options?: { immediate?: boolean }
+) {
+  cachedGamesMap = map;
   const keys = Object.keys(map);
-  while (keys.length > 8) {
+  // Keep at most 2 recent games
+  while (keys.length > 2) {
     delete map[keys.shift() as string];
   }
   for (const k of keys) {
     compactGame(map[k], MAX_PERSISTED_SNAPSHOTS);
   }
-  // Retry with progressively less data instead of failing silently.
-  for (const keep of [MAX_PERSISTED_SNAPSHOTS, 2, 0]) {
+
+  // Retry with progressively less data if quota is constrained
+  for (const keep of [MAX_PERSISTED_SNAPSHOTS, 0]) {
     try {
-      localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(map));
+      const raw = JSON.stringify(map);
+      lastStorageRaw = raw;
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(GAMES_STORAGE_KEY, raw);
+      }
       return;
     } catch {
       for (const k of keys) compactGame(map[k], keep);
-      // Last resort: drop the oldest games, never the current one.
       if (keep === 0 && keys.length > 1) {
         delete map[keys[0]];
       }
@@ -1854,6 +1892,9 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
   state.state_index = state.action_records.length;
   recomputeScoresAndPlayableActions(game);
   game.history.push(JSON.parse(JSON.stringify(state)));
+  if (game.history.length > MAX_PERSISTED_SNAPSHOTS) {
+    game.history = game.history.slice(-MAX_PERSISTED_SNAPSHOTS);
+  }
 
   if (state.winning_color) {
     const winnerColor = state.winning_color;
@@ -2908,7 +2949,7 @@ export function localCreateGame(options: {
 
   const map = loadGamesMap();
   map[gameId] = stored;
-  saveGamesMap(map);
+  saveGamesMap(map, { immediate: true });
   return gameId;
 }
 
@@ -2931,13 +2972,16 @@ export function localGetState(
     game = freshMap[createdId];
     game.state.game.id = gameId;
     freshMap[gameId] = game;
-    saveGamesMap(freshMap);
+    saveGamesMap(freshMap, { immediate: true });
   }
   const idx = Number(stateIndex);
   const rawState =
     stateIndex === "latest"
       ? game.state
-      : game.history[idx] || game.state;
+      : (game.history &&
+          (game.history.find((s) => s && s.state_index === idx) ||
+            game.history[idx])) ||
+        game.state;
   const cloned = JSON.parse(JSON.stringify(rawState)) as GameState;
   if (game.seatMeta) {
     const {
@@ -2990,7 +3034,11 @@ export function localPostAction(
   const chosen = action ?? chooseBotAction(game);
   if (chosen) {
     applyActionToGame(game, chosen);
-    saveGamesMap(map);
+    const isImmediate =
+      Boolean(game.state.winning_color) ||
+      chosen[1] === "END_TURN" ||
+      !game.state.bot_colors.includes(game.state.current_color);
+    saveGamesMap(map, { immediate: isImmediate });
   }
   return buildView();
 }
@@ -3021,7 +3069,7 @@ export function localGameHeartbeat(
     !game.seatMeta[color].taken_over_by_bot
   ) {
     game.seatMeta[color].last_seen_at = nowSec;
-    saveGamesMap(map);
+    saveGamesMap(map, { immediate: true });
   }
   const takenOver = Object.entries(game.seatMeta || {})
     .filter(([, m]) => Boolean(m?.taken_over_by_bot))
@@ -3089,7 +3137,7 @@ export function localAbandonGame(
     game.state.bot_colors = [...game.state.bot_colors, targetColor];
   }
   recomputeScoresAndPlayableActions(game);
-  saveGamesMap(map);
+  saveGamesMap(map, { immediate: true });
   return localGetState(gameId, "latest");
 }
 
@@ -3131,7 +3179,7 @@ export function localReclaimGame(
   }
   game.state.bot_colors = game.state.bot_colors.filter((c) => c !== targetColor);
   recomputeScoresAndPlayableActions(game);
-  saveGamesMap(map);
+  saveGamesMap(map, { immediate: true });
   return localGetState(gameId, "latest");
 }
 

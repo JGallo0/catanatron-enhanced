@@ -94,6 +94,7 @@ def test_v2_colors_snapshot_and_v1_compat_sanitization(app, client):
                     "outfitSecondary": "javascript:alert(1)",
                     "outfitTrim": "#facc15",
                     "mount": "#e2e8f0",
+                    "backpack": "#065f46",
                     "unknownColor": "#ffffff",
                 },
                 "portraitSnapshot": valid_snap,
@@ -113,6 +114,7 @@ def test_v2_colors_snapshot_and_v1_compat_sanitization(app, client):
     assert cfg["mount"] == "island_horse"
     assert cfg["colors"]["skin"] == "#e4b287"
     assert cfg["colors"]["mount"] == "#e2e8f0"
+    assert cfg["colors"]["backpack"] == "#065f46"
     assert "outfitSecondary" not in cfg["colors"]
     assert "unknownColor" not in cfg["colors"]
     assert cfg["portraitSnapshot"] == valid_snap

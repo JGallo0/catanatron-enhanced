@@ -358,6 +358,7 @@ function createMaterials() {
     secondary: makeMat("mat_secondary", 0x991b1b, { roughness: 0.68, metalness: 0.05, doubleSided: true }),
     metal: makeMat("mat_metal", 0xfacc15, { roughness: 0.26, metalness: 0.84 }),
     mount: makeMat("mat_mount", 0xd6d3d1, { roughness: 0.64, metalness: 0.08 }),
+    backpack: makeMat("mat_backpack", 0x92400e, { roughness: 0.66, metalness: 0.04, doubleSided: true }),
     darkDetail: makeMat("mat_dark_fixed", 0x1e1b18, { roughness: 0.52, metalness: 0.08 }),
     ivoryDetail: makeMat("mat_ivory_fixed", 0xf1ebd8, { roughness: 0.45, metalness: 0.04 }),
   };
@@ -424,6 +425,9 @@ function makeTube(points, radius = 0.02, tubularSegments = 20, radialSegments = 
 function makeLoftedSection(rings, radialSegs = 28, opts = {}) {
   const capBottom = opts.capBottom !== false;
   const capTop = opts.capTop !== false;
+  const isDescending =
+    rings.length > 1 && rings[rings.length - 1].y < rings[0].y;
+  const orderedRings = isDescending ? [...rings].reverse() : rings;
 
   const positions = [];
   const uvs = [];
@@ -431,9 +435,9 @@ function makeLoftedSection(rings, radialSegs = 28, opts = {}) {
 
   const rowStride = radialSegs + 1;
 
-  for (let r = 0; r < rings.length; r++) {
-    const ring = rings[r];
-    const v = rings.length > 1 ? r / (rings.length - 1) : 0;
+  for (let r = 0; r < orderedRings.length; r++) {
+    const ring = orderedRings[r];
+    const v = orderedRings.length > 1 ? r / (orderedRings.length - 1) : 0;
     const rx = ring.rx ?? 0.1;
     const rz = ring.rz ?? rx;
     const cx = ring.cx ?? 0;
@@ -499,36 +503,42 @@ function makeLoftedSection(rings, radialSegs = 28, opts = {}) {
     }
   }
 
-  for (let r = 0; r < rings.length - 1; r++) {
+  for (let r = 0; r < orderedRings.length - 1; r++) {
     for (let s = 0; s < radialSegs; s++) {
       const a = r * rowStride + s;
       const b = a + rowStride;
       const c = b + 1;
       const d = a + 1;
-      // Outward winding
+      // Outward winding (+Z around Y axis)
       indices.push(a, d, b);
       indices.push(b, d, c);
     }
   }
 
-  if (capBottom && rings.length > 0 && (rings[0].rx ?? 0) > 0.002) {
-    const first = rings[0];
+  if (capBottom && orderedRings.length > 0 && (orderedRings[0].rx ?? 0) > 0.002) {
+    const first = orderedRings[0];
     const centerIdx = positions.length / 3;
     positions.push(first.cx ?? 0, first.y, first.cz ?? 0);
     uvs.push(0.5, 0);
     for (let s = 0; s < radialSegs; s++) {
-      indices.push(centerIdx, s, s + 1);
+      // Outward -Y bottom normal
+      indices.push(centerIdx, s + 1, s);
     }
   }
 
-  if (capTop && rings.length > 0 && (rings[rings.length - 1].rx ?? 0) > 0.002) {
-    const last = rings[rings.length - 1];
-    const baseRow = (rings.length - 1) * rowStride;
+  if (
+    capTop &&
+    orderedRings.length > 0 &&
+    (orderedRings[orderedRings.length - 1].rx ?? 0) > 0.002
+  ) {
+    const last = orderedRings[orderedRings.length - 1];
+    const baseRow = (orderedRings.length - 1) * rowStride;
     const centerIdx = positions.length / 3;
     positions.push(last.cx ?? 0, last.y, last.cz ?? 0);
     uvs.push(0.5, 1);
     for (let s = 0; s < radialSegs; s++) {
-      indices.push(centerIdx, baseRow + s + 1, baseRow + s);
+      // Outward +Y top normal
+      indices.push(centerIdx, baseRow + s, baseRow + s + 1);
     }
   }
 
@@ -540,7 +550,7 @@ function makeLoftedSection(rings, radialSegs = 28, opts = {}) {
 
   // Weld wrap-seam vertex normals (s=0 & s=radialSegs) so no centerline shading crease appears on front +Z!
   const normAttr = geo.getAttribute("normal");
-  for (let r = 0; r < rings.length; r++) {
+  for (let r = 0; r < orderedRings.length; r++) {
     const idx0 = r * rowStride;
     const idxLast = idx0 + radialSegs;
     const nx = normAttr.getX(idx0) + normAttr.getX(idxLast);
@@ -553,6 +563,193 @@ function makeLoftedSection(rings, radialSegs = 28, opts = {}) {
   normAttr.needsUpdate = true;
 
   return geo;
+}
+
+/**
+ * Builds a closed, variable-radius curved mesh along 3D stations [{ pos: [x,y,z], rx, rz }]
+ * with outward end caps — eliminating hollow TubeGeometry open pipe ends on necks, tails, beaks, and antlers!
+ */
+function makeTaperedCurvedTube(stations, radialSegs = 14) {
+  const pts = stations.map((s) => new THREE.Vector3(...s.pos));
+  const curve = new THREE.CatmullRomCurve3(pts, false);
+  const segCount = Math.max(stations.length * 4, 12);
+  const frames = curve.computeFrenetFrames(segCount, false);
+  const rowStride = radialSegs + 1;
+
+  const lerpVal = (t, key, fallbackKey) => {
+    const fIdx = t * (stations.length - 1);
+    const i0 = Math.min(stations.length - 1, Math.floor(fIdx));
+    const i1 = Math.min(stations.length - 1, i0 + 1);
+    const alpha = fIdx - i0;
+    const v0 = stations[i0][key] ?? stations[i0][fallbackKey] ?? 0.03;
+    const v1 = stations[i1][key] ?? stations[i1][fallbackKey] ?? 0.03;
+    return v0 + (v1 - v0) * alpha;
+  };
+
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+
+  for (let i = 0; i <= segCount; i++) {
+    const t = i / segCount;
+    const p = curve.getPointAt(t);
+    const N = frames.normals[i];
+    const B = frames.binormals[i];
+    const rx = lerpVal(t, "rx", "r");
+    const rz = lerpVal(t, "rz", "rx");
+
+    for (let j = 0; j <= radialSegs; j++) {
+      const theta = (j / radialSegs) * Math.PI * 2;
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+      const vx = p.x + N.x * (cosT * rx) + B.x * (sinT * rz);
+      const vy = p.y + N.y * (cosT * rx) + B.y * (sinT * rz);
+      const vz = p.z + N.z * (cosT * rx) + B.z * (sinT * rz);
+      positions.push(vx, vy, vz);
+      uvs.push(j / radialSegs, t);
+    }
+  }
+
+  for (let i = 0; i < segCount; i++) {
+    for (let j = 0; j < radialSegs; j++) {
+      const a = i * rowStride + j;
+      const b = a + rowStride;
+      const c = b + 1;
+      const d = a + 1;
+      // Outward winding around tangent +T (det(N,B,T) = +1 => (d-a) x (b-a) = B x T = +N)
+      indices.push(a, d, b);
+      indices.push(b, d, c);
+    }
+  }
+
+  // Start cap (outward normal -T)
+  const p0 = curve.getPointAt(0);
+  const startCenter = positions.length / 3;
+  positions.push(p0.x, p0.y, p0.z);
+  uvs.push(0.5, 0);
+  for (let j = 0; j < radialSegs; j++) {
+    indices.push(startCenter, j + 1, j);
+  }
+
+  // End cap (outward normal +T)
+  const p1 = curve.getPointAt(1);
+  const endBase = segCount * rowStride;
+  const endCenter = positions.length / 3;
+  positions.push(p1.x, p1.y, p1.z);
+  uvs.push(0.5, 1);
+  for (let j = 0; j < radialSegs; j++) {
+    indices.push(endCenter, endBase + j, endBase + j + 1);
+  }
+
+  // Verify closed signed volume > 0; if Frenet orientation flipped, reverse triangle winding
+  let signedVol = 0;
+  for (let tIdx = 0; tIdx < indices.length; tIdx += 3) {
+    const ia = indices[tIdx] * 3;
+    const ib = indices[tIdx + 1] * 3;
+    const ic = indices[tIdx + 2] * 3;
+    const ax = positions[ia], ay = positions[ia + 1], az = positions[ia + 2];
+    const bx = positions[ib], by = positions[ib + 1], bz = positions[ib + 2];
+    const cx = positions[ic], cy = positions[ic + 1], cz = positions[ic + 2];
+    signedVol +=
+      (ax * (by * cz - bz * cy) +
+        ay * (bz * cx - bx * cz) +
+        az * (bx * cy - by * cx)) /
+      6.0;
+  }
+  if (signedVol < 0) {
+    for (let tIdx = 0; tIdx < indices.length; tIdx += 3) {
+      const tmp = indices[tIdx + 1];
+      indices[tIdx + 1] = indices[tIdx + 2];
+      indices[tIdx + 2] = tmp;
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+
+  const normAttr = geo.getAttribute("normal");
+  for (let i = 0; i <= segCount; i++) {
+    const idx0 = i * rowStride;
+    const idxLast = idx0 + radialSegs;
+    const nx = normAttr.getX(idx0) + normAttr.getX(idxLast);
+    const ny = normAttr.getY(idx0) + normAttr.getY(idxLast);
+    const nz = normAttr.getZ(idx0) + normAttr.getZ(idxLast);
+    const len = Math.hypot(nx, ny, nz) || 1;
+    normAttr.setXYZ(idx0, nx / len, ny / len, nz / len);
+    normAttr.setXYZ(idxLast, nx / len, ny / len, nz / len);
+  }
+  normAttr.needsUpdate = true;
+
+  return geo;
+}
+
+/**
+ * Adds a detailed Parrot-grade layered animal eye (brow lid + white sclera + colored iris + pupil + glint).
+ */
+function addExpressiveAnimalEye(
+  parent,
+  namePrefix,
+  pos,
+  yawRad,
+  mats,
+  opts = {}
+) {
+  const scale = opts.scale ?? 1.0;
+  const irisMat = opts.irisMat ?? mats.eyes;
+  const browMat = opts.browMat ?? mats.mount;
+  const g = addGroup(parent, namePrefix, pos, [0, yawRad, opts.tiltZ ?? 0]);
+  // Brow hood / upper eyelid
+  addMesh(
+    g,
+    `${namePrefix}_brow`,
+    new THREE.SphereGeometry(0.022 * scale, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
+    browMat,
+    [0, 0.004 * scale, -0.002 * scale],
+    [-0.18, 0, 0],
+    [1.15, 0.78, 0.92]
+  );
+  // White sclera
+  addMesh(
+    g,
+    `${namePrefix}_sclera`,
+    new THREE.SphereGeometry(0.018 * scale, 12, 10),
+    mats.sclera,
+    [0, 0, 0],
+    [0, 0, 0],
+    [1.15, 0.88, 0.65]
+  );
+  // Colored iris
+  addMesh(
+    g,
+    `${namePrefix}_iris`,
+    new THREE.SphereGeometry(0.0125 * scale, 10, 8),
+    irisMat,
+    [0, -0.001 * scale, 0.007 * scale],
+    [0, 0, 0],
+    [1.0, 1.0, 0.58]
+  );
+  // Dark pupil
+  addMesh(
+    g,
+    `${namePrefix}_pupil`,
+    new THREE.SphereGeometry(0.0078 * scale, 8, 8),
+    mats.pupil,
+    [0, -0.001 * scale, 0.0105 * scale],
+    [0, 0, 0],
+    [1.0, 1.0, 0.55]
+  );
+  // Specular catchlight glint
+  addMesh(
+    g,
+    `${namePrefix}_glint`,
+    new THREE.SphereGeometry(0.0032 * scale, 6, 6),
+    mats.ivoryDetail,
+    [0.0045 * scale, 0.0042 * scale, 0.0125 * scale]
+  );
+  return g;
 }
 
 /**
@@ -2019,7 +2216,7 @@ function buildBackProp(variant) {
         ],
         18
       ),
-      mats.primary,
+      mats.backpack,
       [0, 0, -0.05]
     );
     addMesh(root, "pack_bedroll", new THREE.CylinderGeometry(0.052, 0.052, 0.32, 16), mats.secondary, [0, 0.18, -0.05], [0, 0, Math.PI / 2]);
@@ -2219,392 +2416,1155 @@ function buildPet(variant) {
 //     Horse vs Wolf (fangs, thick ruff, clawed digitigrade paws!) vs Stag (tall 6-tine antlers!) vs Griffin (eagle head/talons + lion hind + spreading wings!)
 // ============================================================================
 
+// ============================================================================
+// 12. MOUNTS (Closed Organic Anatomy, Parrot-Grade Faces, Zero Holes!)
+//     Horse vs Wolf vs Stag vs Griffin — articulated limbs, sculpted heads/eyes,
+//     snug harness/bridle, and smooth closed toroidal/tapered meshes!
+// ============================================================================
+
+function addMountLimbJointed(
+  parent,
+  id,
+  hipPos,
+  kneePos,
+  footPos,
+  topRx,
+  midRx,
+  lowRx,
+  mat,
+  radialSegs = 14
+) {
+  const legGroup = addGroup(parent, `mount_leg_${id}`, hipPos);
+  // Sculpted shoulder/haunch dome bridging torso seamlessly into upper leg
+  addMesh(
+    legGroup,
+    `mount_hip_dome_${id}`,
+    new THREE.SphereGeometry(topRx * 0.96, 14, 12),
+    mat,
+    [0, 0.01, 0],
+    [0, 0, 0],
+    [0.88, 1.15, 1.05]
+  );
+
+  const midVec = [
+    kneePos[0] - hipPos[0],
+    kneePos[1] - hipPos[1],
+    kneePos[2] - hipPos[2],
+  ];
+  legGroup.add(
+    buildContouredBoneLimb(
+      midVec,
+      [
+        { t: 0.0, rx: topRx * 0.95, rz: topRx * 1.08 },
+        { t: 0.45, rx: (topRx + midRx) * 0.5, rz: (topRx + midRx) * 0.56 },
+        { t: 1.0, rx: midRx, rz: midRx * 1.04 },
+      ],
+      mat,
+      `mount_upper_leg_${id}`,
+      radialSegs
+    )
+  );
+
+  // Smooth anatomical knee/hock joint sphere (zero open cap gap on bend!)
+  addMesh(
+    legGroup,
+    `mount_joint_${id}`,
+    new THREE.SphereGeometry(midRx * 1.04, 12, 10),
+    mat,
+    midVec
+  );
+
+  const shinGroup = addGroup(legGroup, `mount_lower_piv_${id}`, midVec);
+  const footVec = [
+    footPos[0] - kneePos[0],
+    footPos[1] - kneePos[1],
+    footPos[2] - kneePos[2],
+  ];
+  shinGroup.add(
+    buildContouredBoneLimb(
+      footVec,
+      [
+        { t: 0.0, rx: midRx * 0.96, rz: midRx },
+        { t: 0.55, rx: (midRx + lowRx) * 0.48, rz: (midRx + lowRx) * 0.5 },
+        { t: 1.0, rx: lowRx, rz: lowRx * 1.04 },
+      ],
+      mat,
+      `mount_cannon_${id}`,
+      radialSegs
+    )
+  );
+  // Ankle/fetlock condyle
+  addMesh(
+    shinGroup,
+    `mount_fetlock_${id}`,
+    new THREE.SphereGeometry(lowRx * 1.08, 10, 8),
+    mat,
+    footVec
+  );
+
+  return { legGroup, shinGroup, footVec };
+}
+
+function addMountSaddleAndHarness(
+  saddleGroup,
+  mats,
+  opts
+) {
+  const { bodyY, chestZ = 0.46, headY, headZ, muzzleReinY, muzzleReinZ, halfWidth = 0.19 } = opts;
+  const saddleY = bodyY + 0.21;
+
+  // Contoured curved saddle blanket draping flanks cleanly (sized to mount barrel width, zero clipping!)
+  const padW = Math.min(0.23, halfWidth + 0.032);
+  const padShape = new THREE.Shape();
+  padShape.moveTo(-padW, -0.015);
+  padShape.quadraticCurveTo(0, 0.095, padW, -0.015);
+  padShape.lineTo(padW + 0.022, -0.145);
+  padShape.quadraticCurveTo(padW * 0.88, -0.215, padW * 0.50, -0.215);
+  padShape.quadraticCurveTo(0, -0.155, -padW * 0.50, -0.215);
+  padShape.quadraticCurveTo(-padW * 0.88, -0.215, -(padW + 0.022), -0.145);
+  padShape.closePath();
+  addMesh(
+    saddleGroup,
+    "mount_saddle_pad",
+    makeBeveledShape(padShape, 0.36, 0.014, 0.014),
+    mats.primary,
+    [0, bodyY + 0.15, -0.17]
+  );
+
+  // Cushioned sculpted leather saddle seat + front pommel + rear cantle sitting cleanly atop blanket
+  addMesh(
+    saddleGroup,
+    "mount_saddle",
+    makeLoftedSection(
+      [
+        { y: -0.17, rx: 0.155, rz: 0.055, squircle: 0.45 },
+        { y: 0.0, rx: 0.17, rz: 0.05, squircle: 0.45 },
+        { y: 0.17, rx: 0.14, rz: 0.055, squircle: 0.45 },
+      ],
+      18
+    ),
+    mats.secondary,
+    [0, saddleY + 0.015, 0.01],
+    [Math.PI / 2, 0, 0]
+  );
+  addMesh(
+    saddleGroup,
+    "mount_saddle_cantle",
+    new THREE.TorusGeometry(0.125, 0.028, 10, 18, Math.PI),
+    mats.metal,
+    [0, saddleY + 0.05, -0.155],
+    [-0.36, 0, 0]
+  );
+  addMesh(
+    saddleGroup,
+    "mount_saddle_pommel",
+    new THREE.TorusGeometry(0.105, 0.022, 8, 16, Math.PI),
+    mats.metal,
+    [0, saddleY + 0.045, 0.17],
+    [0.32, 0, 0]
+  );
+
+  // Royal Chest Breastplate Harness & Medallion wrapping smoothly over front chest
+  addMesh(
+    saddleGroup,
+    "mount_chest_strap",
+    makeTaperedCurvedTube(
+      [
+        { pos: [-halfWidth, saddleY - 0.06, 0.16], rx: 0.015 },
+        { pos: [-halfWidth * 0.72, bodyY - 0.01, chestZ * 0.88], rx: 0.016 },
+        { pos: [0, bodyY - 0.03, chestZ], rx: 0.020 },
+        { pos: [halfWidth * 0.72, bodyY - 0.01, chestZ * 0.88], rx: 0.016 },
+        { pos: [halfWidth, saddleY - 0.06, 0.16], rx: 0.015 },
+      ],
+      10
+    ),
+    mats.secondary
+  );
+  addMesh(
+    saddleGroup,
+    "mount_chest_medallion",
+    new THREE.CylinderGeometry(0.044, 0.044, 0.018, 16),
+    mats.metal,
+    [0, bodyY - 0.03, chestZ + 0.012],
+    [Math.PI / 2 + 0.15, 0, 0]
+  );
+
+  // Stirrups & Sweeping Curved Reins connecting bit/jaw cleanly to pommel!
+  for (const side of [-1, 1]) {
+    addMesh(
+      saddleGroup,
+      `stirrup_strap_${side}`,
+      makeTaperedCurvedTube(
+        [
+          { pos: [side * 0.175, saddleY - 0.01, 0.05], rx: 0.011 },
+          { pos: [side * (halfWidth + 0.03), bodyY - 0.16, 0.06], rx: 0.010 },
+          { pos: [side * (halfWidth + 0.04), saddleY - 0.46, 0.065], rx: 0.010 },
+        ],
+        8
+      ),
+      mats.secondary
+    );
+    addMesh(
+      saddleGroup,
+      `stirrup_iron_${side}`,
+      new THREE.TorusGeometry(0.040, 0.008, 8, 14),
+      mats.metal,
+      [side * (halfWidth + 0.045), saddleY - 0.49, 0.065],
+      [0, Math.PI / 2, 0]
+    );
+    const reinStartZ = muzzleReinZ ?? headZ + 0.16;
+    const reinStartY = muzzleReinY ?? headY - 0.06;
+    addMesh(
+      saddleGroup,
+      `mount_rein_${side}`,
+      makeTaperedCurvedTube(
+        [
+          { pos: [side * (muzzleReinZ ? 0.056 : 0.065), reinStartY, reinStartZ], rx: 0.0068 },
+          { pos: [side * 0.125, Math.min(reinStartY, saddleY + 0.18) - 0.06, (reinStartZ + 0.18) * 0.52], rx: 0.0068 },
+          { pos: [side * 0.088, saddleY + 0.06, 0.18], rx: 0.0068 },
+        ],
+        8
+      ),
+      mats.secondary
+    );
+  }
+}
+
 function buildMount(variant) {
   const mats = createMaterials();
   const root = new THREE.Group();
   root.name = `mount_${variant}`;
 
-  // Centered heroic mount anchor (rotated 3/4 ONLY at display root inside sceneComposer or mount anchor so rider sits synchronously!)
   const anchor = addGroup(root, "mount_anchor", [0, 0, 0]);
-
   const saddleGroup = addGroup(anchor, "mount_saddle_group");
   const neckPivot = addGroup(anchor, "mount_neck_pivot");
   const tailPivot = addGroup(anchor, "mount_tail_pivot");
 
   if (variant === "snow_wolf") {
-    // LOBO DAS NEVES: Unmistakably lupine predator (thick fur ruff, deep chest + tucked narrow waist, digitigrade clawed paws — ZERO hooves!)
-    const torso = makeLoftedSection(
+    // =========================================================================
+    // LOBO DAS NEVES: Closed predator torso, thick shoulder fur mantle, sculpted
+    // fierce snout, 4 fangs, expressive almond eyes, clawed digitigrade paws!
+    // =========================================================================
+    const bodyY = 0.72;
+    const wolfBody = makeLoftedSection(
       [
-        { y: -0.44, rx: 0.165, rz: 0.175, squircle: 0.35 }, // croup / hindquarters (rotated horizontal so Y->Z!)
-        { y: -0.16, rx: 0.145, rz: 0.155, frontBulge: -0.15 }, // tucked narrow wolf waist
-        { y: 0.18, rx: 0.215, rz: 0.235, squircle: 0.3, frontBulge: 0.18 }, // deep powerful wolf chest
-        { y: 0.38, rx: 0.175, rz: 0.185 }, // shoulder ruff base
+        { y: -0.52, rx: 0.012, rz: 0.012 }, // smooth closed rump tip
+        { y: -0.46, rx: 0.125, rz: 0.132, squircle: 0.25 },
+        { y: -0.35, rx: 0.168, rz: 0.178, squircle: 0.30 },
+        { y: -0.14, rx: 0.148, rz: 0.158, frontBulge: -0.14 }, // tucked athletic loin
+        { y: 0.08, rx: 0.195, rz: 0.215, squircle: 0.28, frontBulge: 0.14 },
+        { y: 0.26, rx: 0.215, rz: 0.235, squircle: 0.30, frontBulge: 0.18 }, // deep wolf ribcage
+        { y: 0.39, rx: 0.175, rz: 0.188, frontBulge: 0.14 },
+        { y: 0.46, rx: 0.115, rz: 0.122 },
+        { y: 0.50, rx: 0.014, rz: 0.014 }, // smooth closed chest tip
       ],
-      22
+      26
     );
-    addMesh(anchor, "wolf_body", torso, mats.mount, [0, 0.72, 0], [Math.PI / 2, 0, 0]);
+    addMesh(anchor, "wolf_body", wolfBody, mats.mount, [0, bodyY, 0], [Math.PI / 2, 0, 0]);
 
-    // Dense jagged Arctic Wolf Ruff around neck & shoulders!
+    // Sculpted furry shoulder ruff collar anchored cleanly around neck base (zero Z-fighting with chest!)
+    addMesh(
+      neckPivot,
+      "wolf_shoulder_mantle",
+      makeLoftedSection(
+        [
+          { y: -0.09, rx: 0.02, rz: 0.02 },
+          { y: -0.02, rx: 0.198, rz: 0.212, foldFreq: 8, foldAmp: 0.08 },
+          { y: 0.10, rx: 0.172, rz: 0.184, foldFreq: 8, foldAmp: 0.08 },
+          { y: 0.20, rx: 0.125, rz: 0.132 },
+          { y: 0.24, rx: 0.02, rz: 0.02 },
+        ],
+        24
+      ),
+      mats.secondary,
+      [0, -0.01, -0.02],
+      [0.72, 0, 0]
+    );
     for (let r = 0; r < 10; r++) {
       const a = (r / 10) * Math.PI * 2;
       addMesh(
-        anchor,
+        neckPivot,
         `wolf_ruff_spike_${r}`,
-        new THREE.ConeGeometry(0.068, 0.22, 6),
+        new THREE.ConeGeometry(0.048, 0.14, 8),
         mats.secondary,
-        [Math.sin(a) * 0.16, 0.78 + Math.cos(a) * 0.14, 0.30],
-        [-0.78, 0, -Math.sin(a) * 0.45]
+        [Math.sin(a) * 0.145, 0.04 + Math.cos(a) * 0.125, -0.01],
+        [-0.78, 0, -Math.sin(a) * 0.42]
       );
     }
 
-    // 4 Articulated Canine Legs + Digitigrade Hind + Paw & Claws (NO HOOVES!)
+    // 4 Articulated Canine Legs + Joint Spheres + Padded Clawed Paws
     const wolfLegs = [
-      { id: "fl", x: 0.14, z: 0.30, hind: false },
-      { id: "fr", x: -0.14, z: 0.30, hind: false },
-      { id: "bl", x: 0.14, z: -0.34, hind: true },
-      { id: "br", x: -0.14, z: -0.34, hind: true },
+      { id: "fl", x: 0.145, z: 0.29, hind: false },
+      { id: "fr", x: -0.145, z: 0.29, hind: false },
+      { id: "bl", x: 0.140, z: -0.34, hind: true },
+      { id: "br", x: -0.140, z: -0.34, hind: true },
     ];
     for (const lg of wolfLegs) {
-      const hipPos = [lg.x, 0.66, lg.z];
-      const hockPos = [lg.x, 0.32, lg.hind ? lg.z - 0.11 : lg.z + 0.02];
+      const hipPos = [lg.x, 0.65, lg.z];
+      const hockPos = [lg.x, 0.32, lg.hind ? lg.z - 0.10 : lg.z + 0.02];
       const pawPos = [lg.x, 0.055, lg.hind ? lg.z - 0.02 : lg.z + 0.05];
-      const thighGroup = addGroup(anchor, `mount_leg_${lg.id}`, hipPos);
-      thighGroup.add(
-        buildContouredBoneLimb(
-          [0, hockPos[1] - hipPos[1], hockPos[2] - hipPos[2]],
-          [
-            { t: 0.0, rx: lg.hind ? 0.095 : 0.082, rz: lg.hind ? 0.110 : 0.088 },
-            { t: 0.5, rx: 0.068, rz: 0.072 },
-            { t: 1.0, rx: 0.048, rz: 0.050 },
-          ],
-          mats.mount,
-          `wolf_upper_${lg.id}`,
-          14
-        )
+      const { shinGroup, footVec } = addMountLimbJointed(
+        anchor,
+        lg.id,
+        hipPos,
+        hockPos,
+        pawPos,
+        lg.hind ? 0.105 : 0.088,
+        0.052,
+        0.040,
+        mats.mount,
+        14
       );
-      const shinGroup = addGroup(thighGroup, `wolf_shin_piv_${lg.id}`, [0, hockPos[1] - hipPos[1], hockPos[2] - hipPos[2]]);
-      shinGroup.add(
-        buildContouredBoneLimb(
-          [0, pawPos[1] - hockPos[1], pawPos[2] - hockPos[2]],
-          [
-            { t: 0.0, rx: 0.046, rz: 0.048 },
-            { t: 0.8, rx: 0.038, rz: 0.040 },
-          ],
-          mats.mount,
-          `wolf_lower_${lg.id}`,
-          12
-        )
+      const pawGroup = addGroup(shinGroup, `wolf_paw_${lg.id}`, footVec);
+      addMesh(
+        pawGroup,
+        `paw_pad_${lg.id}`,
+        new THREE.SphereGeometry(0.054, 12, 10),
+        mats.mount,
+        [0, -0.024, 0.028],
+        [0, 0, 0],
+        [1.02, 0.62, 1.38]
       );
-      // Furry Wolf Paw + 3 Dark Claws resting on ground Y=0!
-      const pawGroup = addGroup(shinGroup, `wolf_paw_${lg.id}`, [0, pawPos[1] - hockPos[1], pawPos[2] - hockPos[2]]);
-      addMesh(pawGroup, `paw_pad_${lg.id}`, new THREE.SphereGeometry(0.056, 10, 8), mats.mount, [0, -0.025, 0.03], [0, 0, 0], [1.0, 0.65, 1.38]);
-      for (const c of [-1, 0, 1]) {
-        addMesh(pawGroup, `claw_${lg.id}_${c}`, new THREE.ConeGeometry(0.011, 0.042, 5), mats.darkDetail, [c * 0.022, -0.040, 0.095], [Math.PI / 2, 0, 0]);
+      for (const c of [-1.2, -0.4, 0.4, 1.2]) {
+        const idx = Math.round(c + 2);
+        addMesh(
+          pawGroup,
+          `toe_${lg.id}_${idx}`,
+          new THREE.SphereGeometry(0.018, 8, 8),
+          mats.mount,
+          [c * 0.020, -0.032, 0.072],
+          [0, 0, 0],
+          [0.9, 0.8, 1.35]
+        );
+        addMesh(
+          pawGroup,
+          `claw_${lg.id}_${idx}`,
+          new THREE.ConeGeometry(0.0085, 0.034, 6),
+          mats.darkDetail,
+          [c * 0.020, -0.036, 0.098],
+          [Math.PI / 1.9, 0, 0]
+        );
       }
     }
 
-    // Neck + Fierce Lupine Head (snout, black nose, fangs, upright triangular wolf ears!)
-    neckPivot.position.set(0, 0.80, 0.34);
-    neckPivot.add(
-      buildContouredBoneLimb(
-        [0, 0.16, 0.20],
+    // Arched Lupine Neck (smooth closed curve!)
+    neckPivot.position.set(0, bodyY + 0.06, 0.32);
+    addMesh(
+      neckPivot,
+      "wolf_neck",
+      makeTaperedCurvedTube(
         [
-          { t: 0.0, rx: 0.15, rz: 0.17 },
-          { t: 0.6, rx: 0.13, rz: 0.15 },
-          { t: 1.0, rx: 0.115, rz: 0.125 },
+          { pos: [0, -0.04, -0.04], rx: 0.165, rz: 0.175 },
+          { pos: [0, 0.07, 0.08], rx: 0.145, rz: 0.155 },
+          { pos: [0, 0.18, 0.21], rx: 0.118, rz: 0.125 },
         ],
-        mats.mount,
-        "wolf_neck",
         16
-      )
+      ),
+      mats.mount
     );
-    const head = addGroup(neckPivot, "mount_head_pivot", [0, 0.18, 0.22]);
-    addMesh(head, "wolf_skull", new THREE.SphereGeometry(0.125, 16, 12), mats.mount, [0, 0, 0.03], [0, 0, 0], [1.02, 0.94, 1.25]);
-    addMesh(head, "wolf_muzzle_upper", new THREE.CylinderGeometry(0.046, 0.072, 0.20, 12), mats.mount, [0, -0.015, 0.19], [Math.PI / 2 + 0.05, 0, 0]);
-    addMesh(head, "wolf_jaw_lower", new THREE.CylinderGeometry(0.036, 0.055, 0.16, 10), mats.mount, [0, -0.055, 0.16], [Math.PI / 2 + 0.18, 0, 0]);
-    addMesh(head, "wolf_nose", new THREE.SphereGeometry(0.028, 10, 8), mats.darkDetail, [0, -0.005, 0.295]);
-    for (const side of [-1, 1]) {
-      addMesh(head, `wolf_fang_${side}`, new THREE.ConeGeometry(0.009, 0.032, 5), mats.ivoryDetail, [side * 0.028, -0.042, 0.245], [Math.PI, 0, 0]);
-      addMesh(head, `wolf_eye_${side}`, new THREE.SphereGeometry(0.016, 8, 8), mats.metal, [side * 0.068, 0.042, 0.120]);
-      addMesh(head, `wolf_ear_${side}`, new THREE.ConeGeometry(0.048, 0.145, 6), mats.secondary, [side * 0.075, 0.145, -0.015], [0.12, 0, side * -0.22]);
-    }
 
-    // Thick Curved Bushy Wolf Tail
-    tailPivot.position.set(0, 0.76, -0.44);
+    // Sculpted Fierce Wolf Head & Face
+    const head = addGroup(neckPivot, "mount_head_pivot", [0, 0.18, 0.22]);
+    // Cranium + continuous nasal bridge + tapered muzzle (all solid smooth loft facing +Z!)
+    addMesh(
+      head,
+      "wolf_head_sculpt",
+      makeLoftedSection(
+        [
+          { y: -0.09, rx: 0.02, rz: 0.02 },
+          { y: -0.04, rx: 0.115, rz: 0.112, squircle: 0.25 },
+          { y: 0.04, rx: 0.122, rz: 0.110, frontBulge: 0.08 }, // broad cheekbones & brow
+          { y: 0.13, rx: 0.072, rz: 0.066, cz: -0.012 }, // tapered bridge
+          { y: 0.23, rx: 0.056, rz: 0.048, cz: -0.018 }, // upper muzzle
+          { y: 0.295, rx: 0.038, rz: 0.032, cz: -0.020 },
+          { y: 0.312, rx: 0.010, rz: 0.010, cz: -0.020 }, // closed tip
+        ],
+        22
+      ),
+      mats.mount,
+      [0, 0.0, 0.0],
+      [Math.PI / 2 + 0.08, 0, 0]
+    );
+    // Cheek ruffs + lower jaw (slightly parted for fierce wolf fangs!)
+    for (const side of [-1, 1]) {
+      addMesh(
+        head,
+        `wolf_cheek_ruff_${side}`,
+        new THREE.ConeGeometry(0.056, 0.135, 8),
+        mats.secondary,
+        [side * 0.105, -0.018, 0.035],
+        [-0.35, side * -0.45, side * -1.15]
+      );
+      addMesh(
+        head,
+        `wolf_brow_${side}`,
+        new THREE.SphereGeometry(0.028, 10, 8),
+        mats.secondary,
+        [side * 0.058, 0.072, 0.104],
+        [0.10, side * 0.25, side * -0.22],
+        [1.05, 0.44, 1.20]
+      );
+      addExpressiveAnimalEye(
+        head,
+        `wolf_eye_${side}`,
+        [side * 0.064, 0.048, 0.122],
+        side * 0.42,
+        mats,
+        { scale: 1.12, irisMat: mats.metal, browMat: mats.secondary, tiltZ: side * -0.14 }
+      );
+      // Articulated wolf ears with pale inner fur
+      addMesh(
+        head,
+        `wolf_ear_${side}`,
+        new THREE.ConeGeometry(0.050, 0.15, 8),
+        mats.mount,
+        [side * 0.072, 0.135, 0.005],
+        [0.14, side * 0.18, side * -0.24],
+        [0.85, 1.0, 0.65]
+      );
+      addMesh(
+        head,
+        `wolf_ear_inner_${side}`,
+        new THREE.ConeGeometry(0.030, 0.105, 6),
+        mats.ivoryDetail,
+        [side * 0.073, 0.128, 0.022],
+        [0.14, side * 0.18, side * -0.24],
+        [0.80, 1.0, 0.45]
+      );
+      // Upper + lower fangs!
+      addMesh(
+        head,
+        `wolf_fang_${side}`,
+        new THREE.ConeGeometry(0.009, 0.034, 6),
+        mats.ivoryDetail,
+        [side * 0.026, -0.046, 0.252],
+        [Math.PI - 0.1, 0, 0]
+      );
+      addMesh(
+        head,
+        `wolf_lower_fang_${side}`,
+        new THREE.ConeGeometry(0.007, 0.026, 6),
+        mats.ivoryDetail,
+        [side * 0.022, -0.066, 0.242],
+        [0.18, 0, 0]
+      );
+    }
+    // Lower jaw sculpted cleanly & tucked
+    addMesh(
+      head,
+      "wolf_jaw_lower",
+      makeLoftedSection(
+        [
+          { y: -0.02, rx: 0.015, rz: 0.012 },
+          { y: 0.02, rx: 0.056, rz: 0.036 },
+          { y: 0.13, rx: 0.038, rz: 0.026 },
+          { y: 0.19, rx: 0.024, rz: 0.018 },
+          { y: 0.21, rx: 0.008, rz: 0.008 },
+        ],
+        16
+      ),
+      mats.mount,
+      [0, -0.045, 0.085],
+      [Math.PI / 2 + 0.24, 0, 0]
+    );
+    // Dark snout bridge & sculpted triangular wet nose
+    addMesh(
+      head,
+      "wolf_nose",
+      new THREE.SphereGeometry(0.028, 12, 10),
+      mats.darkDetail,
+      [0, 0.002, 0.295],
+      [0.2, 0, 0],
+      [1.18, 0.85, 1.05]
+    );
+
+    // Thick Tapered Sweeping Wolf Tail (closed curve!)
+    tailPivot.position.set(0, bodyY + 0.04, -0.45);
     addMesh(
       tailPivot,
       "wolf_tail",
-      makeTube(
+      makeTaperedCurvedTube(
         [
-          [0, 0, 0],
-          [0, 0.08, -0.18],
-          [0, -0.02, -0.38],
-          [0, -0.18, -0.50],
+          { pos: [0, 0, 0.04], rx: 0.045, rz: 0.048 },
+          { pos: [0, 0.06, -0.14], rx: 0.072, rz: 0.078 },
+          { pos: [0, -0.03, -0.34], rx: 0.064, rz: 0.070 },
+          { pos: [0, -0.18, -0.47], rx: 0.026, rz: 0.028 },
+          { pos: [0, -0.22, -0.50], rx: 0.006, rz: 0.006 },
         ],
-        0.075,
-        14,
-        10
+        14
       ),
       mats.secondary
     );
 
-    // Nordic Saddle + Stirrups (Y = 0.89 for rider pelvis!)
-    addMesh(saddleGroup, "wolf_saddle", new THREE.BoxGeometry(0.38, 0.08, 0.36), mats.secondary, [0, 0.90, 0.01]);
-    addMesh(saddleGroup, "wolf_saddle_cantle", new THREE.TorusGeometry(0.14, 0.035, 8, 16, Math.PI), mats.metal, [0, 0.94, -0.15], [-0.35, 0, 0]);
-    for (const side of [-1, 1]) {
-      addMesh(saddleGroup, `stirrup_strap_${side}`, new THREE.CylinderGeometry(0.012, 0.012, 0.44, 6), mats.secondary, [side * 0.24, 0.68, 0.06], [0, 0, side * 0.08]);
-      addMesh(saddleGroup, `stirrup_iron_${side}`, new THREE.TorusGeometry(0.042, 0.009, 6, 12), mats.metal, [side * 0.26, 0.46, 0.06], [0, Math.PI / 2, 0]);
-      addMesh(
-        saddleGroup,
-        `wolf_rein_${side}`,
-        makeTube(
-          [
-            [side * 0.06, 0.95, 0.64],
-            [side * 0.14, 1.04, 0.38],
-            [side * 0.10, 1.06, 0.22],
-          ],
-          0.008,
-          10,
-          6
-        ),
-        mats.secondary
-      );
-    }
+    addMountSaddleAndHarness(saddleGroup, mats, {
+      bodyY,
+      chestZ: 0.45,
+      headY: 0.96,
+      headZ: 0.56,
+      muzzleReinY: 0.92,
+      muzzleReinZ: 0.72,
+      halfWidth: 0.18,
+    });
   } else {
-    // EQUINE / CERVID / GRIFFIN shared muscular riding scale (saddle ~1.04..1.08m above pedestal!)
+    // =========================================================================
+    // ISLAND HORSE / ROYAL STAG / IMPERIAL GRIFFIN (Closed Organic Sculpt + Expressive Faces!)
+    // =========================================================================
     const isStag = variant === "royal_stag";
     const isGriffin = variant === "imperial_griffin";
     const bodyMat = mats.mount;
     const bodyY = isStag ? 0.98 : isGriffin ? 0.88 : 0.95;
 
-    // Sculpted anatomical barrel torso (broad chest, arched croup!)
+    // 1. Fully Closed Organic Barrel Torso (zero flat cylinder rims front or rear!)
     addMesh(
       anchor,
       "mount_body",
       makeLoftedSection(
         [
-          { y: -0.45, rx: isStag ? 0.155 : isGriffin ? 0.180 : 0.195, rz: isGriffin ? 0.185 : 0.195, squircle: 0.3 }, // croup
-          { y: -0.10, rx: isStag ? 0.165 : isGriffin ? 0.198 : 0.210, rz: 0.215, squircle: 0.28 }, // barrel/saddle zone
-          { y: 0.25, rx: isStag ? 0.175 : isGriffin ? 0.228 : 0.220, rz: 0.235, squircle: 0.32, frontBulge: isGriffin ? 0.22 : 0.16 }, // broad chest
-          { y: 0.44, rx: 0.125, rz: 0.140 }, // breast taper
+          { y: -0.52, rx: 0.012, rz: 0.012 }, // closed croup end
+          { y: -0.46, rx: isStag ? 0.125 : 0.155, rz: 0.145, squircle: 0.25 },
+          { y: -0.34, rx: isStag ? 0.165 : isGriffin ? 0.188 : 0.200, rz: 0.195, squircle: 0.28 },
+          { y: -0.10, rx: isStag ? 0.168 : isGriffin ? 0.202 : 0.214, rz: 0.218, squircle: 0.28 },
+          { y: 0.16, rx: isStag ? 0.174 : isGriffin ? 0.224 : 0.222, rz: 0.232, squircle: 0.30, frontBulge: 0.14 },
+          { y: 0.34, rx: isStag ? 0.168 : isGriffin ? 0.220 : 0.212, rz: 0.224, squircle: 0.32, frontBulge: 0.20 },
+          { y: 0.44, rx: isStag ? 0.125 : 0.160, rz: 0.165, frontBulge: 0.15 },
+          { y: 0.50, rx: 0.075, rz: 0.080 },
+          { y: 0.53, rx: 0.012, rz: 0.012 }, // closed chest end
         ],
-        22
+        28
       ),
       bodyMat,
       [0, bodyY, 0],
       [Math.PI / 2, 0, 0]
     );
 
-    // 4 Articulated Jointed Legs (Hooves for Horse/Stag; Talons + Lion Paws for Griffin!)
+    // Sculpted bilateral Chest Pectoral Mounds & Muscular Haunches (no blocky tube appearance from front/back!)
+    for (const side of [-1, 1]) {
+      addMesh(
+        anchor,
+        `mount_pectoral_${side}`,
+        new THREE.SphereGeometry(isStag ? 0.105 : 0.125, 14, 12),
+        bodyMat,
+        [side * (isStag ? 0.068 : 0.086), bodyY - 0.025, 0.38],
+        [0, 0, 0],
+        [0.95, 1.15, 1.05]
+      );
+      addMesh(
+        anchor,
+        `mount_haunch_${side}`,
+        new THREE.SphereGeometry(isStag ? 0.115 : 0.135, 14, 12),
+        bodyMat,
+        [side * (isStag ? 0.082 : 0.100), bodyY - 0.01, -0.35],
+        [0, 0, 0],
+        [0.92, 1.16, 1.15]
+      );
+    }
+
+    // 2. 4 Jointed Muscular Legs (with shoulder domes, knee/hock spheres, fetlocks & solid feet)
     const mountLegs = [
-      { id: "fl", x: isStag ? 0.12 : isGriffin ? 0.175 : 0.15, z: isGriffin ? 0.33 : 0.31, hind: false },
-      { id: "fr", x: isStag ? -0.12 : isGriffin ? -0.175 : -0.15, z: isGriffin ? 0.33 : 0.31, hind: false },
-      { id: "bl", x: isStag ? 0.12 : isGriffin ? 0.165 : 0.15, z: -0.34, hind: true },
-      { id: "br", x: isStag ? -0.12 : isGriffin ? -0.165 : -0.15, z: -0.34, hind: true },
+      { id: "fl", x: isStag ? 0.125 : isGriffin ? 0.175 : 0.15, z: isGriffin ? 0.33 : 0.31, hind: false },
+      { id: "fr", x: isStag ? -0.125 : isGriffin ? -0.175 : -0.15, z: isGriffin ? 0.33 : 0.31, hind: false },
+      { id: "bl", x: isStag ? 0.125 : isGriffin ? 0.165 : 0.15, z: -0.34, hind: true },
+      { id: "br", x: isStag ? -0.125 : isGriffin ? -0.165 : -0.15, z: -0.34, hind: true },
     ];
     for (const lg of mountLegs) {
-      const hipY = bodyY - 0.08;
+      const hipY = bodyY - 0.07;
       const kneeY = isGriffin ? 0.42 : 0.44;
-      const legR = isStag ? 0.044 : isGriffin ? 0.068 : 0.062;
-      const legGroup = addGroup(anchor, `mount_leg_${lg.id}`, [lg.x, hipY, lg.z]);
-      const midZ = lg.hind ? -0.07 : isGriffin ? 0.06 : 0.03;
-      legGroup.add(
-        buildContouredBoneLimb(
-          [0, kneeY - hipY, midZ],
-          [
-            { t: 0.0, rx: legR * (lg.hind ? 1.7 : 1.35), rz: legR * (lg.hind ? 1.9 : 1.45) },
-            { t: 0.6, rx: legR * 0.95, rz: legR * 1.0 },
-            { t: 1.0, rx: legR * 0.72, rz: legR * 0.75 },
-          ],
-          bodyMat,
-          `mount_upper_leg_${lg.id}`,
-          12
-        )
-      );
-      const shinGroup = addGroup(legGroup, `mount_lower_piv_${lg.id}`, [0, kneeY - hipY, midZ]);
-      shinGroup.add(
-        buildContouredBoneLimb(
-          [0, 0.05 - kneeY, lg.hind ? 0.05 : 0.0],
-          [
-            { t: 0.0, rx: legR * 0.70, rz: legR * 0.72 },
-            { t: 0.85, rx: legR * 0.56, rz: legR * 0.58 },
-          ],
-          bodyMat,
-          `mount_cannon_${lg.id}`,
-          12
-        )
+      const legR = isStag ? 0.044 : isGriffin ? 0.066 : 0.060;
+      const kneeZ = lg.z + (lg.hind ? -0.065 : isGriffin ? 0.055 : 0.025);
+      const footZ = kneeZ + (lg.hind ? 0.05 : 0.0);
+      const { shinGroup, footVec } = addMountLimbJointed(
+        anchor,
+        lg.id,
+        [lg.x, hipY, lg.z],
+        [lg.x, kneeY, kneeZ],
+        [lg.x, 0.055, footZ],
+        legR * (lg.hind ? 1.55 : 1.32),
+        legR * 0.72,
+        legR * 0.58,
+        bodyMat,
+        14
       );
 
-      const footPos = [0, 0.05 - kneeY, lg.hind ? 0.05 : 0.0];
       if (isGriffin && !lg.hind) {
-        // Griffin Front Eagle Talons!
-        const talon = addGroup(shinGroup, `griffin_talon_${lg.id}`, footPos);
+        // Griffin Front Eagle Talons with curved black claws!
+        const talon = addGroup(shinGroup, `griffin_talon_${lg.id}`, footVec);
+        addMesh(talon, `talon_ank_${lg.id}`, new THREE.SphereGeometry(0.042, 10, 8), mats.metal, [0, -0.015, 0.015]);
         for (const c of [-1, 0, 1]) {
-          addMesh(talon, `eagle_claw_${lg.id}_${c}`, new THREE.ConeGeometry(0.015, 0.075, 6), mats.metal, [c * 0.026, -0.03, 0.055], [Math.PI / 2.2, 0, c * -0.15]);
+          addMesh(talon, `eagle_toe_${lg.id}_${c}`, new THREE.CapsuleGeometry(0.013, 0.042, 4, 8), mats.metal, [c * 0.025, -0.032, 0.045], [Math.PI / 2.2, 0, c * -0.16]);
+          addMesh(talon, `eagle_claw_${lg.id}_${c}`, new THREE.ConeGeometry(0.011, 0.045, 6), mats.darkDetail, [c * 0.030, -0.038, 0.088], [Math.PI / 1.85, 0, c * -0.16]);
         }
       } else if (isGriffin && lg.hind) {
-        // Griffin Hind Lion Paws!
-        addMesh(shinGroup, `lion_paw_${lg.id}`, new THREE.SphereGeometry(0.058, 10, 8), mats.mount, [footPos[0], footPos[1] - 0.025, footPos[2] + 0.025], [0, 0, 0], [1.0, 0.65, 1.35]);
+        // Griffin Hind Lion Paws + Claws
+        const lPaw = addGroup(shinGroup, `griffin_hindpaw_${lg.id}`, footVec);
+        addMesh(lPaw, `lion_paw_${lg.id}`, new THREE.SphereGeometry(0.056, 12, 10), mats.mount, [0, -0.024, 0.025], [0, 0, 0], [1.0, 0.65, 1.35]);
+        for (const c of [-1, 0, 1]) {
+          addMesh(lPaw, `lion_claw_${lg.id}_${c}`, new THREE.ConeGeometry(0.008, 0.030, 5), mats.darkDetail, [c * 0.022, -0.035, 0.088], [Math.PI / 1.9, 0, 0]);
+        }
       } else {
-        // Hooves (Horse sturdy hoof / Stag cloven hoof)
-        addMesh(shinGroup, `mount_hoof_${lg.id}`, new THREE.CylinderGeometry(legR * 0.62, legR * 0.84, 0.06, 12), mats.secondary, [footPos[0], footPos[1] - 0.02, footPos[2]]);
+        // Sculpted Fetlock + Angled Solid Equine/Cervid Hoof!
+        addMesh(
+          shinGroup,
+          `mount_fetlock_tuft_${lg.id}`,
+          new THREE.ConeGeometry(legR * 0.72, 0.055, 10),
+          mats.secondary,
+          [footVec[0], footVec[1] + 0.005, footVec[2] - 0.005],
+          [Math.PI, 0, 0]
+        );
+        addMesh(
+          shinGroup,
+          `mount_hoof_${lg.id}`,
+          new THREE.CylinderGeometry(legR * 0.64, legR * 0.88, 0.056, 14),
+          mats.darkDetail,
+          [footVec[0], footVec[1] - 0.024, footVec[2] + 0.008],
+          [0.08, 0, 0]
+        );
       }
     }
 
-    // Arched Neck + Species-Specific Head!
-    neckPivot.position.set(0, bodyY + 0.06, 0.28);
-    const neckEnd = isStag ? [0, 0.45, 0.21] : [0, 0.42, 0.18];
-    neckPivot.add(
-      buildContouredBoneLimb(
-        neckEnd,
+    // 3. Gracefully Curved Closed Neck (S-arch flowing out of chest!)
+    neckPivot.position.set(0, bodyY + 0.05, 0.29);
+    const neckEnd = isStag ? [0, 0.45, 0.22] : isGriffin ? [0, 0.39, 0.18] : [0, 0.43, 0.19];
+    addMesh(
+      neckPivot,
+      "mount_neck",
+      makeTaperedCurvedTube(
         [
-          { t: 0.0, rx: isStag ? 0.105 : 0.135, rz: isStag ? 0.125 : 0.165 },
-          { t: 0.55, rx: isStag ? 0.085 : 0.112, rz: isStag ? 0.105 : 0.135 },
-          { t: 1.0, rx: isStag ? 0.074 : 0.095, rz: isStag ? 0.088 : 0.110 },
+          { pos: [0, -0.06, -0.05], rx: isStag ? 0.115 : 0.148, rz: isStag ? 0.132 : 0.172 },
+          { pos: [0, neckEnd[1] * 0.38, neckEnd[2] * 0.22], rx: isStag ? 0.095 : 0.128, rz: isStag ? 0.112 : 0.150 },
+          { pos: [0, neckEnd[1] * 0.72, neckEnd[2] * 0.56], rx: isStag ? 0.080 : 0.106, rz: isStag ? 0.095 : 0.125 },
+          { pos: neckEnd, rx: isStag ? 0.072 : 0.092, rz: isStag ? 0.085 : 0.105 },
         ],
-        bodyMat,
-        "mount_neck",
-        16
-      )
+        18
+      ),
+      bodyMat
     );
 
     const head = addGroup(neckPivot, "mount_head_pivot", neckEnd);
 
     if (variant === "island_horse") {
-      // Flowing wavy horse mane along dorsal neck crest
-      for (let m = 0; m < 6; m++) {
-        const f = m / 5;
-        addMesh(neckPivot, `horse_mane_${m}`, new THREE.SphereGeometry(0.055, 10, 8), mats.secondary, [0.02, 0.06 + f * 0.36, -0.06 + f * 0.14], [0.4, 0, 0], [0.55, 1.3, 1.1]);
-      }
-      addMesh(head, "horse_head", new THREE.CapsuleGeometry(0.086, 0.20, 8, 14), bodyMat, [0, -0.02, 0.12], [1.08, 0, 0]);
-      addMesh(head, "horse_bridle", new THREE.TorusGeometry(0.072, 0.011, 8, 16), mats.metal, [0, -0.05, 0.18], [0.45, 0, 0]);
-      for (const side of [-1, 1]) {
-        addMesh(head, `horse_ear_${side}`, new THREE.ConeGeometry(0.026, 0.095, 6), bodyMat, [side * 0.058, 0.11, 0.01], [0.1, 0, side * -0.2]);
-        addMesh(head, `horse_eye_${side}`, new THREE.SphereGeometry(0.015, 8, 8), mats.darkDetail, [side * 0.076, 0.03, 0.095]);
-      }
-      // Flowing horse tail
-      tailPivot.position.set(0, bodyY + 0.05, -0.44);
+      // Sweeping Continuous Horse Mane + Charming Forelock!
       addMesh(
-        tailPivot,
-        "horse_tail",
-        makeTube(
+        neckPivot,
+        "horse_mane_crest",
+        makeTaperedCurvedTube(
           [
-            [0, 0, 0],
-            [0, -0.14, -0.14],
-            [0, -0.48, -0.18],
+            { pos: [0, 0.02, -0.07], rx: 0.032, rz: 0.065 },
+            { pos: [0, 0.18, -0.03], rx: 0.038, rz: 0.072 },
+            { pos: [0, 0.34, 0.05], rx: 0.036, rz: 0.068 },
+            { pos: [0, 0.47, 0.14], rx: 0.022, rz: 0.044 },
           ],
-          0.054,
-          12,
-          8
+          12
         ),
         mats.secondary
       );
-    } else if (isStag) {
-      // CERVO REAL: Graceful stag neck ruff, refined cervid muzzle, wide deer ears & TOWERING 6-POINT BRANCHING ANTLERS!
-      addMesh(neckPivot, "stag_chest_ruff", new THREE.SphereGeometry(0.135, 12, 10), mats.secondary, [0, 0.05, 0.05], [0, 0, 0], [0.9, 1.4, 1.0]);
-      addMesh(head, "stag_head", new THREE.CapsuleGeometry(0.070, 0.19, 8, 12), bodyMat, [0, -0.01, 0.11], [1.14, 0, 0]);
-      addMesh(head, "stag_nose", new THREE.SphereGeometry(0.024, 8, 8), mats.darkDetail, [0, -0.06, 0.25]);
+      for (let m = 0; m < 6; m++) {
+        const f = m / 5;
+        addMesh(
+          neckPivot,
+          `horse_mane_${m}`,
+          new THREE.ConeGeometry(0.038, 0.13, 8),
+          mats.secondary,
+          [0.036, 0.08 + f * 0.34, -0.045 + f * 0.18],
+          [0.35, 0.2, -0.85]
+        );
+      }
+
+      // Sculpted Equine Head Group pitched gracefully forward & slightly down (proud carriage; -Z is forehead/top!)
+      const hSkull = addGroup(head, "horse_head_sculpt", [0, 0.01, 0.01], [Math.PI / 2 + 0.36, 0, 0]);
+      addMesh(
+        hSkull,
+        "horse_head",
+        makeLoftedSection(
+          [
+            { y: -0.08, rx: 0.015, rz: 0.015 },
+            { y: -0.04, rx: 0.092, rz: 0.100, squircle: 0.25 }, // poll
+            { y: 0.04, rx: 0.096, rz: 0.106, squircle: 0.25 }, // cheeks/forehead
+            { y: 0.14, rx: 0.064, rz: 0.074, cz: -0.010 }, // nasal bridge (-Z is top ridge)
+            { y: 0.25, rx: 0.054, rz: 0.060, cz: -0.014 }, // broad horse muzzle
+            { y: 0.295, rx: 0.042, rz: 0.044, cz: -0.014 },
+            { y: 0.312, rx: 0.012, rz: 0.012, cz: -0.014 }, // smooth closed nose tip
+          ],
+          22
+        ),
+        bodyMat
+      );
+      // Velvety Contrasting Muzzle Pad + Sculpted Nostrils
+      addMesh(
+        hSkull,
+        "horse_muzzle_pad",
+        new THREE.SphereGeometry(0.054, 14, 12),
+        mats.secondary,
+        [0, 0.255, -0.014],
+        [0, 0, 0],
+        [0.98, 0.85, 1.04]
+      );
+      // Forelock tuft sweeping between eyes on crown (-Z)!
+      addMesh(
+        hSkull,
+        "horse_forelock",
+        new THREE.ConeGeometry(0.032, 0.11, 8),
+        mats.secondary,
+        [0, 0.035, -0.105],
+        [0.24, 0, 0]
+      );
+      // Snug Leather + Gold Bridle (Noseband + Cheek Straps + Browband + Bit Rings!)
+      addMesh(
+        hSkull,
+        "horse_bridle_noseband",
+        new THREE.TorusGeometry(0.060, 0.009, 8, 18),
+        mats.secondary,
+        [0, 0.205, -0.014],
+        [Math.PI / 2, 0, 0]
+      );
+      addMesh(
+        hSkull,
+        "horse_bridle_brow",
+        new THREE.TorusGeometry(0.092, 0.009, 8, 18, Math.PI),
+        mats.secondary,
+        [0, 0.015, -0.032],
+        [-2.75, 0, 0]
+      );
+      addMesh(
+        hSkull,
+        "horse_bridle",
+        new THREE.TorusGeometry(0.050, 0.008, 8, 16),
+        mats.metal,
+        [0, 0.245, -0.014],
+        [Math.PI / 2, 0, 0]
+      );
       for (const side of [-1, 1]) {
-        addMesh(head, `stag_ear_${side}`, new THREE.ConeGeometry(0.032, 0.13, 6), bodyMat, [side * 0.075, 0.09, -0.01], [0.15, 0, side * -0.65], [0.65, 1.0, 0.4]);
-        addMesh(head, `stag_eye_${side}`, new THREE.SphereGeometry(0.015, 8, 8), mats.darkDetail, [side * 0.062, 0.025, 0.09]);
-        // Grand multi-branching 6-point golden/ivory Stag Antlers framed wide around rider head!
+        // Muscular Jowls / Cheekbones (+Z underside of skull)
+        addMesh(
+          hSkull,
+          `horse_cheek_${side}`,
+          new THREE.SphereGeometry(0.054, 12, 10),
+          bodyMat,
+          [side * 0.056, 0.035, 0.025],
+          [0, 0, 0],
+          [0.75, 1.15, 0.95]
+        );
+        // Sculpted Nostrils on upper muzzle bridge (-Z)
+        addMesh(
+          hSkull,
+          `horse_nostril_${side}`,
+          new THREE.SphereGeometry(0.014, 8, 8),
+          mats.darkDetail,
+          [side * 0.030, 0.268, -0.048],
+          [0, side * 0.35, 0],
+          [0.75, 1.15, 0.6]
+        );
+        // Cheek bridle straps & Gold bit rings
+        addMesh(
+          hSkull,
+          `horse_cheek_strap_${side}`,
+          new THREE.CylinderGeometry(0.007, 0.007, 0.22, 6),
+          mats.secondary,
+          [side * 0.064, 0.125, -0.020],
+          [0.05, 0, side * 0.14]
+        );
+        addMesh(
+          hSkull,
+          `horse_bit_ring_${side}`,
+          new THREE.TorusGeometry(0.018, 0.0045, 6, 12),
+          mats.metal,
+          [side * 0.052, 0.240, 0.004],
+          [0, Math.PI / 2, 0]
+        );
+        // Alert Upright Cupped Horse Ears + Inner Ear on crown (-Z pointing UP)
+        addMesh(
+          hSkull,
+          `horse_ear_${side}`,
+          new THREE.ConeGeometry(0.028, 0.115, 8),
+          bodyMat,
+          [side * 0.055, -0.025, -0.088],
+          [-Math.PI / 2 - 0.15, side * 0.18, side * -0.22],
+          [0.85, 1.0, 0.65]
+        );
+        addMesh(
+          hSkull,
+          `horse_ear_inner_${side}`,
+          new THREE.ConeGeometry(0.016, 0.078, 6),
+          mats.secondary,
+          [side * 0.055, -0.018, -0.088],
+          [-Math.PI / 2 - 0.15, side * 0.18, side * -0.22],
+          [0.75, 1.0, 0.45]
+        );
+        // Expressive Equine Eyes level on temples!
+        addExpressiveAnimalEye(
+          head,
+          `horse_eye_${side}`,
+          [side * 0.070, 0.052, 0.088],
+          side * 0.66,
+          mats,
+          { scale: 1.08, irisMat: mats.eyes, browMat: bodyMat }
+        );
+      }
+
+      // Lush Dock + Cascading Horse Tail (zero air gap at croup!)
+      tailPivot.position.set(0, bodyY + 0.05, -0.45);
+      addMesh(
+        tailPivot,
+        "horse_tail_dock",
+        new THREE.SphereGeometry(0.064, 12, 10),
+        mats.secondary,
+        [0, 0, 0.01],
+        [0, 0, 0],
+        [0.85, 1.0, 1.25]
+      );
+      addMesh(
+        tailPivot,
+        "horse_tail",
+        makeTaperedCurvedTube(
+          [
+            { pos: [0, 0.0, 0.0], rx: 0.055, rz: 0.055 },
+            { pos: [0, -0.10, -0.13], rx: 0.068, rz: 0.072 },
+            { pos: [0, -0.34, -0.17], rx: 0.052, rz: 0.056 },
+            { pos: [0, -0.56, -0.15], rx: 0.018, rz: 0.020 },
+            { pos: [0, -0.60, -0.14], rx: 0.005, rz: 0.005 },
+          ],
+          12
+        ),
+        mats.secondary
+      );
+
+      addMountSaddleAndHarness(saddleGroup, mats, {
+        bodyY,
+        chestZ: 0.49,
+        headY: 1.44,
+        headZ: 0.48,
+        muzzleReinY: 1.35,
+        muzzleReinZ: 0.71,
+        halfWidth: 0.19,
+      });
+    } else if (isStag) {
+      // =========================================================================
+      // CERVO REAL: Form-fitting Fur Neck Mantle + Ivory Throat Patch, Sculpted
+      // Cervid Head with Expressive Eyes & Nostrils, Coronet-Burr Antlers!
+      // =========================================================================
+      // Snug contoured chest & throat fur collar + ivory blaze (zero awkward poking chunks!)
+      addMesh(
+        neckPivot,
+        "stag_chest_ruff",
+        makeTaperedCurvedTube(
+          [
+            { pos: [0, -0.06, -0.02], rx: 0.155, rz: 0.168 },
+            { pos: [0, 0.07, 0.05], rx: 0.128, rz: 0.142 },
+            { pos: [0, 0.20, 0.11], rx: 0.098, rz: 0.110 },
+          ],
+          18
+        ),
+        mats.secondary
+      );
+      addMesh(
+        neckPivot,
+        "stag_ivory_blaze",
+        makeTaperedCurvedTube(
+          [
+            { pos: [0, -0.05, 0.06], rx: 0.078, rz: 0.065 },
+            { pos: [0, 0.10, 0.12], rx: 0.062, rz: 0.055 },
+            { pos: [0, 0.25, 0.17], rx: 0.044, rz: 0.040 },
+          ],
+          12
+        ),
+        mats.ivoryDetail
+      );
+
+      // Sculpted Graceful Stag Head facing proud (+Z angled softly down; -Z is crown/bridge!)
+      const sSkull = addGroup(head, "stag_head_sculpt", [0, 0.01, 0.01], [Math.PI / 2 + 0.32, 0, 0]);
+      addMesh(
+        sSkull,
+        "stag_head",
+        makeLoftedSection(
+          [
+            { y: -0.08, rx: 0.015, rz: 0.015 },
+            { y: -0.04, rx: 0.082, rz: 0.088, squircle: 0.22 },
+            { y: 0.03, rx: 0.086, rz: 0.092, squircle: 0.22 }, // brows/temples
+            { y: 0.13, rx: 0.050, rz: 0.060, cz: -0.010 }, // slender nasal bridge (-Z top ridge)
+            { y: 0.23, rx: 0.038, rz: 0.042, cz: -0.014 }, // fine cervid muzzle
+            { y: 0.28, rx: 0.028, rz: 0.028, cz: -0.014 },
+            { y: 0.295, rx: 0.008, rz: 0.008, cz: -0.014 },
+          ],
+          20
+        ),
+        bodyMat
+      );
+      // Pale chin underside (+Z) & Contoured Wet Dark Nose!
+      addMesh(
+        sSkull,
+        "stag_chin_patch",
+        new THREE.SphereGeometry(0.032, 10, 8),
+        mats.ivoryDetail,
+        [0, 0.225, 0.014],
+        [0, 0, 0],
+        [0.95, 1.35, 0.72]
+      );
+      addMesh(
+        sSkull,
+        "stag_nose",
+        new THREE.SphereGeometry(0.024, 12, 10),
+        mats.darkDetail,
+        [0, 0.282, -0.014],
+        [0, 0, 0],
+        [1.15, 0.85, 1.05]
+      );
+
+      for (const side of [-1, 1]) {
+        // Leaf-shaped deer ears with ivory inner cups on crown (-Z pointing upward/outward cleanly below antlers!)
+        addMesh(
+          sSkull,
+          `stag_ear_${side}`,
+          new THREE.ConeGeometry(0.034, 0.135, 8),
+          bodyMat,
+          [side * 0.072, -0.025, -0.070],
+          [-Math.PI / 2 - 0.10, side * 0.22, side * -0.52],
+          [0.85, 1.0, 0.45]
+        );
+        addMesh(
+          sSkull,
+          `stag_ear_inner_${side}`,
+          new THREE.ConeGeometry(0.020, 0.095, 6),
+          mats.ivoryDetail,
+          [side * 0.072, -0.018, -0.070],
+          [-Math.PI / 2 - 0.10, side * 0.22, side * -0.52],
+          [0.75, 1.0, 0.30]
+        );
+        // Expressive Noble Cervid Eyes level on temples!
+        addExpressiveAnimalEye(
+          head,
+          `stag_eye_${side}`,
+          [side * 0.062, 0.048, 0.080],
+          side * 0.64,
+          mats,
+          { scale: 1.05, irisMat: mats.eyes, browMat: bodyMat }
+        );
+      }
+
+      // Grand Branching Tapered Stag Antlers anchored with Golden Coronet Burrs!
+      for (const side of [-1, 1]) {
+        addMesh(
+          head,
+          `antler_burr_${side}`,
+          new THREE.CylinderGeometry(0.032, 0.028, 0.035, 10),
+          mats.metal,
+          [side * 0.048, 0.088, 0.005],
+          [0.18, 0, side * -0.35]
+        );
         addMesh(
           head,
           `antler_beam_${side}`,
-          makeTube(
+          makeTaperedCurvedTube(
             [
-              [side * 0.04, 0.09, 0.02],
-              [side * 0.19, 0.24, 0.01],
-              [side * 0.36, 0.43, 0.03],
-              [side * 0.41, 0.61, 0.10],
+              { pos: [side * 0.048, 0.090, 0.005], rx: 0.022 },
+              { pos: [side * 0.19, 0.24, 0.00], rx: 0.018 },
+              { pos: [side * 0.36, 0.43, 0.03], rx: 0.014 },
+              { pos: [side * 0.41, 0.61, 0.10], rx: 0.008 },
+              { pos: [side * 0.42, 0.66, 0.13], rx: 0.003 },
             ],
-            0.018,
-            14,
-            8
+            10
           ),
           mats.metal
         );
         addMesh(
           head,
           `antler_brow_tine_${side}`,
-          makeTube(
+          makeTaperedCurvedTube(
             [
-              [side * 0.075, 0.13, 0.03],
-              [side * 0.14, 0.22, 0.18],
-              [side * 0.13, 0.33, 0.24],
+              { pos: [side * 0.082, 0.13, 0.015], rx: 0.016 },
+              { pos: [side * 0.145, 0.22, 0.17], rx: 0.012 },
+              { pos: [side * 0.135, 0.33, 0.24], rx: 0.007 },
+              { pos: [side * 0.125, 0.37, 0.26], rx: 0.0025 },
             ],
-            0.013,
-            10,
-            6
+            8
           ),
           mats.metal
         );
         addMesh(
           head,
           `antler_crown_fork_${side}`,
-          makeTube(
+          makeTaperedCurvedTube(
             [
-              [side * 0.29, 0.36, 0.02],
-              [side * 0.32, 0.51, 0.18],
-              [side * 0.28, 0.64, 0.22],
+              { pos: [side * 0.28, 0.35, 0.015], rx: 0.015 },
+              { pos: [side * 0.32, 0.50, 0.17], rx: 0.011 },
+              { pos: [side * 0.28, 0.63, 0.22], rx: 0.006 },
+              { pos: [side * 0.26, 0.67, 0.23], rx: 0.0025 },
             ],
-            0.013,
-            10,
-            6
+            8
           ),
           mats.metal
         );
       }
-      tailPivot.position.set(0, bodyY + 0.04, -0.44);
-      addMesh(tailPivot, "stag_tail", new THREE.ConeGeometry(0.040, 0.14, 8), mats.secondary, [0, -0.03, -0.04], [-2.2, 0, 0]);
+
+      // Anchored Flush Sculpted White-Trimmed Deer Scut Tail (zero gap!)
+      tailPivot.position.set(0, bodyY + 0.04, -0.46);
+      addMesh(
+        tailPivot,
+        "stag_tail_under",
+        new THREE.SphereGeometry(0.046, 10, 8),
+        mats.ivoryDetail,
+        [0, 0.0, 0.0],
+        [-0.35, 0, 0],
+        [0.85, 1.45, 0.72]
+      );
+      addMesh(
+        tailPivot,
+        "stag_tail",
+        new THREE.ConeGeometry(0.042, 0.13, 10),
+        bodyMat,
+        [0, 0.02, -0.025],
+        [-0.65, 0, 0],
+        [0.82, 1.0, 0.65]
+      );
+
+      addMountSaddleAndHarness(saddleGroup, mats, {
+        bodyY,
+        chestZ: 0.46,
+        headY: 1.48,
+        headZ: 0.52,
+        muzzleReinY: 1.42,
+        muzzleReinZ: 0.72,
+        halfWidth: 0.165,
+      });
     } else if (isGriffin) {
-      // GRIFO IMPERIAL: Eagle crest/hooked golden beak, tufted lion tail & sweeping multi-layered feathered wings behind the rider!
-      addMesh(neckPivot, "griffin_hackles", new THREE.SphereGeometry(0.155, 14, 12), mats.secondary, [0, 0.14, 0.03], [0, 0, 0], [0.95, 1.5, 1.05]);
-      addMesh(head, "griffin_eagle_head", new THREE.SphereGeometry(0.105, 14, 12), mats.mount, [0, 0.02, 0.04], [0, 0, 0], [0.94, 0.98, 1.15]);
-      // Big hooked eagle beak!
+      // =========================================================================
+      // GRIFO IMPERIAL: Eagle Cranium + Swept Plumes, Two-Part Hooked Beak,
+      // Parrot-Grade Fierce Eyes, Feathered Hackles, Sweeping Layered Wings!
+      // =========================================================================
+      // Sculpted Feathered Collar Hackles bridging neck cleanly into chest
+      addMesh(
+        neckPivot,
+        "griffin_hackles",
+        makeLoftedSection(
+          [
+            { y: -0.06, rx: 0.02, rz: 0.02 },
+            { y: 0.04, rx: 0.185, rz: 0.195, foldFreq: 9, foldAmp: 0.10 },
+            { y: 0.18, rx: 0.155, rz: 0.165, foldFreq: 9, foldAmp: 0.09 },
+            { y: 0.30, rx: 0.118, rz: 0.125 },
+            { y: 0.36, rx: 0.02, rz: 0.02 },
+          ],
+          24
+        ),
+        mats.secondary,
+        [0, -0.02, 0.02],
+        [0.36, 0, 0]
+      );
+
+      // Eagle Head Cranium + Swept Crest Plumes
+      addMesh(
+        head,
+        "griffin_eagle_head",
+        makeLoftedSection(
+          [
+            { y: -0.09, rx: 0.02, rz: 0.02 },
+            { y: -0.03, rx: 0.108, rz: 0.108 },
+            { y: 0.05, rx: 0.102, rz: 0.098 },
+            { y: 0.12, rx: 0.068, rz: 0.064 },
+            { y: 0.15, rx: 0.02, rz: 0.02 },
+          ],
+          20
+        ),
+        bodyMat,
+        [0, 0.02, 0.0],
+        [Math.PI / 2, 0, 0]
+      );
+      // 3 Arched Eagle Crest Feathers!
+      for (let c = -1; c <= 1; c++) {
+        addMesh(
+          head,
+          `griffin_crest_${c + 1}`,
+          makeTaperedCurvedTube(
+            [
+              { pos: [c * 0.018, 0.09, 0.04], rx: 0.016 },
+              { pos: [c * 0.035, 0.135, -0.05], rx: 0.015 },
+              { pos: [c * 0.050, 0.115, -0.15], rx: 0.008 },
+              { pos: [c * 0.055, 0.095, -0.19], rx: 0.0025 },
+            ],
+            8
+          ),
+          mats.secondary
+        );
+      }
+
+      // Cere + Sculpted Two-Part Hooked Eagle Beak (upper hooked mandible + lower mandible!)
+      addMesh(
+        head,
+        "griffin_cere",
+        new THREE.SphereGeometry(0.052, 12, 10),
+        mats.metal,
+        [0, 0.026, 0.118],
+        [0, 0, 0],
+        [0.88, 0.78, 0.85]
+      );
       addMesh(
         head,
         "griffin_beak",
-        makeTube(
+        makeTaperedCurvedTube(
           [
-            [0, 0.02, 0.13],
-            [0, 0.01, 0.23],
-            [0, -0.04, 0.27],
-            [0, -0.075, 0.24],
+            { pos: [0, 0.022, 0.12], rx: 0.042, rz: 0.038 },
+            { pos: [0, 0.012, 0.21], rx: 0.032, rz: 0.026 },
+            { pos: [0, -0.032, 0.26], rx: 0.016, rz: 0.014 },
+            { pos: [0, -0.072, 0.245], rx: 0.004, rz: 0.004 },
           ],
-          0.032,
-          12,
-          8
+          12
         ),
         mats.metal
       );
-      for (const side of [-1, 1]) {
-        addMesh(head, `griffin_ear_tuft_${side}`, new THREE.ConeGeometry(0.026, 0.125, 6), mats.secondary, [side * 0.075, 0.10, -0.02], [-0.35, 0, side * -0.45]);
-        addMesh(head, `griffin_eye_${side}`, new THREE.SphereGeometry(0.015, 8, 8), mats.metal, [side * 0.076, 0.04, 0.095]);
+      addMesh(
+        head,
+        "griffin_lower_beak",
+        new THREE.ConeGeometry(0.024, 0.085, 8),
+        mats.secondary,
+        [0, -0.014, 0.175],
+        [Math.PI / 1.85, 0, 0],
+        [0.9, 1.0, 0.65]
+      );
 
-        // Sweeping Multi-Layered Feathered Eagle Wings positioned cleanly BEHIND saddle & flaring wide outward/rearward!
+      for (const side of [-1, 1]) {
+        // Swept feathered ear tufts + Fierce angled raptor brow hood + Parrot-grade Eyes!
+        addMesh(
+          head,
+          `griffin_ear_tuft_${side}`,
+          new THREE.ConeGeometry(0.028, 0.14, 8),
+          mats.secondary,
+          [side * 0.078, 0.095, -0.03],
+          [-0.45, side * -0.18, side * -0.52]
+        );
+        addMesh(
+          head,
+          `griffin_brow_hood_${side}`,
+          new THREE.BoxGeometry(0.034, 0.012, 0.052),
+          bodyMat,
+          [side * 0.068, 0.065, 0.082],
+          [0.24, side * 0.42, side * -0.26]
+        );
+        addExpressiveAnimalEye(
+          head,
+          `griffin_eye_${side}`,
+          [side * 0.076, 0.042, 0.090],
+          side * 0.56,
+          mats,
+          { scale: 1.12, irisMat: mats.metal, browMat: bodyMat, tiltZ: side * -0.18 }
+        );
+
+        // Sweeping Multi-Layered Feathered Eagle Wings positioned cleanly BEHIND saddle!
         const wingPivot = addGroup(
           anchor,
           side > 0 ? "mount_wing_l" : "mount_wing_r",
-          [side * 0.20, bodyY + 0.14, -0.10],
+          [side * 0.20, bodyY + 0.15, -0.08],
           [-0.08, side * 0.58, side * -0.16]
         );
         const wingShape = new THREE.Shape();
         wingShape.moveTo(0, 0.04);
-        wingShape.quadraticCurveTo(0.36, 0.54, 0.84, 0.64);
-        wingShape.lineTo(0.72, 0.32);
-        wingShape.lineTo(0.58, 0.16);
-        wingShape.lineTo(0.42, 0.05);
-        wingShape.quadraticCurveTo(0.20, -0.05, 0, -0.06);
+        wingShape.quadraticCurveTo(side * 0.36, 0.56, side * 0.86, 0.66);
+        wingShape.lineTo(side * 0.75, 0.34);
+        wingShape.lineTo(side * 0.60, 0.18);
+        wingShape.lineTo(side * 0.44, 0.06);
+        wingShape.quadraticCurveTo(side * 0.20, -0.05, 0, -0.06);
         wingShape.closePath();
         addMesh(
           wingPivot,
           `wing_primary_${side}`,
           makeBeveledShape(wingShape, 0.028, 0.008, 0.008),
-          bodyMat,
-          [0, 0, 0],
-          [0, 0, 0],
-          [side, 1, 1]
+          bodyMat
         );
         addMesh(
           wingPivot,
@@ -2613,51 +3573,43 @@ function buildMount(variant) {
           mats.metal,
           [side * 0.01, -0.02, 0.022],
           [0, 0, 0],
-          [side * 0.62, 0.62, 1]
+          [0.64, 0.64, 1]
         );
       }
-      // Lion tail with terminal tuft
-      tailPivot.position.set(0, bodyY + 0.02, -0.44);
+
+      // Tapered Lion Tail + Bushy Terminal Tuft (zero air gap!)
+      tailPivot.position.set(0, bodyY + 0.03, -0.45);
       addMesh(
         tailPivot,
         "lion_tail_shaft",
-        makeTube(
+        makeTaperedCurvedTube(
           [
-            [0, 0, 0],
-            [0.04, 0.08, -0.22],
-            [0.02, -0.10, -0.42],
+            { pos: [0, 0, 0.03], rx: 0.032 },
+            { pos: [0.03, 0.08, -0.20], rx: 0.026 },
+            { pos: [0.02, -0.10, -0.41], rx: 0.022 },
           ],
-          0.024,
-          12,
-          8
+          10
         ),
         bodyMat
       );
-      addMesh(tailPivot, "lion_tail_tuft", new THREE.ConeGeometry(0.055, 0.13, 8), mats.secondary, [0.02, -0.14, -0.46], [-2.2, 0, 0]);
-    }
-
-    // Heroic Saddle, Cantle, Leather Reins & Stirrups (saddle surface matches rider hips!)
-    const saddleY = bodyY + 0.18;
-    addMesh(saddleGroup, "mount_saddle", new THREE.BoxGeometry(0.38, 0.08, 0.36), mats.secondary, [0, saddleY, 0.02]);
-    addMesh(saddleGroup, "mount_saddle_cantle", new THREE.TorusGeometry(0.14, 0.035, 8, 16, Math.PI), mats.metal, [0, saddleY + 0.04, -0.15], [-0.35, 0, 0]);
-    for (const side of [-1, 1]) {
-      addMesh(saddleGroup, `stirrup_strap_${side}`, new THREE.CylinderGeometry(0.012, 0.012, 0.50, 6), mats.secondary, [side * 0.25, saddleY - 0.25, 0.07], [0, 0, side * 0.08]);
-      addMesh(saddleGroup, `stirrup_iron_${side}`, new THREE.TorusGeometry(0.044, 0.009, 6, 12), mats.metal, [side * 0.27, saddleY - 0.50, 0.07], [0, Math.PI / 2, 0]);
       addMesh(
-        saddleGroup,
-        `mount_rein_${side}`,
-        makeTube(
-          [
-            [side * 0.06, bodyY + 0.44, 0.56],
-            [side * 0.14, bodyY + 0.30, 0.32],
-            [side * 0.10, bodyY + 0.24, 0.18],
-          ],
-          0.008,
-          10,
-          6
-        ),
-        mats.secondary
+        tailPivot,
+        "lion_tail_tuft",
+        new THREE.ConeGeometry(0.056, 0.14, 10),
+        mats.secondary,
+        [0.02, -0.14, -0.45],
+        [-2.2, 0, 0]
       );
+
+      addMountSaddleAndHarness(saddleGroup, mats, {
+        bodyY,
+        chestZ: 0.48,
+        headY: 1.32,
+        headZ: 0.49,
+        muzzleReinY: 1.20,
+        muzzleReinZ: 0.56,
+        halfWidth: 0.19,
+      });
     }
   }
 

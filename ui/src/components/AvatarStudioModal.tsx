@@ -122,6 +122,43 @@ const SLOT_LABELS: Record<AvatarItemSlot, { pt: string; en: string }> = {
   frame: { pt: "Moldura", en: "Frame" },
 };
 
+export const SLOT_CAMERA_FOCUS: Record<AvatarItemSlot, "full" | "portrait"> = {
+  bodyType: "full",
+  headShape: "portrait",
+  eyeStyle: "portrait",
+  browStyle: "portrait",
+  noseStyle: "portrait",
+  mouthStyle: "portrait",
+  hair: "portrait",
+  beard: "portrait",
+  outfit: "full",
+  legsBoots: "full",
+  cape: "full",
+  hat: "portrait",
+  handProp: "full",
+  backProp: "full",
+  pet: "full",
+  mount: "full",
+  pedestal: "full",
+  aura: "full",
+  background: "full",
+  frame: "full",
+};
+
+export const COLOR_CHANNEL_CAMERA_FOCUS: Record<
+  keyof AvatarColors,
+  "full" | "portrait"
+> = {
+  skin: "portrait",
+  hair: "portrait",
+  eyes: "portrait",
+  outfitPrimary: "full",
+  outfitSecondary: "full",
+  outfitTrim: "full",
+  backpack: "full",
+  mount: "full",
+};
+
 const COLOR_CHANNELS: ReadonlyArray<{
   key: keyof AvatarColors;
   labelPt: string;
@@ -133,6 +170,7 @@ const COLOR_CHANNELS: ReadonlyArray<{
   { key: "outfitPrimary", labelPt: "Roupa Principal", labelEn: "Primary Outfit" },
   { key: "outfitSecondary", labelPt: "Secundária", labelEn: "Secondary" },
   { key: "outfitTrim", labelPt: "Detalhes / Metal", labelEn: "Trim / Metal" },
+  { key: "backpack", labelPt: "Mochila", labelEn: "Backpack" },
   { key: "mount", labelPt: "Montaria", labelEn: "Mount Coat" },
 ];
 
@@ -246,6 +284,12 @@ export default function AvatarStudioModal({
     setServerLockedItems([]);
   }, [open, account, guestProfile, language, wins]);
 
+  useEffect(() => {
+    if (open) {
+      setCameraFocus("full");
+    }
+  }, [open]);
+
   const lockedItems = useMemo(
     () => findLockedAvatarItems(draftConfig, wins, entitlements),
     [draftConfig, wins, entitlements]
@@ -259,6 +303,7 @@ export default function AvatarStudioModal({
 
   const setSlotValue = (slot: AvatarItemSlot, value: string) => {
     setServerLockedItems([]);
+    setCameraFocus(SLOT_CAMERA_FOCUS[slot]);
     setDraftConfig((prev) => {
       const next: ResolvedAvatarConfig = {
         ...prev,
@@ -284,6 +329,7 @@ export default function AvatarStudioModal({
   };
 
   const setColorField = (key: keyof AvatarColors, hex: string) => {
+    setCameraFocus(COLOR_CHANNEL_CAMERA_FOCUS[key]);
     setDraftConfig((prev) => ({
       ...prev,
       version: 2,
@@ -634,14 +680,16 @@ export default function AvatarStudioModal({
                 const label = language === "en" ? channel.labelEn : channel.labelPt;
                 const currentHex = draftConfig.colors[channel.key];
                 const swatches = AVATAR_COLOR_SWATCHES[channel.key];
-                const isMountHighlighted =
-                  channel.key === "mount" && draftConfig.mount !== "none";
+                const isHighlighted =
+                  (channel.key === "mount" && draftConfig.mount !== "none") ||
+                  (channel.key === "backpack" &&
+                    draftConfig.backProp === "explorer_pack");
 
                 return (
                   <div
                     key={channel.key}
                     className={`avatar-color-row ${
-                      isMountHighlighted ? "avatar-color-row--highlight" : ""
+                      isHighlighted ? "avatar-color-row--highlight" : ""
                     }`}
                   >
                     <div className="avatar-color-row__header">
@@ -720,6 +768,7 @@ export default function AvatarStudioModal({
             className="avatar-studio-random-btn"
             onClick={() => {
               setServerLockedItems([]);
+              setCameraFocus("full");
               setDraftConfig(randomizeUnlockedAvatar(wins, entitlements));
             }}
           >
@@ -738,6 +787,7 @@ export default function AvatarStudioModal({
                   className="avatar-preset-btn"
                   onClick={() => {
                     setServerLockedItems([]);
+                    setCameraFocus("full");
                     setDraftConfig((prev) => ({
                       ...resolveAvatarConfig(preset.config, effectiveUsername),
                       frame: isAvatarItemUnlocked(

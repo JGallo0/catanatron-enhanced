@@ -175,6 +175,7 @@ export type AvatarColors = {
   outfitSecondary: string;
   outfitTrim: string;
   mount: string;
+  backpack?: string;
 };
 
 export type AvatarBodyType = "athletic" | "sturdy" | "slender";

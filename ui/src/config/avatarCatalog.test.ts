@@ -107,6 +107,7 @@ describe("avatarCatalog", () => {
         hair: "#2c1810",
         outfitSecondary: "javascript:alert(1)",
         outfitTrim: "#facc15",
+        backpack: "#065f46",
       },
       portraitSnapshot: validWebp,
       __proto__: { polluted: true },
@@ -118,6 +119,7 @@ describe("avatarCatalog", () => {
       skin: "#e4b287",
       hair: "#2c1810",
       outfitTrim: "#facc15",
+      backpack: "#065f46",
     });
     expect(sanitized.portraitSnapshot).toBe(validWebp);
 
@@ -238,9 +240,16 @@ describe("avatarCatalog", () => {
     expect(findLockedAvatarItems(stripped, 2, [])).toEqual([]);
   });
 
-  test("catalog exposes color swatches, 3D modelPaths, and monetization metadata", () => {
-    expect(AVATAR_COLOR_SWATCHES.skin.length).toBeGreaterThanOrEqual(6);
-    expect(AVATAR_COLOR_SWATCHES.mount.length).toBeGreaterThanOrEqual(4);
+  test("catalog exposes expanded unique color swatches including backpack, 3D modelPaths, and monetization metadata", () => {
+    expect(AVATAR_COLOR_SWATCHES.skin.length).toBeGreaterThanOrEqual(10);
+    expect(AVATAR_COLOR_SWATCHES.hair.length).toBeGreaterThanOrEqual(12);
+    expect(AVATAR_COLOR_SWATCHES.outfitPrimary.length).toBeGreaterThanOrEqual(12);
+    expect(AVATAR_COLOR_SWATCHES.mount.length).toBeGreaterThanOrEqual(10);
+    expect(AVATAR_COLOR_SWATCHES.backpack.length).toBeGreaterThanOrEqual(10);
+    for (const list of Object.values(AVATAR_COLOR_SWATCHES)) {
+      const hexes = list.map((s) => s.hex.toLowerCase());
+      expect(new Set(hexes).size).toBe(hexes.length);
+    }
 
     const griffin = AVATAR_CATALOG_ITEMS.find(
       (i) => i.slot === "mount" && i.id === "imperial_griffin"

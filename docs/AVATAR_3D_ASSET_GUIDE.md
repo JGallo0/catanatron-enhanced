@@ -71,19 +71,21 @@ O motor `materialTint.ts` percorre os materiais de cada `.glb` e substitui em te
 | `mat_skin` | `colors.skin` | Pele (corpo, rosto, orelhas, nariz, mãos) |
 | `mat_hair` | `colors.hair` | Cabelos, barbas, bigodes e sobrancelhas |
 | `mat_eyes` | `colors.eyes` | Íris dos olhos |
-| `mat_primary` | `colors.outfitPrimary` | Tecido principal (túnica, casaco, calça, capa, chapéu, mochila, plumagem principal do pet) |
-| `mat_secondary` | `colors.outfitSecondary` | Tecido/couro secundário (forro, botas, cintos, pergaminho, selas, detalhe secundário do pet/pedestal) |
+| `mat_primary` | `colors.outfitPrimary` | Tecido principal (túnica, casaco, calça, capa, chapéu, bainha/escudo, plumagem principal do pet) |
+| `mat_secondary` | `colors.outfitSecondary` | Tecido/couro secundário (forro, botas, cintos, pergaminho, selas, saco de dormir da mochila, detalhe secundário do pet/pedestal) |
 | `mat_metal` | `colors.outfitTrim` | Metais e ornamentos (fivelas, ombreiras, lâminas, coroas, luneta, chifres/adornos, bordas do pedestal) |
+| `mat_backpack` | `colors.backpack` | Corpo principal da mochila do explorador (`props_back/explorer_pack.glb`) — independente da cor da roupa |
 | `mat_mount` | `colors.mount` | Pelagem ou corpo principal da montaria |
 
-> **Materiais Fixos (não recoloridos):** qualquer material cujo nome **não** comece pelos 7 nomes acima (por exemplo `mat_sclera` branco dos olhos, `mat_pupil` preto ou `mat_fixed_stone`) mantém sua cor original do `.glb` intacta.
+> **Materiais Fixos (não recoloridos):** qualquer material cujo nome **não** comece pelos 8 nomes acima (por exemplo `mat_sclera` branco dos olhos, `mat_pupil` preto ou `mat_fixed_stone`) mantém sua cor original do `.glb` intacta.
 
 ### Materiais Esperados por Categoria (Validação Automática)
 O script `verify_starter_3d_assets.mjs` exige os seguintes materiais por pasta:
 - `bodies/`: `mat_skin`
 - `heads/`: `mat_skin`, `mat_eyes`, `mat_hair`, `mat_secondary` *(ex.: detalhe de gola/lábio; mantenha esclera em `mat_sclera`)*
 - `hair/` e `beards/`: `mat_hair`
-- `outfits/`, `legs/`, `capes/`, `props_back/`, `pets/`: `mat_primary`, `mat_secondary`, `mat_metal`
+- `outfits/`, `legs/`, `capes/`, `pets/`: `mat_primary`, `mat_secondary`, `mat_metal`
+- `props_back/`: `mat_backpack`, `mat_secondary`, `mat_metal` *(para `explorer_pack.glb`)* ou `mat_primary`, `mat_secondary`, `mat_metal` *(demais peças)*
 - `hats/`: `mat_primary` e/ou `mat_metal`
 - `props_hand/`: `mat_metal`, `mat_secondary`
 - `mounts/`: `mat_mount`, `mat_secondary`, `mat_metal`
@@ -172,5 +174,5 @@ Abra o **Blender (4.x+)** e prepare o arquivo para o motor do *Rule the Isle*:
 - [ ] Arquivo `.glb` válido (versão glTF 2.0, compressão Draco opcional suportada pelo `DRACOLoader`).
 - [ ] Escala em metros (`1.75 m` de altura total de referência), frente voltada para `+Z`, pés/base em `Y = 0`.
 - [ ] Pivô alinhado ao *socket* correto (sem flutuar ou afundar no pedestal).
-- [ ] Todos os materiais recoloríveis nomeados estritamente com `mat_skin`, `mat_hair`, `mat_eyes`, `mat_primary`, `mat_secondary`, `mat_metal` ou `mat_mount`.
+- [ ] Todos os materiais recoloríveis nomeados estritamente com `mat_skin`, `mat_hair`, `mat_eyes`, `mat_primary`, `mat_secondary`, `mat_metal`, `mat_backpack` ou `mat_mount`.
 - [ ] `npm run verify:avatars3d` passando sem erros.

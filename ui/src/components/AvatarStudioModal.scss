@@ -313,13 +313,13 @@
   &__swatches {
     display: flex;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 4px 5px;
   }
 }
 
 .avatar-color-swatch {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   border-radius: 50%;
   border: 1.5px solid rgba(255, 255, 255, 0.35);
   cursor: pointer;

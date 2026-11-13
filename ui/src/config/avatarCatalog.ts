@@ -66,62 +66,116 @@ export const AVATAR_COLOR_SWATCHES: Record<
   skin: [
     { hex: "#fbe2d1", label: "Porcelana", labelEn: "Porcelain" },
     { hex: "#f3cfb3", label: "Clara", labelEn: "Fair" },
+    { hex: "#ecc1a1", label: "Pêssego", labelEn: "Peach" },
     { hex: "#e4b287", label: "Dourada", labelEn: "Warm" },
+    { hex: "#d49a6a", label: "Mel", labelEn: "Honey" },
     { hex: "#c98b5b", label: "Bronzeada", labelEn: "Tan" },
+    { hex: "#b07144", label: "Canela", labelEn: "Cinnamon" },
     { hex: "#995c37", label: "Castanha", labelEn: "Brown" },
+    { hex: "#7b4528", label: "Cacau", labelEn: "Cocoa" },
     { hex: "#633722", label: "Ébano", labelEn: "Deep" },
   ],
   hair: [
     { hex: "#5a3821", label: "Castanho", labelEn: "Brown" },
-    { hex: "#1f242d", label: "Preto", labelEn: "Black" },
-    { hex: "#eab308", label: "Loiro", labelEn: "Blonde" },
-    { hex: "#c2410c", label: "Ruivo", labelEn: "Auburn" },
-    { hex: "#cbd5e1", label: "Prateado", labelEn: "Silver" },
-    { hex: "#1e40af", label: "Marinho", labelEn: "Navy" },
+    { hex: "#8b5a36", label: "Castanho Claro", labelEn: "Light Brown" },
     { hex: "#432316", label: "Mogno", labelEn: "Mahogany" },
+    { hex: "#1f242d", label: "Preto", labelEn: "Black" },
+    { hex: "#0f172a", label: "Preto Azulado", labelEn: "Blue Black" },
+    { hex: "#eab308", label: "Loiro", labelEn: "Blonde" },
+    { hex: "#ca8a04", label: "Loiro Mel", labelEn: "Honey Blonde" },
+    { hex: "#fef08a", label: "Platinado", labelEn: "Platinum" },
+    { hex: "#c2410c", label: "Ruivo", labelEn: "Auburn" },
+    { hex: "#ea580c", label: "Cobre", labelEn: "Copper" },
+    { hex: "#881337", label: "Borgonha", labelEn: "Burgundy" },
+    { hex: "#cbd5e1", label: "Prateado", labelEn: "Silver" },
     { hex: "#f8fafc", label: "Branco Lunar", labelEn: "Lunar White" },
+    { hex: "#1e40af", label: "Marinho", labelEn: "Navy" },
+    { hex: "#047857", label: "Esmeralda", labelEn: "Emerald" },
+    { hex: "#6d28d9", label: "Violeta", labelEn: "Violet" },
   ],
   eyes: [
     { hex: "#1e293b", label: "Obsidiana", labelEn: "Obsidian" },
-    { hex: "#0284c7", label: "Azul Oceano", labelEn: "Ocean Blue" },
-    { hex: "#16a34a", label: "Esmeralda", labelEn: "Emerald" },
+    { hex: "#78350f", label: "Castanho Mel", labelEn: "Hazel Brown" },
     { hex: "#92400e", label: "Âmbar", labelEn: "Amber" },
+    { hex: "#65a30d", label: "Avelã", labelEn: "Hazel Green" },
+    { hex: "#16a34a", label: "Esmeralda", labelEn: "Emerald" },
+    { hex: "#0d9488", label: "Turquesa", labelEn: "Teal" },
+    { hex: "#0284c7", label: "Azul Oceano", labelEn: "Ocean Blue" },
+    { hex: "#38bdf8", label: "Celeste", labelEn: "Sky Blue" },
     { hex: "#7c3aed", label: "Ametista", labelEn: "Amethyst" },
     { hex: "#dc2626", label: "Rubi", labelEn: "Ruby" },
   ],
   outfitPrimary: [
     { hex: "#dc2626", label: "Carmesim", labelEn: "Crimson" },
-    { hex: "#2563eb", label: "Azul Real", labelEn: "Royal Blue" },
-    { hex: "#059669", label: "Esmeralda", labelEn: "Emerald" },
+    { hex: "#b91c1c", label: "Escarlate", labelEn: "Scarlet" },
+    { hex: "#c2410c", label: "Terracota", labelEn: "Terracotta" },
     { hex: "#d97706", label: "Âmbar", labelEn: "Amber" },
-    { hex: "#475569", label: "Ardósia", labelEn: "Slate" },
+    { hex: "#eab308", label: "Ocre Real", labelEn: "Royal Ochre" },
+    { hex: "#059669", label: "Esmeralda", labelEn: "Emerald" },
+    { hex: "#15803d", label: "Floresta", labelEn: "Forest" },
+    { hex: "#0f766e", label: "Turquesa", labelEn: "Teal" },
+    { hex: "#2563eb", label: "Azul Real", labelEn: "Royal Blue" },
     { hex: "#1d4ed8", label: "Safira", labelEn: "Sapphire" },
+    { hex: "#0284c7", label: "Celeste", labelEn: "Cerulean" },
     { hex: "#581c87", label: "Púrpura Imperial", labelEn: "Imperial Purple" },
+    { hex: "#7e22ce", label: "Ameixa", labelEn: "Plum" },
+    { hex: "#475569", label: "Ardósia", labelEn: "Slate" },
     { hex: "#0f172a", label: "Noite", labelEn: "Midnight" },
+    { hex: "#e2e8f0", label: "Marfim", labelEn: "Ivory" },
   ],
   outfitSecondary: [
     { hex: "#7f1d1d", label: "Vinho", labelEn: "Burgundy" },
-    { hex: "#1e3a8a", label: "Marinho Profundo", labelEn: "Deep Navy" },
-    { hex: "#064e3b", label: "Pinho", labelEn: "Pine" },
-    { hex: "#78350f", label: "Couro", labelEn: "Leather" },
-    { hex: "#1e293b", label: "Carvão", labelEn: "Charcoal" },
     { hex: "#991b1b", label: "Escarlate", labelEn: "Scarlet" },
+    { hex: "#92400e", label: "Caramelo", labelEn: "Caramel" },
+    { hex: "#78350f", label: "Couro", labelEn: "Leather" },
+    { hex: "#3f6212", label: "Oliva", labelEn: "Olive" },
+    { hex: "#064e3b", label: "Pinho", labelEn: "Pine" },
+    { hex: "#1e3a8a", label: "Marinho Profundo", labelEn: "Deep Navy" },
+    { hex: "#312e81", label: "Índigo", labelEn: "Indigo" },
+    { hex: "#4c1d95", label: "Roxo Sombrio", labelEn: "Dark Plum" },
+    { hex: "#334155", label: "Grafite", labelEn: "Graphite" },
+    { hex: "#1e293b", label: "Carvão", labelEn: "Charcoal" },
     { hex: "#cbd5e1", label: "Linho", labelEn: "Linen" },
   ],
   outfitTrim: [
     { hex: "#facc15", label: "Ouro Antigo", labelEn: "Antique Gold" },
     { hex: "#fde047", label: "Ouro Solar", labelEn: "Sun Gold" },
+    { hex: "#fef08a", label: "Champanhe", labelEn: "Champagne" },
     { hex: "#e2e8f0", label: "Prata Polida", labelEn: "Polished Silver" },
+    { hex: "#f8fafc", label: "Platina", labelEn: "Platinum" },
+    { hex: "#94a3b8", label: "Aço", labelEn: "Steel" },
     { hex: "#d97736", label: "Bronze", labelEn: "Bronze" },
+    { hex: "#b45309", label: "Cobre", labelEn: "Copper" },
     { hex: "#38bdf8", label: "Ciano Místico", labelEn: "Mystic Cyan" },
+    { hex: "#ef4444", label: "Rubi", labelEn: "Ruby" },
   ],
   mount: [
     { hex: "#854d0e", label: "Alazão", labelEn: "Chestnut" },
+    { hex: "#a16207", label: "Baio", labelEn: "Bay" },
+    { hex: "#5c3317", label: "Castanho", labelEn: "Dark Bay" },
+    { hex: "#b45309", label: "Caramelo", labelEn: "Sorrel" },
+    { hex: "#d97706", label: "Dourado", labelEn: "Golden" },
+    { hex: "#eab308", label: "Palomino", labelEn: "Palomino" },
     { hex: "#e2e8f0", label: "Branco Glacial", labelEn: "Glacial White" },
+    { hex: "#f8fafc", label: "Neve", labelEn: "Snow" },
+    { hex: "#94a3b8", label: "Prata Lunar", labelEn: "Moon Silver" },
     { hex: "#334155", label: "Cinza Tempestade", labelEn: "Storm Grey" },
     { hex: "#1e293b", label: "Obsidiana", labelEn: "Obsidian" },
-    { hex: "#d97706", label: "Dourado", labelEn: "Golden" },
-    { hex: "#f8fafc", label: "Neve", labelEn: "Snow" },
+    { hex: "#0f172a", label: "Noturno", labelEn: "Nightmare" },
+  ],
+  backpack: [
+    { hex: "#92400e", label: "Couro Explorador", labelEn: "Explorer Leather" },
+    { hex: "#5a3821", label: "Couro Escuro", labelEn: "Dark Leather" },
+    { hex: "#b45309", label: "Camurça", labelEn: "Suede" },
+    { hex: "#d97706", label: "Ocre Areia", labelEn: "Sandstone" },
+    { hex: "#3f6212", label: "Oliva", labelEn: "Olive" },
+    { hex: "#065f46", label: "Verde Mata", labelEn: "Forest" },
+    { hex: "#0f766e", label: "Turquesa", labelEn: "Teal" },
+    { hex: "#1e40af", label: "Azul Náutico", labelEn: "Nautical Blue" },
+    { hex: "#b91c1c", label: "Carmesim", labelEn: "Crimson" },
+    { hex: "#7f1d1d", label: "Vinho", labelEn: "Burgundy" },
+    { hex: "#475569", label: "Ardósia", labelEn: "Slate" },
+    { hex: "#1e293b", label: "Carvão", labelEn: "Charcoal" },
   ],
 };
 
@@ -517,6 +571,7 @@ const COLOR_KEYS: readonly (keyof AvatarColors)[] = [
   "outfitSecondary",
   "outfitTrim",
   "mount",
+  "backpack",
 ];
 
 export type AvatarPreset = {
@@ -565,6 +620,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
         outfitSecondary: "#1e3a8a",
         outfitTrim: "#facc15",
         mount: "#854d0e",
+        backpack: "#5a3821",
       },
     },
   },
@@ -606,6 +662,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
         outfitSecondary: "#064e3b",
         outfitTrim: "#fde68a",
         mount: "#854d0e",
+        backpack: "#92400e",
       },
     },
   },
@@ -647,6 +704,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
         outfitSecondary: "#1e293b",
         outfitTrim: "#e2e8f0",
         mount: "#334155",
+        backpack: "#5a3821",
       },
     },
   },
@@ -688,6 +746,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
         outfitSecondary: "#78350f",
         outfitTrim: "#fef08a",
         mount: "#854d0e",
+        backpack: "#5a3821",
       },
     },
   },
@@ -729,6 +788,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
         outfitSecondary: "#7f1d1d",
         outfitTrim: "#fde047",
         mount: "#854d0e",
+        backpack: "#92400e",
       },
     },
   },
@@ -770,6 +830,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
         outfitSecondary: "#1e3a8a",
         outfitTrim: "#facc15",
         mount: "#854d0e",
+        backpack: "#b45309",
       },
     },
   },
@@ -944,7 +1005,8 @@ function v1EyesFromV2EyeStyle(eyeStyle: AvatarEyeStyle): AvatarEyes {
   return "calm";
 }
 
-export type ResolvedAvatarConfig = AvatarConfigV2 & {
+export type ResolvedAvatarConfig = Omit<AvatarConfigV2, "colors"> & {
+  colors: Required<AvatarColors>;
   skin: AvatarSkin;
   eyes: AvatarEyes;
   hairColor: AvatarHairColor;
@@ -1004,15 +1066,27 @@ export function resolveAvatarConfig(
   const defaultMountHex =
     AVATAR_COLOR_SWATCHES.mount[(seed >>> 7) % AVATAR_COLOR_SWATCHES.mount.length]
       .hex;
+  const resolvedOutfitPrimaryHex =
+    rawColors.outfitPrimary ?? outfitV1Colors.primary;
+  const backpackPool = AVATAR_COLOR_SWATCHES.backpack;
+  let backpackIdx = (seed >>> 15) % backpackPool.length;
+  if (
+    backpackPool[backpackIdx].hex.toLowerCase() ===
+    resolvedOutfitPrimaryHex.toLowerCase()
+  ) {
+    backpackIdx = (backpackIdx + 1) % backpackPool.length;
+  }
+  const defaultBackpackHex = backpackPool[backpackIdx].hex;
 
-  const colors: AvatarColors = {
+  const colors: Required<AvatarColors> = {
     skin: rawColors.skin ?? SKIN_HEX_BY_V1[resolvedSkinV1],
     hair: rawColors.hair ?? HAIR_HEX_BY_V1[resolvedHairColorV1],
     eyes: rawColors.eyes ?? defaultEyeHex,
-    outfitPrimary: rawColors.outfitPrimary ?? outfitV1Colors.primary,
+    outfitPrimary: resolvedOutfitPrimaryHex,
     outfitSecondary: rawColors.outfitSecondary ?? outfitV1Colors.secondary,
     outfitTrim: rawColors.outfitTrim ?? outfitV1Colors.trim,
     mount: rawColors.mount ?? defaultMountHex,
+    backpack: rawColors.backpack ?? defaultBackpackHex,
   };
 
   const resolved: ResolvedAvatarConfig = {
@@ -1164,6 +1238,18 @@ export function randomizeUnlockedAvatar(
   const outfitColorV1 = pickRandom(AVATAR_OUTFIT_COLOR_OPTIONS).value;
   const eyeStyle = pickUnlockedSlot("eyeStyle") as AvatarEyeStyle;
 
+  const randomOutfitPrimary = pickRandom(
+    AVATAR_COLOR_SWATCHES.outfitPrimary
+  ).hex;
+  const distinctBackpackOptions = AVATAR_COLOR_SWATCHES.backpack.filter(
+    (sw) => sw.hex.toLowerCase() !== randomOutfitPrimary.toLowerCase()
+  );
+  const randomBackpack = pickRandom(
+    distinctBackpackOptions.length > 0
+      ? distinctBackpackOptions
+      : AVATAR_COLOR_SWATCHES.backpack
+  ).hex;
+
   return {
     version: 2,
     bodyType: pickUnlockedSlot("bodyType") as AvatarBodyType,
@@ -1190,10 +1276,11 @@ export function randomizeUnlockedAvatar(
       skin: pickRandom(AVATAR_COLOR_SWATCHES.skin).hex,
       hair: pickRandom(AVATAR_COLOR_SWATCHES.hair).hex,
       eyes: pickRandom(AVATAR_COLOR_SWATCHES.eyes).hex,
-      outfitPrimary: pickRandom(AVATAR_COLOR_SWATCHES.outfitPrimary).hex,
+      outfitPrimary: randomOutfitPrimary,
       outfitSecondary: pickRandom(AVATAR_COLOR_SWATCHES.outfitSecondary).hex,
       outfitTrim: pickRandom(AVATAR_COLOR_SWATCHES.outfitTrim).hex,
       mount: pickRandom(AVATAR_COLOR_SWATCHES.mount).hex,
+      backpack: randomBackpack,
     },
     skin: skinV1,
     eyes: v1EyesFromV2EyeStyle(eyeStyle),

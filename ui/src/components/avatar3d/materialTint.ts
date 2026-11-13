@@ -9,6 +9,7 @@ export const RESERVED_MATERIAL_COLOR_MAP: Record<string, keyof AvatarColors> = {
   mat_secondary: "outfitSecondary",
   mat_metal: "outfitTrim",
   mat_mount: "mount",
+  mat_backpack: "backpack",
 };
 
 type ColorableMaterial =
