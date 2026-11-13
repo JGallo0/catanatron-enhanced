@@ -22,22 +22,25 @@ type BuildingProps<T = Color | null> = {
   color: T;
   building: T extends Color ? BuildingType : null;
   size: number;
+  isGhost?: boolean;
 };
 
-function Building({ building, color, size }: BuildingProps) {
+function Building({ building, color, size, isGhost = false }: BuildingProps) {
   if (!color) return null;
   const type = building === "CITY" ? "city" : "settlement";
   const label = PLAYER_COLOR_META[color]?.label || color;
   const pieceName = building === "CITY" ? "Cidade (2 PV)" : "Aldeia (1 PV)";
   const svgSize =
     building === "CITY"
-      ? Math.max(38, Math.min(54, Math.round(size * 0.72)))
-      : Math.max(34, Math.min(48, Math.round(size * 0.64)));
+      ? Math.max(46, Math.min(68, Math.round(size * 0.90)))
+      : Math.max(42, Math.min(60, Math.round(size * 0.80)));
 
   return (
     <div
-      className={cn("building-piece", color, type)}
-      title={`${pieceName} — ${label}`}
+      className={cn("building-piece", color, type, {
+        "building-piece--ghost": isGhost,
+      })}
+      title={isGhost ? `Confirmar ${pieceName} — ${label}` : `${pieceName} — ${label}`}
     >
       <svg
         width={svgSize}
@@ -46,9 +49,9 @@ function Building({ building, color, size }: BuildingProps) {
         className="building-piece__svg"
       >
         {building === "CITY" ? (
-          <CitySvgPiece color={color} scale={1.06} />
+          <CitySvgPiece color={color} scale={1.22} />
         ) : (
-          <SettlementSvgPiece color={color} scale={1.08} />
+          <SettlementSvgPiece color={color} scale={1.24} />
         )}
       </svg>
     </div>
@@ -65,6 +68,8 @@ type NodeProps = {
   flashing: boolean;
   isRecent?: boolean;
   isPending?: boolean;
+  pendingColor?: Color | null;
+  pendingBuilding?: BuildingType | null;
   onClick: React.MouseEventHandler<HTMLDivElement>;
 };
 
@@ -78,6 +83,8 @@ export default function Node({
   flashing,
   isRecent,
   isPending,
+  pendingColor = null,
+  pendingBuilding = null,
   onClick,
 }: NodeProps) {
   const [centerX, centerY] = center;
@@ -87,7 +94,7 @@ export default function Node({
   const [deltaX, deltaY] = getNodeDelta(direction, w, h);
   const x = tileX + deltaX;
   const y = tileY + deltaY;
-  const nodeDiameter = Math.max(30, Math.min(46, Math.round(size * 0.52)));
+  const nodeDiameter = Math.max(38, Math.min(56, Math.round(size * 0.68)));
 
   return (
     <div
@@ -111,8 +118,15 @@ export default function Node({
         onClick(e);
       }}
     >
-      {color && <Building building={building} color={color} size={size} />}
-      {flashing && (
+      {(color || (isPending && pendingColor)) && (
+        <Building
+          building={building || pendingBuilding || "SETTLEMENT"}
+          color={color || (pendingColor as Color)}
+          size={size}
+          isGhost={!color && !!isPending}
+        />
+      )}
+      {flashing && !isPending && (
         <div
           className="pulse"
           title={

@@ -67,6 +67,8 @@ type BoardProps = {
   recentEdgeId?: string | null;
   pendingNodeId?: number | null;
   pendingEdgeId?: string | null;
+  pendingColor?: Color | null;
+  pendingBuilding?: Building | null;
 };
 
 export default function Board({
@@ -89,6 +91,8 @@ export default function Board({
   recentEdgeId = null,
   pendingNodeId = null,
   pendingEdgeId = null,
+  pendingColor = null,
+  pendingBuilding = null,
 }: BoardProps) {
   // Exact available viewport: prefer ResizeObserver container bounds when mounted in ZoomableBoard
   const leftSidebarWidth = 0;
@@ -176,6 +180,8 @@ export default function Board({
         flashing={!replayMode && !!nodeActions && id in nodeActions}
         isRecent={recentNodeId === id}
         isPending={pendingNodeId === id}
+        pendingColor={pendingColor}
+        pendingBuilding={pendingBuilding}
         onClick={buildOnNodeClick(
           id,
           nodeActions ? nodeActions[id] : undefined
@@ -205,6 +211,7 @@ export default function Board({
           flashing={!!action}
           isRecent={recentEdgeId === normalizedEdgeId}
           isPending={pendingEdgeId === normalizedEdgeId}
+          pendingColor={pendingColor}
           onClick={buildOnEdgeClick(id, action)}
         />
       );

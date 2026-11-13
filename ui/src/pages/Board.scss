@@ -107,7 +107,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 14px;
+  height: 18px;
   z-index: 6;
 
   &--buildable {
@@ -118,8 +118,8 @@
 
 .road {
   position: absolute;
-  width: 84%;
-  height: 15px;
+  width: 86%;
+  height: 19px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,10 +138,10 @@
 
 @media screen and (min-width: variables.$sm-breakpoint) {
   .edge {
-    height: 17px;
+    height: 22px;
   }
   .road {
-    height: 16px;
+    height: 22px;
   }
 }
 
@@ -170,7 +170,30 @@
 
   &__svg {
     overflow: visible;
-    filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.78));
+    filter:
+      drop-shadow(0 4px 6px rgba(0, 0, 0, 0.85))
+      drop-shadow(0 0 1px rgba(255, 255, 255, 0.45));
+  }
+}
+
+.building-piece--ghost,
+.road-piece--ghost {
+  opacity: 0.92;
+  animation: ghost-piece-pulse 1.3s ease-in-out infinite alternate !important;
+  filter:
+    drop-shadow(0 0 10px #facc15)
+    drop-shadow(0 0 20px rgba(52, 211, 153, 0.95)) !important;
+  pointer-events: none;
+}
+
+@keyframes ghost-piece-pulse {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.84;
+  }
+  100% {
+    transform: scale(1.06);
+    opacity: 1;
   }
 }
 

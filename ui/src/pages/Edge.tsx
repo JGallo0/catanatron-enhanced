@@ -10,14 +10,18 @@ import {
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { RoadSvgPiece } from "../components/icons/GameIcons";
 
-function Road({ color }: { color: Color }) {
+function Road({ color, isGhost = false }: { color: Color; isGhost?: boolean }) {
   const palette = PLAYER_COLOR_META[color];
   return (
     <div
-      className={cn("road road-piece", color)}
-      title={`Estrada — ${palette.label}`}
+      className={cn("road road-piece", color, {
+        "road-piece--ghost": isGhost,
+      })}
+      title={isGhost ? `Confirmar Estrada — ${palette.label}` : `Estrada — ${palette.label}`}
       style={{
-        filter: `drop-shadow(0 3px 5px rgba(0, 0, 0, 0.72)) drop-shadow(0 0 6px ${palette.glow})`,
+        filter: isGhost
+          ? `drop-shadow(0 0 10px #facc15) drop-shadow(0 0 16px ${palette.glow})`
+          : `drop-shadow(0 4px 6px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 8px ${palette.glow})`,
       }}
     >
       <RoadSvgPiece color={color} className="road-piece__svg" />
@@ -39,6 +43,7 @@ type EdgeProps = {
   flashing: boolean;
   isRecent?: boolean;
   isPending?: boolean;
+  pendingColor?: Color | null;
   onClick: React.MouseEventHandler;
 };
 
@@ -52,6 +57,7 @@ export default function Edge({
   flashing,
   isRecent,
   isPending,
+  pendingColor = null,
   onClick,
 }: EdgeProps) {
   const [centerX, centerY] = center;
@@ -80,8 +86,13 @@ export default function Edge({
         onClick(e);
       }}
     >
-      {color && <Road color={color} />}
-      {flashing && <div className="pulse" title="Construir Estrada aqui" />}
+      {(color || (isPending && pendingColor)) && (
+        <Road
+          color={color || (pendingColor as Color)}
+          isGhost={!color && !!isPending}
+        />
+      )}
+      {flashing && !isPending && <div className="pulse" title="Construir Estrada aqui" />}
     </div>
   );
 }

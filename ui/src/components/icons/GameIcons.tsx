@@ -940,23 +940,53 @@ type PiecePalette = {
 };
 
 function getPiecePalette(color: Color): PiecePalette {
-  const base = PLAYER_COLOR_META[color];
+  if (color === "RED") {
+    return {
+      light: "#FFAAA8",
+      main: "#EF4444",
+      shade: "#DC2626",
+      deep: "#991B1B",
+      outline: "#450A0A",
+      trim: "#FEF08A",
+    };
+  }
+  if (color === "BLUE") {
+    return {
+      light: "#BAE6FD",
+      main: "#2563EB",
+      shade: "#1D4ED8",
+      deep: "#1E3A8A",
+      outline: "#082F49",
+      trim: "#FEF08A",
+    };
+  }
+  if (color === "ORANGE") {
+    return {
+      light: "#FEF08A",
+      main: "#F59E0B",
+      shade: "#D97706",
+      deep: "#78350F",
+      outline: "#451A03",
+      trim: "#FFFFFF",
+    };
+  }
   if (color === "WHITE") {
     return {
       light: "#FFFFFF",
-      main: "#F5F0E6",
+      main: "#F8FAFC",
       shade: "#CBD5E1",
       deep: "#64748B",
-      outline: "#1E293B",
-      trim: "#E2E8F0",
+      outline: "#0F172A",
+      trim: "#F59E0B",
     };
   }
+  const base = PLAYER_COLOR_META[color];
   return {
     light: base.secondary,
     main: base.primary,
     shade: base.dark,
-    deep: "#23140B",
-    outline: "#190E08",
+    deep: "#18181B",
+    outline: "#09090B",
     trim: "#FDE68A",
   };
 }
@@ -978,25 +1008,25 @@ export const SettlementSvgPiece: React.FC<{
       <defs>
         <linearGradient id={wallGradId} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor={palette.light} />
-          <stop offset="48%" stopColor={palette.main} />
+          <stop offset="45%" stopColor={palette.main} />
           <stop offset="100%" stopColor={palette.shade} />
         </linearGradient>
         <linearGradient id={roofGradId} x1="0" y1="0" x2="0.8" y2="1">
           <stop offset="0%" stopColor={palette.light} />
-          <stop offset="55%" stopColor={palette.main} />
+          <stop offset="50%" stopColor={palette.main} />
           <stop offset="100%" stopColor={palette.shade} />
         </linearGradient>
       </defs>
 
-      {/* Warm ground contact shadow */}
-      <ellipse cx="0" cy="13" rx="17" ry="5.5" fill="rgba(10, 6, 3, 0.72)" />
+      {/* Ground contact shadow */}
+      <ellipse cx="0" cy="13" rx="17" ry="5.5" fill="rgba(0, 0, 0, 0.72)" />
 
-      {/* Carved stone/oak plinth base */}
+      {/* Solid player-colored plinth base */}
       <path
         d="M-14 9.5 L-11 13 L11 13 L15 9.5 L15 7.5 L-14 7.5 Z"
-        fill="#473120"
+        fill={palette.deep}
         stroke={palette.outline}
-        strokeWidth="1.5"
+        strokeWidth="1.8"
         strokeLinejoin="round"
       />
       <line
@@ -1004,39 +1034,39 @@ export const SettlementSvgPiece: React.FC<{
         y1="8.2"
         x2="13"
         y2="8.2"
-        stroke="#D6BFA3"
-        strokeWidth="0.9"
-        opacity="0.55"
+        stroke="#FFFFFF"
+        strokeWidth="1.0"
+        opacity="0.65"
       />
 
-      {/* Stone chimney behind left roof pitch */}
+      {/* Chimney in faction contrast tone */}
       <rect
         x="-10"
         y="-14"
-        width="4.4"
+        width="4.8"
         height="8.5"
         rx="0.8"
-        fill="#64748B"
+        fill={palette.shade}
         stroke={palette.outline}
-        strokeWidth="1.4"
+        strokeWidth="1.6"
       />
       <rect
-        x="-10.8"
-        y="-15.2"
-        width="6"
-        height="2.2"
+        x="-11"
+        y="-15.4"
+        width="6.8"
+        height="2.4"
         rx="0.6"
-        fill="#CBD5E1"
+        fill={palette.light}
         stroke={palette.outline}
-        strokeWidth="1.1"
+        strokeWidth="1.3"
       />
 
-      {/* Front gable wall */}
+      {/* Front gable wall with vibrant player color */}
       <path
         d="M-11.5 9.5 L-11.5 0 L-1 -11 L9 0 L9 9.5 Z"
         fill={`url(#${wallGradId})`}
         stroke={palette.outline}
-        strokeWidth="1.9"
+        strokeWidth="2.2"
         strokeLinejoin="round"
       />
 
@@ -1045,79 +1075,57 @@ export const SettlementSvgPiece: React.FC<{
         d="M9 0 L14.5 -2.5 L14.5 7.5 L9 9.5 Z"
         fill={palette.shade}
         stroke={palette.outline}
-        strokeWidth="1.7"
+        strokeWidth="2.0"
         strokeLinejoin="round"
-      />
-
-      {/* Half-timber cottage trim & subtle roof eave shadow */}
-      <line
-        x1="-9.5"
-        y1="1.2"
-        x2="7.5"
-        y2="1.2"
-        stroke={palette.outline}
-        strokeWidth="1.2"
-        opacity="0.45"
       />
 
       {/* Sloped right roof wing */}
       <path
         d="M-1 -12.5 L8 -14.5 L16.2 -2.2 L9.5 0.5 Z"
-        fill={palette.shade}
+        fill={palette.deep}
         stroke={palette.outline}
-        strokeWidth="1.6"
+        strokeWidth="2.0"
         strokeLinejoin="round"
       />
 
-      {/* Main sunlit pitched shingle gable roof */}
+      {/* Main pitched shingle gable roof with vibrant sunlit gradient */}
       <path
         d="M-14.2 1.2 L-1 -13 L10.8 1.2 L8.2 2.2 L-1 -8.8 L-11.2 2.2 Z"
         fill={`url(#${roofGradId})`}
         stroke={palette.outline}
-        strokeWidth="1.7"
+        strokeWidth="2.2"
         strokeLinejoin="round"
       />
-      {/* Roof ridge highlight */}
+      {/* Crisp roof ridge specular highlight */}
       <line
-        x1="-12.5"
-        y1="0.2"
+        x1="-13"
+        y1="0.5"
         x2="-1"
-        y2="-12"
+        y2="-12.2"
         stroke="#FFFFFF"
-        strokeWidth="1.2"
+        strokeWidth="1.6"
         strokeLinecap="round"
-        opacity="0.55"
+        opacity="0.85"
       />
 
-      {/* Arched oak door */}
+      {/* Contrasting arched door with glowing handle */}
       <path
         d="M-4.2 9.5 L-4.2 3.8 C-4.2 1.8, 1.8 1.8, 1.8 3.8 L1.8 9.5 Z"
-        fill="#4A2511"
+        fill={palette.outline}
         stroke={palette.outline}
-        strokeWidth="1.2"
+        strokeWidth="1.4"
         strokeLinejoin="round"
       />
-      <circle cx="0.3" cy="6.2" r="0.7" fill="#FDE68A" />
+      <circle cx="0.4" cy="6.2" r="0.9" fill={palette.trim} />
 
-      {/* Warm lantern-lit side window */}
-      <rect
-        x="10.4"
-        y="1.6"
-        width="2.9"
-        height="4"
-        rx="0.7"
-        fill="#FDE68A"
-        stroke={palette.outline}
-        strokeWidth="1"
-      />
-      {/* Gable attic rose window */}
+      {/* Warm glowing attic window */}
       <circle
         cx="-1.2"
         cy="-3.6"
-        r="1.9"
-        fill="#FEF3C7"
+        r="2.2"
+        fill={palette.trim}
         stroke={palette.outline}
-        strokeWidth="1"
+        strokeWidth="1.3"
       />
     </g>
   );
@@ -1140,24 +1148,24 @@ export const CitySvgPiece: React.FC<{
       <defs>
         <linearGradient id={keepGradId} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor={palette.light} />
-          <stop offset="55%" stopColor={palette.main} />
+          <stop offset="50%" stopColor={palette.main} />
           <stop offset="100%" stopColor={palette.shade} />
         </linearGradient>
         <linearGradient id={hallGradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={palette.light} />
-          <stop offset="65%" stopColor={palette.shade} />
+          <stop offset="60%" stopColor={palette.shade} />
         </linearGradient>
       </defs>
 
-      {/* Wide ambient shadow */}
-      <ellipse cx="0" cy="14" rx="20" ry="6.2" fill="rgba(10, 6, 3, 0.78)" />
+      {/* Wide ambient ground shadow */}
+      <ellipse cx="0" cy="14" rx="20" ry="6.2" fill="rgba(0, 0, 0, 0.78)" />
 
-      {/* Stone courtyard pedestal */}
+      {/* Courtyard fortress base in deep faction tone */}
       <path
         d="M-18 10.5 L-15 14 L15 14 L18.5 10.5 L18.5 8.5 L-18 8.5 Z"
-        fill="#473120"
+        fill={palette.deep}
         stroke={palette.outline}
-        strokeWidth="1.6"
+        strokeWidth="1.9"
         strokeLinejoin="round"
       />
       <line
@@ -1165,9 +1173,9 @@ export const CitySvgPiece: React.FC<{
         y1="9.2"
         x2="16.5"
         y2="9.2"
-        stroke="#E7D3B5"
-        strokeWidth="0.9"
-        opacity="0.55"
+        stroke="#FFFFFF"
+        strokeWidth="1.0"
+        opacity="0.65"
       />
 
       {/* Towering Watchtower Keep (left) */}
@@ -1179,23 +1187,23 @@ export const CitySvgPiece: React.FC<{
         rx="1.2"
         fill={`url(#${keepGradId})`}
         stroke={palette.outline}
-        strokeWidth="1.9"
+        strokeWidth="2.2"
       />
-      {/* Keep crenellated overhang collar */}
+      {/* Keep crenellated battlements */}
       <path
         d="M-16 -10.5 L-1 -10.5 L-1 -13 L-4.5 -13 L-4.5 -11.5 L-7 -11.5 L-7 -13 L-10 -13 L-10 -11.5 L-12.5 -11.5 L-12.5 -13 L-16 -13 Z"
-        fill={palette.shade}
+        fill={palette.light}
         stroke={palette.outline}
-        strokeWidth="1.3"
+        strokeWidth="1.6"
         strokeLinejoin="round"
       />
 
-      {/* Keep conical citadel spire */}
+      {/* Citadel conical spire */}
       <polygon
         points="-16.5,-13 -8.2,-23.5 -0.2,-13"
         fill={`url(#${hallGradId})`}
         stroke={palette.outline}
-        strokeWidth="1.7"
+        strokeWidth="2.0"
         strokeLinejoin="round"
       />
       <line
@@ -1204,71 +1212,71 @@ export const CitySvgPiece: React.FC<{
         x2="-8.2"
         y2="-22.3"
         stroke="#FFFFFF"
-        strokeWidth="1.1"
+        strokeWidth="1.4"
         strokeLinecap="round"
-        opacity="0.55"
+        opacity="0.8"
       />
 
-      {/* Spire finial & billowing faction pennant */}
+      {/* Spire finial & faction pennant */}
       <line
         x1="-8.2"
         y1="-23.5"
         x2="-8.2"
         y2="-28"
-        stroke="#FDE68A"
-        strokeWidth="1.5"
+        stroke={palette.trim}
+        strokeWidth="1.8"
         strokeLinecap="round"
       />
       <path
-        d="M-8.2 -27.5 L0.5 -25.2 L-8.2 -22.8 Z"
-        fill={palette.main}
+        d="M-8.2 -27.5 L1.0 -25.2 L-8.2 -22.8 Z"
+        fill={palette.light}
         stroke={palette.outline}
-        strokeWidth="1.1"
+        strokeWidth="1.3"
         strokeLinejoin="round"
       />
 
-      {/* Great Hall body & shaded 3D east wall */}
+      {/* Great Hall body (right) */}
       <path
         d="M-3 10.5 L-3 -2.5 L6 -10 L14.5 -2.5 L14.5 10.5 Z"
         fill={`url(#${keepGradId})`}
         stroke={palette.outline}
-        strokeWidth="1.9"
+        strokeWidth="2.2"
         strokeLinejoin="round"
       />
       <path
         d="M14.5 -2.5 L18 -4.5 L18 8.5 L14.5 10.5 Z"
-        fill={palette.shade}
+        fill={palette.deep}
         stroke={palette.outline}
-        strokeWidth="1.5"
+        strokeWidth="1.8"
         strokeLinejoin="round"
       />
 
-      {/* Steep Great Hall gabled roof */}
+      {/* Great Hall pitched roof */}
       <path
         d="M-4.5 -1.5 L6 -11.2 L16.2 -1.5 L13.8 -0.6 L6 -7.8 L-2.2 -0.6 Z"
         fill={`url(#${hallGradId})`}
         stroke={palette.outline}
-        strokeWidth="1.6"
+        strokeWidth="2.0"
         strokeLinejoin="round"
       />
       <path
         d="M6 -11.2 L12.5 -12.6 L18.5 -4.2 L14.5 -2.5 Z"
-        fill={palette.shade}
+        fill={palette.deep}
         stroke={palette.outline}
-        strokeWidth="1.4"
+        strokeWidth="1.7"
         strokeLinejoin="round"
       />
 
-      {/* Keep arched windows */}
+      {/* Arched windows with glowing warm gold */}
       <rect
         x="-10.2"
         y="-7.5"
         width="3.8"
         height="5.6"
         rx="1.8"
-        fill="#FEF3C7"
+        fill={palette.trim}
         stroke={palette.outline}
-        strokeWidth="1.1"
+        strokeWidth="1.2"
       />
       <rect
         x="-10.2"
@@ -1276,35 +1284,26 @@ export const CitySvgPiece: React.FC<{
         width="3.8"
         height="5"
         rx="1.2"
-        fill="#FDE68A"
-        stroke={palette.outline}
-        strokeWidth="1.1"
-      />
-
-      {/* Great Hall twin gatehouse arch & glowing lancet windows */}
-      <path
-        d="M2.5 10.5 L2.5 3.6 C2.5 1.2, 9.2 1.2, 9.2 3.6 L9.2 10.5 Z"
-        fill="#3F1E0D"
+        fill={palette.trim}
         stroke={palette.outline}
         strokeWidth="1.2"
-        strokeLinejoin="round"
       />
-      <line
-        x1="5.85"
-        y1="2.2"
-        x2="5.85"
-        y2="10.5"
-        stroke="#FDE68A"
-        strokeWidth="0.9"
-        opacity="0.7"
+
+      {/* Castle grand portal arch */}
+      <path
+        d="M2.5 10.5 L2.5 3.6 C2.5 1.2, 9.2 1.2, 9.2 3.6 L9.2 10.5 Z"
+        fill={palette.outline}
+        stroke={palette.outline}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
       />
       <circle
         cx="5.85"
         cy="-3.8"
-        r="1.9"
-        fill="#FEF3C7"
+        r="2.2"
+        fill={palette.trim}
         stroke={palette.outline}
-        strokeWidth="1"
+        strokeWidth="1.2"
       />
     </g>
   );
@@ -1323,7 +1322,7 @@ export const RoadSvgPiece: React.FC<{
 
   return (
     <svg
-      viewBox="0 0 100 22"
+      viewBox="0 0 100 24"
       width="100%"
       height="100%"
       preserveAspectRatio="none"
@@ -1333,50 +1332,50 @@ export const RoadSvgPiece: React.FC<{
       <defs>
         <linearGradient id={topGradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={palette.light} />
-          <stop offset="48%" stopColor={palette.main} />
+          <stop offset="42%" stopColor={palette.main} />
           <stop offset="100%" stopColor={palette.shade} />
         </linearGradient>
       </defs>
 
-      {/* Ground shadow */}
-      <rect x="4" y="8" width="92" height="12" rx="4.5" fill="rgba(10, 6, 3, 0.72)" />
+      {/* Ground contact shadow */}
+      <rect x="2" y="7" width="96" height="15" rx="5" fill="rgba(0, 0, 0, 0.75)" />
 
-      {/* Beveled wooden/stone cradle base */}
+      {/* Beveled timber/stone beam base */}
       <path
-        d="M6 6 L12 3.5 L88 3.5 L94 6 L96 14 L90 17.5 L10 17.5 L4 14 Z"
-        fill={palette.shade}
+        d="M4 6 L10 2.5 L90 2.5 L96 6 L98 15 L91 19.5 L9 19.5 L2 15 Z"
+        fill={palette.deep}
         stroke={palette.outline}
-        strokeWidth="2.2"
+        strokeWidth="2.5"
         strokeLinejoin="round"
       />
 
-      {/* Faceted top causeway beam */}
+      {/* Top causeway deck with saturated player color */}
       <path
-        d="M8 6.5 L13.5 4.2 L86.5 4.2 L92 6.5 L92 12 L86.5 14 L13.5 14 L8 12 Z"
+        d="M6 6.5 L12 3.8 L88 3.8 L94 6.5 L94 13.5 L88 15.5 L12 15.5 L6 13.5 Z"
         fill={`url(#${topGradId})`}
         stroke={palette.outline}
-        strokeWidth="1.5"
+        strokeWidth="1.8"
         strokeLinejoin="round"
       />
 
-      {/* Subtle plank/cobble divider notches */}
+      {/* High-contrast divider notches */}
       <path
-        d="M28 5.2 L28 13 M50 5.2 L50 13 M72 5.2 L72 13"
+        d="M26 4.8 L26 14.5 M50 4.8 L50 14.5 M74 4.8 L74 14.5"
         stroke={palette.outline}
-        strokeWidth="1.2"
-        opacity="0.32"
+        strokeWidth="1.6"
+        opacity="0.5"
       />
 
       {/* Top carved specular highlight */}
       <line
-        x1="15"
-        y1="6.1"
-        x2="85"
-        y2="6.1"
+        x1="14"
+        y1="5.5"
+        x2="86"
+        y2="5.5"
         stroke="#FFFFFF"
-        strokeWidth="1.3"
+        strokeWidth="1.8"
         strokeLinecap="round"
-        opacity="0.52"
+        opacity="0.75"
       />
     </svg>
   );
