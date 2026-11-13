@@ -50,7 +50,7 @@ vi.mock("notistack", () => ({
   useSnackbar: () => snackbar,
 }));
 vi.mock("./ZoomableBoard", () => ({
-  default: () => <div data-testid="board">Board</div>,
+  default: () => <div data-testid="board" className="board-container">Board</div>,
 }));
 
 const theme = createTheme();
@@ -891,4 +891,19 @@ test("toggles board skin between Diorama 3D and Pintura Clássica via quick dock
 
   fireEvent.click(skinBtn);
   expect(localStorage.getItem("catan_board_skin_v1")).toBe("diorama");
+});
+
+test("renders game-top-hud-container enclosing top hud and player top bar, with full-bleed board-container", async () => {
+  vi.mocked(getState).mockResolvedValue(baseState);
+
+  const { container } = renderGameScreen();
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  const hudContainer = container.querySelector(".game-top-hud-container");
+  expect(hudContainer).toBeInTheDocument();
+  expect(hudContainer?.querySelector(".game-top-hud")).toBeInTheDocument();
+  expect(
+    hudContainer?.querySelector(".cu-player-top-bar, .player-top-bar")
+  ).toBeInTheDocument();
+  expect(container.querySelector(".board-container")).toBeInTheDocument();
 });

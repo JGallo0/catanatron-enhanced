@@ -1240,82 +1240,130 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   return (
     <main className="catan-game-screen">
       <OceanBackdrop />
-      {/* Top Floating HUD Bar (Steam Catan style) */}
-      <header className="game-top-hud">
-        <div className="game-top-hud__left">
-          <Link
-            to="/"
-            className="game-top-hud__home-btn"
-            title={t("Voltar ao Lobby", "Back to Lobby")}
-          >
-            ← Lobby
-          </Link>
-          <h1 className="logo">Rule the Isle</h1>
-          {gs.room_code && (
+
+      {/* Fullscreen Board Canvas */}
+      <ZoomableBoard
+        replayMode={replayMode}
+        recentNodeId={recentNodeId}
+        recentEdgeId={recentEdgeId}
+      />
+
+      {/* Floating Top HUD Container (Glassmorphism over sea) */}
+      <div className="game-top-hud-container">
+        <header className="game-top-hud">
+          <div className="game-top-hud__left">
             <Link
-              to={`/rooms/${gs.room_code}`}
-              className="game-top-hud__room-badge"
-              title={t("Ver Sala e Link de Convite", "View Room & Invite Link")}
+              to="/"
+              className="game-top-hud__home-btn"
+              title={t("Voltar ao Lobby", "Back to Lobby")}
             >
-              🔗 {t("Sala", "Room")} #{gs.room_code}
+              ← Lobby
             </Link>
-          )}
-        </div>
-
-        <div
-          className="game-top-hud__banner"
-          style={{
-            borderColor: currentPalette.primary,
-          }}
-        >
-          <span
-            className="game-top-hud__turn-dot"
-            style={{
-              background: currentPalette.primary,
-              boxShadow: `0 0 10px ${currentPalette.glow}`,
-            }}
-          />
-          <span>{describePromptBanner(gs, isBotThinking, language)}</span>
-        </div>
-
-        <div className="game-top-hud__right">
-          <span
-            className="game-top-hud__bank-chip"
-            title={t(
-              "Cartas de Desenvolvimento restantes no baralho do banco",
-              "Remaining Development Cards in the bank deck"
+            <h1 className="logo">Rule the Isle</h1>
+            {gs.room_code && (
+              <Link
+                to={`/rooms/${gs.room_code}`}
+                className="game-top-hud__room-badge"
+                title={t("Ver Sala e Link de Convite", "View Room & Invite Link")}
+              >
+                🔗 {t("Sala", "Room")} #{gs.room_code}
+              </Link>
             )}
+          </div>
+
+          <div
+            className="game-top-hud__banner"
+            style={{
+              borderColor: currentPalette.primary,
+            }}
           >
-            🃏{" "}
-            <span className="hud-btn-label">
-              {t("Baralho Dev:", "Dev Deck:")}{" "}
+            <span
+              className="game-top-hud__turn-dot"
+              style={{
+                background: currentPalette.primary,
+                boxShadow: `0 0 10px ${currentPalette.glow}`,
+              }}
+            />
+            <span>{describePromptBanner(gs, isBotThinking, language)}</span>
+          </div>
+
+          <div className="game-top-hud__right">
+            <span
+              className="game-top-hud__bank-chip"
+              title={t(
+                "Cartas de Desenvolvimento restantes no baralho do banco",
+                "Remaining Development Cards in the bank deck"
+              )}
+            >
+              🃏{" "}
+              <span className="hud-btn-label">
+                {t("Baralho Dev:", "Dev Deck:")}{" "}
+              </span>
+              <strong>{devCardsRemaining}</strong>
             </span>
-            <strong>{devCardsRemaining}</strong>
-          </span>
-          <LanguageToggle compact />
-          {isMultiplayerGame &&
-            !replayMode &&
-            !gs.winning_color &&
-            mySeatColor &&
-            !isMySeatTakenOver && (
+            <LanguageToggle compact />
+            {isMultiplayerGame &&
+              !replayMode &&
+              !gs.winning_color &&
+              mySeatColor &&
+              !isMySeatTakenOver && (
+                <button
+                  type="button"
+                  className="game-top-hud__abandon-btn"
+                  onClick={() => setAbandonConfirmOpen(true)}
+                  title={t(
+                    "Sair da partida e deixar um Bot IA assumir seu assento",
+                    "Leave the match and let an AI Bot take over your seat"
+                  )}
+                  aria-label={t("Sair (Bot Assume)", "Leave (Bot Takes Over)")}
+                >
+                  🚪{" "}
+                  <span className="hud-btn-label">
+                    {t("Sair (Bot Assume)", "Leave (Bot Takes Over)")}
+                  </span>
+                </button>
+              )}
+          </div>
+        </header>
+
+        <PlayerTopBar
+          gameState={gs}
+          recentDevColor={recentDevColor}
+          discardDrops={discardDrops}
+          yieldFX={yieldFX}
+          vpFX={vpFX}
+          activeTaunts={activeTaunts}
+        />
+
+        {isMultiplayerGame &&
+          !replayMode &&
+          !gs.winning_color &&
+          isMySeatTakenOver && (
+            <div
+              className="game-reclaim-banner"
+              role="region"
+              aria-label={t("Retomar assento", "Reclaim seat")}
+            >
+              <span className="game-reclaim-banner__text">
+                🤖{" "}
+                {t(
+                  "Um Bot IA assumiu o seu assento enquanto você esteve ausente.",
+                  "An AI Bot took over your seat while you were away."
+                )}
+              </span>
               <button
                 type="button"
-                className="game-top-hud__abandon-btn"
-                onClick={() => setAbandonConfirmOpen(true)}
-                title={t(
-                  "Sair da partida e deixar um Bot IA assumir seu assento",
-                  "Leave the match and let an AI Bot take over your seat"
-                )}
-                aria-label={t("Sair (Bot Assume)", "Leave (Bot Takes Over)")}
+                className="game-reclaim-banner__btn"
+                disabled={isReclaiming}
+                onClick={handleReclaimSeat}
               >
-                🚪{" "}
-                <span className="hud-btn-label">
-                  {t("Sair (Bot Assume)", "Leave (Bot Takes Over)")}
-                </span>
+                {isReclaiming
+                  ? t("Retomando...", "Reclaiming...")
+                  : t("↩️ Retomar Meu Assento", "↩️ Reclaim My Seat")}
               </button>
-            )}
-        </div>
-      </header>
+            </div>
+          )}
+      </div>
 
       {/* Left Vertical Quick Dock (Catan Universe style shortcuts) */}
       <nav
@@ -1571,50 +1619,6 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           {muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
         </button>
       </nav>
-
-      <PlayerTopBar
-        gameState={gs}
-        recentDevColor={recentDevColor}
-        discardDrops={discardDrops}
-        yieldFX={yieldFX}
-        vpFX={vpFX}
-        activeTaunts={activeTaunts}
-      />
-
-      {isMultiplayerGame &&
-        !replayMode &&
-        !gs.winning_color &&
-        isMySeatTakenOver && (
-          <div
-            className="game-reclaim-banner"
-            role="region"
-            aria-label={t("Retomar assento", "Reclaim seat")}
-          >
-            <span className="game-reclaim-banner__text">
-              🤖{" "}
-              {t(
-                "Um Bot IA assumiu o seu assento enquanto você esteve ausente.",
-                "An AI Bot took over your seat while you were away."
-              )}
-            </span>
-            <button
-              type="button"
-              className="game-reclaim-banner__btn"
-              disabled={isReclaiming}
-              onClick={handleReclaimSeat}
-            >
-              {isReclaiming
-                ? t("Retomando...", "Reclaiming...")
-                : t("↩️ Retomar Meu Assento", "↩️ Reclaim My Seat")}
-            </button>
-          </div>
-        )}
-
-      <ZoomableBoard
-        replayMode={replayMode}
-        recentNodeId={recentNodeId}
-        recentEdgeId={recentEdgeId}
-      />
 
       {spotlightToast && (
         <div

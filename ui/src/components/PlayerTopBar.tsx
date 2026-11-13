@@ -754,7 +754,7 @@ export default function PlayerTopBar({
 
   return (
     <>
-      <header className="cu-player-top-bar" aria-label={t("Jogadores", "Players")}>
+      <header className="cu-player-top-bar player-top-bar" aria-label={t("Jogadores", "Players")}>
         {seats.map((seat) => (
           <PlayerCard
             key={seat.color}

@@ -47,44 +47,52 @@ main.catan-game-screen {
   color: #f8fafc;
   height: 100%;
   width: 100%;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
 
+  .board-container,
   .loader {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
     display: flex;
     justify-content: center;
     align-items: center;
   }
+}
 
-  .board-container,
-  .loader {
-    height: 100%;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-    z-index: 2;
-    flex: 1;
-    min-height: 0;
+.game-top-hud-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 25;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(
+    180deg,
+    rgba(3, 18, 34, 0.94) 0%,
+    rgba(3, 18, 34, 0.65) 75%,
+    transparent 100%
+  );
+  backdrop-filter: blur(12px);
+  padding-bottom: 6px;
+
+  > * {
+    pointer-events: auto;
   }
 }
 
 .game-top-hud {
   position: relative;
-  z-index: 25;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 5px 14px 2px;
-  background: linear-gradient(
-    180deg,
-    rgba(6, 13, 24, 0.95) 0%,
-    rgba(6, 13, 24, 0.6) 85%,
-    transparent 100%
-  );
+  padding: 6px 14px 2px;
+  background: transparent;
   flex-shrink: 0;
 
   &__left {
