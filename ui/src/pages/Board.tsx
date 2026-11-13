@@ -99,20 +99,20 @@ export default function Board({
     typeof containerHeight === "number" &&
     containerHeight > 0;
   const fallbackCanvasWidth = Math.max(280, width - leftSidebarWidth);
-  const reservedHeight = isCompactHeight
-    ? 184
-    : isMobile || width <= 980
-      ? 344
-      : 268;
+
+  // In floating HUD mode, top and bottom bars float over the sea margins.
+  // We only reserve minimal safety margin so outer harbor ships and 2:1 placards stay comfortably on-screen.
+  const verticalSafetyMargin = isCompactHeight ? 24 : isMobile ? 48 : 64;
   const fallbackCanvasHeight = Math.max(
-    isCompactHeight ? 200 : 280,
-    height - reservedHeight
+    isCompactHeight ? 200 : 320,
+    height - verticalSafetyMargin
   );
+
   const canvasWidth = hasMeasuredContainer ? containerWidth : fallbackCanvasWidth;
   const canvasHeight = hasMeasuredContainer
-    ? Math.max(180, containerHeight)
+    ? Math.max(200, containerHeight)
     : fallbackCanvasHeight;
-  const margin = isMobile ? 16 : 24;
+  const margin = isMobile ? 12 : 20;
 
   const size = computeDefaultSize(canvasWidth - margin, canvasHeight - margin);
   // Nudge center up slightly so bottom harbor ships + hanging 2:1/3:1 placards share balanced sea margin

@@ -74,7 +74,8 @@ test("fits narrow portrait and landscape mobile viewports without overflowing ho
   const landscapeBoard = landscape.container.querySelector(".board") as HTMLElement;
   expect(landscapeBoard).toBeTruthy();
   expect(parseInt(landscapeBoard.style.width, 10)).toBeLessThanOrEqual(667);
-  expect(parseInt(landscapeBoard.style.height, 10)).toBeLessThanOrEqual(240);
+  expect(parseInt(landscapeBoard.style.height, 10)).toBeLessThanOrEqual(375);
+  expect(parseInt(landscapeBoard.style.height, 10)).toBeGreaterThanOrEqual(300);
 });
 
 test("uses explicit measured ResizeObserver containerWidth and containerHeight when provided", () => {
@@ -135,3 +136,49 @@ test("highlights recently placed node and normalized edge with .node--recent and
   expect(container.querySelectorAll(".node--recent")).toHaveLength(1);
   expect(container.querySelectorAll(".edge--recent")).toHaveLength(1);
 });
+
+test("maximizes canvas height in floating HUD layout instead of subtracting rigid 268px reserved height", () => {
+  const gameState = makeGameState();
+
+  const fallbackRender = render(
+    <Board
+      width={1200}
+      height={800}
+      buildOnNodeClick={() => () => undefined}
+      buildOnEdgeClick={() => () => undefined}
+      handleTileClick={() => undefined}
+      replayMode={false}
+      gameState={gameState}
+      isMobile={false}
+      show
+      isMovingRobber={false}
+    />
+  );
+  const fallbackBoard = fallbackRender.container.querySelector(".board") as HTMLElement;
+  expect(fallbackBoard).toBeTruthy();
+  expect(parseInt(fallbackBoard.style.height, 10)).toBeGreaterThanOrEqual(700);
+  fallbackRender.unmount();
+
+  const { container } = render(
+    <Board
+      width={1200}
+      height={800}
+      containerWidth={1200}
+      containerHeight={800}
+      buildOnNodeClick={() => () => undefined}
+      buildOnEdgeClick={() => () => undefined}
+      handleTileClick={() => undefined}
+      replayMode={false}
+      gameState={gameState}
+      isMobile={false}
+      show
+      isMovingRobber={false}
+    />
+  );
+
+  const board = container.querySelector(".board") as HTMLElement;
+  expect(board).toBeTruthy();
+  const boardHeight = parseInt(board.style.height, 10);
+  expect(boardHeight).toBeGreaterThanOrEqual(700);
+});
+
