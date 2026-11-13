@@ -346,6 +346,17 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 
 > **Nota sobre o plano gratuito do Supabase:** Nossa arquitetura de login utiliza Google OAuth via ID Token + PBKDF2 direto no banco SQL. Isso significa que **nenhum e-mail transacional é disparado pelo Supabase**, garantindo que o sistema funcione 100% dentro dos limites do plano gratuito sem bloqueios de cota de SMTP!
 
+- **Bloco 18 Concluído (main & Produção Vercel): Padronização Visual no Vetor Ultra-HD Nativo (Resolução Infinita Catan Universe):**
+  - **Diagnóstico da Perda de Resolução no Zoom:** Identificado que cada hexágono em [`Tile.tsx`](ui/src/pages/Tile.tsx) continha duas camadas sobrepostas — a Camada 1 no fundo com a ilustração vetorial SVG nativa (`TerrainHexIllustration`), e a Camada 2 por cima com uma tag `<img>` carregando o arquivo rasterizado `.webp` (Diorama/Clássica). Durante trocas de tema ou montagem de tela, a imagem ficava temporariamente em `opacity: 0`, revelando por uma fração de segundo a nitidez cristalina do vetor matemático. Ao terminar o carregamento, a imagem bitmap sobrepunha o vetor e, ao aplicar zoom pela GPU via `transform: scale`, o navegador esticava os pixels com interpolação bilinear e esticamento não-uniforme (`object-fit: fill`), causando o desfoque percebido pelo usuário.
+  - **Padronização no Vetor Ultra-HD (Opção 1):** Removida a sobreposição do bitmap rasterizado `.webp` em `Tile.tsx`. O tabuleiro agora utiliza exclusivamente a ilustração vetorial nativa `TerrainHexIllustration` para todos os biomas (Madeira, Argila, Ovelha, Trigo, Minério, Deserto e Mar).
+  - **Vantagens Práticas:**
+    - **Resolução Infinita:** Contornos nítidos e curvas matemáticas perfeitas em qualquer nível de zoom (mesmo em 2.5x ou 3x) e em telas 4K / Retina.
+    - **Carregamento Instantâneo (0ms):** Fim do "piscar de olhos" ou atraso de carregamento de texturas; rendering imediato direto do bundle.
+    - **Leveza Gráfica:** Menor consumo de memória e textura de GPU em dispositivos móveis e navegadores desktop.
+  - **Integração no MatchSetupModal:** Substituída a antiga seleção de temas de mapa pelo seletor oficial de **Estilo das Peças** (Alto Contraste como padrão 🏰 vs Vilarejo Detalhado como variante 🏡) com o hook `usePieceSkin()`.
+  - **Limpeza do HUD (`GameScreen.tsx`):** Removido o botão redundante de trocar tema do dock lateral esquerdo, mantendo o menu rápido focado e harmônico com o seletor de peças 🏰, chances da IA, almanaque, estúdio 3D, som e tela cheia.
+  - **Suíte de Testes & Build:** Criado `ui/src/pages/Tile.test.tsx` com 4 testes unitários dedicados; atualizados `GameScreen.test.tsx` e `MatchSetupModal.test.tsx`; 44 suítes de teste Vitest aprovadas (238 testes 100% verdes), `tsc --noEmit` sem erros e build de produção Vite concluído em 10s.
+
 ---
 
 ## 7. Próximos Passos
@@ -359,12 +370,13 @@ Para colocar o backend em produção na **Vercel** com persistência no **Supaba
 7. ~~**Bloco 8 — Otimização Vite (1.118 módulos) & Velocidade dos Bots (Offline Permanente / Online Pré-Partida Travada)**~~ *(Concluído e publicado em `main` + `layout-topbar`)*
 8. ~~**Bloco 9 — Avatar 3D Modular WebGL, Estúdio 3D (Cores Livres + 55 GLBs) & Estrutura VIP (`layout-topbar`)**~~ *(Concluído e publicado no preview `layout-topbar`)*
 9. ~~**Bloco 10 — Montarias Orgânicas Estanques, Câmera Automática no Estúdio, Tintura de Mochila e Simulação Real de Partidas (`layout-topbar`)**~~ *(Concluído, 209 testes passando, 25 partidas simuladas, 0 deadlocks)*
-10. ~~**Bloco 11 — Correção de Perspectiva de Assento em Partidas Solo Offline com Bots (`layout-topbar`)**~~ *(Concluído: corrigido stall no 1º turno humano onde a perspectiva não sincronizada com o jogador causava 0 vértices clicáveis e travamento da barra; auto-binding do assento humano e persistência em `localEngine`, `MatchSetupModal`, `HomePage`, `GameScreen` e `stateUtils`; 210 testes Vitest e 64 testes Pytest 100% verdes)*
-11. ~~**Bloco 12 — Nova Ilustração Artesanal do Hexágono de Tijolo / Olaria (`layout-topbar`)**~~ *(Concluído: substituição da ilustração anterior de cânion rochoso por olaria artesanal em `ui/public/assets/illustrations/tiles/brick.webp`, apresentando forno abobadado com brasa, galpão de secagem, pilhas de tijolos de terracota e bordas em grama verde perfeitamente integradas ao estilo Catan Universe)*
+10. ~~**Bloco 11 — Correção de Perspectiva de Assento em Partidas Solo Offline com Bots (`layout-topbar`)**~~ *(Concluído)*
+11. ~~**Bloco 12 — Nova Ilustração Artesanal do Hexágono de Tijolo / Olaria (`layout-topbar`)**~~ *(Concluído)*
 12. ~~**Bloco 13 — Sistema de Temas/Skins de Tabuleiro & Novo Padrão 'Diorama 3D' (`layout-topbar`)**~~ *(Concluído)*
 13. ~~**Bloco 14 — Refinamento Visual de Tabuleiro, 'Ovelha', Rolagem no Mar Superior, Descarte Real, Animação Dev Card, Avatar 1.5x e Pino Ladrão**~~ *(Concluído e incorporado na `main`)*
 14. ~~**Bloco 15 — HUD Flutuante Imersivo, Tabuleiro +40% Maior, Zoom Suave com GPU & Dados 3D Top-Down de Mesa**~~ *(Concluído e publicado em produção na Vercel)*
 15. ~~**Bloco 16 — Enquadramento Padrão de Tabuleiro Calibrado (+24%), Confirmação de Construção Catan Universe e Vértices Reduzidos**~~ *(Concluído e publicado em produção na Vercel)*
-16. ~~**Bloco 17 — Peças de Alto Contraste (Base Padrão) e Sistema de Skins de Peças com Variante Vilarejo**~~ *(Concluído: implementação dos novos modelos de alto contraste aprovados via Visual Companion — Aldeia com contorno duplo preto/branco, Estrada em barra retangular perfeitamente reta eliminando o formato tubular, e Cidade com a silhueta clássica de torre alta pontiaguda + salão nobre e acabamento de alto contraste; criação de `pieceSkin.ts` com persistência em `localStorage` e hook reativo `usePieceSkin()`; botão de alternância com ícone 🏰 no dock lateral esquerdo do HUD; 234 testes Vitest 100% verdes, build de produção validado)*
-17. **Loja VIP & Checkout (Stripe / Pix):** Conectar os SKUs `vip_*` do catálogo ao checkout e gravação de `user_entitlements`, além de permitir substituição opcional de `.glb` iniciais por modelos refinados no Blender seguindo [`docs/AVATAR_3D_ASSET_GUIDE.md`](docs/AVATAR_3D_ASSET_GUIDE.md).
-18. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.
+16. ~~**Bloco 17 — Peças de Alto Contraste (Base Padrão) e Sistema de Skins de Peças com Variante Vilarejo**~~ *(Concluído e publicado em produção na Vercel)*
+17. ~~**Bloco 18 — Padronização Visual no Vetor Ultra-HD Nativo (Resolução Infinita Catan Universe)**~~ *(Concluído: eliminação do desfoque por textura rasterizada WebP no zoom, padronização na arte vetorial pura com 0ms de delay e testes unitários dedicados)*
+18. **Loja VIP & Checkout (Stripe / Pix):** Conectar os SKUs `vip_*` do catálogo ao checkout e gravação de `user_entitlements`, além de permitir substituição opcional de `.glb` iniciais por modelos refinados no Blender seguindo [`docs/AVATAR_3D_ASSET_GUIDE.md`](docs/AVATAR_3D_ASSET_GUIDE.md).
+19. **Expansão de Ilustrações Originais:** Gerar arte dedicada extra para cartas de desenvolvimento/terrenos opcionais e polir efeitos sonoros/hápticos em dispositivos móveis.

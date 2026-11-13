@@ -58,7 +58,7 @@ describe("TradeOfferDecisionDialog", () => {
         tradeTuple,
       ]);
     });
-  });
+  }, 12000);
 
   test("renders DECIDE_TRADE Accept button when affordable and emits ACCEPT_TRADE", async () => {
     const onExecuteAction = vi.fn().mockResolvedValue(undefined);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import cn from "classnames";
 
 import "./Tile.scss";
@@ -8,9 +8,8 @@ import {
   type ResourceCard,
   type Tile as TileData,
 } from "../utils/api.types";
-import { getDesertMeta, getResourceMeta } from "../config/assetRegistry";
+import { getResourceMeta } from "../config/assetRegistry";
 import { useLanguage } from "../i18n";
-import { useBoardSkin, getTileIllustrationUrl } from "../utils/boardSkin";
 import {
   HarborPortSvg,
   ResourceIcon,
@@ -210,14 +209,6 @@ export default function Tile({
   hasRobber = false,
 }: TileProps) {
   const { language, t } = useLanguage();
-  const { skin } = useBoardSkin();
-  const [customImgLoaded, setCustomImgLoaded] = useState(false);
-  const [extIndex, setExtIndex] = useState(0);
-
-  useEffect(() => {
-    setExtIndex(0);
-    setCustomImgLoaded(false);
-  }, [skin]);
 
   const w = SQRT3 * size;
   const h = 2 * size;
@@ -226,38 +217,8 @@ export default function Tile({
 
   const isLand = tile.type === "RESOURCE_TILE" || tile.type === "DESERT";
   const resourceMetaMap = getResourceMeta(language);
-  const desertMeta = getDesertMeta(language);
   const resourceMeta =
     tile.type === "RESOURCE_TILE" ? resourceMetaMap[tile.resource] : null;
-
-  const terrainKey =
-    tile.type === "RESOURCE_TILE"
-      ? tile.resource
-      : tile.type === "DESERT"
-        ? "DESERT"
-        : null;
-
-  const themedIllustrationUrl = terrainKey
-    ? getTileIllustrationUrl(terrainKey, skin)
-    : undefined;
-
-  const defaultIllustrationUrl =
-    tile.type === "RESOURCE_TILE"
-      ? resourceMeta?.customTileIllustration
-      : tile.type === "DESERT"
-        ? desertMeta.customTileIllustration
-        : undefined;
-
-  const candidateUrls = themedIllustrationUrl
-    ? [
-        themedIllustrationUrl,
-        defaultIllustrationUrl,
-        themedIllustrationUrl.replace(/\.webp$/i, ".png"),
-        themedIllustrationUrl.replace(/\.webp$/i, ".jpg"),
-      ].filter((v, idx, arr): v is string => Boolean(v) && arr.indexOf(v) === idx)
-    : [];
-  const activeCustomUrl =
-    extIndex < candidateUrls.length ? candidateUrls[extIndex] : undefined;
 
   return (
     <div
@@ -297,29 +258,12 @@ export default function Tile({
 
       {isLand && (
         <div className="tile__hex-surface">
-          {/* Rich Catan Universe style vector landscape */}
+          {/* Native Ultra-HD Vector Catan Universe Terrain (Infinite Resolution at any zoom level) */}
           <div className="tile__artwork">
             <TerrainHexIllustration
               terrain={tile.type === "RESOURCE_TILE" ? tile.resource : "DESERT"}
             />
           </div>
-
-          {/* Optional Nano Banana Pro high-res illustration overlay */}
-          {activeCustomUrl && (
-            <img
-              src={activeCustomUrl}
-              alt=""
-              className={cn("tile__custom-illustration", {
-                "tile__custom-illustration--loaded": customImgLoaded,
-              })}
-              onLoad={() => setCustomImgLoaded(true)}
-              onError={() => {
-                setCustomImgLoaded(false);
-                setExtIndex((prev) => prev + 1);
-              }}
-              draggable={false}
-            />
-          )}
 
           {/* Sandy Beach Shoreline & Inner Frame Overlay */}
           <svg

@@ -43,7 +43,7 @@ import { localizeGuestDisplayName } from "../../config/avatarCatalog";
 import { useLanguage } from "../../i18n";
 import { getSavedGameSpeed, saveGameSpeed } from "../../utils/tabletopPacing";
 import { getSavedGameSeat, saveGameSeat } from "../../utils/seatStorage";
-import { useBoardSkin } from "../../utils/boardSkin";
+import { usePieceSkin } from "../../utils/pieceSkin";
 import type { Color } from "../../utils/api.types";
 import PlayerAvatar from "../PlayerAvatar";
 import MapTemplatePreview from "./MapTemplatePreview";
@@ -115,7 +115,7 @@ export default function MatchSetupModal({
   const [seats, setSeats] = useState<SeatSelection[]>(() =>
     defaultSeatsForMode(mode)
   );
-  const { skin: boardSkin, changeSkin: setBoardSkin } = useBoardSkin();
+  const { skin: pieceSkin, setSkin: setPieceSkin } = usePieceSkin();
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -680,11 +680,11 @@ export default function MatchSetupModal({
         <div className="match-setup-group">
           <div className="match-setup-group__header">
             <span className="match-setup-inline-title">
-              {t("Estilo do Tabuleiro", "Board Style")}
+              {t("Estilo das Peças", "Piece Style")}
               <Tooltip
                 title={t(
-                  "Escolha entre o Diorama 3D (novo padrão com relevo e alta legibilidade) ou Pintura Clássica (ilustrações artísticas anteriores).",
-                  "Choose between 3D Diorama (new default with relief & high readability) or Classic Painted (previous artistic illustrations)."
+                  "Escolha entre o visual oficial de Alto Contraste (máxima legibilidade de aldeias, cidades e estradas) ou Vilarejo Detalhado.",
+                  "Choose between official High Contrast (maximum legibility for settlements, cities, and roads) or Detailed Cottage."
                 )}
                 arrow
                 enterTouchDelay={0}
@@ -694,8 +694,8 @@ export default function MatchSetupModal({
                   size="small"
                   className="match-setup-help-btn"
                   aria-label={t(
-                    "Ajuda sobre Estilo do Tabuleiro",
-                    "Help about Board Style"
+                    "Ajuda sobre Estilo das Peças",
+                    "Help about Piece Style"
                   )}
                 >
                   <HelpOutlineRoundedIcon fontSize="inherit" />
@@ -703,35 +703,35 @@ export default function MatchSetupModal({
               </Tooltip>
             </span>
             <strong>
-              {boardSkin === "diorama"
-                ? t("Diorama 3D (Padrão)", "3D Diorama (Default)")
-                : t("Pintura Clássica (Variante)", "Classic Painted (Variant)")}
+              {pieceSkin === "contrast"
+                ? t("Alto Contraste (Padrão)", "High Contrast (Default)")
+                : t("Vilarejo Detalhado (Variante)", "Detailed Cottage (Variant)")}
             </strong>
           </div>
           <div
             className="match-setup-dice-options"
             role="group"
-            aria-label={t("Estilo do Tabuleiro", "Board Style")}
+            aria-label={t("Estilo das Peças", "Piece Style")}
           >
             <Button
               variant="contained"
-              aria-pressed={boardSkin === "diorama"}
-              onClick={() => setBoardSkin("diorama")}
+              aria-pressed={pieceSkin === "contrast"}
+              onClick={() => setPieceSkin("contrast")}
               className={`match-setup-choice-btn match-setup-skin-btn ${
-                boardSkin === "diorama" ? "selected" : ""
+                pieceSkin === "contrast" ? "selected" : ""
               }`}
             >
-              🗺️ {t("Diorama 3D (Padrão)", "3D Diorama (Default)")}
+              🏰 {t("Alto Contraste (Padrão)", "High Contrast (Default)")}
             </Button>
             <Button
               variant="contained"
-              aria-pressed={boardSkin === "classic"}
-              onClick={() => setBoardSkin("classic")}
+              aria-pressed={pieceSkin === "cottage"}
+              onClick={() => setPieceSkin("cottage")}
               className={`match-setup-choice-btn match-setup-skin-btn ${
-                boardSkin === "classic" ? "selected" : ""
+                pieceSkin === "cottage" ? "selected" : ""
               }`}
             >
-              🎨 {t("Pintura Clássica (Variante)", "Classic Painted (Variant)")}
+              🏡 {t("Vilarejo Detalhado (Variante)", "Detailed Cottage (Variant)")}
             </Button>
           </div>
         </div>

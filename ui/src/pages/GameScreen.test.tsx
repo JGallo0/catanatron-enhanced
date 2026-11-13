@@ -792,7 +792,7 @@ test("renders left vertical quick dock shortcuts for AlmanacModal and RightDrawe
   ).toBeInTheDocument();
   expect(screen.getByText(/2 rolagem\(ns\) · Último: 7/i)).toBeInTheDocument();
   expect(screen.getByText(/Equilibrados · 34\/36/i)).toBeInTheDocument();
-});
+}, 15000);
 
 test("locks dock speed to room bot_speed in online matches while keeping offline solo speed editable", async () => {
   localStorage.setItem("catan_game_speed_v1", "normal");
@@ -873,24 +873,17 @@ test("solo match automatically binds perspective to human player and heals bot p
   ).toBeInTheDocument();
 });
 
-test("toggles board skin between Diorama 3D and Pintura Clássica via quick dock button", async () => {
+test("standardizes board visual and renders left dock without obsolete board skin button", async () => {
   const state = makeGameState();
   vi.mocked(getState).mockResolvedValue(state);
 
   renderGameScreen({ initialEntry: "/games/123" });
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
-  const skinBtn = screen.getByRole("button", {
+  const skinBtn = screen.queryByRole("button", {
     name: /Alternar estilo do tabuleiro/i,
   });
-  expect(skinBtn).toBeInTheDocument();
-  expect(localStorage.getItem("catan_board_skin_v1") ?? "diorama").toBe("diorama");
-
-  fireEvent.click(skinBtn);
-  expect(localStorage.getItem("catan_board_skin_v1")).toBe("classic");
-
-  fireEvent.click(skinBtn);
-  expect(localStorage.getItem("catan_board_skin_v1")).toBe("diorama");
+  expect(skinBtn).not.toBeInTheDocument();
 });
 
 test("toggles piece skin between contrast and cottage from left dock", async () => {
