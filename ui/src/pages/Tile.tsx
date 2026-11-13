@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import cn from "classnames";
 
 import "./Tile.scss";
@@ -10,6 +10,7 @@ import {
 } from "../utils/api.types";
 import { getDesertMeta, getResourceMeta } from "../config/assetRegistry";
 import { useLanguage } from "../i18n";
+import { useBoardSkin, getTileIllustrationUrl } from "../utils/boardSkin";
 import {
   HarborPortSvg,
   ResourceIcon,
@@ -209,8 +210,14 @@ export default function Tile({
   hasRobber = false,
 }: TileProps) {
   const { language, t } = useLanguage();
+  const { skin } = useBoardSkin();
   const [customImgLoaded, setCustomImgLoaded] = useState(false);
   const [extIndex, setExtIndex] = useState(0);
+
+  useEffect(() => {
+    setExtIndex(0);
+    setCustomImgLoaded(false);
+  }, [skin]);
 
   const w = SQRT3 * size;
   const h = 2 * size;
@@ -223,23 +230,31 @@ export default function Tile({
   const resourceMeta =
     tile.type === "RESOURCE_TILE" ? resourceMetaMap[tile.resource] : null;
 
-  const customIllustrationUrl =
+  const terrainKey =
+    tile.type === "RESOURCE_TILE"
+      ? tile.resource
+      : tile.type === "DESERT"
+        ? "DESERT"
+        : null;
+
+  const themedIllustrationUrl = terrainKey
+    ? getTileIllustrationUrl(terrainKey, skin)
+    : undefined;
+
+  const defaultIllustrationUrl =
     tile.type === "RESOURCE_TILE"
       ? resourceMeta?.customTileIllustration
       : tile.type === "DESERT"
         ? desertMeta.customTileIllustration
         : undefined;
 
-  const baseWithoutExt = customIllustrationUrl
-    ? customIllustrationUrl.replace(/\.(webp|png|jpg|jpeg)$/i, "")
-    : "";
-  const candidateUrls = customIllustrationUrl
+  const candidateUrls = themedIllustrationUrl
     ? [
-        customIllustrationUrl,
-        `${baseWithoutExt}.webp`,
-        `${baseWithoutExt}.png`,
-        `${baseWithoutExt}.jpg`,
-      ].filter((v, idx, arr) => arr.indexOf(v) === idx)
+        themedIllustrationUrl,
+        defaultIllustrationUrl,
+        themedIllustrationUrl.replace(/\.webp$/i, ".png"),
+        themedIllustrationUrl.replace(/\.webp$/i, ".jpg"),
+      ].filter((v, idx, arr): v is string => Boolean(v) && arr.indexOf(v) === idx)
     : [];
   const activeCustomUrl =
     extIndex < candidateUrls.length ? candidateUrls[extIndex] : undefined;

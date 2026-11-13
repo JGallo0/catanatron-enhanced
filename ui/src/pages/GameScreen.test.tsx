@@ -872,3 +872,23 @@ test("solo match automatically binds perspective to human player and heals bot p
     screen.getByText(/Fase Inicial — Explorador da ilha: Escolha um vértice para fundar sua Aldeia/i)
   ).toBeInTheDocument();
 });
+
+test("toggles board skin between Diorama 3D and Pintura Clássica via quick dock button", async () => {
+  const state = makeGameState();
+  vi.mocked(getState).mockResolvedValue(state);
+
+  renderGameScreen({ initialEntry: "/games/123" });
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  const skinBtn = screen.getByRole("button", {
+    name: /Alternar estilo do tabuleiro/i,
+  });
+  expect(skinBtn).toBeInTheDocument();
+  expect(localStorage.getItem("catan_board_skin_v1") ?? "diorama").toBe("diorama");
+
+  fireEvent.click(skinBtn);
+  expect(localStorage.getItem("catan_board_skin_v1")).toBe("classic");
+
+  fireEvent.click(skinBtn);
+  expect(localStorage.getItem("catan_board_skin_v1")).toBe("diorama");
+});

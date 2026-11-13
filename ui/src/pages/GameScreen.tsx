@@ -104,6 +104,7 @@ import {
   getSavedGameSpeed,
   saveGameSpeed,
 } from "../utils/tabletopPacing";
+import { useBoardSkin } from "../utils/boardSkin";
 
 const VALID_COLORS = new Set<Color>(["RED", "BLUE", "ORANGE", "WHITE"]);
 
@@ -227,6 +228,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [activeTaunts, setActiveTaunts] = useState<
     Partial<Record<Color, ActivePortraitTaunt>>
   >({});
+  const { skin: boardSkin, toggle: toggleBoardSkin } = useBoardSkin();
 
   const prevStateRef = useRef<GameState | null>(null);
   const prevStateIndexRef = useRef<number | null>(null);
@@ -1524,6 +1526,33 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           title={t("Abrir Almanaque & Regras", "Open Almanac & Rules")}
         >
           <span className="game-left-dock__icon" aria-hidden="true">📖</span>
+        </button>
+
+        <button
+          type="button"
+          className={cn("game-left-dock__btn", {
+            "is-variant": boardSkin === "classic",
+          })}
+          onClick={() => {
+            const next = toggleBoardSkin();
+            enqueueSnackbar(
+              t(
+                `Estilo do Tabuleiro: ${next === "diorama" ? "Diorama 3D (Padrão)" : "Pintura Clássica (Variante)"}`,
+                `Board Style: ${next === "diorama" ? "3D Diorama (Default)" : "Classic Painted (Variant)"}`
+              ),
+              { variant: "info", autoHideDuration: 2200 }
+            );
+          }}
+          title={t(
+            `Estilo do Tabuleiro: ${boardSkin === "diorama" ? "Diorama 3D (Padrão)" : "Pintura Clássica (Variante)"}. Clique para alternar`,
+            `Board Style: ${boardSkin === "diorama" ? "3D Diorama (Default)" : "Classic Painted (Variant)"}. Click to switch`
+          )}
+          aria-label={t("Alternar estilo do tabuleiro", "Switch board style")}
+        >
+          <span className="game-left-dock__icon" aria-hidden="true">🗺️</span>
+          <span className="game-left-dock__tag">
+            {boardSkin === "diorama" ? "3D" : "Clas"}
+          </span>
         </button>
 
         <button

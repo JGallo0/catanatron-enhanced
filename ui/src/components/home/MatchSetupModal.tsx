@@ -43,6 +43,7 @@ import { localizeGuestDisplayName } from "../../config/avatarCatalog";
 import { useLanguage } from "../../i18n";
 import { getSavedGameSpeed, saveGameSpeed } from "../../utils/tabletopPacing";
 import { getSavedGameSeat, saveGameSeat } from "../../utils/seatStorage";
+import { useBoardSkin } from "../../utils/boardSkin";
 import type { Color } from "../../utils/api.types";
 import PlayerAvatar from "../PlayerAvatar";
 import MapTemplatePreview from "./MapTemplatePreview";
@@ -114,6 +115,7 @@ export default function MatchSetupModal({
   const [seats, setSeats] = useState<SeatSelection[]>(() =>
     defaultSeatsForMode(mode)
   );
+  const { skin: boardSkin, changeSkin: setBoardSkin } = useBoardSkin();
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -672,6 +674,65 @@ export default function MatchSetupModal({
                 {opt.icon} {opt.label}
               </Button>
             ))}
+          </div>
+        </div>
+
+        <div className="match-setup-group">
+          <div className="match-setup-group__header">
+            <span className="match-setup-inline-title">
+              {t("Estilo do Tabuleiro", "Board Style")}
+              <Tooltip
+                title={t(
+                  "Escolha entre o Diorama 3D (novo padrão com relevo e alta legibilidade) ou Pintura Clássica (ilustrações artísticas anteriores).",
+                  "Choose between 3D Diorama (new default with relief & high readability) or Classic Painted (previous artistic illustrations)."
+                )}
+                arrow
+                enterTouchDelay={0}
+                leaveTouchDelay={3000}
+              >
+                <IconButton
+                  size="small"
+                  className="match-setup-help-btn"
+                  aria-label={t(
+                    "Ajuda sobre Estilo do Tabuleiro",
+                    "Help about Board Style"
+                  )}
+                >
+                  <HelpOutlineRoundedIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+            </span>
+            <strong>
+              {boardSkin === "diorama"
+                ? t("Diorama 3D (Padrão)", "3D Diorama (Default)")
+                : t("Pintura Clássica (Variante)", "Classic Painted (Variant)")}
+            </strong>
+          </div>
+          <div
+            className="match-setup-dice-options"
+            role="group"
+            aria-label={t("Estilo do Tabuleiro", "Board Style")}
+          >
+            <Button
+              variant="contained"
+              aria-pressed={boardSkin === "diorama"}
+              onClick={() => setBoardSkin("diorama")}
+              className={`match-setup-choice-btn match-setup-skin-btn ${
+                boardSkin === "diorama" ? "selected" : ""
+              }`}
+            >
+              🗺️ {t("Diorama 3D (Padrão)", "3D Diorama (Default)")}
+            </Button>
+            <Button
+              variant="contained"
+              aria-pressed={boardSkin === "classic"}
+              onClick={() => setBoardSkin("classic")}
+              className={`match-setup-choice-btn match-setup-skin-btn ${
+                boardSkin === "classic" ? "selected" : ""
+              }`}
+            >
+              🎨 {t("Pintura Clássica (Variante)", "Classic Painted (Variant)")}
+            </Button>
           </div>
         </div>
 
