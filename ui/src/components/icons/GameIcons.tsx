@@ -5,7 +5,6 @@ import type {
   ResourceCard,
   VictoryPointCard,
 } from "../../utils/api.types";
-import { PLAYER_COLOR_META } from "../../config/assetRegistry";
 
 /**
  * Rich Catan Universe (Steam) style SVG terrain landscapes for hex tiles.
@@ -940,55 +939,45 @@ type PiecePalette = {
 };
 
 function getPiecePalette(color: Color): PiecePalette {
-  if (color === "RED") {
-    return {
-      light: "#FFAAA8",
-      main: "#EF4444",
-      shade: "#DC2626",
-      deep: "#991B1B",
-      outline: "#450A0A",
-      trim: "#FEF08A",
-    };
+  switch (color) {
+    case "RED":
+      return {
+        light: "#FFAAA8",
+        main: "#EF4444",
+        shade: "#DC2626",
+        deep: "#991B1B",
+        outline: "#450A0A",
+        trim: "#FEF08A",
+      };
+    case "BLUE":
+      return {
+        light: "#BAE6FD",
+        main: "#2563EB",
+        shade: "#1D4ED8",
+        deep: "#1E3A8A",
+        outline: "#082F49",
+        trim: "#FEF08A",
+      };
+    case "ORANGE":
+      return {
+        light: "#FEF08A",
+        main: "#F59E0B",
+        shade: "#D97706",
+        deep: "#78350F",
+        outline: "#451A03",
+        trim: "#FFFFFF",
+      };
+    case "WHITE":
+    default:
+      return {
+        light: "#FFFFFF",
+        main: "#F8FAFC",
+        shade: "#CBD5E1",
+        deep: "#64748B",
+        outline: "#0F172A",
+        trim: "#F59E0B",
+      };
   }
-  if (color === "BLUE") {
-    return {
-      light: "#BAE6FD",
-      main: "#2563EB",
-      shade: "#1D4ED8",
-      deep: "#1E3A8A",
-      outline: "#082F49",
-      trim: "#FEF08A",
-    };
-  }
-  if (color === "ORANGE") {
-    return {
-      light: "#FEF08A",
-      main: "#F59E0B",
-      shade: "#D97706",
-      deep: "#78350F",
-      outline: "#451A03",
-      trim: "#FFFFFF",
-    };
-  }
-  if (color === "WHITE") {
-    return {
-      light: "#FFFFFF",
-      main: "#F8FAFC",
-      shade: "#CBD5E1",
-      deep: "#64748B",
-      outline: "#0F172A",
-      trim: "#F59E0B",
-    };
-  }
-  const base = PLAYER_COLOR_META[color];
-  return {
-    light: base.secondary,
-    main: base.primary,
-    shade: base.dark,
-    deep: "#18181B",
-    outline: "#09090B",
-    trim: "#FDE68A",
-  };
 }
 
 /**

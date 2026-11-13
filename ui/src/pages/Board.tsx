@@ -3,6 +3,8 @@ import classnames from "classnames";
 
 import { SQRT3 } from "../utils/coordinates";
 import type {
+  Building as BuildingType,
+  Color,
   GameAction,
   GameState,
   TileCoordinate,
@@ -68,7 +70,7 @@ type BoardProps = {
   pendingNodeId?: number | null;
   pendingEdgeId?: string | null;
   pendingColor?: Color | null;
-  pendingBuilding?: Building | null;
+  pendingBuilding?: BuildingType | null;
 };
 
 export default function Board({

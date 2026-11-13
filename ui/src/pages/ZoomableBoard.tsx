@@ -438,7 +438,7 @@ export default function ZoomableBoard({
                     : null
                 }
                 pendingColor={
-                  pendingPlacement ? (gameState.current_player as Color) : null
+                  pendingPlacement ? (gameState.current_color as Color) : null
                 }
                 pendingBuilding={
                   pendingPlacement?.kind === "node"
