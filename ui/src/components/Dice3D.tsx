@@ -46,18 +46,17 @@ const PIP_COORDS: Record<number, Array<[number, number]>> = {
 };
 
 /**
- * Cube rotations that bring face `1..6` cleanly to the top-facing position inside `.dice3d-tilt`
- * for a top-down perspective (visão superior / vista de cima).
+ * Cube rotations that bring face `1..6` cleanly to the TOP face of the cube (visão superior / vista de cima),
+ * matching real physical tabletop dice where the upward-facing surface is the rolled result.
  * Face mapping: 1=front, 2=bottom, 3=right, 4=left, 5=top, 6=back.
- * Corrected orientations: opposite faces sum to 7.
  */
 const TARGET_FACE_TRANSFORM: Record<number, string> = {
-  1: "rotateX(90deg) rotateY(180deg)",
-  2: "rotateX(0deg)",
-  3: "rotateY(90deg) rotateZ(90deg)",
-  4: "rotateY(-90deg) rotateZ(-90deg)",
-  5: "rotateY(180deg) rotateZ(180deg)",
-  6: "rotateX(90deg)",
+  1: "rotateX(90deg)",
+  2: "rotateX(180deg)",
+  3: "rotateZ(-90deg)",
+  4: "rotateZ(90deg)",
+  5: "rotateX(0deg)",
+  6: "rotateX(-90deg)",
 };
 
 const FACES: Array<{ faceValue: 1 | 2 | 3 | 4 | 5 | 6; modifier: string }> = [

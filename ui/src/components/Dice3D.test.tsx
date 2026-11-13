@@ -5,12 +5,12 @@ import Dice3D from "./Dice3D";
 describe("Dice3D", () => {
   test("renders correct transforms and labels for all faces 1 to 6 without face inversion", () => {
     const expectedTransforms: Record<number, string> = {
-      1: "rotateX(90deg) rotateY(180deg)",
-      2: "rotateX(0deg)",
-      3: "rotateY(90deg) rotateZ(90deg)",
-      4: "rotateY(-90deg) rotateZ(-90deg)",
-      5: "rotateY(180deg) rotateZ(180deg)",
-      6: "rotateX(90deg)",
+      1: "rotateX(90deg)",
+      2: "rotateX(180deg)",
+      3: "rotateZ(-90deg)",
+      4: "rotateZ(90deg)",
+      5: "rotateX(0deg)",
+      6: "rotateX(-90deg)",
     };
 
     for (let val = 1; val <= 6; val++) {
@@ -37,9 +37,9 @@ describe("Dice3D", () => {
 
     const cubes = container.querySelectorAll(".dice3d-cube");
     expect(cubes).toHaveLength(2);
-    // Die 1 (value 6) must have transform rotateX(90deg), not rotateX(90deg) rotateY(180deg)
-    expect((cubes[0] as HTMLElement).style.transform).toBe("rotateX(90deg)");
-    // Die 2 (value 5) must have transform rotateY(180deg) rotateZ(180deg), not rotateX(0deg)
-    expect((cubes[1] as HTMLElement).style.transform).toBe("rotateY(180deg) rotateZ(180deg)");
+    // Die 1 (value 6) must have transform rotateX(-90deg) bringing 6 to the TOP face
+    expect((cubes[0] as HTMLElement).style.transform).toBe("rotateX(-90deg)");
+    // Die 2 (value 5) must have transform rotateX(0deg) bringing 5 to the TOP face
+    expect((cubes[1] as HTMLElement).style.transform).toBe("rotateX(0deg)");
   });
 });
