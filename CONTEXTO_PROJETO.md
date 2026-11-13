@@ -313,6 +313,24 @@ Os retratos legados `.webp` herdados do Catan Universe foram completamente apose
     - Ajustado o ângulo de inclinação da câmera em [`Dice3D.scss`](ui/src/components/Dice3D.scss) de `56°` para **`24°`** (visão superior autêntica de mesa / *tabletop top-down*), onde a face de cima domina mais de 85% do dado com leitura imediata, com paredes laterais aparecendo apenas como relevo 3D sutil para dar sensação de volume e sombra física.
   - **Cobertura de Testes e Build:** Nova suíte dedicada [`Dice3D.test.tsx`](ui/src/components/Dice3D.test.tsx) testando e validando todas as 6 faces sem inversão, 34 testes unitários passando em Vitest (`Board`, `ZoomableBoard`, `GameScreen`, `Dice3D`, `DiscardPlannerDialog`, `boardSkin`), zero erros de TypeScript (`tsc --noEmit`) e build de produção Vite concluído com sucesso.
 
+- **Bloco 16 Concluído (main & Produção Vercel): Confirmação de Construção Estilo Catan Universe, Alto Contraste de Peças e Enquadramento Safe-Area ("All-in-View"):**
+  - **Confirmação Obrigatória em 2 Etapas Ativa por Padrão ([`ZoomableBoard.tsx`](ui/src/pages/ZoomableBoard.tsx)):**
+    - Corrigido o problema de jogadas irreversíveis com clique único acidental. `confirmPlacement` passa a ser ativo por padrão (`loadSavedConfirmPlacement() === true`).
+    - **Peça Fantasma Iluminada ("Provisional Ghost Piece" em [`Node.tsx`](ui/src/pages/Node.tsx) e [`Edge.tsx`](ui/src/pages/Edge.tsx)):** Ao selecionar um vértice ou aresta disponível, a peça (aldeia, cidade ou estrada) da cor do jogador é colocada provisoriamente no local com opacidade de 92%, anel/borda de pulso dourado suave (`@keyframes ghost-piece-pulse`) e retícula de encaixe.
+    - **Botão Catan Universe `[✔]` ([`Board.scss`](ui/src/pages/Board.scss)):** Criado o dock flutuante `.cu-placement-confirm-dock` na lateral direita com botão proeminente verde esmeralda (`#10b981` a `#047857`) com borda luminosa, ícone de checkmark grande e pulsação suave idêntico ao Catan Universe, acompanhado de botão de cancelamento circular `[✕]`.
+    - **Confirmação Flexível:** O jogador pode confirmar clicando no botão verde `[✔]` **ou** dando um segundo clique direto na própria peça fantasma no tabuleiro. Clicar em outro nó ou no `[✕]` cancela a jogada sem nenhum gasto.
+  - **Novo Modelo e Alto Contraste para Peças ([`GameIcons.tsx`](ui/src/components/icons/GameIcons.tsx)):**
+    - **Paleta Saturada e Vibrante (`getPiecePalette`):** Eliminados tons marrons escuros e bases de pedra lamacentas que se confundiam com os hexágonos de floresta e tijolo. Vermelho carmim puro, azul royal vívido, laranja âmbar reluzente e branco marfim nobre com detalhes dourados.
+    - **Aldeias (+25% em `SettlementSvgPiece`):** Casa clássica com telhado de 2 águas pontudo, chaminé em destaque, fachada frontal colorida e contorno duplo de 2.2px de alto contraste. Escala visual ampliada no nó (`size * 0.80`).
+    - **Cidades (+25% em `CitySvgPiece`):** Fortaleza imponente com duas torres, ameias (crenellations), estandarte no topo e contorno reforçado. Escala visual ampliada no nó (`size * 0.90`).
+    - **Estradas (+25% de espessura em `RoadSvgPiece`):** Viga chanfrada com 22px de altura (18px em mobile), deck iluminado, chanfros 3D e sulcos divisórios de alto contraste.
+    - **Sombra Projetada Tátil (`Board.scss`):** Filtro multi-ângulo `drop-shadow` que faz todas as peças saltarem fisicamente do mapa em qualquer um dos 5 biomas de terreno.
+  - **Enquadramento Seguro do Tabuleiro ("Safe-Area All-in-View" em [`Board.tsx`](ui/src/pages/Board.tsx)):**
+    - Corrigido o corte da ilha e dos portos ao iniciar a partida. O cálculo de tamanho passa a deduzir a área útil ocupada pela barra superior (~108px) e pelo console inferior (~128px): `availableCanvasHeight = canvasHeight - 236px`.
+    - Ajustado o fator de níveis de `7.0` para **`8.3`**, garantindo que todos os 19 hexágonos de terra e **todos os 9 navios de portos com suas placas 2:1 e 3:1 fiquem 100% visíveis** dentro da tela com 40px de respiro confortável no mar.
+    - Ponto central vertical (`center[1]`) calibrado no centro geométrico exato entre as duas barras flutuantes. O botão "Centralizar tabuleiro" da câmera restaura instantaneamente essa visão panorâmica completa.
+  - **Validação de Testes e Build:** 28 testes passando nas suítes principais de tela e tabuleiro (`Board`, `ZoomableBoard`, `GameScreen`), TypeScript sem erros (`tsc --noEmit`) e build de produção Vite concluído em 16s.
+
 ---
 
 ## 6. Guia de Variáveis de Ambiente (Vercel & Supabase Gratuito)
