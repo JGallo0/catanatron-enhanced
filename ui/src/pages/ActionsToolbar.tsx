@@ -128,9 +128,16 @@ export default function ActionsToolbar({
 
   const resolvedGameId = gameId ?? gameState.game?.id ?? "";
   const botsTurn = gameState.bot_colors.includes(gameState.current_color);
+  const isNativeBotPerspective = Boolean(
+    state.perspective &&
+      gameState.bot_colors.includes(state.perspective) &&
+      !gameState.taken_over_colors?.includes(state.perspective) &&
+      !gameState.seat_takeover?.[state.perspective]?.taken_over
+  );
   const isOtherHumansTurn =
     !botsTurn &&
     state.perspective !== null &&
+    !isNativeBotPerspective &&
     gameState.current_color !== state.perspective;
   const isInteractiveTurn =
     !(botsTurn || isOtherHumansTurn || gameState.winning_color) && !replayMode;

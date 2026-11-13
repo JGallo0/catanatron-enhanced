@@ -16,7 +16,7 @@ import {
   type PlayerAccount,
   type PlayerEntry,
 } from "../utils/apiClient";
-import { saveGameSeat } from "../utils/seatStorage";
+import { getSavedGameSeat, saveGameSeat } from "../utils/seatStorage";
 import type { Color, RoomState } from "../utils/api.types";
 import {
   getFrameLabel,
@@ -469,7 +469,9 @@ export default function HomePage() {
         account={account}
         onGameCreated={(gameId) => {
           setSetupMode(null);
-          navigate("/games/" + gameId);
+          const seat = getSavedGameSeat(gameId);
+          const query = seat ? `?seat=${seat}` : "";
+          navigate(`/games/${gameId}${query}`);
         }}
         onRoomCreated={(roomCode) => {
           setSetupMode(null);

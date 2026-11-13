@@ -74,7 +74,7 @@ import {
   useLanguage,
 } from "../i18n";
 import type { Color, GameMessage, GameState } from "../utils/api.types";
-import { getSavedGameSeat } from "../utils/seatStorage";
+import { getSavedGameSeat, saveGameSeat } from "../utils/seatStorage";
 import {
   isSoundMuted,
   setSoundMuted,
@@ -276,15 +276,26 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
   const mySeatColor: Color | null = useMemo(() => {
     if (!gs) return null;
+    const isNativeBot = (c: Color) =>
+      gs.bot_colors.includes(c) &&
+      !gs.taken_over_colors?.includes(c) &&
+      !gs.seat_takeover?.[c]?.taken_over;
+
     const urlSeat = searchParams.get("seat")?.toUpperCase() as Color | undefined;
-    if (urlSeat && VALID_COLORS.has(urlSeat) && gs.colors.includes(urlSeat)) {
+    if (urlSeat && VALID_COLORS.has(urlSeat) && gs.colors.includes(urlSeat) && !isNativeBot(urlSeat)) {
       return urlSeat;
     }
     const savedSeat = gameId ? getSavedGameSeat(gameId) : null;
-    if (savedSeat && VALID_COLORS.has(savedSeat) && gs.colors.includes(savedSeat)) {
+    if (savedSeat && VALID_COLORS.has(savedSeat) && gs.colors.includes(savedSeat) && !isNativeBot(savedSeat)) {
       return savedSeat;
     }
-    if (state.perspective && gs.colors.includes(state.perspective)) {
+    const activeHumans = gs.colors.filter((c) => !isNativeBot(c));
+    const takeoverColors = Object.keys(gs.seat_takeover || {}) as Color[];
+    const origHumanCount = new Set([...activeHumans, ...takeoverColors]).size;
+    if (!gs.room_code && origHumanCount <= 1 && activeHumans.length === 1) {
+      return activeHumans[0];
+    }
+    if (state.perspective && gs.colors.includes(state.perspective) && !isNativeBot(state.perspective)) {
       return state.perspective;
     }
     const acctUsername =
@@ -297,12 +308,6 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           gs.seat_takeover?.[c]?.original_username === acctUsername
       );
       if (matched) return matched;
-    }
-    const activeHumans = gs.colors.filter((c) => !gs.bot_colors.includes(c));
-    const takeoverColors = Object.keys(gs.seat_takeover || {}) as Color[];
-    const origHumanCount = new Set([...activeHumans, ...takeoverColors]).size;
-    if (!gs.room_code && origHumanCount < 2 && activeHumans.length === 1) {
-      return activeHumans[0];
     }
     return null;
   }, [gs, gameId, searchParams, state.perspective]);
@@ -478,21 +483,28 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     };
   }, []);
 
-  // Automatically apply seat perspective if ?seat=COLOR is in URL or saved from Room Lobby
+  // Automatically apply seat perspective if ?seat=COLOR is in URL, saved, or solo human
   useEffect(() => {
-    if (!gameId || replayMode) return;
+    if (!gameId || replayMode || !gs) return;
+    const isNativeBot = (c: Color) =>
+      gs.bot_colors.includes(c) &&
+      !gs.taken_over_colors?.includes(c) &&
+      !gs.seat_takeover?.[c]?.taken_over;
+
     const urlSeat = searchParams.get("seat")?.toUpperCase() as Color | undefined;
     const savedSeat = getSavedGameSeat(gameId);
-    const chosenSeat =
-      urlSeat && VALID_COLORS.has(urlSeat)
-        ? urlSeat
-        : savedSeat && VALID_COLORS.has(savedSeat)
-          ? savedSeat
-          : null;
+    const activeHumans = gs.colors.filter((c) => !isNativeBot(c));
+    const takeoverColors = Object.keys(gs.seat_takeover || {}) as Color[];
+    const origHumanCount = new Set([...activeHumans, ...takeoverColors]).size;
 
-    if (chosenSeat && state.perspective !== chosenSeat) {
-      dispatch({ type: ACTIONS.SET_PERSPECTIVE, data: chosenSeat });
-    } else if (!chosenSeat && !state.perspective && gs) {
+    let targetSeat: Color | null = null;
+    if (urlSeat && VALID_COLORS.has(urlSeat) && gs.colors.includes(urlSeat) && !isNativeBot(urlSeat)) {
+      targetSeat = urlSeat;
+    } else if (savedSeat && VALID_COLORS.has(savedSeat) && gs.colors.includes(savedSeat) && !isNativeBot(savedSeat)) {
+      targetSeat = savedSeat;
+    } else if (!gs.room_code && origHumanCount <= 1 && activeHumans.length === 1) {
+      targetSeat = activeHumans[0];
+    } else {
       const acctUsername =
         getSavedAccount?.()?.username ??
         getSavedAccountAvatarSummary()?.username;
@@ -502,12 +514,26 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             gs.seat_avatars?.[c]?.username === acctUsername ||
             gs.seat_takeover?.[c]?.original_username === acctUsername
         );
-        if (matched) {
-          dispatch({ type: ACTIONS.SET_PERSPECTIVE, data: matched });
-        }
+        if (matched) targetSeat = matched;
       }
     }
+
+    if (targetSeat) {
+      saveGameSeat(gameId, targetSeat);
+      if (state.perspective !== targetSeat) {
+        dispatch({ type: ACTIONS.SET_PERSPECTIVE, data: targetSeat });
+      }
+    } else if (state.perspective && isNativeBot(state.perspective)) {
+      const fallback = activeHumans[0] ?? null;
+      dispatch({ type: ACTIONS.SET_PERSPECTIVE, data: fallback });
+      if (fallback) saveGameSeat(gameId, fallback);
+    }
   }, [gameId, replayMode, searchParams, state.perspective, gs, dispatch]);
+
+  // Synchronize perspective to apiClient
+  useEffect(() => {
+    setPerspective(state.perspective);
+  }, [state.perspective]);
 
   // Load game state
   useEffect(() => {
@@ -515,12 +541,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       return;
     }
 
-    setPerspective(state.perspective);
     (async () => {
       const gameState = await getState(gameId, stateIndex as StateIndex);
       dispatch({ type: ACTIONS.SET_GAME_STATE, data: gameState });
     })();
-  }, [gameId, stateIndex, state.perspective, dispatch]);
+  }, [gameId, stateIndex, dispatch]);
 
   // Real-time multiplayer polling (700ms) when waiting on peer human, peer bot coordinator, or while taken over
   useEffect(() => {
@@ -1190,7 +1215,6 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     introActive,
     isTurnPauseActive,
     mySeatColor,
-    state.perspective,
     dispatch,
     enqueueSnackbar,
     closeSnackbar,

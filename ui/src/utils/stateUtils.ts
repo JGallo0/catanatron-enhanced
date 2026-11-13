@@ -11,7 +11,14 @@ export function isPlayersTurn(
   if (gameState.bot_colors.includes(gameState.current_color)) {
     return false;
   }
-  if (perspective) {
+  const isNativeBot =
+    Boolean(
+      perspective &&
+      gameState.bot_colors.includes(perspective) &&
+      !gameState.taken_over_colors?.includes(perspective) &&
+      !gameState.seat_takeover?.[perspective]?.taken_over
+    );
+  if (perspective && !isNativeBot) {
     return gameState.current_color === perspective;
   }
   return true;

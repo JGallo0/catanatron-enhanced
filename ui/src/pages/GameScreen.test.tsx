@@ -842,3 +842,33 @@ test("switches active match HUD, actions toolbar, and top bar cleanly to English
   fireEvent.click(screen.getByRole("button", { name: "PT" }));
   expect(screen.getByRole("button", { name: "ROLAR DADOS" })).toBeInTheDocument();
 });
+
+test("solo match automatically binds perspective to human player and heals bot perspective", async () => {
+  const soloState = makeGameState({
+    state_index: 2,
+    colors: ["ORANGE", "RED", "BLUE", "WHITE"],
+    bot_colors: ["ORANGE", "BLUE", "WHITE"],
+    current_color: "RED",
+    current_prompt: "BUILD_INITIAL_SETTLEMENT",
+    is_initial_build_phase: true,
+    seat_names: {
+      ORANGE: "Felire",
+      RED: "Explorador da ilha",
+      BLUE: "Creltu",
+      WHITE: "Gulri",
+    },
+    current_playable_actions: [["RED", "BUILD_SETTLEMENT", 12]],
+  });
+  vi.mocked(getState).mockResolvedValue(soloState);
+
+  // Render WITHOUT ?seat in url and without existing saved seat
+  renderGameScreen({ initialEntry: "/games/local-solo-test" });
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  await waitFor(() => {
+    expect(localStorage.getItem("catan_game_seat_local-solo-test")).toBe("RED");
+  });
+  expect(
+    screen.getByText(/Fase Inicial — Explorador da ilha: Escolha um vértice para fundar sua Aldeia/i)
+  ).toBeInTheDocument();
+});

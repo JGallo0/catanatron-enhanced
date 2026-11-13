@@ -32,6 +32,7 @@ import type {
 import type { MapTemplate, MCTSProbabilities, PlayerAccount } from "./apiClient";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { tr } from "../i18n";
+import { saveGameSeat } from "./seatStorage";
 import {
   DEFAULT_GUEST_DISPLAY_NAME,
   filterUnlockedAvatarConfig,
@@ -2950,6 +2951,19 @@ export function localCreateGame(options: {
   const map = loadGamesMap();
   map[gameId] = stored;
   saveGamesMap(map, { immediate: true });
+
+  const hostColor =
+    (typeof options.hostSeatIndex === "number" &&
+      rawPairs[options.hostSeatIndex]?.playerKey === "HUMAN" &&
+      rawPairs[options.hostSeatIndex]?.color) ||
+    (Object.values(resolvedSeatMeta).find((m) => m.seat_kind === "USER")?.color) ||
+    rawPairs.find((p) => p.playerKey === "HUMAN")?.color ||
+    null;
+
+  if (hostColor) {
+    saveGameSeat(gameId, hostColor);
+  }
+
   return gameId;
 }
 

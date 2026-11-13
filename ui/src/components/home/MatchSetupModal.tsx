@@ -42,6 +42,8 @@ import { getPlayerColorMeta } from "../../config/assetRegistry";
 import { localizeGuestDisplayName } from "../../config/avatarCatalog";
 import { useLanguage } from "../../i18n";
 import { getSavedGameSpeed, saveGameSpeed } from "../../utils/tabletopPacing";
+import { getSavedGameSeat, saveGameSeat } from "../../utils/seatStorage";
+import type { Color } from "../../utils/api.types";
 import PlayerAvatar from "../PlayerAvatar";
 import MapTemplatePreview from "./MapTemplatePreview";
 import "./MatchSetupModal.scss";
@@ -247,6 +249,17 @@ export default function MatchSetupModal({
           hostName: cleanName,
           hostSeatIndex: hostIdx,
         });
+        if (!getSavedGameSeat(gameId)) {
+          const defaultSeatColor: Color =
+            hostIdx === 0
+              ? "RED"
+              : hostIdx === 1
+                ? "BLUE"
+                : hostIdx === 2
+                  ? "ORANGE"
+                  : "WHITE";
+          saveGameSeat(gameId, defaultSeatColor);
+        }
         onGameCreated(gameId);
       } else {
         localStorage.setItem("catan_player_name", cleanName);
