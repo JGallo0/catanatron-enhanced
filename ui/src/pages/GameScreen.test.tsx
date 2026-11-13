@@ -893,6 +893,25 @@ test("toggles board skin between Diorama 3D and Pintura Clássica via quick dock
   expect(localStorage.getItem("catan_board_skin_v1")).toBe("diorama");
 });
 
+test("toggles piece skin between contrast and cottage from left dock", async () => {
+  vi.mocked(getState).mockResolvedValue(baseState);
+
+  renderGameScreen({ initialEntry: "/games/123" });
+
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+  const pieceSkinBtn = screen.getByRole("button", {
+    name: /Alternar estilo das peças/i,
+  });
+  expect(pieceSkinBtn).toBeInTheDocument();
+  expect(localStorage.getItem("catan_piece_skin_v1") ?? "contrast").toBe("contrast");
+
+  fireEvent.click(pieceSkinBtn);
+  expect(localStorage.getItem("catan_piece_skin_v1")).toBe("cottage");
+
+  fireEvent.click(pieceSkinBtn);
+  expect(localStorage.getItem("catan_piece_skin_v1")).toBe("contrast");
+});
+
 test("renders game-top-hud-container enclosing top hud and player top bar, with full-bleed board-container", async () => {
   vi.mocked(getState).mockResolvedValue(baseState);
 

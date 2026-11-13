@@ -9,8 +9,10 @@ import {
 } from "../utils/coordinates";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 import { RoadSvgPiece } from "../components/icons/GameIcons";
+import { usePieceSkin } from "../utils/pieceSkin";
 
 function Road({ color, isGhost = false }: { color: Color; isGhost?: boolean }) {
+  const { skin } = usePieceSkin();
   const palette = PLAYER_COLOR_META[color];
   return (
     <div
@@ -24,7 +26,7 @@ function Road({ color, isGhost = false }: { color: Color; isGhost?: boolean }) {
           : `drop-shadow(0 4px 6px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 8px ${palette.glow})`,
       }}
     >
-      <RoadSvgPiece color={color} className="road-piece__svg" />
+      <RoadSvgPiece color={color} className="road-piece__svg" skin={skin} />
     </div>
   );
 }

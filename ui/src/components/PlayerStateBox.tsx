@@ -12,6 +12,7 @@ import {
   SettlementSvgPiece,
 } from "./icons/GameIcons";
 import { RoadStatSvg, SwordStatSvg } from "./PlayerTopBar";
+import { usePieceSkin } from "../utils/pieceSkin";
 
 export default function PlayerStateBox({
   playerState,
@@ -29,6 +30,7 @@ export default function PlayerStateBox({
   customName?: string;
 }) {
   const { language, t } = useLanguage();
+  const { skin } = usePieceSkin();
   const actualVps =
     playerState[`${playerKey}_ACTUAL_VICTORY_POINTS`] ??
     playerState[`${playerKey}_VICTORY_POINTS`];
@@ -113,7 +115,7 @@ export default function PlayerStateBox({
             viewBox="-24 -30 48 52"
             aria-hidden="true"
           >
-            <SettlementSvgPiece color={color} scale={1.0} />
+            <SettlementSvgPiece color={color} scale={1.0} skin={skin} />
           </svg>
           <div className="player-piece-badge__text">
             <strong>{builtSettlements}/5</strong>
@@ -134,7 +136,7 @@ export default function PlayerStateBox({
             viewBox="-24 -30 48 52"
             aria-hidden="true"
           >
-            <CitySvgPiece color={color} scale={0.96} />
+            <CitySvgPiece color={color} scale={0.96} skin={skin} />
           </svg>
           <div className="player-piece-badge__text">
             <strong>{builtCities}/4</strong>
@@ -150,7 +152,7 @@ export default function PlayerStateBox({
           )}
         >
           <span className="player-piece-badge__road-svg" aria-hidden="true">
-            <RoadSvgPiece color={color} />
+            <RoadSvgPiece color={color} skin={skin} />
           </span>
           <div className="player-piece-badge__text">
             <strong>{builtRoads}/15</strong>

@@ -16,6 +16,7 @@ import {
   CitySvgPiece,
   SettlementSvgPiece,
 } from "../components/icons/GameIcons";
+import { usePieceSkin } from "../utils/pieceSkin";
 import { PLAYER_COLOR_META } from "../config/assetRegistry";
 
 type BuildingProps<T = Color | null> = {
@@ -26,6 +27,7 @@ type BuildingProps<T = Color | null> = {
 };
 
 function Building({ building, color, size, isGhost = false }: BuildingProps) {
+  const { skin } = usePieceSkin();
   if (!color) return null;
   const type = building === "CITY" ? "city" : "settlement";
   const label = PLAYER_COLOR_META[color]?.label || color;
@@ -49,9 +51,9 @@ function Building({ building, color, size, isGhost = false }: BuildingProps) {
         className="building-piece__svg"
       >
         {building === "CITY" ? (
-          <CitySvgPiece color={color} scale={1.22} />
+          <CitySvgPiece color={color} scale={1.22} skin={skin} />
         ) : (
-          <SettlementSvgPiece color={color} scale={1.24} />
+          <SettlementSvgPiece color={color} scale={1.24} skin={skin} />
         )}
       </svg>
     </div>

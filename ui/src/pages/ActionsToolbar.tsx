@@ -44,6 +44,7 @@ import {
   RoadSvgPiece,
   SettlementSvgPiece,
 } from "../components/icons/GameIcons";
+import { usePieceSkin } from "../utils/pieceSkin";
 import {
   getBuildingCosts,
   getDevCardMeta,
@@ -114,6 +115,7 @@ export default function ActionsToolbar({
   const [costsModalOpen, setCostsModalOpen] = useState(false);
   const [drawnDevCard, setDrawnDevCard] = useState<DevCardType | null>(null);
   const { isSubmitting, submitDiscardBatch } = useDiscardBatchSubmission();
+  const { skin: pieceSkin } = usePieceSkin();
 
   const {
     gameState,
@@ -599,7 +601,7 @@ export default function ActionsToolbar({
                     >
                       {humanColor ? (
                         <span className="cu-build-tile__road-svg" aria-hidden="true">
-                          <RoadSvgPiece color={humanColor} />
+                          <RoadSvgPiece color={humanColor} skin={pieceSkin} />
                         </span>
                       ) : (
                         <span className="cu-build-tile__piece cu-build-tile__piece--road" />
@@ -633,7 +635,7 @@ export default function ActionsToolbar({
                     >
                       {humanColor && (
                         <svg width="22" height="22" viewBox="-24 -30 48 52" aria-hidden="true">
-                          <SettlementSvgPiece color={humanColor} scale={0.95} />
+                          <SettlementSvgPiece color={humanColor} scale={0.95} skin={pieceSkin} />
                         </svg>
                       )}
                       <span className="cu-build-tile__name">
@@ -665,7 +667,7 @@ export default function ActionsToolbar({
                     >
                       {humanColor && (
                         <svg width="22" height="22" viewBox="-24 -30 48 52" aria-hidden="true">
-                          <CitySvgPiece color={humanColor} scale={0.88} />
+                          <CitySvgPiece color={humanColor} scale={0.88} skin={pieceSkin} />
                         </svg>
                       )}
                       <span className="cu-build-tile__name">

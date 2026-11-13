@@ -105,6 +105,7 @@ import {
   saveGameSpeed,
 } from "../utils/tabletopPacing";
 import { useBoardSkin } from "../utils/boardSkin";
+import { usePieceSkin } from "../utils/pieceSkin";
 
 const VALID_COLORS = new Set<Color>(["RED", "BLUE", "ORANGE", "WHITE"]);
 
@@ -229,6 +230,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     Partial<Record<Color, ActivePortraitTaunt>>
   >({});
   const { skin: boardSkin, toggle: toggleBoardSkin } = useBoardSkin();
+  const { skin: pieceSkin, toggle: togglePieceSkin } = usePieceSkin();
 
   const prevStateRef = useRef<GameState | null>(null);
   const prevStateIndexRef = useRef<number | null>(null);
@@ -1600,6 +1602,33 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           <span className="game-left-dock__icon" aria-hidden="true">🗺️</span>
           <span className="game-left-dock__tag">
             {boardSkin === "diorama" ? "3D" : "Clas"}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={cn("game-left-dock__btn", {
+            "is-variant": pieceSkin === "cottage",
+          })}
+          onClick={() => {
+            const next = togglePieceSkin();
+            enqueueSnackbar(
+              t(
+                `Estilo das Peças: ${next === "contrast" ? "Alto Contraste (Padrão)" : "Vilarejo Detalhado (Variante)"}`,
+                `Piece Style: ${next === "contrast" ? "High Contrast (Default)" : "Detailed Cottage (Variant)"}`
+              ),
+              { variant: "info", autoHideDuration: 2200 }
+            );
+          }}
+          title={t(
+            `Estilo das Peças: ${pieceSkin === "contrast" ? "Alto Contraste (Padrão)" : "Vilarejo Detalhado (Variante)"}. Clique para alternar`,
+            `Piece Style: ${pieceSkin === "contrast" ? "High Contrast (Default)" : "Detailed Cottage (Variant)"}. Click to switch`
+          )}
+          aria-label={t("Alternar estilo das peças", "Switch piece style")}
+        >
+          <span className="game-left-dock__icon" aria-hidden="true">🏰</span>
+          <span className="game-left-dock__tag">
+            {pieceSkin === "contrast" ? "Min" : "Det"}
           </span>
         </button>
 

@@ -5,6 +5,7 @@ import type {
   ResourceCard,
   VictoryPointCard,
 } from "../../utils/api.types";
+import { type PieceSkinId, getSavedPieceSkin } from "../../utils/pieceSkin";
 
 /**
  * Rich Catan Universe (Steam) style SVG terrain landscapes for hex tiles.
@@ -982,12 +983,47 @@ function getPiecePalette(color: Color): PiecePalette {
 
 /**
  * Artisanal Wooden & Half-Timbered Island Homestead SVG for Settlement (Aldeia)
+ * Supports 'contrast' (Default - high-contrast clean model) and 'cottage' (Variant - detailed cottage).
  */
 export const SettlementSvgPiece: React.FC<{
   color: Color;
   scale?: number;
-}> = ({ color, scale = 1 }) => {
+  skin?: PieceSkinId;
+}> = ({ color, scale = 1, skin }) => {
+  const activeSkin = skin ?? getSavedPieceSkin();
   const palette = getPiecePalette(color);
+
+  if (activeSkin !== "cottage") {
+    return (
+      <g transform={`scale(${scale})`}>
+        {/* Ground contact shadow */}
+        <ellipse cx="0" cy="14" rx="17" ry="5.5" fill="rgba(0, 0, 0, 0.78)" />
+        {/* High-contrast dual outline: outer black 2.6px */}
+        <path
+          d="M-14 13 L-14 0 L0 -13 L14 0 L14 13 Z"
+          fill="#000000"
+          stroke="#ffffff"
+          strokeWidth="2.6"
+          strokeLinejoin="round"
+        />
+        {/* Solid player color core */}
+        <path
+          d="M-11.5 11 L-11.5 1.5 L0 -9 L11.5 1.5 L11.5 11 Z"
+          fill={palette.main}
+        />
+        {/* Subtle sunlit roof ridge accent */}
+        <path
+          d="M-10 1.5 L0 -7.5 L10 1.5"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          opacity="0.85"
+        />
+      </g>
+    );
+  }
+
   const uid = useId().replace(/:/g, "");
   const wallGradId = `set-wall-${color}-${uid}`;
   const roofGradId = `set-roof-${color}-${uid}`;
@@ -1122,12 +1158,63 @@ export const SettlementSvgPiece: React.FC<{
 
 /**
  * Fortified Manor Keep & Citadel SVG for City (Cidade / Vila Fortificada)
+ * Supports 'contrast' (Default - stepped peaked tower + main hall with high-contrast dual border)
+ * and 'cottage' (Variant - spire keep and great hall).
  */
 export const CitySvgPiece: React.FC<{
   color: Color;
   scale?: number;
-}> = ({ color, scale = 1 }) => {
+  skin?: PieceSkinId;
+}> = ({ color, scale = 1, skin }) => {
+  const activeSkin = skin ?? getSavedPieceSkin();
   const palette = getPiecePalette(color);
+
+  if (activeSkin !== "cottage") {
+    return (
+      <g transform={`scale(${scale})`}>
+        {/* Ground contact shadow */}
+        <ellipse cx="0" cy="16" rx="22" ry="6.5" fill="rgba(0, 0, 0, 0.78)" />
+        {/* Stepped tower + peaked hall outer dual border */}
+        <path
+          d="M-19 15 L-19 -7 L-7 -19 L-7 1 L6 -9 L19 1 L19 15 Z"
+          fill="#000000"
+          stroke="#ffffff"
+          strokeWidth="2.8"
+          strokeLinejoin="round"
+        />
+        {/* Player color core */}
+        <path
+          d="M-16.5 12.5 L-16.5 -5.5 L-7 -16.5 L-7 2.5 L6 -6.5 L16.5 2.5 L16.5 12.5 Z"
+          fill={palette.main}
+        />
+        {/* Tower sunlit facet */}
+        <path
+          d="M-16.5 -5.5 L-7 -16.5 L-7 12.5 L-16.5 12.5 Z"
+          fill={palette.light}
+          opacity="0.35"
+        />
+        {/* White ridge and volume separator accents */}
+        <line
+          x1="-7"
+          y1="-16.5"
+          x2="-7"
+          y2="12.5"
+          stroke="#ffffff"
+          strokeWidth="1.6"
+          opacity="0.8"
+        />
+        <path
+          d="M-16.5 -5.5 L-7 -16.5 M-7 2.5 L6 -6.5 L16.5 2.5"
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          opacity="0.85"
+        />
+      </g>
+    );
+  }
+
   const uid = useId().replace(/:/g, "");
   const keepGradId = `city-keep-${color}-${uid}`;
   const hallGradId = `city-hall-${color}-${uid}`;
@@ -1300,12 +1387,63 @@ export const CitySvgPiece: React.FC<{
 
 /**
  * Carved Timber & Cobblestone Causeway SVG for Road (Estrada)
+ * Supports 'contrast' (Default - straight rectangular bar with dual border) and 'cottage' (Variant - beveled causeway).
  */
 export const RoadSvgPiece: React.FC<{
   color: Color;
   className?: string;
-}> = ({ color, className }) => {
+  skin?: PieceSkinId;
+}> = ({ color, className, skin }) => {
+  const activeSkin = skin ?? getSavedPieceSkin();
   const palette = getPiecePalette(color);
+
+  if (activeSkin !== "cottage") {
+    return (
+      <svg
+        viewBox="0 0 100 32"
+        width="100%"
+        height="100%"
+        preserveAspectRatio="none"
+        className={className}
+        aria-hidden="true"
+      >
+        {/* Ground shadow */}
+        <rect x="2" y="8" width="96" height="20" rx="3" fill="rgba(0, 0, 0, 0.78)" />
+        {/* Outer high-contrast dual border: black 2.6px + white stroke */}
+        <rect
+          x="3"
+          y="6"
+          width="94"
+          height="18"
+          rx="2"
+          fill="#000000"
+          stroke="#ffffff"
+          strokeWidth="2.6"
+        />
+        {/* Solid player color straight rectangular bar core */}
+        <rect
+          x="6"
+          y="8.5"
+          width="88"
+          height="13"
+          rx="1"
+          fill={palette.main}
+        />
+        {/* Clean specular center line */}
+        <line
+          x1="10"
+          y1="12"
+          x2="90"
+          y2="12"
+          stroke="#ffffff"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          opacity="0.8"
+        />
+      </svg>
+    );
+  }
+
   const uid = useId().replace(/:/g, "");
   const topGradId = `road-top-${color}-${uid}`;
 
