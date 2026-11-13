@@ -16,6 +16,12 @@ const snackbar = vi.hoisted(() => ({
   closeSnackbar: vi.fn(),
 }));
 
+const zoomControls = vi.hoisted(() => ({
+  zoomIn: vi.fn(),
+  zoomOut: vi.fn(),
+  resetTransform: vi.fn(),
+}));
+
 vi.mock("../utils/apiClient", () => ({
   postAction: vi.fn(),
 }));
@@ -28,11 +34,7 @@ vi.mock("react-zoom-pan-pinch", () => ({
   TransformWrapper: ({ children }: { children: any }) => (
     <div>
       {typeof children === "function"
-        ? children({
-            zoomIn: vi.fn(),
-            zoomOut: vi.fn(),
-            resetTransform: vi.fn(),
-          })
+        ? children(zoomControls)
         : children}
     </div>
   ),
@@ -242,5 +244,41 @@ describe("ZoomableBoard robber victim selector", () => {
       })
     ).toHaveAttribute("aria-pressed", "true");
     secondMount.unmount();
+  });
+
+  test("ZoomableBoard provides smooth zoom controls and reset camera buttons", () => {
+    const gameState = makeGameState();
+
+    render(
+      <ThemeProvider theme={theme}>
+        <StateProvider>
+          <MemoryRouter initialEntries={["/games/game-123"]}>
+            <Routes>
+              <Route
+                path="/games/:gameId"
+                element={<SeedState gameState={gameState} />}
+              />
+            </Routes>
+          </MemoryRouter>
+        </StateProvider>
+      </ThemeProvider>
+    );
+
+    const zoomInBtn = screen.getByLabelText(/Zoom \+/i);
+    const zoomOutBtn = screen.getByLabelText(/Zoom -/i);
+    const resetBtn = screen.getByLabelText(/Centralizar tabuleiro/i);
+
+    expect(zoomInBtn).toBeInTheDocument();
+    expect(zoomOutBtn).toBeInTheDocument();
+    expect(resetBtn).toBeInTheDocument();
+
+    fireEvent.click(zoomInBtn);
+    expect(zoomControls.zoomIn).toHaveBeenCalledWith(0.25, 220, "easeOutCubic");
+
+    fireEvent.click(zoomOutBtn);
+    expect(zoomControls.zoomOut).toHaveBeenCalledWith(0.25, 220, "easeOutCubic");
+
+    fireEvent.click(resetBtn);
+    expect(zoomControls.resetTransform).toHaveBeenCalledWith(250, "easeOutCubic");
   });
 });

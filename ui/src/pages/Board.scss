@@ -47,10 +47,12 @@
   pointer-events: none;
   z-index: 0;
   filter: drop-shadow(0 0 42px rgba(20, 184, 166, 0.22));
+  will-change: transform;
 }
 
 .board__surf-ring {
   transform-origin: 300px 300px;
+  will-change: transform;
 
   &--inner {
     animation: board-surf-breathe 11s ease-in-out infinite alternate;

@@ -324,12 +324,16 @@ export default function ZoomableBoard({
     <>
       <TransformWrapper
         initialScale={1}
-        minScale={0.55}
-        maxScale={2.4}
+        minScale={0.65}
+        maxScale={2.5}
         centerOnInit={true}
-        limitToBounds={false}
-        wheel={{ step: 0.08 }}
+        limitToBounds={true}
+        smooth={true}
+        wheel={{ step: 0.05, smoothStep: 0.002 }}
+        pinch={{ step: 5 }}
+        doubleClick={{ disabled: true }}
         panning={{
+          velocityDisabled: false,
           excluded: [
             "node--buildable",
             "edge--buildable",
@@ -347,7 +351,7 @@ export default function ZoomableBoard({
               <button
                 type="button"
                 className="camera-btn"
-                onClick={() => zoomIn()}
+                onClick={() => zoomIn(0.25, 220, "easeOutCubic")}
                 title={t("Aproximar (Zoom +)", "Zoom +")}
                 aria-label={t("Zoom +", "Zoom +")}
               >
@@ -356,7 +360,7 @@ export default function ZoomableBoard({
               <button
                 type="button"
                 className="camera-btn"
-                onClick={() => zoomOut()}
+                onClick={() => zoomOut(0.25, 220, "easeOutCubic")}
                 title={t("Afastar (Zoom -)", "Zoom -")}
                 aria-label={t("Zoom -", "Zoom -")}
               >
@@ -365,7 +369,7 @@ export default function ZoomableBoard({
               <button
                 type="button"
                 className="camera-btn"
-                onClick={() => resetTransform()}
+                onClick={() => resetTransform(250, "easeOutCubic")}
                 title={t("Centralizar tabuleiro", "Center board")}
                 aria-label={t("Centralizar tabuleiro", "Center board")}
               >
