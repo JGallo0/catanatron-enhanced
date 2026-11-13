@@ -18,7 +18,7 @@ import "./Board.scss";
  * Computes optimal hex size based on available canvas dimensions.
  */
 function computeDefaultSize(divWidth: number, divHeight: number): number {
-  const numLevels = 7.0; // 3 land rings + outer illustrated harbor ring + ocean clearance
+  const numLevels = 8.3; // 3 land rings + outer illustrated harbor ring + ocean clearance
   const maxSizeThatRespectsHeight = (4 * divHeight) / (3 * numLevels + 1) / 2;
   const correspondingWidth = SQRT3 * maxSizeThatRespectsHeight;
   if (numLevels * correspondingWidth < divWidth) {
@@ -100,25 +100,33 @@ export default function Board({
     containerHeight > 0;
   const fallbackCanvasWidth = Math.max(280, width - leftSidebarWidth);
 
-  // In floating HUD mode, top and bottom bars float over the sea margins.
-  // We only reserve minimal safety margin so outer harbor ships and 2:1 placards stay comfortably on-screen.
-  const verticalSafetyMargin = isCompactHeight ? 24 : isMobile ? 48 : 64;
-  const fallbackCanvasHeight = Math.max(
-    isCompactHeight ? 200 : 320,
-    height - verticalSafetyMargin
-  );
+  // Clearance for floating top bar (players + prompt banner) and bottom console (cards + actions)
+  // Ensures all 19 hexes and 9 coastal harbor ships are 100% visible on load without cropping
+  const topHudClearance = isCompactHeight ? 56 : isMobile ? 84 : 108;
+  const bottomConsoleClearance = isCompactHeight ? 64 : isMobile ? 100 : 128;
+  const verticalSafetyMargin = topHudClearance + bottomConsoleClearance;
 
   const canvasWidth = hasMeasuredContainer ? containerWidth : fallbackCanvasWidth;
   const canvasHeight = hasMeasuredContainer
     ? Math.max(200, containerHeight)
-    : fallbackCanvasHeight;
-  const margin = isMobile ? 12 : 20;
+    : height;
 
-  const size = computeDefaultSize(canvasWidth - margin, canvasHeight - margin);
-  // Nudge center up slightly so bottom harbor ships + hanging 2:1/3:1 placards share balanced sea margin
+  const availableCanvasWidth = Math.max(280, canvasWidth);
+  const availableCanvasHeight = Math.max(
+    isCompactHeight ? 220 : 300,
+    canvasHeight - verticalSafetyMargin
+  );
+  const margin = isMobile ? 12 : 24;
+
+  const size = computeDefaultSize(
+    availableCanvasWidth - margin,
+    availableCanvasHeight - margin
+  );
+
+  // Optical center: centered right in the middle of the available safe sea area between top and bottom HUDs
   const center: [number, number] = [
     canvasWidth / 2,
-    canvasHeight / 2 - (size ? size * 0.1 : 0),
+    topHudClearance + availableCanvasHeight / 2,
   ];
 
   const lastRolledSum = useMemo(() => getLastRolledSum(gameState), [gameState]);
