@@ -515,7 +515,7 @@ test("reveals Roubar only when the dice animation shows the rolled seven", async
   expect(screen.getByRole("button", { name: "ROUBAR" })).toHaveClass("cu-cta-orb--robber");
 });
 
-test("reveals gained cards only after dice stop, one card at a time, including identical cards", async () => {
+test("reveals gained cards only after dice stop, showing all gained cards side by side at once", async () => {
   const rollState = makeGameState({ state_index: 13,
     player_state: { ...baseState.player_state, P1_HAS_ROLLED: true, P1_SHEEP_IN_HAND: 2, P1_WHEAT_IN_HAND: 1 },
     current_playable_actions: [["BLUE", "END_TURN", null]],
@@ -531,11 +531,8 @@ test("reveals gained cards only after dice stop, one card at a time, including i
   expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
   await act(async () => vi.advanceTimersByTimeAsync(3300));
   expect(screen.getByTestId("board")).toHaveAttribute("data-rolling", "false");
-  expect(screen.getAllByLabelText(/Você recebeu/)).toHaveLength(1);
-  expect(screen.getByLabelText("Você recebeu: Ovelha")).toBeInTheDocument();
-  await act(async () => vi.advanceTimersByTimeAsync(1800));
-  expect(screen.getByLabelText("Você recebeu: Ovelha")).toBeInTheDocument();
-  await act(async () => vi.advanceTimersByTimeAsync(1800));
+  expect(screen.getAllByLabelText(/Você recebeu/)).toHaveLength(3);
+  expect(screen.getAllByLabelText("Você recebeu: Ovelha")).toHaveLength(2);
   expect(screen.getByLabelText("Você recebeu: Trigo")).toBeInTheDocument();
   await act(async () => vi.advanceTimersByTimeAsync(1800));
   expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();

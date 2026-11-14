@@ -76,6 +76,17 @@ export default function Robber({ center, size, coordinate }: RobberProps) {
 
         {/* Ground shadow on hex */}
         <ellipse cx="20" cy="50" rx="16" ry="4" fill="url(#robberShadow)" />
+        {/* Crimson-gold menace ring at base */}
+        <ellipse
+          cx="20"
+          cy="47.5"
+          rx="15.5"
+          ry="4.2"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="1.5"
+          opacity="0.82"
+        />
 
         {/* Base Rim */}
         <ellipse
@@ -126,6 +137,11 @@ export default function Robber({ center, size, coordinate }: RobberProps) {
           fill="rgba(255,255,255,0.25)"
         />
       </svg>
+      <span
+        key={JSON.stringify(coordinate)}
+        className="robber__arrival-shockwave"
+        aria-hidden="true"
+      />
       <span className="sr-only">R</span>
     </div>
   );

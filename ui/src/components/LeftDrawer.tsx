@@ -150,6 +150,10 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
                   className={cn("action foreground", color, {
                     "action--roll": actionRecord[0][1] === "ROLL",
                     "action--end": actionRecord[0][1] === "END_TURN",
+                    "action--robber":
+                      actionRecord[0][1] === "MOVE_ROBBER" ||
+                      actionRecord[0][1] === "PLAY_KNIGHT_CARD" ||
+                      actionRecord[0][1] === "PLAY_MONOPOLY",
                   })}
                 >
                   <div className="action__main">

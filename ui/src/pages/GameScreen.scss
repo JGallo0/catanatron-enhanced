@@ -981,107 +981,209 @@ main.catan-game-screen {
   }
 }
 
-/* Turn Transition Banner ("Vez de <Nome>" — 3s) */
+/* Turn Transition Banner ("Vez de <Nome>" — sleek top ribbon that never covers the board) */
 .turn-transition-banner {
   position: fixed;
-  top: 50%;
+  top: calc(var(--match-top-clearance, 106px) + 10px);
   left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 45;
+  transform: translateX(-50%);
+  z-index: 44;
   pointer-events: none;
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 26px;
+  gap: 11px;
+  padding: 8px 22px 8px 14px;
   border-radius: 999px;
+  overflow: hidden;
   background:
-    radial-gradient(circle at 50% 0%, rgba(250, 204, 21, 0.12), transparent 70%),
-    linear-gradient(175deg, rgba(15, 23, 42, 0.96) 0%, rgba(6, 17, 34, 0.97) 100%);
-  border: 2px solid var(--turn-color, #facc15);
+    radial-gradient(circle at 18% 50%, var(--turn-glow, rgba(250, 204, 21, 0.28)), transparent 65%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.94) 0%, rgba(8, 15, 30, 0.96) 55%, rgba(20, 29, 49, 0.94) 100%);
+  border: 1.5px solid var(--turn-color, #facc15);
   box-shadow:
-    0 18px 42px rgba(0, 0, 0, 0.8),
-    0 0 28px var(--turn-glow, rgba(250, 204, 21, 0.45));
-  animation: turn-banner-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    0 12px 28px rgba(0, 0, 0, 0.72),
+    0 0 22px var(--turn-glow, rgba(250, 204, 21, 0.38)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  animation: turn-banner-glide 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 
   &.is-local {
     border-color: #facc15;
     box-shadow:
-      0 18px 46px rgba(0, 0, 0, 0.85),
-      0 0 36px rgba(250, 204, 21, 0.55);
+      0 14px 32px rgba(0, 0, 0, 0.8),
+      0 0 30px rgba(250, 204, 21, 0.55),
+      inset 0 1px 0 rgba(254, 243, 199, 0.35);
+  }
+
+  &__crest {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 10px var(--turn-glow, rgba(250, 204, 21, 0.45));
+    flex-shrink: 0;
   }
 
   &__dot {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     flex-shrink: 0;
-    border: 1.5px solid rgba(255, 255, 255, 0.7);
+    border: 1.5px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 8px var(--turn-color, #facc15);
   }
 
   &__text {
+    position: relative;
+    z-index: 1;
     font-family: "Cinzel", "Outfit", serif;
-    font-size: clamp(1rem, 2.6vw, 1.32rem);
+    font-size: clamp(0.86rem, 1.8vw, 1.05rem);
     font-weight: 800;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     color: #fef3c7;
     white-space: nowrap;
-    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  }
+
+  &__shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      110deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.18) 48%,
+      transparent 76%
+    );
+    transform: translateX(-120%);
+    animation: turn-banner-shimmer 1.3s ease-out 0.12s forwards;
+    pointer-events: none;
   }
 }
 
-@keyframes turn-banner-enter {
-  from {
+@keyframes turn-banner-glide {
+  0% {
     opacity: 0;
-    transform: translate(-50%, -44%) scale(0.88);
+    transform: translate(-50%, -18px) scale(0.92);
+    filter: blur(3px);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, 2px) scale(1.015);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes turn-banner-shimmer {
+  from {
+    transform: translateX(-120%);
   }
   to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translateX(120%);
   }
 }
 
-/* Robber Outcome Pill ("Você não foi roubado!" / "... roubou 1 carta") */
+/* Robber Outcome Pill — prominent alert banner below top HUD */
 .game-robber-notice {
   position: fixed;
-  top: 196px;
+  top: calc(var(--match-top-clearance, 106px) + 56px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 37;
+  z-index: 43;
   pointer-events: none;
-  padding: 6px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 20px 9px 12px;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   font-weight: 800;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.65);
-  max-width: min(92vw, 520px);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.8),
+    0 0 26px rgba(239, 68, 68, 0.45);
+  max-width: min(94vw, 680px);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  animation: spotlight-toast-in 0.22s ease;
+  animation: robber-notice-pop 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    background: rgba(0, 0, 0, 0.38);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+  }
+
+  &__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   &--safe {
-    background: rgba(6, 78, 59, 0.92);
-    border: 1.5px solid #34d399;
-    color: #d1fae5;
+    background: linear-gradient(135deg, rgba(6, 78, 59, 0.96), rgba(4, 47, 46, 0.96));
+    border: 2px solid #34d399;
+    color: #ecfdf5;
+    box-shadow:
+      0 14px 32px rgba(0, 0, 0, 0.78),
+      0 0 24px rgba(52, 211, 153, 0.4);
   }
 
   &--victim {
-    background: rgba(127, 29, 29, 0.94);
-    border: 1.5px solid #f87171;
-    color: #fee2e2;
+    background: linear-gradient(135deg, rgba(153, 27, 27, 0.97), rgba(88, 12, 12, 0.97));
+    border: 2px solid #f87171;
+    color: #fef2f2;
+    box-shadow:
+      0 14px 34px rgba(0, 0, 0, 0.85),
+      0 0 30px rgba(248, 113, 113, 0.6);
   }
 
   &--attacker {
-    background: rgba(120, 53, 15, 0.94);
-    border: 1.5px solid #facc15;
+    background: linear-gradient(135deg, rgba(146, 64, 14, 0.97), rgba(78, 30, 6, 0.97));
+    border: 2px solid #facc15;
     color: #fef3c7;
+    box-shadow:
+      0 14px 34px rgba(0, 0, 0, 0.85),
+      0 0 28px rgba(250, 204, 21, 0.55);
   }
 
   &--neutral {
-    background: rgba(15, 23, 42, 0.92);
-    border: 1.5px solid rgba(148, 163, 184, 0.65);
-    color: #e2e8f0;
+    background: linear-gradient(135deg, rgba(88, 28, 35, 0.95), rgba(15, 23, 42, 0.96));
+    border: 2px solid #fb7185;
+    color: #ffe4e6;
+    box-shadow:
+      0 14px 32px rgba(0, 0, 0, 0.82),
+      0 0 24px rgba(251, 113, 133, 0.45);
+  }
+}
+
+@keyframes robber-notice-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.88);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
   }
 }
 
@@ -1095,7 +1197,7 @@ main.catan-game-screen {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  width: min(286px, calc(100vw - 32px));
+  width: min(320px, calc(100vw - 32px));
   padding: 6px 10px;
   border-radius: 10px;
   background: rgba(6, 17, 34, 0.72);
@@ -1122,6 +1224,16 @@ main.catan-game-screen {
       color: #f8fafc;
       font-weight: 600;
       opacity: 1;
+    }
+
+    &--robber {
+      color: #fecaca !important;
+      font-weight: 700;
+      opacity: 1;
+      background: rgba(185, 28, 28, 0.28);
+      border-left: 2px solid #f87171;
+      padding: 2px 6px;
+      border-radius: 4px;
     }
   }
 

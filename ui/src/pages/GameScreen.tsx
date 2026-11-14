@@ -186,7 +186,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [isBotThinking, setIsBotThinking] = useState(false);
   const thinkDeadlineRef = useRef({ key: "", at: 0 });
   const [cardGains, setCardGains] = useState<{ id: number; card: Card }[]>([]);
-  const finishCardGain = useCallback(() => setCardGains((queue) => queue.slice(1)), []);
+  const finishCardGain = useCallback(() => setCardGains([]), []);
   const [muted, setMuted] = useState(() => isSoundMuted());
   const [localGameSpeed, setLocalGameSpeed] = useState<GameSpeed>(() =>
     getSavedGameSpeed()
@@ -955,7 +955,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         setRobberNotice(batchFx.robberEvent);
         robberNoticeTimerRef.current = setTimeout(() => {
           setRobberNotice(null);
-        }, 4800);
+        }, 6200);
       }
 
       if (batchFx.turnHandoff) {
@@ -1749,7 +1749,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         </div>
       )}
 
-      {!isRollingDice && cardGains[0] && <CardGainOverlay key={cardGains[0].id} card={cardGains[0].card} onComplete={finishCardGain} />}
+      {!isRollingDice && cardGains.length > 0 && (
+        <CardGainOverlay
+          key={cardGains[0].id}
+          cards={cardGains.map((item) => item.card)}
+          onComplete={finishCardGain}
+        />
+      )}
 
       {turnPauseBanner && !introActive && (
         <div
@@ -1768,13 +1774,15 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           role="status"
           aria-live="polite"
         >
-          <span
-            className="turn-transition-banner__dot"
-            style={{
-              background:
-                colorMeta[turnPauseBanner.color]?.primary || "#facc15",
-            }}
-          />
+          <span className="turn-transition-banner__crest" aria-hidden="true">
+            <span
+              className="turn-transition-banner__dot"
+              style={{
+                background:
+                  colorMeta[turnPauseBanner.color]?.primary || "#facc15",
+              }}
+            />
+          </span>
           <span className="turn-transition-banner__text">
             {turnPauseBanner.isLocal
               ? t(
@@ -1786,6 +1794,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                   `${turnPauseBanner.name}'s Turn`
                 )}
           </span>
+          <span className="turn-transition-banner__shimmer" aria-hidden="true" />
         </div>
       )}
 
@@ -1798,7 +1807,12 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           role="status"
           aria-live="polite"
         >
-          {robberNotice.message}
+          <span className="game-robber-notice__badge" aria-hidden="true">
+            🥷 LADRÃO
+          </span>
+          <span className="game-robber-notice__text">
+            {robberNotice.message}
+          </span>
         </div>
       )}
 
@@ -1811,13 +1825,27 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         >
           {gs.action_records.slice(-3).map((rec, idx, arr) => {
             const c = rec[0]?.[0];
+            const actionType = rec[0]?.[1];
+            const isRobberRow =
+              actionType === "MOVE_ROBBER" ||
+              actionType === "PLAY_KNIGHT_CARD" ||
+              actionType === "PLAY_MONOPOLY";
             const palette = c ? colorMeta[c] : null;
             const globalIdx = gs.action_records.length - arr.length + idx;
             return (
-              <div key={globalIdx} className="mini-action-log__row">
+              <div
+                key={globalIdx}
+                className={cn("mini-action-log__row", {
+                  "mini-action-log__row--robber": isRobberRow,
+                })}
+              >
                 <span
                   className="mini-action-log__dot"
-                  style={{ background: palette?.primary || "#94a3b8" }}
+                  style={{
+                    background: isRobberRow
+                      ? "#f87171"
+                      : palette?.primary || "#94a3b8",
+                  }}
                 />
                 <span className="mini-action-log__text">
                   {isRollingDice && rec === latestActionRecord && rec[0][1] === "ROLL" ? "Rolando os dados…" : humanizeActionRecordPt(gs, rec, language)}

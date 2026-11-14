@@ -5,7 +5,7 @@ import type {
   ResourceCard,
 } from "./api.types";
 import { playerKey } from "./stateUtils";
-import { getPlayerColorMeta } from "../config/assetRegistry";
+import { getPlayerColorMeta, getResourceMeta } from "../config/assetRegistry";
 import { resolvePlayerDisplayName } from "../config/botCatalog";
 import { getCurrentLanguage, type AppLanguage } from "../i18n";
 
@@ -429,6 +429,7 @@ export function extractBatchTransitionFX(
   let robberEvent: RobberNoticeFX | null = null;
   if (latestRobberRecord && latestRobberRecord[0]) {
     const colorMeta = getPlayerColorMeta(lang);
+    const resMeta = getResourceMeta(lang);
     const en = lang === "en";
     const [action] = latestRobberRecord;
     const attackerColor = action[0];
@@ -438,6 +439,21 @@ export function extractBatchTransitionFX(
       colorMeta[attackerColor]?.label || attackerColor
     );
     const moveVal = Array.isArray(action[2]) ? action[2] : [];
+    const targetCoordKey = JSON.stringify(moveVal[0]);
+    let tileDesc = "";
+    for (const pt of nextState.tiles || []) {
+      if (JSON.stringify(pt.coordinate) === targetCoordKey) {
+        if (pt.tile.type === "RESOURCE_TILE") {
+          const rLabel = resMeta[pt.tile.resource]?.label || pt.tile.resource;
+          tileDesc = en
+            ? ` to ${pt.tile.number} (${rLabel})`
+            : ` para ${pt.tile.number} (${rLabel})`;
+        } else if (pt.tile.type === "DESERT") {
+          tileDesc = en ? " to the Desert" : " para o Deserto";
+        }
+        break;
+      }
+    }
     const rawVictim = moveVal[1] as Color | null | undefined;
     const victimColor = rawVictim ?? null;
     const victimName = victimColor
@@ -457,11 +473,11 @@ export function extractBatchTransitionFX(
         tone: "safe",
         message: spared
           ? en
-            ? `🛡️ You were spared! (${attackerName} moved the Robber)`
-            : `🛡️ Você não foi roubado! (${attackerName} moveu o Ladrão)`
+            ? `🛡️ You were spared! (${attackerName} moved the Robber${tileDesc})`
+            : `🛡️ Você não foi roubado! (${attackerName} moveu o Ladrão${tileDesc})`
           : en
-            ? `🥷 ${attackerName} moved the Robber (nobody was robbed)`
-            : `🥷 ${attackerName} moveu o Ladrão (ninguém foi roubado)`,
+            ? `🥷 ${attackerName} moved the Robber${tileDesc} (nobody was robbed)`
+            : `🥷 ${attackerName} moveu o Ladrão${tileDesc} (ninguém foi roubado)`,
       };
     } else if (mySeatColor !== null && victimColor === mySeatColor) {
       robberEvent = {
@@ -469,8 +485,8 @@ export function extractBatchTransitionFX(
         victimColor,
         tone: "victim",
         message: en
-          ? `🥷 ${attackerName} stole 1 card from You!`
-          : `🥷 ${attackerName} roubou 1 carta de Você!`,
+          ? `🥷 ${attackerName} moved the Robber${tileDesc} and stole 1 resource from You!`
+          : `🥷 ${attackerName} moveu o Ladrão${tileDesc} e roubou 1 recurso de Você!`,
       };
     } else if (
       mySeatColor !== null &&
@@ -481,8 +497,8 @@ export function extractBatchTransitionFX(
         victimColor,
         tone: "attacker",
         message: en
-          ? `🥷 You stole 1 resource from ${victimName}!`
-          : `🥷 Você roubou 1 recurso de ${victimName}!`,
+          ? `🥷 You moved the Robber${tileDesc} and stole 1 resource from ${victimName}!`
+          : `🥷 Você moveu o Ladrão${tileDesc} e roubou 1 recurso de ${victimName}!`,
       };
     } else {
       const isObserverNotHit =
@@ -493,11 +509,11 @@ export function extractBatchTransitionFX(
         tone: isObserverNotHit ? "safe" : "neutral",
         message: isObserverNotHit
           ? en
-            ? `🥷 ${attackerName} stole 1 card from ${victimName} • You were spared!`
-            : `🥷 ${attackerName} roubou 1 carta de ${victimName} • Você não foi roubado!`
+            ? `🥷 ${attackerName} moved the Robber${tileDesc} and stole 1 resource from ${victimName} • You were spared!`
+            : `🥷 ${attackerName} moveu o Ladrão${tileDesc} e roubou 1 recurso de ${victimName} • Você não foi roubado!`
           : en
-            ? `🥷 ${attackerName} stole 1 card from ${victimName}!`
-            : `🥷 ${attackerName} roubou 1 carta de ${victimName}!`,
+            ? `🥷 ${attackerName} moved the Robber${tileDesc} and stole 1 resource from ${victimName}!`
+            : `🥷 ${attackerName} moveu o Ladrão${tileDesc} e roubou 1 recurso de ${victimName}!`,
       };
     }
   }
