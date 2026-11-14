@@ -132,6 +132,8 @@ const Port = ({
   const offset = calculatePortOffset(direction, size);
   const meta = resource ? getResourceMeta(language)[resource] : null;
   const bridgeLen = Math.max(18, Math.round(size * 0.4));
+  const placardWidth = Math.max(36, Math.round(size * 0.52));
+  const placardHeight = Math.max(24, Math.round(size * 0.36));
 
   return (
     <div
@@ -162,23 +164,26 @@ const Port = ({
         />
       </div>
 
-      {/* Physical-board style port badge aligned along the hexagon edge */}
+      {/* Physical-board style port badge aligned along the hexagon edge (standardized size) */}
       <div
         className="port-scene__placard"
         style={{
+          width: placardWidth,
+          height: placardHeight,
           borderColor: meta ? meta.borderColor : "#f59e0b",
           transform: `rotate(${offset.edgeAngle}deg)`,
         }}
       >
-        {resource && (
+        {resource ? (
           <span className="port-scene__icon">
             <ResourceIcon
               resource={resource}
-              size={Math.max(15, Math.round(size * 0.25))}
+              size={Math.max(15, Math.round(size * 0.24))}
             />
           </span>
+        ) : (
+          <span className="port-scene__ratio">{ratio}</span>
         )}
-        <span className="port-scene__ratio">{ratio}</span>
       </div>
     </div>
   );

@@ -1333,7 +1333,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         isRollingDice={isRollingDice}
         replayMode={replayMode}
         hudClearance={hudClearance && {
-          top: hudClearance.top + (hasOceanChatSpace ? 0 : 18 + hudClearance.shortcutsHeight),
+          top: hudClearance.top,
           bottom: hudClearance.bottom,
         }}
         recentNodeId={recentNodeId}

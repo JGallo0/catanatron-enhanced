@@ -456,16 +456,17 @@ main.catan-game-screen {
 /* Left Vertical Quick Dock */
 .game-left-dock {
   position: fixed;
-  left: 20px;
-  top: calc(var(--match-top-clearance, 106px) + 12px);
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 44;
   pointer-events: auto;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 4px;
-  border-radius: 11px;
+  gap: 5px;
+  padding: 5px;
+  border-radius: 13px;
   background: rgba(10, 19, 34, 0.88);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(148, 187, 206, 0.28);
@@ -473,10 +474,10 @@ main.catan-game-screen {
 
   &__btn {
     position: relative;
-    width: 32px;
+    width: 34px;
     height: 34px;
     padding: 0;
-    border-radius: 7px;
+    border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(30, 41, 59, 0.82);
     color: #e2e8f0;
@@ -598,18 +599,18 @@ main.catan-game-screen {
 @media (max-width: 768px), (max-height: 640px) {
   .game-left-dock {
     left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     z-index: 44;
-    flex-direction: row;
-    flex-wrap: wrap;
-    max-width: calc(100vw - 16px);
+    flex-direction: column;
     padding: 4px;
     gap: 4px;
     border-radius: 12px;
 
     &__btn {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
 
       &:hover:not(:disabled) {
         transform: none;
@@ -1087,7 +1088,7 @@ main.catan-game-screen {
 /* Discreet Persistent Mini Action Log */
 .mini-action-log {
   position: fixed;
-  left: 20px;
+  left: 66px;
   bottom: calc(var(--match-bottom-clearance, 90px) + 8px);
   z-index: 16;
   pointer-events: none;
@@ -1156,9 +1157,10 @@ main.catan-game-screen {
   animation: spotlight-toast-in 0.18s ease;
 
   &--dock {
-    top: calc(100% + 8px);
-    left: 0;
+    top: 50%;
+    left: calc(100% + 10px);
     right: auto;
+    transform: translateY(-50%);
     width: min(266px, calc(100vw - 94px));
   }
 
