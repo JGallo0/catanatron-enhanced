@@ -50,7 +50,30 @@ vi.mock("notistack", () => ({
   useSnackbar: () => snackbar,
 }));
 vi.mock("./ZoomableBoard", () => ({
-  default: ({ isRollingDice }: { isRollingDice: boolean }) => <div data-testid="board" data-rolling={isRollingDice} className="board-container">Board</div>,
+  default: ({
+    isRollingDice,
+    diceStage,
+  }: {
+    isRollingDice: boolean;
+    diceStage?: {
+      open: boolean;
+      rolling: boolean;
+      dice: [number, number] | null;
+    } | null;
+  }) => (
+    <div data-testid="board" data-rolling={isRollingDice} className="board-container">
+      Board
+      {diceStage?.open && diceStage?.dice && (
+        <div>
+          {diceStage.rolling
+            ? "🎲 Rolando..."
+            : diceStage.dice[0] + diceStage.dice[1] === 7
+              ? "⚡ Total 7 — Ladrão! ⚡"
+              : `✦ Total ${diceStage.dice[0] + diceStage.dice[1]} ✦`}
+        </div>
+      )}
+    </div>
+  ),
 }));
 
 const theme = createTheme();
@@ -825,7 +848,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
     color: "BLUE",
     sender_name: "João",
     kind: "TAUNT",
-    body: "[TAUNT:coyote] 🚬 Acende um Coyote aí, Charlie! Essa mesa tá muito quieta.",
+    body: "[TAUNT:quedi_a_paia] Quedi a paia? 🚬",
     created_at: 1700000200,
   });
 
@@ -839,18 +862,18 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
   const tauntBtn = screen.getByRole("button", { name: /^Provocações$/i });
   fireEvent.click(tauntBtn);
 
-  const coyoteItem = screen.getByRole("button", { name: /Acende o Coyote/i });
+  const paiaItem = screen.getByRole("button", { name: /Quedi a paia\?/i });
   await act(async () => {
-    fireEvent.click(coyoteItem);
+    fireEvent.click(paiaItem);
   });
 
   expect(sendGameMessage).toHaveBeenCalledWith("game-123", {
-    body: "[TAUNT:coyote] 🚬 Acende um Coyote aí, Charlie! Essa mesa tá muito quieta.",
+    body: "[TAUNT:quedi_a_paia] Quedi a paia? 🚬",
     color: "BLUE",
     senderName: "João",
     kind: "TAUNT",
   });
-  expect(screen.getByText(/Acende um Coyote aí, Charlie!/i)).toBeInTheDocument();
+  expect(screen.getByText(/Quedi a paia\?/i)).toBeInTheDocument();
   expect(tauntBtn).toBeDisabled();
 
   // Cooldown clears after 3s
@@ -858,7 +881,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
     await vi.advanceTimersByTimeAsync(3100);
   });
   expect(tauntBtn).toBeEnabled();
-  expect(screen.queryByText(/Acende um Coyote aí, Charlie!/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Quedi a paia\?/i)).not.toBeInTheDocument();
 
   // Incoming peer TAUNT animates without adding unread chat count
   vi.mocked(getGameMessages).mockResolvedValueOnce([
@@ -868,7 +891,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
       color: "RED",
       sender_name: "Ana",
       kind: "TAUNT",
-      body: "[TAUNT:cerveja_mesa] 🍻 Pega mais uma gelada que essa rodada vai feder pro seu lado, Charles!",
+      body: "[TAUNT:tchita_3x3] ⚔️ 3 contra 3 na Tchita",
       created_at: 1700000210,
     },
   ]);
@@ -877,7 +900,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
     await vi.advanceTimersByTimeAsync(1600);
   });
 
-  expect(screen.getByText(/Pega mais uma gelada/i)).toBeInTheDocument();
+  expect(screen.getByText(/3 contra 3 na Tchita/i)).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: /Bate-papo \(1 não lidas\)/i })
   ).not.toBeInTheDocument();

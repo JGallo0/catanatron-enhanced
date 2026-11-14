@@ -31,7 +31,6 @@ import PlayerTopBar, {
   type FloatingVpFX,
   type FloatingYieldFX,
 } from "../components/PlayerTopBar";
-import DiceRollOverlay from "../components/DiceRollOverlay";
 import CardGainOverlay from "../components/CardGainOverlay";
 import { getCardGains } from "../utils/cardGains";
 import GameChatPanel from "../components/GameChatPanel";
@@ -1040,7 +1039,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             if (victim && gs.bot_colors.includes(victim)) {
               botReaction = { color: victim, tauntId: "olha_trairagem" };
             } else if (victim && gs.bot_colors.includes(actorColor)) {
-              botReaction = { color: actorColor, tauntId: "coyote" };
+              botReaction = { color: actorColor, tauntId: "quedi_a_paia" };
             }
           } else if (
             gs.winning_color &&
@@ -1329,7 +1328,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         aria-hidden="true"
       />
 
-      {/* Fullscreen Board + Tabletop Canvas (Zoom In/Out scales both table and board) */}
+      {/* Fullscreen Board + Tabletop Canvas (Zoom In/Out scales table, board, and dice inside the box together) */}
       <ZoomableBoard
         isRollingDice={isRollingDice}
         replayMode={replayMode}
@@ -1339,6 +1338,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         }}
         recentNodeId={recentNodeId}
         recentEdgeId={recentEdgeId}
+        diceStage={{
+          open: Boolean(diceStage?.open),
+          rolling: Boolean(diceStage?.rolling),
+          dice: diceStage?.dice ?? null,
+          rollerName: diceStage?.rollerName ?? "",
+          rollerColor: diceStage?.rollerColor ?? gs.current_color,
+        }}
       />
 
       {/* Floating Top HUD Container (Glassmorphism over sea) */}
@@ -1744,14 +1750,6 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       )}
 
       {!isRollingDice && cardGains[0] && <CardGainOverlay key={cardGains[0].id} card={cardGains[0].card} onComplete={finishCardGain} />}
-
-      <DiceRollOverlay
-        open={Boolean(diceStage?.open)}
-        rolling={Boolean(diceStage?.rolling)}
-        dice={diceStage?.dice ?? null}
-        rollerName={diceStage?.rollerName ?? ""}
-        rollerColor={diceStage?.rollerColor ?? gs.current_color}
-      />
 
       {turnPauseBanner && !introActive && (
         <div

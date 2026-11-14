@@ -692,7 +692,7 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
         {/* 5. RIGHT BLACK GAME BOX HALF (3D Sloped Walls + Darker Floor)    */}
         {/*    Positioned on the right side for rolling the dice inside      */}
         {/* ================================================================ */}
-        <g transform="translate(1712, 628) rotate(3)">
+        <g transform="translate(1640, 616) rotate(3)">
           {/* Heavy drop shadow on wood */}
           <rect
             x="-138"

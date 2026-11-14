@@ -14,6 +14,7 @@ import Node from "./Node";
 import Edge, { toEdgeId, type EdgeId } from "./Edge";
 import Robber from "./Robber";
 import OceanBackdrop from "../components/OceanBackdrop";
+import DiceRollOverlay, { type DiceRollOverlayProps } from "../components/DiceRollOverlay";
 
 import "./Board.scss";
 
@@ -74,6 +75,7 @@ type BoardProps = {
   pendingEdgeId?: string | null;
   pendingColor?: Color | null;
   pendingBuilding?: BuildingType | null;
+  diceStage?: Omit<DiceRollOverlayProps, "center" | "size"> | null;
 };
 
 export default function Board({
@@ -100,6 +102,7 @@ export default function Board({
   pendingEdgeId = null,
   pendingColor = null,
   pendingBuilding = null,
+  diceStage = null,
 }: BoardProps) {
   // Exact available viewport: prefer ResizeObserver container bounds when mounted in ZoomableBoard
   const leftSidebarWidth = 0;
@@ -257,6 +260,13 @@ export default function Board({
         size={size}
         coordinate={gameState.robber_coordinate}
       />
+      {diceStage && (
+        <DiceRollOverlay
+          {...diceStage}
+          center={center}
+          size={size}
+        />
+      )}
     </div>
   );
 }

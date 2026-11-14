@@ -25,6 +25,7 @@ import type { CatanState } from "../store";
 import { useParams } from "react-router-dom";
 import ACTIONS from "../actions";
 import Board from "./Board";
+import type { DiceRollOverlayProps } from "../components/DiceRollOverlay";
 import type {
   Color,
   GameAction,
@@ -98,6 +99,7 @@ type ZoomableBoardProps = {
   hudClearance?: { top: number; bottom: number };
   recentNodeId?: number | null;
   recentEdgeId?: string | null;
+  diceStage?: Omit<DiceRollOverlayProps, "center" | "size"> | null;
 };
 
 export const CONFIRM_PLACEMENT_STORAGE_KEY = "catan_confirm_placement_v1";
@@ -131,6 +133,7 @@ export default function ZoomableBoard({
   hudClearance,
   recentNodeId = null,
   recentEdgeId = null,
+  diceStage = null,
 }: ZoomableBoardProps) {
   const { gameId } = useParams();
   const { state, dispatch } = useContext(store);
@@ -451,6 +454,7 @@ export default function ZoomableBoard({
                     ? pendingPlacement.buildType
                     : null
                 }
+                diceStage={diceStage}
               />
             </TransformComponent>
 
