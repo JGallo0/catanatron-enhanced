@@ -147,6 +147,10 @@
     z-index: 2;
   }
 
+  &__hex-surface--classic .tile__bevel-inner {
+    display: none;
+  }
+
   // Subtle golden beach seam around each hex
   &__bevel-outer {
     fill: none;

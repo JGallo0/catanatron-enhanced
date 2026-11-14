@@ -72,6 +72,7 @@ export default function ResourceCards({
   playerKey,
   compact = false,
   showEmptySlots = false,
+  iconOnly = false,
   interactiveDevCards = false,
   playableDevCallbacks,
 }: {
@@ -79,6 +80,7 @@ export default function ResourceCards({
   playerKey: string;
   compact?: boolean;
   showEmptySlots?: boolean;
+  iconOnly?: boolean;
   interactiveDevCards?: boolean;
   playableDevCallbacks?: Partial<Record<DevCardType, () => void>>;
 }) {
@@ -117,7 +119,8 @@ export default function ResourceCards({
     <div
       className={cn("resource-cards", {
         "resource-cards--compact": compact,
-        "resource-cards--deck": showEmptySlots,
+        "resource-cards--deck": showEmptySlots && !iconOnly,
+        "resource-cards--icons": iconOnly,
       })}
       title={t("Cartas de Recurso", "Resource Cards")}
     >
@@ -126,6 +129,21 @@ export default function ResourceCards({
         if (count === 0 && !showEmptySlots) return null;
         const meta = resourceMeta[res];
         const lower = res.toLowerCase();
+
+        if (iconOnly) {
+          return (
+            <div
+              key={res}
+              className={cn("hand-resource-icon", { "is-empty": count === 0 })}
+              role="img"
+              aria-label={`${meta.label} (${count})`}
+              title={`${meta.label} · ${count}`}
+            >
+              <ResourceIcon resource={res} size={23} />
+              <span>{count}</span>
+            </div>
+          );
+        }
 
         return (
           <div
@@ -183,7 +201,7 @@ export default function ResourceCards({
         );
       })}
 
-      <div className="separator" />
+      {(!iconOnly || DEV_CARDS.some(({ id }) => (amount(id) ?? 0) > 0)) && <div className="separator" />}
 
       {DEV_CARDS.map(({ id, codePt, codeEn, shortPt, shortEn }) => {
         const count = amount(id) ?? 0;
@@ -244,9 +262,10 @@ export default function ResourceCards({
                 : undefined
             }
             className={cn(
-              "dev-cards center-text card resource-card-item resource-card-item--dev",
+              "dev-cards",
+              iconOnly ? "hand-resource-icon hand-resource-icon--dev" : "center-text card resource-card-item resource-card-item--dev",
               {
-                "resource-card-item--deck": showEmptySlots,
+                "resource-card-item--deck": showEmptySlots && !iconOnly,
                 "resource-card-item--playable": canPlay,
                 "resource-card-item--locked": isNewlyBoughtOnly,
                 "resource-card-item--selected": isInspected,
@@ -256,6 +275,12 @@ export default function ResourceCards({
               borderColor: canPlay ? "#facc15" : meta.accentColor,
             }}
           >
+            {iconOnly ? (
+              <>
+                <DevCardIcon card={id} size={22} />
+                <span>{count}</span>
+              </>
+            ) : <>
             <CardArtIllustration
               cardType={id}
               className="resource-card-item__bg-art"
@@ -318,6 +343,7 @@ export default function ResourceCards({
                 <span className="resource-card-item__label">{code}</span>
               </div>
             )}
+            </>}
           </div>
         );
 

@@ -262,8 +262,8 @@ export const RESOURCE_META_EN: Record<ResourceCard, ResourceMeta> = {
   },
   SHEEP: {
     ...RESOURCE_META.SHEEP,
-    label: "Wool",
-    shortLabel: "WOL",
+    label: "Sheep",
+    shortLabel: "SHP",
     terrainName: "Pasture",
   },
   WHEAT: {

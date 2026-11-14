@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useId, useMemo, useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import type {
   Color,
+  ConfirmTradeAction,
   GameAction,
   GameState,
   MaritimeTradeAction,
@@ -45,6 +46,8 @@ type TradeModalProps = {
   playerColor?: Color;
   gameState?: GameState;
   canOfferDomesticTrade?: boolean;
+  reviewingActiveOffer?: boolean;
+  canTradeMaritime?: boolean;
   onExecuteTrade: (action: GameAction) => Promise<void> | void;
 };
 
@@ -69,16 +72,23 @@ export default function TradeModal({
   playerColor,
   gameState,
   canOfferDomesticTrade = false,
+  reviewingActiveOffer = false,
+  canTradeMaritime = true,
   onExecuteTrade,
 }: TradeModalProps) {
   const { language, t } = useLanguage();
   const resourceMeta = getResourceMeta(language);
   const colorMeta = getPlayerColorMeta(language);
-  const [activeTab, setActiveTab] = useState<TradeTab>("player");
+  const [tab, setActiveTab] = useState<TradeTab | null>(null);
   const [offerCounts, setOfferCounts] = useState<number[]>([0, 0, 0, 0, 0]);
   const [askCounts, setAskCounts] = useState<number[]>([0, 0, 0, 0, 0]);
   const [submitting, setSubmitting] = useState(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
+  const [maritimeTradeCompleted, setMaritimeTradeCompleted] = useState(false);
+  const [trackedOffer, setTrackedOffer] = useState<number | null>(null);
+  const [selectedPartner, setSelectedPartner] = useState<Color | null>(null);
+  const submittingRef = useRef(false);
+  const partnerGroup = useId();
 
   const parsedTrades = useMemo(() => {
     const byGive: Partial<
@@ -122,10 +132,15 @@ export default function TradeModal({
     [parsedTrades]
   );
 
-  const [selectedGive, setSelectedGive] = useState<ResourceCard | null>(null);
-  const [selectedReceive, setSelectedReceive] = useState<ResourceCard | null>(
-    null
-  );
+  const [givePreference, setSelectedGive] = useState<ResourceCard | null>(null);
+  const [receivePreference, setSelectedReceive] = useState<ResourceCard | null>(null);
+  const selectedGive = givePreference && parsedTrades[givePreference]
+    ? givePreference
+    : availableGiveResources[0] ?? null;
+  const receiveOptions = selectedGive ? parsedTrades[selectedGive]?.actionsByReceive : undefined;
+  const selectedReceive = receivePreference && receiveOptions?.[receivePreference]
+    ? receivePreference
+    : RESOURCE_ORDER.find((resource) => receiveOptions?.[resource]) ?? null;
 
   const effectiveColor: Color =
     playerColor ?? gameState?.current_color ?? "RED";
@@ -157,28 +172,85 @@ export default function TradeModal({
       });
   }, [gameState, effectiveColor, colorMeta]);
 
-  useEffect(() => {
-    if (open) {
-      setSubmitting(false);
-      setTradeError(null);
-      setOfferCounts([0, 0, 0, 0, 0]);
-      setAskCounts([0, 0, 0, 0, 0]);
-      setActiveTab(canOfferDomesticTrade ? "player" : "maritime");
-
-      const firstGive = availableGiveResources[0] ?? null;
-      setSelectedGive(firstGive);
-      if (firstGive) {
-        const firstReceive =
-          RESOURCE_ORDER.find(
-            (r) =>
-              r !== firstGive && parsedTrades[firstGive]?.actionsByReceive[r]
-          ) ?? null;
-        setSelectedReceive(firstReceive);
-      } else {
-        setSelectedReceive(null);
+  const records = gameState?.action_records ?? [];
+  let activeOfferIndex = -1;
+  if (reviewingActiveOffer) {
+    for (let i = records.length - 1; i >= 0; i--) {
+      const [action] = records[i];
+      if (action[1] === "OFFER_TRADE" && action[0] === effectiveColor) {
+        activeOfferIndex = i;
+        break;
       }
     }
-  }, [open, availableGiveResources, parsedTrades, canOfferDomesticTrade]);
+  }
+  const offerIndex = activeOfferIndex >= 0 ? activeOfferIndex : trackedOffer;
+  const offerAction = offerIndex === null ? undefined : records[offerIndex]?.[0];
+  const offerBundle = offerAction?.[1] === "OFFER_TRADE" ? offerAction[2] : gameState?.current_trade;
+  const reviewingOffer = reviewingActiveOffer || offerIndex !== null;
+  const activeTab = reviewingOffer ? "player" : tab ?? (canOfferDomesticTrade ? "player" : "maritime");
+
+  useEffect(() => {
+    if (open && activeOfferIndex >= 0) setTrackedOffer(activeOfferIndex);
+  }, [open, activeOfferIndex]);
+
+  const responses = new Map<Color, "accepted" | "declined">();
+  let confirmedPartner: Color | undefined;
+  let cancelled = false;
+  if (offerIndex !== null) {
+    for (const [action] of records.slice(offerIndex + 1)) {
+      if (action[1] === "ACCEPT_TRADE") responses.set(action[0], "accepted");
+      else if (action[1] === "REJECT_TRADE") responses.set(action[0], "declined");
+      else {
+        if (action[1] === "CONFIRM_TRADE") confirmedPartner = action[2][10] as Color;
+        if (action[1] === "CANCEL_TRADE") cancelled = true;
+        break;
+      }
+    }
+  }
+
+  const confirmActions = reviewingActiveOffer && gameState?.current_prompt === "DECIDE_ACCEPTEES"
+    ? gameState.current_playable_actions.filter(
+        (action): action is ConfirmTradeAction => action[0] === effectiveColor && action[1] === "CONFIRM_TRADE"
+      )
+    : [];
+  const cancelAction = reviewingActiveOffer && gameState?.current_prompt === "DECIDE_ACCEPTEES"
+    ? gameState.current_playable_actions.find((action) => action[0] === effectiveColor && action[1] === "CANCEL_TRADE")
+    : undefined;
+  const confirmAction = confirmActions.length === 1
+    ? confirmActions[0]
+    : confirmActions.find((action) => action[2][10] === selectedPartner);
+  const confirmedName = opponents.find((opponent) => opponent.color === confirmedPartner)?.name;
+  let offerStatus = t("Aguardando as respostas da mesa.", "Waiting for players to respond.");
+  if (confirmedName) {
+    offerStatus = t(`Troca concluída com ${confirmedName}.`, `Trade completed with ${confirmedName}.`);
+  } else if (cancelled) {
+    offerStatus = t("Proposta cancelada.", "Offer cancelled.");
+  } else if (!reviewingActiveOffer) {
+    offerStatus = responses.size > 0 && opponents.every(({ color }) => responses.get(color) === "declined")
+      ? t("Todos os jogadores recusaram a proposta.", "All players declined the offer.")
+      : t("Proposta encerrada.", "Offer closed.");
+  } else if (gameState?.current_prompt === "DECIDE_ACCEPTEES") {
+    if (confirmActions.length > 1) {
+      offerStatus = t("Escolha com quem deseja trocar.", "Choose who to trade with.");
+    } else if (confirmActions.length === 1) {
+      offerStatus = t("Um jogador aceitou. Você já pode confirmar.", "One player accepted. You can now confirm.");
+    } else {
+      offerStatus = t("Nenhum jogador disponível para concluir a troca.", "No player available to complete the trade.");
+    }
+  }
+
+  const handleClose = () => {
+    setActiveTab(null);
+    setOfferCounts([0, 0, 0, 0, 0]);
+    setAskCounts([0, 0, 0, 0, 0]);
+    setSelectedGive(null);
+    setSelectedReceive(null);
+    setSelectedPartner(null);
+    setTrackedOffer(null);
+    setTradeError(null);
+    setMaritimeTradeCompleted(false);
+    onClose();
+  };
 
   const activeTradeOption =
     selectedGive && selectedReceive
@@ -239,47 +311,32 @@ export default function TradeModal({
     }
   };
 
-  const handleConfirm = async () => {
-    if (submitting) return;
+  const submitTrade = async (action: GameAction) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     setTradeError(null);
-    if (activeTab === "maritime") {
-      if (!activeTradeOption) return;
-      try {
-        setSubmitting(true);
-        await onExecuteTrade(activeTradeOption);
-        onClose();
-      } catch (err) {
-        setTradeError(
-          err instanceof Error
-            ? err.message
-            : t(
-                "Não foi possível concluir a troca.",
-                "Could not complete the trade."
-              )
-        );
-      } finally {
-        setSubmitting(false);
-      }
-      return;
-    }
-
-    if (!canSubmitDomestic) return;
-    const payload = [...offerCounts, ...askCounts] as TradeOfferTuple;
+    setMaritimeTradeCompleted(false);
     try {
-      setSubmitting(true);
-      await onExecuteTrade([effectiveColor, "OFFER_TRADE", payload]);
-      onClose();
-    } catch (err) {
-      setTradeError(
-        err instanceof Error
-          ? err.message
-          : t(
-              "Não foi possível enviar a proposta.",
-              "Could not send the trade offer."
-            )
-      );
+      await onExecuteTrade(action);
+      if (action[1] === "MARITIME_TRADE") setMaritimeTradeCompleted(true);
+    } catch {
+      setTradeError(t(
+        "Não foi possível enviar a jogada de troca. Tente novamente.",
+        "Could not submit the trade action. Try again."
+      ));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (activeTab === "maritime") {
+      if (canTradeMaritime && activeTradeOption) void submitTrade(activeTradeOption);
+    } else if (canSubmitDomestic) {
+      const payload = [...offerCounts, ...askCounts] as TradeOfferTuple;
+      void submitTrade([effectiveColor, "OFFER_TRADE", payload]);
     }
   };
 
@@ -288,7 +345,9 @@ export default function TradeModal({
   return (
     <Dialog
       open={open}
-      onClose={submitting ? undefined : onClose}
+      onClose={(_, reason) => {
+        if (!submitting && reason !== "backdropClick") handleClose();
+      }}
       maxWidth="sm"
       fullWidth
       PaperProps={{
@@ -297,16 +356,16 @@ export default function TradeModal({
     >
       <DialogTitle className="catan-modal-title">
         <span>⚖️ {t("Central de Negociação", "Trade Center")}</span>
-        <small className="catan-modal-subtitle">
+        {!reviewingOffer && <small className="catan-modal-subtitle">
           {t(
             "Proponha trocas diretas com jogadores ou negocie com o Banco & Portos",
             "Propose direct trades with players or trade with the Bank & Ports"
           )}
-        </small>
+        </small>}
       </DialogTitle>
 
       <DialogContent className="catan-modal-content">
-        <div
+        {!reviewingOffer && <div
           className="trade-tabs"
           role="tablist"
           aria-label={t("Tipo de negociação", "Trade type")}
@@ -318,6 +377,7 @@ export default function TradeModal({
             className={`trade-tab-btn ${activeTab === "player" ? "is-active" : ""}`}
             onClick={() => {
               setTradeError(null);
+              setMaritimeTradeCompleted(false);
               setActiveTab("player");
             }}
           >
@@ -335,15 +395,55 @@ export default function TradeModal({
           >
             ⚓ {t("Porto & Banco", "Bank / Port")}
           </button>
-        </div>
+        </div>}
 
         {tradeError && (
           <div className="trade-p2p-warning" role="alert">
             ⚠️ {tradeError}
           </div>
         )}
+        {activeTab === "maritime" && maritimeTradeCompleted && (
+          <p className="trade-offer-status" role="status">
+            {t("Troca com Porto ou Banco concluída.", "Bank or port trade completed.")}
+          </p>
+        )}
 
-        {activeTab === "player" ? (
+        {reviewingOffer ? (
+          <div className="trade-workbench">
+            {offerBundle && (
+              <div className="trade-summary-pill">
+                <span>{t("Você oferece", "You offer")} <strong>{formatTradeBundlePt(offerBundle.slice(0, 5), language)}</strong></span>
+                <span aria-hidden="true">⇄</span>
+                <span>{t("Você pede", "You request")} <strong>{formatTradeBundlePt(offerBundle.slice(5, 10), language)}</strong></span>
+              </div>
+            )}
+            <p className="trade-offer-status" role="status">{offerStatus}</p>
+            <div className="trade-response-list" role="group" aria-label={t("Respostas à proposta", "Offer responses")}>
+              {opponents.map(({ color, name, avatarProps }) => {
+                const canSelect = confirmActions.some((action) => action[2][10] === color);
+                const accepted = responses.get(color) === "accepted" || canSelect ||
+                  Boolean(reviewingActiveOffer && gameState?.acceptees?.[gameState.colors.indexOf(color)]);
+                const declined = responses.get(color) === "declined";
+                const status = accepted ? t("aceitou", "accepted") : declined ? t("recusou", "declined") : t("aguardando", "waiting");
+                return (
+                  <label className="trade-response-row" key={color}>
+                    <PlayerAvatar config={avatarProps.config} username={avatarProps.username} size={30} />
+                    <span>{name} · {status}</span>
+                    {confirmActions.length > 1 && canSelect && (
+                      <input
+                        type="radio"
+                        name={partnerGroup}
+                        checked={selectedPartner === color}
+                        disabled={submitting}
+                        onChange={() => setSelectedPartner(color)}
+                      />
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ) : activeTab === "player" ? (
           <div className="trade-workbench">
             {opponents.length > 0 && (
               <div
@@ -694,25 +794,42 @@ export default function TradeModal({
 
       <DialogActions className="catan-modal-actions">
         <Button
-          onClick={onClose}
+          onClick={handleClose}
           disabled={submitting}
           className="catan-btn-secondary"
         >
-          {t("Cancelar", "Cancel")}
+          {t("Fechar", "Close")}
         </Button>
-        <Button
-          variant="contained"
-          disabled={
-            submitting ||
-            (activeTab === "maritime" ? !activeTradeOption : !canSubmitDomestic)
-          }
-          onClick={handleConfirm}
-          className="catan-btn-primary"
-        >
-          {activeTab === "player"
-            ? t("Enviar Proposta à Mesa", "Send Offer")
-            : t("Confirmar Troca", "Confirm Trade")}
-        </Button>
+        {reviewingOffer ? (
+          <>
+            {cancelAction && (
+              <Button color="error" disabled={submitting} onClick={() => submitTrade(cancelAction)}>
+                {t("Cancelar proposta", "Cancel offer")}
+              </Button>
+            )}
+            {confirmActions.length > 0 && (
+              <Button
+                variant="contained"
+                disabled={submitting || !confirmAction}
+                onClick={() => confirmAction && submitTrade(confirmAction)}
+                className="catan-btn-primary"
+              >
+                {t("Confirmar troca", "Confirm trade")}
+              </Button>
+            )}
+          </>
+        ) : (
+          <Button
+            variant="contained"
+            disabled={submitting || (activeTab === "maritime" ? !canTradeMaritime || !activeTradeOption : !canSubmitDomestic)}
+            onClick={handleConfirm}
+            className="catan-btn-primary"
+          >
+            {activeTab === "player"
+              ? t("Enviar Proposta à Mesa", "Send Offer")
+              : t("Confirmar Troca", "Confirm Trade")}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

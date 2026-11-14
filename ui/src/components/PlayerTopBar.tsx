@@ -17,7 +17,7 @@ import {
 } from "../config/botCatalog";
 import { store } from "../store";
 import { playerKey } from "../utils/stateUtils";
-import { AwardStarSvg, ResourceIcon } from "./icons/GameIcons";
+import { AchievementMedalSvg, ResourceIcon } from "./icons/GameIcons";
 import PlayerAvatar from "./PlayerAvatar";
 
 /* -------------------------------------------------------------------------- */
@@ -34,11 +34,8 @@ export const SwordStatSvg: React.FC = () => (
     className="cu-icon"
   >
     {/* Upright medieval sword */}
-    <path d="M11 2h2v13h-2z" />
-    <polygon points="12,0.5 9.5,3.5 14.5,3.5" />
-    <rect x="6.5" y="14" width="11" height="2" rx="0.5" />
-    <rect x="11" y="16" width="2" height="4.5" rx="0.5" />
-    <circle cx="12" cy="21.5" r="1.5" />
+    <path d="M7 7 12 2l5 5-2.8 7h-4.4Z" />
+    <path d="M6 15h12v2.4h-4.6V21h-2.8v-3.6H6Z" />
   </svg>
 );
 
@@ -56,9 +53,8 @@ export const RoadStatSvg: React.FC = () => (
     className="cu-icon"
   >
     {/* S-curve road segment matching Catan Universe */}
-    <path d="M7 4 C 7 10, 17 8, 17 14 C 17 18, 12 20, 10 21" />
-    <circle cx="7" cy="4" r="1" fill="currentColor" stroke="none" />
-    <circle cx="10" cy="21" r="1" fill="currentColor" stroke="none" />
+    <path d="M6 4h8.5a3.5 3.5 0 0 1 0 7H10a4.5 4.5 0 0 0 0 9h8" strokeWidth="5.4" />
+    <path d="M6 4h8.5a3.5 3.5 0 0 1 0 7H10a4.5 4.5 0 0 0 0 9h8" stroke="#142235" strokeWidth="1.25" strokeDasharray="1.6 2.5" />
   </svg>
 );
 
@@ -500,17 +496,12 @@ function PlayerCard({
                   : t("Cavaleiros Jogados", "Knights Played")
               }
             >
+              {seat.hasArmy
+                ? <AchievementMedalSvg award="army" label={t("Maior Exército", "Largest Army")} />
+                : <SwordStatSvg />}
               <span className="cu-stat__num">{seat.knights}</span>
-              <span className="cu-stat__icon-wrap">
-                <SwordStatSvg />
-                {seat.hasArmy && (
-                  <AwardStarSvg
-                    awardType="army"
-                    size={14}
-                    className="cu-award-star"
-                    label={t("Maior Exército", "Largest Army")}
-                  />
-                )}
+              <span className="cu-stat__label">
+                {seat.knights === 1 ? t("Cavaleiro", "Knight") : t("Cavaleiros", "Knights")}
               </span>
             </div>
             <div
@@ -523,18 +514,11 @@ function PlayerCard({
                   : t("Sequência de Estrada", "Longest Road Length")
               }
             >
+              {seat.hasRoad
+                ? <AchievementMedalSvg award="road" label={t("Maior Estrada", "Longest Road")} />
+                : <RoadStatSvg />}
               <span className="cu-stat__num">{seat.roadLength}</span>
-              <span className="cu-stat__icon-wrap">
-                <RoadStatSvg />
-                {seat.hasRoad && (
-                  <AwardStarSvg
-                    awardType="road"
-                    size={14}
-                    className="cu-award-star"
-                    label={t("Maior Estrada", "Longest Road")}
-                  />
-                )}
-              </span>
+              <span className="cu-stat__label">{t("Estrada", "Road")}</span>
             </div>
           </div>
 
@@ -553,8 +537,11 @@ function PlayerCard({
                   : t("Cartas de Recurso na mão", "Resource Cards in hand")
               }
             >
-              <span className="cu-stat__num">{seat.resources}</span>
               <ResourceStatSvg />
+              <span className="cu-stat__num">{seat.resources}</span>
+              <span className="cu-stat__label">
+                {seat.resources === 1 ? t("Recurso", "Resource") : t("Recursos", "Resources")}
+              </span>
             </div>
             <div
               className={cn("cu-stat cu-stat--devcards", {
@@ -562,8 +549,11 @@ function PlayerCard({
               })}
               title={t("Cartas de Desenvolvimento na mão", "Dev Cards in hand")}
             >
-              <span className="cu-stat__num">{seat.devCards}</span>
               <DevCardStatSvg />
+              <span className="cu-stat__num">{seat.devCards}</span>
+              <span className="cu-stat__label">
+                {seat.devCards === 1 ? t("Carta Dev", "Dev card") : t("Cartas Dev", "Dev cards")}
+              </span>
             </div>
           </div>
 
@@ -573,32 +563,10 @@ function PlayerCard({
               className="cu-stat cu-stat--vp"
               title={t("Pontos de Vitória", "Victory Points")}
             >
-              <span className="cu-stat__num cu-stat__num--vp">{seat.vps}</span>
               <TrophyStatSvg />
+              <span className="cu-stat__num cu-stat__num--vp">{seat.vps}</span>
+              <span className="cu-stat__label">{t("PV", "VP")}</span>
             </div>
-
-            {(seat.hasArmy || seat.hasRoad) && (
-              <div className="cu-mobile-award-badges" aria-hidden="true">
-                {seat.hasArmy && (
-                  <span
-                    className="cu-mobile-award-badges__item"
-                    title={t("Maior Exército", "Largest Army")}
-                  >
-                    <SwordStatSvg />
-                    <AwardStarSvg size={11} className="cu-award-star" />
-                  </span>
-                )}
-                {seat.hasRoad && (
-                  <span
-                    className="cu-mobile-award-badges__item"
-                    title={t("Maior Estrada", "Longest Road")}
-                  >
-                    <RoadStatSvg />
-                    <AwardStarSvg size={11} className="cu-award-star" />
-                  </span>
-                )}
-              </div>
-            )}
 
             <div
               className="cu-pieces-mini"

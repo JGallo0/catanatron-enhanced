@@ -16,20 +16,8 @@
   height: 100%;
   display: block;
   transform-style: preserve-3d;
-  transform: rotateX(24deg) rotateZ(-6deg);
+  transform: var(--dice-camera-tilt);
   transition: transform 0.35s ease;
-}
-
-.dice3d-scene.is-alt .dice3d-tilt {
-  transform: rotateX(22deg) rotateZ(10deg);
-}
-
-.dice3d-scene--mini .dice3d-tilt {
-  transform: rotateX(24deg) rotateZ(-6deg);
-}
-
-.dice3d-scene--mini.is-alt .dice3d-tilt {
-  transform: rotateX(22deg) rotateZ(10deg);
 }
 
 .dice3d-scene--mini .dice3d-face {
@@ -50,7 +38,6 @@
   height: 100%;
   display: block;
   transform-style: preserve-3d;
-  transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dice3d-scene.is-rolling .dice3d-cube {
@@ -95,6 +82,7 @@
     inset 0 2px 3px rgba(255, 255, 255, 0.88),
     inset 0 -2px 4px rgba(120, 53, 15, 0.35);
   box-sizing: border-box;
+  backface-visibility: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -104,32 +92,23 @@
     border-color: #991b1b;
   }
 
-  &--front {
-    transform: rotateY(0deg) translateZ(var(--die-half, 25px));
-  }
-
   &--back {
-    transform: rotateY(180deg) translateZ(var(--die-half, 25px));
     filter: brightness(0.92);
   }
 
   &--right {
-    transform: rotateY(90deg) translateZ(var(--die-half, 25px));
     filter: brightness(0.9);
   }
 
   &--left {
-    transform: rotateY(-90deg) translateZ(var(--die-half, 25px));
     filter: brightness(0.95);
   }
 
   &--top {
-    transform: rotateX(90deg) translateZ(var(--die-half, 25px));
     filter: brightness(1.03);
   }
 
   &--bottom {
-    transform: rotateX(-90deg) translateZ(var(--die-half, 25px));
     filter: brightness(0.84);
   }
 }
@@ -197,25 +176,25 @@
 
 @keyframes dice3d-land-settle-a {
   0% {
-    transform: rotateX(42deg) rotateZ(-14deg) scale(1.12);
+    transform: rotateX(-55deg) rotateZ(-14deg) scale(1.12);
   }
   65% {
-    transform: rotateX(22deg) rotateZ(-4deg) scale(0.97);
+    transform: rotateX(-68deg) rotateZ(-4deg) scale(0.97);
   }
   100% {
-    transform: rotateX(24deg) rotateZ(-6deg) scale(1);
+    transform: var(--dice-camera-tilt);
   }
 }
 
 @keyframes dice3d-land-settle-b {
   0% {
-    transform: rotateX(42deg) rotateZ(18deg) scale(1.12);
+    transform: rotateX(-55deg) rotateZ(18deg) scale(1.12);
   }
   65% {
-    transform: rotateX(20deg) rotateZ(8deg) scale(0.97);
+    transform: rotateX(-70deg) rotateZ(8deg) scale(0.97);
   }
   100% {
-    transform: rotateX(22deg) rotateZ(10deg) scale(1);
+    transform: var(--dice-camera-tilt);
   }
 }
 

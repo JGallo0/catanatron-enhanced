@@ -29,11 +29,14 @@ describe("boardSkin utils", () => {
     expect(getSavedBoardSkin()).toBe("diorama");
   });
 
-  it("toggles between diorama and classic cleanly", () => {
+  it("cycles through all three board styles", () => {
     expect(getSavedBoardSkin()).toBe("diorama");
     const next = toggleBoardSkin();
     expect(next).toBe("classic");
     expect(getSavedBoardSkin()).toBe("classic");
+
+    expect(toggleBoardSkin()).toBe("vector");
+    expect(getSavedBoardSkin()).toBe("vector");
 
     const back = toggleBoardSkin();
     expect(back).toBe("diorama");
@@ -52,5 +55,6 @@ describe("boardSkin utils", () => {
 
     const dioramaDesert = getTileIllustrationUrl("DESERT", "diorama");
     expect(dioramaDesert).toBe("/assets/illustrations/tiles/themes/diorama/desert.webp");
+    expect(getTileIllustrationUrl("DESERT", "vector")).toBeUndefined();
   });
 });

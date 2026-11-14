@@ -821,31 +821,16 @@ export const ResourceIcon: React.FC<{
           className={className}
           aria-hidden="true"
         >
-          <circle
-            cx="9"
-            cy="11"
-            r="5"
-            fill="#ECFCCB"
-            stroke="#365314"
-            strokeWidth="1.5"
+          <path d="M7 15v5m7-5v5" stroke="#F3DCC0" strokeWidth="2.3" strokeLinecap="round" />
+          <path
+            d="M3.3 9.4A3.1 3.1 0 0 1 7.4 6a3.4 3.4 0 0 1 5.2.3 3.7 3.7 0 0 1 5.2 4.2 3.5 3.5 0 0 1-2.7 5.7H6.6a3.8 3.8 0 0 1-3.3-6.8Z"
+            fill="#FFF8E7"
+            stroke="#604C41"
+            strokeWidth="1.2"
+            strokeLinejoin="round"
           />
-          <circle
-            cx="14"
-            cy="10"
-            r="5.5"
-            fill="#F7FEE7"
-            stroke="#365314"
-            strokeWidth="1.5"
-          />
-          <circle
-            cx="12"
-            cy="14"
-            r="4.5"
-            fill="#D9F99D"
-            stroke="#365314"
-            strokeWidth="1.5"
-          />
-          <circle cx="17.5" cy="11.5" r="2.8" fill="#3F3F46" />
+          <path d="M16.1 9.1 19 6.9l.8 2 2.1 1.1-.7 4.1-2.2 1.1-3.1-2Z" fill="#796254" stroke="#3A2A27" strokeWidth="1.1" strokeLinejoin="round" />
+          <circle cx="19.4" cy="11.2" r=".75" fill="#FFF8E7" />
         </svg>
       );
     case "WHEAT":
@@ -1396,11 +1381,12 @@ export const RoadSvgPiece: React.FC<{
 }> = ({ color, className, skin }) => {
   const activeSkin = skin ?? getSavedPieceSkin();
   const palette = getPiecePalette(color);
+  const uid = useId().replace(/:/g, "");
 
   if (activeSkin !== "cottage") {
     return (
       <svg
-        viewBox="0 0 100 32"
+        viewBox="0 0 100 24"
         width="100%"
         height="100%"
         preserveAspectRatio="none"
@@ -1408,14 +1394,14 @@ export const RoadSvgPiece: React.FC<{
         aria-hidden="true"
       >
         {/* Ground shadow */}
-        <rect x="2" y="8" width="96" height="20" rx="3" fill="rgba(0, 0, 0, 0.78)" />
+        <rect x="2" y="6" width="96" height="15" rx="2" fill="rgba(0, 0, 0, 0.78)" />
         {/* Outer high-contrast dual border: black 2.6px + white stroke */}
         <rect
           x="3"
-          y="6"
+          y="4"
           width="94"
-          height="18"
-          rx="2"
+          height="14"
+          rx="1.5"
           fill="#000000"
           stroke="#ffffff"
           strokeWidth="2.6"
@@ -1423,18 +1409,18 @@ export const RoadSvgPiece: React.FC<{
         {/* Solid player color straight rectangular bar core */}
         <rect
           x="6"
-          y="8.5"
+          y="6.5"
           width="88"
-          height="13"
+          height="9"
           rx="1"
           fill={palette.main}
         />
         {/* Clean specular center line */}
         <line
           x1="10"
-          y1="12"
+          y1="9"
           x2="90"
-          y2="12"
+          y2="9"
           stroke="#ffffff"
           strokeWidth="1.6"
           strokeLinecap="round"
@@ -1444,7 +1430,6 @@ export const RoadSvgPiece: React.FC<{
     );
   }
 
-  const uid = useId().replace(/:/g, "");
   const topGradId = `road-top-${color}-${uid}`;
 
   return (
@@ -1553,6 +1538,26 @@ export const AwardStarSvg: React.FC<{
     </svg>
   );
 };
+
+export function AchievementMedalSvg({ award, label }: { award: "army" | "road"; label: string }) {
+  const isArmy = award === "army";
+  return (
+    <svg className="cu-achievement-medal" viewBox="0 0 24 24" role="img" aria-label={label}>
+      {isArmy ? (
+        <>
+          <path d="M12 1.6 21 5v6c0 5.2-3.5 8.6-9 11.4C6.5 19.6 3 16.2 3 11V5Z" fill="#F6CE74" stroke="#FFF2BB" strokeWidth="1.1" />
+          <path d="M7 7l9.8 9.8m.2-9.8L7.2 16.8M6 14l3.8 3.8m4.4 0L18 14" stroke="#503021" strokeWidth="1.7" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <path d="M12 1.7 21 6.8v10.4l-9 5.1-9-5.1V6.8Z" fill="#B8EBDD" stroke="#E7FFF1" strokeWidth="1.1" />
+          <path d="M15.8 5.9c-1.8 3.5-6.1 3-6.1 6.5 0 2.4 3.8 3.3 3.8 5.8" fill="none" stroke="#16534F" strokeWidth="4.8" strokeLinecap="round" />
+          <path d="M15.8 5.9c-1.8 3.5-6.1 3-6.1 6.5 0 2.4 3.8 3.3 3.8 5.8" fill="none" stroke="#E7FFF1" strokeWidth="1" strokeDasharray="1.4 1.4" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 /**
  * Carved Ivory & Bronze 2D6 Dice Face SVG

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ResourceCard } from "./api.types";
 
-export type BoardSkinId = "diorama" | "classic";
+export type BoardSkinId = "diorama" | "classic" | "vector";
 
 export interface BoardSkinMeta {
   id: BoardSkinId;
@@ -38,7 +38,24 @@ export const BOARD_SKINS: Record<BoardSkinId, BoardSkinMeta> = {
     isDefault: false,
     isVip: false,
   },
+  vector: {
+    id: "vector",
+    namePt: "Vetorial Simplificado",
+    nameEn: "Simplified Vector",
+    badgePt: "Variante",
+    badgeEn: "Variant",
+    descriptionPt: "Ilustrações vetoriais com formas mais simples",
+    descriptionEn: "Vector illustrations with simpler shapes",
+    isDefault: false,
+    isVip: false,
+  },
 };
+
+const BOARD_SKIN_ORDER: BoardSkinId[] = ["diorama", "classic", "vector"];
+
+function isBoardSkin(value: unknown): value is BoardSkinId {
+  return value === "diorama" || value === "classic" || value === "vector";
+}
 
 export const BOARD_SKIN_STORAGE_KEY = "catan_board_skin_v1";
 export const BOARD_SKIN_EVENT = "catan_board_skin_changed";
@@ -46,7 +63,7 @@ export const BOARD_SKIN_EVENT = "catan_board_skin_changed";
 export function getSavedBoardSkin(): BoardSkinId {
   try {
     const saved = localStorage.getItem(BOARD_SKIN_STORAGE_KEY);
-    if (saved === "classic" || saved === "diorama") {
+    if (isBoardSkin(saved)) {
       return saved;
     }
     return "diorama";
@@ -70,7 +87,7 @@ export function saveBoardSkin(skin: BoardSkinId): void {
 
 export function toggleBoardSkin(current?: BoardSkinId): BoardSkinId {
   const active = current ?? getSavedBoardSkin();
-  const next: BoardSkinId = active === "diorama" ? "classic" : "diorama";
+  const next = BOARD_SKIN_ORDER[(BOARD_SKIN_ORDER.indexOf(active) + 1) % BOARD_SKIN_ORDER.length];
   saveBoardSkin(next);
   return next;
 }
@@ -78,12 +95,9 @@ export function toggleBoardSkin(current?: BoardSkinId): BoardSkinId {
 export function getTileIllustrationUrl(
   terrain: ResourceCard | "DESERT",
   skin: BoardSkinId = getSavedBoardSkin()
-): string {
-  const filename = terrain.toLowerCase();
-  if (skin === "classic") {
-    return `/assets/illustrations/tiles/themes/classic/${filename}.webp`;
-  }
-  return `/assets/illustrations/tiles/themes/diorama/${filename}.webp`;
+): string | undefined {
+  if (skin === "vector") return undefined;
+  return `/assets/illustrations/tiles/themes/${skin}/${terrain.toLowerCase()}.webp`;
 }
 
 export function useBoardSkin() {
@@ -92,7 +106,7 @@ export function useBoardSkin() {
   useEffect(() => {
     const handleSkinChange = (e: Event) => {
       const customEvent = e as CustomEvent<BoardSkinId>;
-      if (customEvent.detail && (customEvent.detail === "diorama" || customEvent.detail === "classic")) {
+      if (isBoardSkin(customEvent.detail)) {
         setSkin(customEvent.detail);
       } else {
         setSkin(getSavedBoardSkin());

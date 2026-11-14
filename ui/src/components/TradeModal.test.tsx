@@ -3,7 +3,7 @@ import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import TradeModal from "./TradeModal";
 import { makeGameState } from "../test/fixtures";
-import type { MaritimeTradeAction } from "../utils/api.types";
+import type { ConfirmTradeAction, GameState, MaritimeTradeAction, OfferTradeAction } from "../utils/api.types";
 
 const theme = createTheme();
 
@@ -89,7 +89,7 @@ describe("TradeModal", () => {
         "OFFER_TRADE",
         [0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
       ]);
-      expect(onClose).toHaveBeenCalledOnce();
+      expect(onClose).not.toHaveBeenCalled();
     });
   });
 
@@ -130,7 +130,71 @@ describe("TradeModal", () => {
 
     await waitFor(() => {
       expect(onExecuteTrade).toHaveBeenCalledWith(maritimeAction);
-      expect(onClose).toHaveBeenCalledOnce();
     });
+    expect(await screen.findByRole("status")).toHaveTextContent("Troca com Porto ou Banco concluída");
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  test.each([true, false])("keeps the offer open after the last response (accepted: %s)", async (accepted) => {
+    const offer: OfferTradeAction = ["BLUE", "OFFER_TRADE", [1, 0, 0, 0, 0, 0, 0, 0, 1, 0]];
+    const confirm: ConfirmTradeAction = ["BLUE", "CONFIRM_TRADE", [...offer[2], "RED"]];
+    const state = makeGameState({
+      current_color: "RED",
+      current_prompt: "DECIDE_TRADE",
+      current_trade: [...offer[2], 1],
+      action_records: [[offer, null]],
+      seat_names: { RED: "Creitu" },
+    });
+    const answered: GameState = {
+      ...state,
+      current_color: "BLUE",
+      current_prompt: accepted ? "DECIDE_ACCEPTEES" : "PLAY_TURN",
+      current_playable_actions: accepted ? [confirm, ["BLUE", "CANCEL_TRADE", null]] : [],
+      action_records: [
+        [offer, null],
+        accepted
+          ? [["RED", "ACCEPT_TRADE", [...offer[2], 1]], null]
+          : [["RED", "REJECT_TRADE", [...offer[2], 1]], null],
+      ],
+    };
+    const onClose = vi.fn();
+    const onExecuteTrade = vi.fn().mockRejectedValueOnce(new Error()).mockResolvedValue(undefined);
+    const renderModal = (gameState: GameState, reviewingActiveOffer: boolean) => (
+      <ThemeProvider theme={theme}>
+        <TradeModal
+          open
+          onClose={onClose}
+          tradeActions={[]}
+          playerState={gameState.player_state}
+          playerKey="P1"
+          playerColor="BLUE"
+          gameState={gameState}
+          reviewingActiveOffer={reviewingActiveOffer}
+          onExecuteTrade={onExecuteTrade}
+        />
+      </ThemeProvider>
+    );
+
+    const { rerender } = render(renderModal(state, true));
+    expect(screen.getByText(/Creitu.*aguardando/i)).toBeInTheDocument();
+    rerender(renderModal(answered, accepted));
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    if (accepted) {
+      expect(screen.getByText(/Creitu.*aceitou/i)).toBeInTheDocument();
+      const button = screen.getByRole("button", { name: "Confirmar troca" });
+      expect(button).toBeEnabled();
+      fireEvent.click(button);
+      expect(await screen.findByRole("alert")).toHaveTextContent("Tente novamente");
+      fireEvent.click(button);
+      await waitFor(() => expect(onExecuteTrade).toHaveBeenCalledTimes(2));
+      expect(onExecuteTrade).toHaveBeenLastCalledWith(confirm);
+    } else {
+      expect(screen.getByText(/Creitu.*recusou/i)).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Todos os jogadores recusaram");
+      expect(screen.queryByRole("button", { name: "Confirmar troca" })).not.toBeInTheDocument();
+    }
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import { GridLoader } from "react-spinners";
@@ -11,7 +11,11 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Menu,
+  MenuItem,
+  useMediaQuery,
 } from "@mui/material";
+import { BookOpen, Castle, ChartColumn, FastForward, History, Map as MapIcon, MessageSquare, Smile } from "lucide-react";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 
@@ -105,6 +109,7 @@ import {
   saveGameSpeed,
 } from "../utils/tabletopPacing";
 import { usePieceSkin } from "../utils/pieceSkin";
+import { useBoardSkin } from "../utils/boardSkin";
 
 const VALID_COLORS = new Set<Color>(["RED", "BLUE", "ORANGE", "WHITE"]);
 
@@ -216,7 +221,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [vpFX, setVpFX] = useState<FloatingVpFX[]>([]);
   const [robberNotice, setRobberNotice] = useState<RobberNoticeFX | null>(null);
 
-  const [chatOpen, setChatOpen] = useState(false);
+  const hasOceanChatSpace = useMediaQuery("(min-width: 1100px) and (min-height: 640px)");
+  const [chatPreference, setChatOpen] = useState<boolean | null>(null);
+  const chatOpen = chatPreference ?? (!replayMode && hasOceanChatSpace);
   const [chatMessages, setChatMessages] = useState<GameMessage[]>([]);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [isSendingChat, setIsSendingChat] = useState(false);
@@ -229,6 +236,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     Partial<Record<Color, ActivePortraitTaunt>>
   >({});
   const { skin: pieceSkin, toggle: togglePieceSkin } = usePieceSkin();
+  const { skin: boardSkin, changeSkin: setBoardSkin, skins: boardSkins } = useBoardSkin();
+  const [boardSkinAnchor, setBoardSkinAnchor] = useState<HTMLElement | null>(null);
+  const boardSkinLabel = t("Estilo do tabuleiro", "Board style");
 
   const prevStateRef = useRef<GameState | null>(null);
   const prevStateIndexRef = useRef<number | null>(null);
@@ -267,7 +277,20 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const lastBotTauntAtRef = useRef<number>(0);
 
   const gs = state.gameState;
+  const topHudRef = useRef<HTMLDivElement>(null);
+  const consoleRef = useRef<HTMLDivElement>(null);
+  const shortcutsRef = useRef<HTMLElement>(null);
+  const [hudClearance, setHudClearance] = useState<{ top: number; bottom: number; shortcutsHeight: number }>();
   latestStateIndexRef.current = gs?.state_index ?? null;
+  const latestActionRecord = gs?.action_records?.[gs.action_records.length - 1];
+  const isDiceRollStarting =
+    !replayMode &&
+    gs !== null &&
+    prevStateIndexRef.current !== null &&
+    gs.state_index > prevStateIndexRef.current &&
+    latestActionRecord?.[0][1] === "ROLL" &&
+    Boolean(extractTransitionVisuals(latestActionRecord).rollDice);
+  const isRollingDice = isDiceRollStarting || Boolean(diceStage?.rolling);
   const introActive = Boolean(
     gs &&
       !replayMode &&
@@ -577,9 +600,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     const currBots = (gs.bot_colors || []).join(",");
     const currTaken = (gs.taken_over_colors || []).join(",");
 
+    let cancelled = false;
     const interval = setInterval(async () => {
       try {
         const latest = await getState(gameId, "latest");
+        if (cancelled || latest.state_index < (latestStateIndexRef.current ?? 0)) return;
         const latestBots = (latest.bot_colors || []).join(",");
         const latestTaken = (latest.taken_over_colors || []).join(",");
         if (
@@ -600,7 +625,10 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       }
     }, 700);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [
     gameId,
     replayMode,
@@ -614,8 +642,37 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     closeSnackbar,
   ]);
 
-  // 10s multiplayer heartbeat to prevent false inactivity takeover and sync promoted bots promptly
   const hasGameState = Boolean(gs);
+  useLayoutEffect(() => {
+    const topHud = topHudRef.current;
+    const console = consoleRef.current;
+    const shortcuts = shortcutsRef.current;
+    const screen = topHud?.parentElement;
+    if (!topHud || !console || !shortcuts || !screen || !hasGameState) return;
+
+    const measure = () => {
+      const screenBottom = screen.getBoundingClientRect().bottom;
+      const top = topHud.offsetHeight + 4;
+      const bottom = Math.ceil(screenBottom - console.getBoundingClientRect().top) + 4;
+      const shortcutsHeight = shortcuts.offsetHeight;
+      if (top <= 4 || bottom <= 4) return;
+      setHudClearance((current) => (
+        current?.top === top && current.bottom === bottom && current.shortcutsHeight === shortcutsHeight
+          ? current
+          : { top, bottom, shortcutsHeight }
+      ));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(topHud);
+    observer.observe(console);
+    observer.observe(shortcuts);
+    observer.observe(screen);
+    return () => observer.disconnect();
+  }, [hasGameState, gameId]);
+
+  // 10s multiplayer heartbeat to prevent false inactivity takeover and sync promoted bots promptly
   const hasWinningColor = Boolean(gs?.winning_color);
   const botColorsKeyRef = useRef("");
   const takenOverKeyRef = useRef("");
@@ -825,7 +882,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         mySeatColor,
         activeLang
       );
-      const latestRecord = gs.action_records?.[gs.action_records.length - 1];
+      const latestRecord = latestActionRecord;
       playActionRecordSound(latestRecord);
       if (gs.winning_color && !prevWinnerRef.current) {
         playVictorySound();
@@ -1003,7 +1060,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     prevStateRef.current = gs;
     prevStateIndexRef.current = gs.state_index;
     prevWinnerRef.current = gs.winning_color;
-  }, [gs, replayMode, mySeatColor, gameId, triggerPortraitTaunt]);
+  }, [gs, latestActionRecord, replayMode, mySeatColor, gameId, triggerPortraitTaunt]);
 
   const handleDismissIntro = () => {
     if (introTimerRef.current) clearTimeout(introTimerRef.current);
@@ -1024,15 +1081,12 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   };
 
   const handleToggleChat = () => {
-    setChatOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setUnreadChatCount(0);
-        setChatPreview(null);
-        setChatError(null);
-      }
-      return next;
-    });
+    if (!chatOpen) {
+      setUnreadChatCount(0);
+      setChatPreview(null);
+      setChatError(null);
+    }
+    setChatOpen(!chatOpen);
   };
 
   const handleSendChat = async (body: string) => {
@@ -1238,18 +1292,28 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const tauntCatalog = getTauntCatalog(language);
 
   return (
-    <main className="catan-game-screen">
+    <main
+      className="catan-game-screen"
+      style={hudClearance ? ({
+        "--match-top-clearance": `${hudClearance.top}px`,
+        "--match-bottom-clearance": `${hudClearance.bottom}px`,
+      } as React.CSSProperties) : undefined}
+    >
       <OceanBackdrop />
 
       {/* Fullscreen Board Canvas */}
       <ZoomableBoard
         replayMode={replayMode}
+        hudClearance={hudClearance && {
+          top: hudClearance.top + (hasOceanChatSpace ? 0 : 18 + hudClearance.shortcutsHeight),
+          bottom: hudClearance.bottom,
+        }}
         recentNodeId={recentNodeId}
         recentEdgeId={recentEdgeId}
       />
 
       {/* Floating Top HUD Container (Glassmorphism over sea) */}
-      <div className="game-top-hud-container">
+      <div className="game-top-hud-container" ref={topHudRef}>
         <header className="game-top-hud">
           <div className="game-top-hud__left">
             <Link
@@ -1367,6 +1431,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
       {/* Left Vertical Quick Dock (Catan Universe style shortcuts) */}
       <nav
+        ref={shortcutsRef}
         className="game-left-dock"
         aria-label={t("Atalhos da partida", "Match shortcuts")}
       >
@@ -1415,11 +1480,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             }
           >
             <span className="game-left-dock__icon" aria-hidden="true">
-              {gameSpeed === "normal"
-                ? "🐢"
-                : gameSpeed === "fast"
-                  ? "⏩"
-                  : "⚡"}
+              <FastForward />
             </span>
             <span className="game-left-dock__tag">
               {gameSpeed === "normal"
@@ -1438,7 +1499,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
         <button
           type="button"
-          className={cn("game-left-dock__btn", {
+          className={cn("game-left-dock__btn game-left-dock__btn--chat", {
             "is-open": chatOpen,
             "has-unread": unreadChatCount > 0,
           })}
@@ -1454,7 +1515,8 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           aria-expanded={chatOpen}
           title={t("Abrir Bate-papo da Partida", "Open Match Chat")}
         >
-          <span className="game-left-dock__icon" aria-hidden="true">💬</span>
+          <span className="game-left-dock__icon" aria-hidden="true"><MessageSquare /></span>
+          <span className="game-left-dock__tag" aria-hidden="true">Chat</span>
           {unreadChatCount > 0 && (
             <span className="game-left-dock__badge">
               {unreadChatCount > 9 ? "9+" : unreadChatCount}
@@ -1486,7 +1548,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                     )
               }
             >
-              <span className="game-left-dock__icon" aria-hidden="true">🎭</span>
+              <span className="game-left-dock__icon" aria-hidden="true"><Smile /></span>
             </button>
             {tauntPickerOpen && (
               <div
@@ -1541,7 +1603,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           aria-label={t("Histórico", "History")}
           title={t("Abrir Histórico de Jogadas", "Open Action Log")}
         >
-          <span className="game-left-dock__icon" aria-hidden="true">📜</span>
+          <span className="game-left-dock__icon" aria-hidden="true"><History /></span>
         </button>
 
         <button
@@ -1561,7 +1623,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             "Win Odds (AI) & Dice Histogram"
           )}
         >
-          <span className="game-left-dock__icon" aria-hidden="true">📊</span>
+          <span className="game-left-dock__icon" aria-hidden="true"><ChartColumn /></span>
         </button>
 
         <button
@@ -1573,8 +1635,43 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           aria-label={t("Almanaque", "Almanac")}
           title={t("Abrir Almanaque & Regras", "Open Almanac & Rules")}
         >
-          <span className="game-left-dock__icon" aria-hidden="true">📖</span>
+          <span className="game-left-dock__icon" aria-hidden="true"><BookOpen /></span>
         </button>
+
+        <button
+          type="button"
+          className={cn("game-left-dock__btn", {
+            "is-variant": boardSkin !== "diorama",
+          })}
+          onClick={(event) => setBoardSkinAnchor(event.currentTarget)}
+          aria-label={boardSkinLabel}
+          aria-haspopup="menu"
+          aria-expanded={Boolean(boardSkinAnchor)}
+          title={`${boardSkinLabel} · ${t(boardSkins[boardSkin].namePt, boardSkins[boardSkin].nameEn)}`}
+        >
+          <span className="game-left-dock__icon" aria-hidden="true"><MapIcon /></span>
+        </button>
+        <Menu
+          anchorEl={boardSkinAnchor}
+          open={Boolean(boardSkinAnchor)}
+          onClose={() => setBoardSkinAnchor(null)}
+          slotProps={{ list: { "aria-label": boardSkinLabel } }}
+        >
+          {Object.values(boardSkins).map((option) => (
+            <MenuItem
+              key={option.id}
+              role="menuitemradio"
+              aria-checked={option.id === boardSkin}
+              selected={option.id === boardSkin}
+              onClick={() => {
+                setBoardSkin(option.id);
+                setBoardSkinAnchor(null);
+              }}
+            >
+              {t(option.namePt, option.nameEn)}
+            </MenuItem>
+          ))}
+        </Menu>
 
         <button
           type="button"
@@ -1597,7 +1694,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           )}
           aria-label={t("Alternar estilo das peças", "Switch piece style")}
         >
-          <span className="game-left-dock__icon" aria-hidden="true">🏰</span>
+          <span className="game-left-dock__icon" aria-hidden="true"><Castle /></span>
           <span className="game-left-dock__tag">
             {pieceSkin === "contrast" ? "Min" : "Det"}
           </span>
@@ -1705,7 +1802,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         </div>
       )}
 
-      {gs.action_records && gs.action_records.length > 0 && (
+      {!chatOpen && gs.action_records && gs.action_records.length > 0 && (
         <aside
           className="mini-action-log"
           aria-label={t("Últimas jogadas na mesa", "Recent table actions")}
@@ -1784,9 +1881,12 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       />
 
       <ActionsToolbar
+        key={gameId}
+        consoleRef={consoleRef}
         isBotThinking={isBotThinking}
         replayMode={replayMode}
-        isRollingDice={Boolean(diceStage?.open && diceStage.rolling)}
+        mySeatColor={mySeatColor}
+        isRollingDice={isRollingDice}
         onSendChatMessage={handleSendChat}
       />
       <LeftDrawer />

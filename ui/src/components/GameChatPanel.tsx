@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import cn from "classnames";
+import { MessageSquare } from "lucide-react";
 import type { Color, GameMessage } from "../utils/api.types";
 import { getPlayerColorMeta } from "../config/assetRegistry";
 import { parseTauntMessage } from "../config/tauntCatalog";
@@ -97,7 +98,7 @@ export default function GameChatPanel({
       <header className="game-chat-panel__header">
         <div className="game-chat-panel__title-group">
           <span className="game-chat-panel__icon" aria-hidden="true">
-            💬
+            <MessageSquare size={16} />
           </span>
           <h2 className="game-chat-panel__title">
             {t("Bate-papo da Mesa", "Table Chat")}

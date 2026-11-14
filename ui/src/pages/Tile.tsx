@@ -10,8 +10,10 @@ import {
 } from "../utils/api.types";
 import { getResourceMeta } from "../config/assetRegistry";
 import { useLanguage } from "../i18n";
+import { getTileIllustrationUrl, useBoardSkin } from "../utils/boardSkin";
 import {
   HarborPortSvg,
+  HybridIllustration,
   ResourceIcon,
   TerrainHexIllustration,
 } from "../components/icons/GameIcons";
@@ -209,13 +211,15 @@ export default function Tile({
   hasRobber = false,
 }: TileProps) {
   const { language, t } = useLanguage();
+  const { skin } = useBoardSkin();
 
   const w = SQRT3 * size;
   const h = 2 * size;
   const [centerX, centerY] = center;
   const [x, y] = tilePixelVector(coordinate, size, centerX, centerY);
 
-  const isLand = tile.type === "RESOURCE_TILE" || tile.type === "DESERT";
+  const terrain = tile.type === "RESOURCE_TILE" ? tile.resource : tile.type === "DESERT" ? "DESERT" : null;
+  const illustrationUrl = terrain ? getTileIllustrationUrl(terrain, skin) : undefined;
   const resourceMetaMap = getResourceMeta(language);
   const resourceMeta =
     tile.type === "RESOURCE_TILE" ? resourceMetaMap[tile.resource] : null;
@@ -237,7 +241,7 @@ export default function Tile({
       }}
       onClick={onClick}
     >
-      {!isLand && (
+      {!terrain && (
         <div className="tile__sea-surface" aria-hidden="true">
           <div className="tile__sea-artwork">
             <TerrainHexIllustration terrain="WATER" />
@@ -256,12 +260,14 @@ export default function Tile({
         </div>
       )}
 
-      {isLand && (
-        <div className="tile__hex-surface">
-          {/* Native Ultra-HD Vector Catan Universe Terrain (Infinite Resolution at any zoom level) */}
+      {terrain && (
+        <div className={cn("tile__hex-surface", `tile__hex-surface--${skin}`)}>
           <div className="tile__artwork">
-            <TerrainHexIllustration
-              terrain={tile.type === "RESOURCE_TILE" ? tile.resource : "DESERT"}
+            <HybridIllustration
+              key={illustrationUrl ?? terrain}
+              src={illustrationUrl}
+              alt=""
+              fallback={<TerrainHexIllustration terrain={terrain} />}
             />
           </div>
 

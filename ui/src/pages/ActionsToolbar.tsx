@@ -56,6 +56,7 @@ import { useLanguage } from "../i18n";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import type {
+  Color,
   GameAction,
   GameState,
   MaritimeTradeAction,
@@ -91,11 +92,15 @@ function getLatestRollPair(gameState: GameState): [number, number] | null {
 export default function ActionsToolbar({
   isBotThinking,
   replayMode,
+  mySeatColor,
+  consoleRef,
   isRollingDice = false,
   onSendChatMessage,
 }: {
   isBotThinking: boolean;
   replayMode: boolean;
+  mySeatColor: Color | null;
+  consoleRef?: React.Ref<HTMLDivElement>;
   isRollingDice?: boolean;
   onSendChatMessage?: (body: string) => Promise<void> | void;
 }) {
@@ -166,8 +171,13 @@ export default function ActionsToolbar({
     !gameState.player_state[`${activeKey}_HAS_ROLLED`];
   const isDiscard = gameState.current_prompt === "DISCARD";
   const isMoveRobber = gameState.current_prompt === "MOVE_ROBBER";
+  const showPrimaryAction = !(isMoveRobber && isRollingDice);
   const isDecideTrade = gameState.current_prompt === "DECIDE_TRADE";
   const isDecideAcceptees = gameState.current_prompt === "DECIDE_ACCEPTEES";
+  const isOwnTrade = !replayMode && mySeatColor !== null &&
+    !gameState.bot_colors.includes(mySeatColor) &&
+    gameState.colors[gameState.current_turn_index] === mySeatColor &&
+    (isDecideTrade || isDecideAcceptees);
   const isPlayingDevCard =
     isPlayingMonopoly || isPlayingYearOfPlenty || isRoadBuilding;
 
@@ -439,20 +449,20 @@ export default function ActionsToolbar({
 
   // Primary CTA orb state
   const ctaConfig = useMemo(() => {
+    if (isOwnTrade) {
+      return {
+        label: t("ABRIR NEGOCIAÇÃO", "OPEN TRADE CENTER"),
+        shortSub: t("Sua proposta", "Your offer"),
+        variant: "gold",
+        icon: <AccountBalanceIcon />,
+        onClick: () => setTradeModalOpen(true),
+      };
+    }
     if (isDecideTrade) {
       return {
         label: t("RESPONDER", "RESPOND"),
         shortSub: t("Proposta", "Offer"),
         variant: "gold",
-        icon: <AccountBalanceIcon />,
-        onClick: () => setTradeDecisionMinimized(false),
-      };
-    }
-    if (isDecideAcceptees) {
-      return {
-        label: t("CONFIRMAR", "CONFIRM"),
-        shortSub: t("Fechar Troca", "Confirm Trade"),
-        variant: "emerald",
         icon: <AccountBalanceIcon />,
         onClick: () => setTradeDecisionMinimized(false),
       };
@@ -507,7 +517,7 @@ export default function ActionsToolbar({
     };
   }, [
     isDecideTrade,
-    isDecideAcceptees,
+    isOwnTrade,
     isDiscard,
     isMoveRobber,
     isPlayingYearOfPlenty,
@@ -563,7 +573,7 @@ export default function ActionsToolbar({
         </div>
       )}
 
-      <div className="cu-bottom-console">
+      <div className="cu-bottom-console" ref={consoleRef}>
         {/* LEFT ZONE: Quick Build & Tactical Actions (or Bot/Opponent status) */}
         <div className="cu-console__actions">
           {isInteractiveTurn ? (
@@ -594,6 +604,8 @@ export default function ActionsToolbar({
                             } as React.CSSProperties)
                           : undefined
                       }
+                      aria-label={buildingCosts.ROAD.label}
+                      aria-pressed={isBuildingRoad}
                       disabled={!canRoad}
                       onClick={() =>
                         dispatch({ type: ACTIONS.TOGGLE_BUILDING_ROAD })
@@ -606,10 +618,7 @@ export default function ActionsToolbar({
                       ) : (
                         <span className="cu-build-tile__piece cu-build-tile__piece--road" />
                       )}
-                      <span className="cu-build-tile__name">
-                        {buildingCosts.ROAD.label}
-                      </span>
-                      <span className="cu-build-tile__stock">{myRoadsLeft}</span>
+                      <span className="cu-build-tile__stock" aria-label={t(`${myRoadsLeft} restantes`, `${myRoadsLeft} left`)}>{myRoadsLeft}</span>
                     </button>
                   </span>
                 </Tooltip>
@@ -617,7 +626,7 @@ export default function ActionsToolbar({
                 <Tooltip
                   title={t(
                     "Fundar Aldeia (1 Madeira + 1 Argila + 1 Ovelha + 1 Trigo) — +1 PV",
-                    "Build Settlement (1 Lumber + 1 Brick + 1 Wool + 1 Grain) — +1 VP"
+                    "Build Settlement (1 Lumber + 1 Brick + 1 Sheep + 1 Grain) — +1 VP"
                   )}
                   arrow
                   placement="top"
@@ -628,20 +637,19 @@ export default function ActionsToolbar({
                       className={cn("cu-build-tile", {
                         "is-selected": isBuildingSettlement,
                       })}
+                      aria-label={buildingCosts.SETTLEMENT.label}
+                      aria-pressed={isBuildingSettlement}
                       disabled={!canSettlement}
                       onClick={() =>
                         dispatch({ type: ACTIONS.SET_IS_BUILDING_SETTLEMENT })
                       }
                     >
                       {humanColor && (
-                        <svg width="22" height="22" viewBox="-24 -30 48 52" aria-hidden="true">
-                          <SettlementSvgPiece color={humanColor} scale={0.95} skin={pieceSkin} />
+                        <svg className="cu-build-tile__building-svg" viewBox="-24 -30 48 52" aria-hidden="true">
+                          <SettlementSvgPiece color={humanColor} scale={1.24} skin={pieceSkin} />
                         </svg>
                       )}
-                      <span className="cu-build-tile__name">
-                        {buildingCosts.SETTLEMENT.label}
-                      </span>
-                      <span className="cu-build-tile__stock">{mySettlementsLeft}</span>
+                      <span className="cu-build-tile__stock" aria-label={t(`${mySettlementsLeft} restantes`, `${mySettlementsLeft} left`)}>{mySettlementsLeft}</span>
                     </button>
                   </span>
                 </Tooltip>
@@ -660,20 +668,19 @@ export default function ActionsToolbar({
                       className={cn("cu-build-tile", {
                         "is-selected": isBuildingCity,
                       })}
+                      aria-label={buildingCosts.CITY.label}
+                      aria-pressed={isBuildingCity}
                       disabled={!canCity}
                       onClick={() =>
                         dispatch({ type: ACTIONS.SET_IS_BUILDING_CITY })
                       }
                     >
                       {humanColor && (
-                        <svg width="22" height="22" viewBox="-24 -30 48 52" aria-hidden="true">
-                          <CitySvgPiece color={humanColor} scale={0.88} skin={pieceSkin} />
+                        <svg className="cu-build-tile__building-svg" viewBox="-24 -30 48 52" aria-hidden="true">
+                          <CitySvgPiece color={humanColor} scale={1.22} skin={pieceSkin} />
                         </svg>
                       )}
-                      <span className="cu-build-tile__name">
-                        {buildingCosts.CITY.label}
-                      </span>
-                      <span className="cu-build-tile__stock">{myCitiesLeft}</span>
+                      <span className="cu-build-tile__stock" aria-label={t(`${myCitiesLeft} restantes`, `${myCitiesLeft} left`)}>{myCitiesLeft}</span>
                     </button>
                   </span>
                 </Tooltip>
@@ -681,7 +688,7 @@ export default function ActionsToolbar({
                 <Tooltip
                   title={t(
                     "Comprar Carta de Desenvolvimento (1 Ovelha + 1 Trigo + 1 Minério)",
-                    "Buy Development Card (1 Wool + 1 Grain + 1 Ore)"
+                    "Buy Development Card (1 Sheep + 1 Grain + 1 Ore)"
                   )}
                   arrow
                   placement="top"
@@ -771,6 +778,7 @@ export default function ActionsToolbar({
               playerState={gameState.player_state}
               playerKey={playerKey(gameState, humanColor)}
               showEmptySlots={true}
+              iconOnly
               interactiveDevCards={true}
               playableDevCallbacks={playableDevCallbacks}
             />
@@ -836,7 +844,7 @@ export default function ActionsToolbar({
             );
           })()}
 
-          {isInteractiveTurn && (
+          {showPrimaryAction && (isOwnTrade || (isInteractiveTurn && !isDecideAcceptees)) && (
             <button
               type="button"
               disabled={
@@ -864,17 +872,21 @@ export default function ActionsToolbar({
         onClose={() => setTradeModalOpen(false)}
         tradeActions={tradeActions}
         playerState={gameState.player_state}
-        playerKey={activeKey}
-        playerColor={humanColor ?? gameState.current_color}
+        playerKey={humanKey ?? activeKey}
+        playerColor={mySeatColor ?? humanColor ?? gameState.current_color}
         gameState={gameState}
         canOfferDomesticTrade={canOfferDomesticTrade}
+        reviewingActiveOffer={isOwnTrade}
+        canTradeMaritime={isInteractiveTurn && !isDecideTrade && !isDecideAcceptees}
         onExecuteTrade={executeGameAction}
       />
 
       <TradeOfferDecisionDialog
         open={
           isInteractiveTurn &&
-          (isDecideTrade || isDecideAcceptees) &&
+          isDecideTrade &&
+          !isOwnTrade &&
+          !tradeModalOpen &&
           !tradeDecisionMinimized
         }
         onMinimize={() => setTradeDecisionMinimized(true)}

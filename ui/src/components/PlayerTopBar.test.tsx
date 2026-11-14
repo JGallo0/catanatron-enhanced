@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, test } from "vitest";
 import PlayerTopBar from "./PlayerTopBar";
 import { makeGameState } from "../test/fixtures";
@@ -216,7 +216,7 @@ describe("PlayerTopBar", () => {
     expect(document.querySelectorAll(".cu-inspect-stat-box--warn")).toHaveLength(1);
   });
 
-  test("renders heraldic star beside road/army icons for current leader and moves the star dynamically when surpassed", () => {
+  test("shows distinct medals on the current holders and moves them when surpassed", () => {
     const base = makeGameState({
       colors: ["RED", "BLUE"],
       bot_colors: ["BLUE"],
@@ -240,11 +240,10 @@ describe("PlayerTopBar", () => {
       </StateProvider>
     );
 
-    const cards = () => container.querySelectorAll(".cu-player-card");
-    expect(cards()[0].querySelector('[data-testid="award-star-road"]')).toBeTruthy();
-    expect(cards()[0].querySelector('[data-testid="award-star-army"]')).toBeTruthy();
-    expect(cards()[1].querySelector('[data-testid="award-star-road"]')).toBeNull();
-    expect(cards()[1].querySelector('[data-testid="award-star-army"]')).toBeNull();
+    const card = (index: number) => within(container.querySelectorAll<HTMLElement>(".cu-player-card")[index]);
+    expect(card(0).getByRole("img", { name: "Maior Estrada" })).toBeInTheDocument();
+    expect(card(0).getByRole("img", { name: "Maior Exército" })).toBeInTheDocument();
+    expect(card(1).queryByRole("img", { name: /Maior Estrada|Maior Exército/ })).not.toBeInTheDocument();
 
     const overtaken = makeGameState({
       ...base,
@@ -265,9 +264,8 @@ describe("PlayerTopBar", () => {
       </StateProvider>
     );
 
-    expect(cards()[0].querySelector('[data-testid="award-star-road"]')).toBeNull();
-    expect(cards()[0].querySelector('[data-testid="award-star-army"]')).toBeNull();
-    expect(cards()[1].querySelector('[data-testid="award-star-road"]')).toBeTruthy();
-    expect(cards()[1].querySelector('[data-testid="award-star-army"]')).toBeTruthy();
+    expect(card(0).queryByRole("img", { name: /Maior Estrada|Maior Exército/ })).not.toBeInTheDocument();
+    expect(card(1).getByRole("img", { name: "Maior Estrada" })).toBeInTheDocument();
+    expect(card(1).getByRole("img", { name: "Maior Exército" })).toBeInTheDocument();
   });
 });

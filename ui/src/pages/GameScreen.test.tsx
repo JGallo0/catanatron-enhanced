@@ -1,11 +1,11 @@
 import { useContext } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { StateProvider, store } from "../store";
-import type { GameState } from "../utils/api.types";
+import type { ConfirmTradeAction, GameState, OfferTradeAction, TradeOfferTuple } from "../utils/api.types";
 import {
   abandonGame,
   getGameMessages,
@@ -281,6 +281,75 @@ test("enables Trocar post-roll without maritime 4:1 cards and opens TradeOfferDe
   ).toBeEnabled();
 });
 
+test("keeps the trade center open from the offer through confirmation with a chosen partner", async () => {
+  const bundle: TradeOfferTuple = [1, 0, 0, 0, 0, 0, 0, 0, 1, 0];
+  const offer: OfferTradeAction = ["BLUE", "OFFER_TRADE", bundle];
+  const confirm: ConfirmTradeAction = ["BLUE", "CONFIRM_TRADE", [...bundle, "ORANGE"]];
+  const before = makeGameState({
+    colors: ["RED", "BLUE", "ORANGE", "WHITE"],
+    bot_colors: [],
+    seat_names: { RED: "Ana", BLUE: "João", ORANGE: "Beto", WHITE: "Lia" },
+    player_state: { ...baseState.player_state, P1_HAS_ROLLED: true },
+    current_playable_actions: [["BLUE", "END_TURN", null]],
+  });
+  const waiting: GameState = {
+    ...before,
+    state_index: 13,
+    current_color: "WHITE",
+    current_player_index: 3,
+    current_prompt: "DECIDE_TRADE",
+    is_resolving_trade: true,
+    current_trade: [...bundle, 1],
+    current_playable_actions: [["WHITE", "REJECT_TRADE", [...bundle, 1]]],
+    action_records: [
+      [offer, null],
+      [["RED", "ACCEPT_TRADE", [...bundle, 1]], null],
+      [["ORANGE", "ACCEPT_TRADE", [...bundle, 1]], null],
+    ],
+  };
+  const ready: GameState = {
+    ...waiting,
+    state_index: 14,
+    current_color: "BLUE",
+    current_player_index: 1,
+    current_prompt: "DECIDE_ACCEPTEES",
+    current_playable_actions: [
+      ["BLUE", "CANCEL_TRADE", null],
+      ["BLUE", "CONFIRM_TRADE", [...bundle, "RED"]],
+      confirm,
+    ],
+    action_records: [...waiting.action_records, [["WHITE", "REJECT_TRADE", [...bundle, 1]], null]],
+  };
+  const completed: GameState = {
+    ...before,
+    state_index: 15,
+    action_records: [...ready.action_records, [confirm, null]],
+  };
+  vi.mocked(getState).mockResolvedValue(before);
+  vi.mocked(postAction).mockResolvedValueOnce(waiting).mockResolvedValueOnce(completed);
+  renderGameScreen({ initialEntry: "/games/game-123?seat=BLUE" });
+
+  fireEvent.click(await screen.findByRole("button", { name: "Trocar" }));
+  const center = within(screen.getByRole("dialog", { name: /Central de Negociação/i }));
+  fireEvent.click(center.getByRole("button", { name: "Adicionar oferta de Madeira" }));
+  fireEvent.click(center.getByRole("button", { name: "Adicionar pedido de Trigo" }));
+  fireEvent.click(center.getByRole("button", { name: /Enviar Proposta à Mesa/i }));
+  expect(await center.findByText(/Ana.*aceitou/i)).toBeInTheDocument();
+  expect(center.getByText(/Lia.*aguardando/i)).toBeInTheDocument();
+
+  vi.mocked(getState).mockResolvedValue(ready);
+  expect(await center.findByText(/Lia.*recusou/i, {}, { timeout: 5000 })).toBeInTheDocument();
+  const confirmButton = center.getByRole("button", { name: "Confirmar troca" });
+  expect(confirmButton).toBeDisabled();
+  fireEvent.click(center.getByRole("radio", { name: /Beto/i }));
+  expect(postAction).toHaveBeenCalledTimes(1);
+  fireEvent.click(confirmButton);
+  expect(await center.findByText(/Troca concluída com Beto/i)).toBeInTheDocument();
+  expect(postAction).toHaveBeenLastCalledWith("game-123", confirm);
+  fireEvent.click(center.getByRole("button", { name: "Fechar" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: /Central de Negociação/i })).not.toBeInTheDocument());
+});
+
 test("cycles pacing speed across Normal, Rápida, and Turbo and persists catan_game_speed_v1", async () => {
   vi.mocked(getState).mockResolvedValue(baseState);
 
@@ -388,6 +457,34 @@ test("shows animated DiceRollOverlay (Total 8) and .action-spotlight-toast on RO
 
   expect(screen.queryByText(/Total 8/i)).not.toBeInTheDocument();
   expect(container.querySelector(".action-spotlight-toast")).toBeNull();
+});
+
+test("reveals Roubar only when the dice animation shows the rolled seven", async () => {
+  const rollState = makeGameState({
+    state_index: 13,
+    current_prompt: "MOVE_ROBBER",
+    player_state: { ...baseState.player_state, P1_HAS_ROLLED: true },
+    current_playable_actions: [["BLUE", "MOVE_ROBBER", [[0, 0, 0]]]],
+    action_records: [[["BLUE", "ROLL", null], [3, 4]]],
+  });
+  vi.mocked(getState).mockResolvedValue(baseState);
+  vi.mocked(postAction).mockResolvedValueOnce(rollState);
+
+  renderGameScreen();
+  const rollButton = await screen.findByRole("button", { name: "ROLAR DADOS" });
+
+  vi.useFakeTimers();
+  await act(async () => fireEvent.click(rollButton));
+  expect(screen.getByText(/Rolando\.\.\./i)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ROUBAR" })).not.toBeInTheDocument();
+
+  await act(async () => vi.advanceTimersByTimeAsync(3299));
+  expect(screen.queryByText(/Total 7/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ROUBAR" })).not.toBeInTheDocument();
+
+  await act(async () => vi.advanceTimersByTimeAsync(1));
+  expect(screen.getByText(/Total 7 — Ladrão!/i)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "ROUBAR" })).toBeEnabled();
 });
 
 test("supports multiplayer Sair (Bot Assume) dialog, abandonGame, Retomar Meu Assento banner, and reclaimGame", async () => {
@@ -903,6 +1000,19 @@ test("toggles piece skin between contrast and cottage from left dock", async () 
 
   fireEvent.click(pieceSkinBtn);
   expect(localStorage.getItem("catan_piece_skin_v1")).toBe("contrast");
+});
+
+test("offers all three board styles independently of the pieces during a match", async () => {
+  vi.mocked(getState).mockResolvedValue(baseState);
+  renderGameScreen();
+
+  fireEvent.click(await screen.findByRole("button", { name: "Estilo do tabuleiro" }));
+  const menu = within(screen.getByRole("menu", { name: "Estilo do tabuleiro" }));
+  expect(menu.getByRole("menuitemradio", { name: "Diorama 3D" })).toBeChecked();
+  expect(menu.getByRole("menuitemradio", { name: "Pintura Clássica" })).toBeInTheDocument();
+  fireEvent.click(menu.getByRole("menuitemradio", { name: "Vetorial Simplificado" }));
+  expect(localStorage.getItem("catan_board_skin_v1")).toBe("vector");
+  expect(localStorage.getItem("catan_piece_skin_v1")).toBeNull();
 });
 
 test("renders game-top-hud-container enclosing top hud and player top bar, with full-bleed board-container", async () => {

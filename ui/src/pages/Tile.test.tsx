@@ -1,10 +1,13 @@
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { afterEach, describe, it, expect } from "vitest";
+import { act, fireEvent, render } from "@testing-library/react";
 import Tile from "./Tile";
 import type { Tile as TileData } from "../utils/api.types";
+import { saveBoardSkin } from "../utils/boardSkin";
 
-describe("Tile component (Ultra-HD Vector standard)", () => {
-  it("renders land resource tile with pure vector SVG and no blurry img overlays", () => {
+afterEach(() => localStorage.clear());
+
+describe("Tile", () => {
+  it("restores diorama artwork by default and switches to classic and vector styles", () => {
     const tileData: TileData = {
       id: 1,
       type: "RESOURCE_TILE",
@@ -22,25 +25,28 @@ describe("Tile component (Ultra-HD Vector standard)", () => {
       />
     );
 
-    // Vector artwork container must be present
     const artwork = container.querySelector(".tile__artwork");
     expect(artwork).toBeInTheDocument();
+    const diorama = artwork!.querySelector("img")!;
+    expect(diorama).toHaveAttribute("src", "/assets/illustrations/tiles/themes/diorama/wood.webp");
+    fireEvent.load(diorama);
+    expect(diorama).toBeVisible();
+    expect(artwork?.querySelector("svg")).toBeNull();
 
-    // Must render SVG inside artwork
+    act(() => saveBoardSkin("classic"));
+    expect(artwork?.querySelector("img")).toHaveAttribute("src", "/assets/illustrations/tiles/themes/classic/wood.webp");
+    expect(container.querySelector(".tile__hex-surface--classic")).toBeInTheDocument();
+
+    act(() => saveBoardSkin("vector"));
     const svg = artwork?.querySelector("svg");
     expect(svg).toBeInTheDocument();
     expect(svg).toHaveAttribute("viewBox", "0 0 200 230");
-
-    // Must have bevel frame overlay and number token
     expect(container.querySelector(".tile__frame-svg")).toBeInTheDocument();
     expect(container.querySelector(".number-token")).toBeInTheDocument();
-
-    // MUST NOT have any raster img overlay (Option 1 standardization)
-    expect(container.querySelector("img")).toBeNull();
-    expect(container.querySelector(".tile__custom-illustration")).toBeNull();
+    expect(artwork?.querySelector("img")).toBeNull();
   });
 
-  it("renders desert tile with pure vector SVG and no number token", () => {
+  it("uses the vector desert when the selected illustrations are unavailable", () => {
     const desertData: TileData = {
       id: 2,
       type: "DESERT",
@@ -57,7 +63,11 @@ describe("Tile component (Ultra-HD Vector standard)", () => {
     );
 
     const artwork = container.querySelector(".tile__artwork");
-    expect(artwork).toBeInTheDocument();
+    for (const extension of ["webp", "png", "jpg"]) {
+      const image = artwork!.querySelector("img")!;
+      expect(image).toHaveAttribute("src", `/assets/illustrations/tiles/themes/diorama/desert.${extension}`);
+      fireEvent.error(image);
+    }
     expect(artwork?.querySelector("svg")).toBeInTheDocument();
     expect(container.querySelector(".number-token")).toBeNull();
     expect(container.querySelector("img")).toBeNull();

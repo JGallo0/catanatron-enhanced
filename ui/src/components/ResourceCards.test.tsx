@@ -96,3 +96,26 @@ test("supports interactive dev cards with playable action, Nova (Próx. turno) l
   fireEvent.click(playBtn);
   expect(onPlayKnight).toHaveBeenCalledTimes(1);
 });
+
+test("shows the five resource counters and keeps development cards playable in the icon hand", () => {
+  const playKnight = vi.fn();
+  const { container } = render(
+    <ResourceCards
+      playerState={OWN_HAND}
+      playerKey="P0"
+      showEmptySlots
+      iconOnly
+      interactiveDevCards
+      playableDevCallbacks={{ KNIGHT: playKnight }}
+    />
+  );
+
+  expect(screen.getByRole("img", { name: "Madeira (2)" })).toHaveTextContent("2");
+  expect(screen.getByRole("img", { name: "Argila (0)" })).toHaveTextContent("0");
+  expect(screen.getAllByRole("img")).toHaveLength(5);
+  expect(container.querySelector(".resource-card-item__bg-art")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /Cavaleiro.*Clique para jogar/i }));
+  fireEvent.click(screen.getByRole("button", { name: /Jogar Carta/i }));
+  expect(playKnight).toHaveBeenCalledOnce();
+});

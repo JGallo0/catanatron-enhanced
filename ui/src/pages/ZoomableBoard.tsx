@@ -94,6 +94,7 @@ function buildEdgeActions(state: CatanState) {
 
 type ZoomableBoardProps = {
   replayMode: boolean;
+  hudClearance?: { top: number; bottom: number };
   recentNodeId?: number | null;
   recentEdgeId?: string | null;
 };
@@ -125,6 +126,7 @@ function loadSavedConfirmPlacement(): boolean {
 
 export default function ZoomableBoard({
   replayMode,
+  hudClearance,
   recentNodeId = null,
   recentEdgeId = null,
 }: ZoomableBoardProps) {
@@ -414,6 +416,7 @@ export default function ZoomableBoard({
                 height={height}
                 containerWidth={containerSize?.width}
                 containerHeight={containerSize?.height}
+                hudClearance={hudClearance}
                 buildOnNodeClick={buildOnNodeClick}
                 buildOnEdgeClick={buildOnEdgeClick}
                 handleTileClick={handleTileClick}

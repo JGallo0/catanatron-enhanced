@@ -6,7 +6,7 @@ O componente [`HybridIllustration`](../../../src/components/icons/GameIcons.tsx)
 ## 1. `tiles/` — Hexágonos do Tabuleiro (`1:1`, ex: `1024x1024`)
 - `wood.webp` (ou `wood.png`) — Floresta (Madeira)
 - `brick.webp` (ou `brick.png`) — Colinas (Argila)
-- `sheep.webp` (ou `sheep.png`) — Pastagem (Lã)
+- `sheep.webp` (ou `sheep.png`) — Pastagem (Ovelha)
 - `wheat.webp` (ou `wheat.png`) — Campos (Trigo)
 - `ore.webp` (ou `ore.png`) — Montanha (Minério)
 - `desert.webp` (ou `desert.png`) — Deserto (Oásis)
@@ -15,7 +15,7 @@ O componente [`HybridIllustration`](../../../src/components/icons/GameIcons.tsx)
 ## 2. `cards/` — Cartas de Matéria-Prima (`3:4`, ex: `768x1024`)
 - `wood.webp` (ou `wood.png`) — Carta de Madeira
 - `brick.webp` (ou `brick.png`) — Carta de Argila
-- `sheep.webp` (ou `sheep.png`) — Carta de Lã
+- `sheep.webp` (ou `sheep.png`) — Carta de Ovelha
 - `wheat.webp` (ou `wheat.png`) — Carta de Trigo
 - `ore.webp` (ou `ore.png`) — Carta de Minério
 

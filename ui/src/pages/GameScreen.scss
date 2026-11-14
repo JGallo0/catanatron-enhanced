@@ -409,7 +409,7 @@ main.catan-game-screen {
 
 .board-camera-controls {
   position: absolute;
-  bottom: 120px;
+  bottom: calc(var(--match-bottom-clearance, 108px) + 8px);
   right: 16px;
   z-index: 26;
   display: flex;
@@ -454,28 +454,27 @@ main.catan-game-screen {
 /* Left Vertical Quick Dock */
 .game-left-dock {
   position: fixed;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 20px;
+  top: calc(var(--match-top-clearance, 106px) + 12px);
   z-index: 44;
   pointer-events: auto;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 16px;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 11px;
   background: rgba(10, 19, 34, 0.88);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(250, 204, 21, 0.28);
+  border: 1px solid rgba(148, 187, 206, 0.28);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.62);
 
   &__btn {
     position: relative;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 34px;
     padding: 0;
-    border-radius: 11px;
+    border-radius: 7px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(30, 41, 59, 0.82);
     color: #e2e8f0;
@@ -491,14 +490,12 @@ main.catan-game-screen {
       background: rgba(51, 65, 85, 0.95);
       border-color: rgba(250, 204, 21, 0.65);
       color: #fef08a;
-      transform: translateX(2px);
     }
 
     &.is-open {
-      background: rgba(180, 83, 9, 0.72);
-      border-color: #facc15;
-      color: #fef08a;
-      box-shadow: 0 0 12px rgba(250, 204, 21, 0.3);
+      background: #163d44;
+      border-color: #447672;
+      color: #c4fff1;
     }
 
     &.has-unread {
@@ -530,6 +527,8 @@ main.catan-game-screen {
     }
   }
 
+  &__btn--chat { order: -1; }
+
   &__lock {
     position: absolute;
     top: -3px;
@@ -542,8 +541,13 @@ main.catan-game-screen {
   }
 
   &__icon {
-    font-size: 1rem;
-    line-height: 1;
+    display: inline-flex;
+
+    svg {
+      width: 17px;
+      height: 17px;
+      stroke-width: 1.75;
+    }
   }
 
   &__tag {
@@ -573,7 +577,6 @@ main.catan-game-screen {
 
 @media (max-height: 700px) and (min-width: 769px) {
   .game-left-dock {
-    top: 51%;
     gap: 4px;
     padding: 5px;
     border-radius: 13px;
@@ -592,14 +595,11 @@ main.catan-game-screen {
 
 @media (max-width: 768px), (max-height: 640px) {
   .game-left-dock {
-    left: 6px;
-    top: auto;
-    bottom: 196px;
-    transform: none;
+    left: 8px;
     z-index: 44;
     flex-direction: row;
     flex-wrap: wrap;
-    max-width: calc(100vw - 140px);
+    max-width: calc(100vw - 16px);
     padding: 4px;
     gap: 4px;
     border-radius: 12px;
@@ -683,7 +683,6 @@ main.catan-game-screen {
   }
 
   .board-camera-controls {
-    bottom: 140px;
     right: 10px;
     padding: 4px;
     gap: 4px;
@@ -716,7 +715,6 @@ main.catan-game-screen {
   }
 
   .board-camera-controls {
-    bottom: 140px;
     right: 8px;
     padding: 3px;
     gap: 3px;
@@ -767,7 +765,6 @@ main.catan-game-screen {
   }
 
   .board-camera-controls {
-    bottom: 74px;
     right: 8px;
     padding: 3px;
     gap: 3px;
@@ -831,7 +828,7 @@ main.catan-game-screen {
 /* Unified Desktop + Mobile Action Spotlight Toast */
 .action-spotlight-toast {
   position: fixed;
-  top: 158px;
+  top: calc(var(--match-top-clearance, 108px) + 2px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 38;
@@ -884,15 +881,9 @@ main.catan-game-screen {
   }
 }
 
-@media (max-width: 960px) {
-  .action-spotlight-toast {
-    top: 174px;
-  }
-}
-
 @media (max-width: 768px) {
   .action-spotlight-toast {
-    top: 124px;
+    top: calc(var(--match-top-clearance, 108px) + 54px);
     padding: 5px 12px;
     font-size: 0.74rem;
     max-width: 94vw;
@@ -918,14 +909,10 @@ main.catan-game-screen {
     gap: 3px;
   }
 
-  .action-spotlight-toast {
-    top: 118px;
-  }
 }
 
 @media (max-height: 520px) {
   .action-spotlight-toast {
-    top: 88px;
     padding: 4px 10px;
     font-size: 0.72rem;
   }
@@ -933,8 +920,8 @@ main.catan-game-screen {
 
 .game-chat-preview-toast {
   position: fixed;
-  left: 74px;
-  bottom: 162px;
+  left: 20px;
+  bottom: calc(var(--match-bottom-clearance, 108px) + 66px);
   z-index: 33;
   display: inline-flex;
   align-items: center;
@@ -985,7 +972,7 @@ main.catan-game-screen {
 @media (max-width: 768px) {
   .game-chat-preview-toast {
     left: 10px;
-    bottom: 112px;
+    bottom: calc(var(--match-bottom-clearance, 108px) + 8px);
     max-width: calc(100vw - 20px);
     font-size: 0.72rem;
   }
@@ -1098,8 +1085,8 @@ main.catan-game-screen {
 /* Discreet Persistent Bottom-Left Mini Action Log */
 .mini-action-log {
   position: fixed;
-  left: 74px;
-  bottom: 120px;
+  left: 20px;
+  bottom: calc(var(--match-bottom-clearance, 90px) + 8px);
   z-index: 16;
   pointer-events: none;
   display: flex;
@@ -1161,17 +1148,10 @@ main.catan-game-screen {
   animation: spotlight-toast-in 0.18s ease;
 
   &--dock {
-    top: 50%;
-    left: calc(100% + 12px);
+    top: calc(100% + 8px);
+    left: 0;
     right: auto;
-    transform: translateY(-50%);
-
-    @media (max-width: 768px), (max-height: 520px) {
-      top: auto;
-      bottom: calc(100% + 10px);
-      left: 0;
-      transform: none;
-    }
+    width: min(266px, calc(100vw - 94px));
   }
 
   &__header {

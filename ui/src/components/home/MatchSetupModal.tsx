@@ -44,6 +44,7 @@ import { useLanguage } from "../../i18n";
 import { getSavedGameSpeed, saveGameSpeed } from "../../utils/tabletopPacing";
 import { getSavedGameSeat, saveGameSeat } from "../../utils/seatStorage";
 import { usePieceSkin } from "../../utils/pieceSkin";
+import { useBoardSkin } from "../../utils/boardSkin";
 import type { Color } from "../../utils/api.types";
 import PlayerAvatar from "../PlayerAvatar";
 import MapTemplatePreview from "./MapTemplatePreview";
@@ -116,6 +117,7 @@ export default function MatchSetupModal({
     defaultSeatsForMode(mode)
   );
   const { skin: pieceSkin, setSkin: setPieceSkin } = usePieceSkin();
+  const { skin: boardSkin, changeSkin: setBoardSkin, skins: boardSkins } = useBoardSkin();
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -672,6 +674,31 @@ export default function MatchSetupModal({
                 }`}
               >
                 {opt.icon} {opt.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="match-setup-group">
+          <div className="match-setup-group__header">
+            <span>{t("Estilo do Tabuleiro", "Board Style")}</span>
+          </div>
+          <div
+            className="match-setup-templates"
+            role="group"
+            aria-label={t("Estilo do Tabuleiro", "Board Style")}
+          >
+            {Object.values(boardSkins).map((option) => (
+              <Button
+                key={option.id}
+                variant="contained"
+                aria-pressed={boardSkin === option.id}
+                onClick={() => setBoardSkin(option.id)}
+                title={t(option.descriptionPt, option.descriptionEn)}
+                className={`match-setup-choice-btn match-setup-skin-btn ${boardSkin === option.id ? "selected" : ""}`}
+              >
+                {t(option.namePt, option.nameEn)}
+                {option.isDefault && ` (${t(option.badgePt, option.badgeEn)})`}
               </Button>
             ))}
           </div>

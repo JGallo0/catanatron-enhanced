@@ -48,6 +48,7 @@ type BoardProps = {
   height: number;
   containerWidth?: number;
   containerHeight?: number;
+  hudClearance?: { top: number; bottom: number };
   buildOnNodeClick: (
     id: number,
     action?: GameAction
@@ -78,6 +79,7 @@ export default function Board({
   height,
   containerWidth,
   containerHeight,
+  hudClearance,
   buildOnNodeClick,
   buildOnEdgeClick,
   handleTileClick,
@@ -108,8 +110,8 @@ export default function Board({
 
   // Clearance for floating top bar (players + prompt banner) and bottom console (cards + actions)
   // Ensures all 19 hexes and 9 coastal harbor ships are 100% visible on load without cropping
-  const topHudClearance = isCompactHeight ? 56 : isMobile ? 84 : 108;
-  const bottomConsoleClearance = isCompactHeight ? 64 : isMobile ? 100 : 128;
+  const topHudClearance = hudClearance?.top ?? (isCompactHeight ? 56 : isMobile ? 84 : 108);
+  const bottomConsoleClearance = hudClearance?.bottom ?? (isCompactHeight ? 64 : isMobile ? 100 : 128);
   const verticalSafetyMargin = topHudClearance + bottomConsoleClearance;
 
   const canvasWidth = hasMeasuredContainer ? containerWidth : fallbackCanvasWidth;
@@ -132,7 +134,7 @@ export default function Board({
   // Optical center calibrated to Print 2:
   // Nudged slightly down (+22px on desktop, +8px on mobile) so the top harbor ships
   // sit comfortably below the prompt banner while the bottom harbor ships clear the console dock
-  const verticalOffset = isCompactHeight ? 4 : isMobile ? 8 : 22;
+  const verticalOffset = hudClearance ? 0 : isCompactHeight ? 4 : isMobile ? 8 : 22;
   const center: [number, number] = [
     canvasWidth / 2,
     topHudClearance + availableCanvasHeight / 2 + verticalOffset,

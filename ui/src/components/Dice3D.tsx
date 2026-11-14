@@ -59,13 +59,13 @@ const TARGET_FACE_TRANSFORM: Record<number, string> = {
   6: "rotateX(-90deg)",
 };
 
-const FACES: Array<{ faceValue: 1 | 2 | 3 | 4 | 5 | 6; modifier: string }> = [
-  { faceValue: 1, modifier: "front" },
-  { faceValue: 6, modifier: "back" },
-  { faceValue: 3, modifier: "right" },
-  { faceValue: 4, modifier: "left" },
-  { faceValue: 5, modifier: "top" },
-  { faceValue: 2, modifier: "bottom" },
+const FACES = [
+  { faceValue: 1, modifier: "front", rotation: "rotateY(0deg)" },
+  { faceValue: 6, modifier: "back", rotation: "rotateY(180deg)" },
+  { faceValue: 3, modifier: "right", rotation: "rotateY(90deg)" },
+  { faceValue: 4, modifier: "left", rotation: "rotateY(-90deg)" },
+  { faceValue: 5, modifier: "top", rotation: "rotateX(90deg)" },
+  { faceValue: 2, modifier: "bottom", rotation: "rotateX(-90deg)" },
 ];
 
 export default function Dice3D({
@@ -79,6 +79,8 @@ export default function Dice3D({
   const { t } = useLanguage();
   const safeValue = Math.min(6, Math.max(1, Math.round(value || 1)));
   const faceTransform = TARGET_FACE_TRANSFORM[safeValue] || TARGET_FACE_TRANSFORM[1];
+  // A normal do topo aponta para -Y antes da inclinação em direção à câmera.
+  const cameraTilt = dieIndex === 1 ? "rotateX(-68deg) rotateZ(10deg)" : "rotateX(-66deg) rotateZ(-6deg)";
 
   return (
     <span
@@ -101,7 +103,7 @@ export default function Dice3D({
           : t(`Dado ${safeValue}`, `Die ${safeValue}`)
       }
     >
-      <span className="dice3d-tilt" aria-hidden="true">
+      <span className="dice3d-tilt" style={{ "--dice-camera-tilt": cameraTilt } as React.CSSProperties} aria-hidden="true">
         <span
           className="dice3d-cube"
           style={rolling ? undefined : { transform: faceTransform }}
@@ -111,7 +113,7 @@ export default function Dice3D({
           <span className="dice3d-core dice3d-core--y" />
           <span className="dice3d-core dice3d-core--z" />
 
-          {FACES.map(({ faceValue, modifier }) => {
+          {FACES.map(({ faceValue, modifier, rotation }) => {
             const pips = PIP_COORDS[faceValue];
             const pipRed = isHot || faceValue === 1;
             return (
@@ -122,6 +124,7 @@ export default function Dice3D({
                   `dice3d-face--${modifier}`,
                   { "is-red-pips": pipRed }
                 )}
+                style={{ transform: `${rotation} translateZ(var(--die-half))` }}
               >
                 <span className="dice3d-face__bevel">
                   {pips.map(([x, y], idx) => (

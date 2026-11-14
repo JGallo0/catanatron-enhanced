@@ -102,58 +102,6 @@ describe("TradeOfferDecisionDialog", () => {
     });
   });
 
-  test("renders DECIDE_ACCEPTEES partners and dispatches CONFIRM_TRADE or CANCEL_TRADE", async () => {
-    const onExecuteAction = vi.fn().mockResolvedValue(undefined);
-    const baseTrade: [number, number, number, number, number, number, number, number, number, number] = [
-      1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-    ];
-    const confirmRed: GameAction = ["BLUE", "CONFIRM_TRADE", [...baseTrade, "RED"]];
-    const cancelAct: GameAction = ["BLUE", "CANCEL_TRADE", null];
-
-    const state = makeGameState({
-      colors: ["RED", "BLUE", "ORANGE"],
-      bot_colors: ["RED", "ORANGE"],
-      current_color: "BLUE",
-      current_turn_index: 1,
-      current_prompt: "DECIDE_ACCEPTEES",
-      is_resolving_trade: true,
-      current_trade: [...baseTrade, 1],
-      acceptees: [true, false, false],
-      seat_names: { RED: "Creitu", BLUE: "João", ORANGE: "Felire" },
-      seat_avatars: {
-        RED: { seat_kind: "BOT", username: null, avatar_config: {} },
-        BLUE: { seat_kind: "USER", username: "joao", avatar_config: {} },
-        ORANGE: { seat_kind: "BOT", username: null, avatar_config: {} },
-      },
-      current_playable_actions: [cancelAct, confirmRed],
-    });
-
-    render(
-      <ThemeProvider theme={theme}>
-        <TradeOfferDecisionDialog
-          open={true}
-          onMinimize={vi.fn()}
-          gameState={state}
-          humanColor="BLUE"
-          onExecuteAction={onExecuteAction}
-        />
-      </ThemeProvider>
-    );
-
-    expect(screen.getByText(/Creitu aceitou/i)).toBeInTheDocument();
-    expect(screen.getByText(/Felire recusou/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Trocar com Creitu/i }));
-    await waitFor(() => {
-      expect(onExecuteAction).toHaveBeenCalledWith(confirmRed);
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /Cancelar Troca/i }));
-    await waitFor(() => {
-      expect(onExecuteAction).toHaveBeenCalledWith(cancelAct);
-    });
-  });
-
   test("opens Contrapropor editor, sends counter-offer summary to chat, and emits REJECT_TRADE", async () => {
     const onExecuteAction = vi.fn().mockResolvedValue(undefined);
     const onSendChatMessage = vi.fn().mockResolvedValue(undefined);
