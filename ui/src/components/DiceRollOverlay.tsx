@@ -32,16 +32,16 @@ export default function DiceRollOverlay({
   const isSeven = !rolling && sum === 7;
   const palette = getPlayerColorMeta(language)[rollerColor];
 
-  // Anchor directly inside the right black box half on the table (1640, 616 in 2000x1200 SVG)
+  // Anchor directly inside the enlarged right black box half on the 1.5x table (1560, 616 in 2000x1200 SVG)
   const boardAnchoredStyle: React.CSSProperties =
     center && size
       ? {
           "--roller-color": palette.primary,
           position: "absolute",
-          left: center[0] + size * 8.0,
-          top: center[1] + size * 0.2,
+          left: center[0] + size * 10.5,
+          top: center[1] + size * 0.3,
           right: "auto",
-          transform: `translate(-50%, -50%) scale(${Math.max(0.55, size / 62)})`,
+          transform: `translate(-50%, -50%) scale(${Math.max(0.48, size / 70)})`,
         } as React.CSSProperties
       : ({ "--roller-color": palette.primary } as React.CSSProperties);
 

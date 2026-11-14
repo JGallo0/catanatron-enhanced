@@ -37,8 +37,8 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
       ? {
           left: center[0],
           top: center[1],
-          width: size * 25,
-          height: size * 15,
+          width: size * 37.5,
+          height: size * 22.5,
           transform: "translate(-50%, -50%)",
         }
       : undefined;
@@ -570,7 +570,7 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
         </g>
 
         {/* Small cachaça shot glass ("copinho de dose") beside Toni Lourenço & Fofinha */}
-        <g transform="translate(1726, 366)">
+        <g transform="translate(1736, 342)">
           <ellipse cx="4" cy="6" rx="22" ry="20" fill="rgba(12, 5, 1, 0.5)" />
           <circle
             cx="0"
@@ -586,9 +586,9 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
 
         {/* ================================================================ */}
         {/* 4. LEFT BLACK GAME BOX HALF (3D Sloped Walls + Darker Floor)     */}
-        {/*    No text inside, per user request                              */}
+        {/*    Enlarged so the box halves have realistic tabletop proportions */}
         {/* ================================================================ */}
-        <g transform="translate(278, 468) rotate(-4)">
+        <g transform="translate(430, 488) rotate(-4) scale(1.22)">
           {/* Heavy drop shadow on wood */}
           <rect
             x="-134"
@@ -690,9 +690,9 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
 
         {/* ================================================================ */}
         {/* 5. RIGHT BLACK GAME BOX HALF (3D Sloped Walls + Darker Floor)    */}
-        {/*    Positioned on the right side for rolling the dice inside      */}
+        {/*    Enlarged so the rolled dice have realistic space inside        */}
         {/* ================================================================ */}
-        <g transform="translate(1640, 616) rotate(3)">
+        <g transform="translate(1560, 616) rotate(3) scale(1.25)">
           {/* Heavy drop shadow on wood */}
           <rect
             x="-138"
@@ -1118,7 +1118,7 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
         {/* ================================================================ */}
         {/* 8. COLD BEER GLASSES ("COPO LAGOINHA / AMERICANO")               */}
         {/* ================================================================ */}
-        <g transform="translate(456, 224)">
+        <g transform="translate(456, 168)">
           <circle cx="0" cy="6" r="46" fill="none" stroke="rgba(254, 243, 199, 0.25)" strokeWidth="2.5" strokeDasharray="58 14 76 18" />
           <ellipse cx="6" cy="10" rx="42" ry="38" fill="rgba(12, 5, 1, 0.55)" />
           <circle cx="0" cy="0" r="39" fill="rgba(255, 255, 255, 0.18)" stroke="rgba(255, 255, 255, 0.55)" strokeWidth="2.5" />

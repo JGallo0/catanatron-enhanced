@@ -333,7 +333,7 @@ export default function ZoomableBoard({
     <>
       <TransformWrapper
         initialScale={1}
-        minScale={0.5}
+        minScale={0.35}
         maxScale={2.6}
         centerOnInit={true}
         limitToBounds={false}
