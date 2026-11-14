@@ -49,13 +49,13 @@ export function cycleGameSpeed(current: GameSpeed): GameSpeed {
 }
 
 /**
- * Slow uses 6x pauses plus a visible thinking interval before each bot action.
+ * Slow uses 5x pauses (midpoint between 1x/normal 4x and old 6x slow) plus a moderate thinking interval before each bot action.
  * Normal is 4x slower than the original 1x pacing (comfortable real tabletop pace);
  * Rápida matches the original 1x pacing; Turbo is 2x faster (0.5x).
  */
 export function getSpeedMultiplier(speed: GameSpeed): number {
   switch (speed) {
-    case "slow": return 6;
+    case "slow": return 5;
     case "turbo":
       return 0.5;
     case "fast":
@@ -68,7 +68,7 @@ export function getSpeedMultiplier(speed: GameSpeed): number {
 
 export function getRollSpinDurationMs(speed: GameSpeed): number {
   switch (speed) {
-    case "slow": return 4200;
+    case "slow": return 3750;
     case "turbo":
       return 840;
     case "fast":
@@ -81,7 +81,7 @@ export function getRollSpinDurationMs(speed: GameSpeed): number {
 
 export function getDiceOverlayDurationMs(speed: GameSpeed): number {
   switch (speed) {
-    case "slow": return 9600;
+    case "slow": return 9000;
     case "turbo":
       return 2500;
     case "fast":
@@ -564,5 +564,5 @@ export function extractBatchTransitionFX(
 
 /** Stable variation keeps re-renders from restarting a bot's thinking deadline. */
 export function getBotThinkDelayMs(stateIndex: number, speed: GameSpeed): number {
-  return speed === "slow" ? 3200 + (stateIndex % 5) * 650 : 0;
+  return speed === "slow" ? 1600 + (stateIndex % 5) * 325 : 0;
 }

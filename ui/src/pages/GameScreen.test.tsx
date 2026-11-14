@@ -549,7 +549,7 @@ test("slow mode shows thinking and waits before the first bot action", async () 
   expect(screen.getByRole("button", { name: "Velocidade: Lenta" })).toBeInTheDocument();
   expect(postAction).not.toHaveBeenCalled();
   expect(screen.getAllByText(/pensando|calculando/i).length).toBeGreaterThan(0);
-  await act(async () => vi.advanceTimersByTimeAsync(4499));
+  await act(async () => vi.advanceTimersByTimeAsync(2249));
   expect(postAction).not.toHaveBeenCalled();
   await act(async () => vi.advanceTimersByTimeAsync(1));
   expect(postAction).toHaveBeenCalledOnce();
