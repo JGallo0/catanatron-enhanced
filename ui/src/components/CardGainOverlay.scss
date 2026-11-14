@@ -26,7 +26,7 @@
   &__flight {
     display: grid;
     justify-items: center;
-    animation: card-receive 1.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: card-receive 2.3s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   &__card {
@@ -70,7 +70,7 @@
     border: 1px solid rgba(214, 181, 113, 0.45);
     border-radius: 20px;
     font: 600 13px "Outfit", sans-serif;
-    animation: card-receive-fade 1.8s both;
+    animation: card-receive-fade 2.3s both;
   }
 }
 
@@ -79,8 +79,8 @@
     opacity: 0;
     transform: translateY(24px) scale(0.65) rotate(-4deg);
   }
-  18%,
-  66% {
+  14%,
+  73% {
     opacity: 1;
     transform: translateY(0) scale(1) rotate(0);
   }
@@ -92,7 +92,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .card-gain__flight {
-    animation: card-receive-fade 1.8s both;
+    animation: card-receive-fade 2.3s both;
   }
 }
 

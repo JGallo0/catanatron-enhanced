@@ -535,6 +535,8 @@ test("reveals gained cards only after dice stop, showing all gained cards side b
   expect(screen.getAllByLabelText("Você recebeu: Ovelha")).toHaveLength(2);
   expect(screen.getByLabelText("Você recebeu: Trigo")).toBeInTheDocument();
   await act(async () => vi.advanceTimersByTimeAsync(1800));
+  expect(screen.getAllByLabelText(/Você recebeu/)).toHaveLength(3);
+  await act(async () => vi.advanceTimersByTimeAsync(500));
   expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
 });
 

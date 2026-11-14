@@ -5,7 +5,7 @@ import { RESOURCE_TYPES } from "../utils/cardGains";
 import { CardArtIllustration } from "./icons/GameIcons";
 import "./CardGainOverlay.scss";
 
-export const CARD_GAIN_DURATION_MS = 1800;
+export const CARD_GAIN_DURATION_MS = 2300;
 
 type CardGainOverlayProps = {
   cards?: Card[];
