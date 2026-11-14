@@ -134,6 +134,7 @@ export default function ResourceCards({
           return (
             <div
               key={res}
+              data-card-destination={res}
               className={cn("hand-resource-icon", { "is-empty": count === 0 })}
               role="img"
               aria-label={`${meta.label} (${count})`}
@@ -261,6 +262,7 @@ export default function ResourceCards({
                   }
                 : undefined
             }
+            data-card-destination={id}
             className={cn(
               "dev-cards",
               iconOnly ? "hand-resource-icon hand-resource-icon--dev" : "center-text card resource-card-item resource-card-item--dev",

@@ -45,6 +45,34 @@ def client(app):
     return app.test_client()
 
 
+def test_trade_proposer_can_cancel_while_bot_is_responding(client):
+    from catanatron.web.players import WebHumanPlayer
+    from catanatron.models.enums import Action, ActionType
+    from catanatron.state_functions import player_freqdeck_add
+    from unittest.mock import patch
+
+    game = Game([WebHumanPlayer(Color.RED), RandomPlayer(Color.BLUE)], seed=42)
+    while game.state.is_initial_build_phase:
+        game.execute(game.playable_actions[0])
+    with patch("catanatron.apply_action.roll_dice", return_value=(2, 3)):
+        while game.state.current_color() != Color.RED:
+            color = game.state.current_color()
+            game.execute(Action(color, ActionType.ROLL, None))
+            game.execute(Action(color, ActionType.END_TURN, None))
+        game.execute(Action(Color.RED, ActionType.ROLL, None))
+    player_freqdeck_add(game.state, Color.RED, [2, 0, 0, 0, 0])
+    game.execute(Action(Color.RED, ActionType.OFFER_TRADE, (1, 0, 0, 0, 0, 0, 1, 0, 0, 0)))
+    assert game.state.current_player().is_bot
+    with client.application.app_context():
+        upsert_game_state(game)
+    response = client.post(f"/api/games/{game.id}/actions", json=["RED", "CANCEL_TRADE", None])
+    assert response.status_code == 200
+    state = response.get_json()
+    assert state["current_color"] == "RED"
+    assert state["current_prompt"] == "PLAY_TURN"
+    assert state["action_records"][-1][0][1] == "CANCEL_TRADE"
+
+
 def test_post_game_endpoint(client):
     """Test creating a new game."""
     response = client.post("/api/games", json={"players": ["R", "R"]})

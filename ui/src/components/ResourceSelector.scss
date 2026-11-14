@@ -1,91 +1,32 @@
-@use "../variables.scss";
-
-.resource-selector {
-  .MuiPaper-root {
-    background-color: #1a1a1a;
-    color: #e0e0e0;
-    border-radius: 8px;
-    border: 1px solid #333;
-    box-shadow: 0 0 10px rgba(0, 150, 255, 0.05);
+.resource-selector .resource-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 0;
+  &__card {
+    position: relative; display: flex; flex-direction: column; padding: 0;
+    overflow: hidden; border: 2px solid #627685; border-radius: 10px;
+    color: #f6ebcf; background: #0b1e30; cursor: pointer;
+    transition: transform 180ms ease, border-color 180ms ease;
+    strong { padding: 9px 2px; font: 600 13px "Outfit", sans-serif; }
+    &:hover:not(:disabled) { transform: translateY(-4px); border-color: #fde68a; }
+    &:focus-visible { outline: 3px solid #fde68a; outline-offset: 3px; }
+    &:disabled:not(.is-selected) { opacity: .45; cursor: default; }
+    &.is-selected { border-color: #fde68a; box-shadow: 0 0 0 1px #b58b3d; }
   }
-
-  .MuiDialogTitle-root {
-    text-align: center;
-    background-color: #222;
-    padding: 12px 20px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    border-bottom: 1px solid #333;
-  }
-
-  .MuiDialogContent-root {
-    padding: 20px;
-  }
-
-  .resource-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-
-    @media (max-width: variables.$sm-breakpoint) {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .resource-button {
-    height: 40px;
-    font-size: 0.9rem;
-    text-transform: none;
-    background-color: #2a2a2a;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-    border: 1px solid #444;
-    overflow: hidden;
-    position: relative;
-
-    &:hover,
-    &:focus {
-      background-color: #222;
-    }
-
-    .wood {
-      color: #009b00;
-    }
-    .brick {
-      color: #ff0000;
-    }
-    .wheat {
-      color: #ba9202;
-    }
-    .sheep {
-      color: #3eda58;
-    }
-    .ore {
-      color: #b0b0b0;
-    }
-
-    .resource-name {
-      font-weight: bold;
-    }
-
-    .plus {
-      color: #ffffff;
-      margin: 0 4px;
-    }
-  }
-
-  .MuiDialogActions-root {
-    background-color: #222;
-    padding: 12px 20px;
-    border-top: 1px solid #333;
-  }
-
-  .cancel-button {
-    color: #0099ff;
-    font-weight: bold;
-
-    &:hover {
-      background-color: rgba(0, 153, 255, 0.1);
-    }
+  &__art { width: 100%; aspect-ratio: 3/4; display: block; object-fit: cover; }
+  &__count { position: absolute; top: 6px; right: 6px; padding: 2px 7px; border-radius: 20px; background: #071526; color: #fde68a; font-weight: 800; }
+  &__selection { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 12px 0; color: #fde68a; }
+}
+@media (max-width: 500px) {
+  .resource-selector .resource-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .resource-selector .catan-modal-actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    .MuiButton-root { margin: 0; width: 100%; }
+    .catan-btn-primary { grid-column: 1 / -1; }
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  .resource-selector .resource-picker__card { transition: none; }
+}
+.resource-selector .catan-btn-primary.Mui-disabled { opacity: .4; }

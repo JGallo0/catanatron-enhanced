@@ -27,6 +27,13 @@ TURNS_LIMIT = 1000
 def is_valid_action(playable_actions, state: State, action: Action) -> bool:
     """True if its a valid action right now. An action is valid
     if its in playable_actions or if its a OFFER_TRADE in the right time."""
+    if action.action_type == ActionType.CANCEL_TRADE:
+        return (
+            state.is_resolving_trade
+            and state.current_prompt in (ActionPrompt.DECIDE_TRADE, ActionPrompt.DECIDE_ACCEPTEES)
+            and action.color == state.colors[state.current_turn_index]
+            and action.value is None
+        )
     if action.action_type == ActionType.OFFER_TRADE:
         return (
             not state.is_initial_build_phase

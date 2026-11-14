@@ -28,6 +28,17 @@ export function playerKey(gameState: GameState, color: Color): string {
   return `P${gameState.colors.indexOf(color)}`;
 }
 
+export function countPlayerResources(gameState: GameState, color: Color): number {
+  const key = playerKey(gameState, color);
+  const total = gameState.player_state[`${key}_NUM_RESOURCES_IN_HAND`];
+  if (typeof total === "number") return total;
+  const counts = ["WOOD", "BRICK", "SHEEP", "WHEAT", "ORE"].map((r) => gameState.player_state[`${key}_${r}_IN_HAND`]);
+  // Private hands have only a public total; never treat missing cards as zero.
+  return counts.every((n) => typeof n === "number")
+    ? counts.reduce((sum, n) => sum + n, 0)
+    : Number(gameState.player_state[`${key}_NUM_RESOURCES_IN_HAND`] ?? 0);
+}
+
 export function getHumanColor(
   gameState: GameState,
   perspective?: Color | null

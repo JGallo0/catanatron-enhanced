@@ -16,7 +16,7 @@ import {
   resolveSeatAvatarProps,
 } from "../config/botCatalog";
 import { store } from "../store";
-import { playerKey } from "../utils/stateUtils";
+import { countPlayerResources, playerKey } from "../utils/stateUtils";
 import { AchievementMedalSvg, ResourceIcon } from "./icons/GameIcons";
 import PlayerAvatar from "./PlayerAvatar";
 
@@ -204,7 +204,7 @@ function computeSeatStats(
   const seatIndex = Math.max(0, gameState.colors.indexOf(color));
 
   const vps = ps[`${key}_ACTUAL_VICTORY_POINTS`] ?? ps[`${key}_VICTORY_POINTS`] ?? 0;
-  const resources = ps[`${key}_NUM_RESOURCES_IN_HAND`] ?? 0;
+  const resources = countPlayerResources(gameState, color);
   const devCards = ps[`${key}_NUM_DEVELOPMENT_CARDS_IN_HAND`] ?? 0;
   const knights = ps[`${key}_PLAYED_KNIGHT`] ?? 0;
   const roadLength = ps[`${key}_LONGEST_ROAD_LENGTH`] ?? 0;

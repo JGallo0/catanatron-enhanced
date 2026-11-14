@@ -324,7 +324,7 @@ export type RoomSeat = {
 };
 
 export type BotDifficulty = "easy" | "medium" | "hard";
-export type BotSpeed = "normal" | "fast" | "turbo";
+export type BotSpeed = "slow" | "normal" | "fast" | "turbo";
 export type DiceMode = "random" | "balanced";
 
 export type RoomState = {

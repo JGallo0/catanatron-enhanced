@@ -32,6 +32,8 @@ import PlayerTopBar, {
   type FloatingYieldFX,
 } from "../components/PlayerTopBar";
 import DiceRollOverlay from "../components/DiceRollOverlay";
+import CardGainOverlay from "../components/CardGainOverlay";
+import { getCardGains } from "../utils/cardGains";
 import GameChatPanel from "../components/GameChatPanel";
 import MatchIntroOverlay from "../components/MatchIntroOverlay";
 import AlmanacModal from "../components/AlmanacModal";
@@ -77,7 +79,7 @@ import {
   tr,
   useLanguage,
 } from "../i18n";
-import type { Color, GameMessage, GameState } from "../utils/api.types";
+import type { Card, Color, GameMessage, GameState } from "../utils/api.types";
 import { getSavedGameSeat, saveGameSeat } from "../utils/seatStorage";
 import {
   isSoundMuted,
@@ -103,6 +105,7 @@ import {
   extractBatchTransitionFX,
   extractTransitionVisuals,
   getActionDelayMs,
+  getBotThinkDelayMs,
   getDiceOverlayDurationMs,
   getRollSpinDurationMs,
   getSavedGameSpeed,
@@ -182,6 +185,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const languageRef = useRef<AppLanguage>(language);
   languageRef.current = language;
   const [isBotThinking, setIsBotThinking] = useState(false);
+  const thinkDeadlineRef = useRef({ key: "", at: 0 });
+  const [cardGains, setCardGains] = useState<{ id: number; card: Card }[]>([]);
+  const finishCardGain = useCallback(() => setCardGains((queue) => queue.slice(1)), []);
   const [muted, setMuted] = useState(() => isSoundMuted());
   const [localGameSpeed, setLocalGameSpeed] = useState<GameSpeed>(() =>
     getSavedGameSpeed()
@@ -473,6 +479,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     setTurnPauseBanner(null);
     setDiscardDrops([]);
     setYieldFX([]);
+    setCardGains([]);
     setVpFX([]);
     setRobberNotice(null);
     setChatMessages([]);
@@ -883,6 +890,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         activeLang
       );
       const latestRecord = latestActionRecord;
+      const gainedCards = getCardGains(prevStateRef.current, gs, mySeatColor ?? getHumanColor(gs, state.perspective) ?? null);
+      if (gainedCards.length) {
+        const entries = gainedCards.map((card) => ({ id: fxCounterRef.current++, card }));
+        setCardGains((queue) => [...queue, ...entries]);
+      }
       playActionRecordSound(latestRecord);
       if (gs.winning_color && !prevWinnerRef.current) {
         playVictorySound();
@@ -911,11 +923,16 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           amount: y.amount,
         }));
         const createdIds = new Set(createdYields.map((y) => y.id));
-        setYieldFX((prev) => [...prev.slice(-10), ...createdYields]);
+        const revealDelay = latestRecord?.[0][1] === "ROLL" ? getRollSpinDurationMs(gameSpeedRef.current) : 0;
         const t = setTimeout(() => {
           fxCleanupTimersRef.current.delete(t);
-          setYieldFX((prev) => prev.filter((item) => !createdIds.has(item.id)));
-        }, 2300);
+          setYieldFX((prev) => [...prev.slice(-10), ...createdYields]);
+          const cleanup = setTimeout(() => {
+            fxCleanupTimersRef.current.delete(cleanup);
+            setYieldFX((prev) => prev.filter((item) => !createdIds.has(item.id)));
+          }, 2300);
+          fxCleanupTimersRef.current.add(cleanup);
+        }, revealDelay);
         fxCleanupTimersRef.current.add(t);
       }
 
@@ -993,7 +1010,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         });
         toastTimerRef.current = setTimeout(() => {
           setSpotlightToast(null);
-        }, 3600);
+        }, 3600 + (visuals.rollDice ? getRollSpinDurationMs(gameSpeedRef.current) : 0));
 
         if (
           visuals.recentNodeId !== null ||
@@ -1192,7 +1209,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       !gameId ||
       gs.winning_color ||
       introActive ||
-      isTurnPauseActive
+      isTurnPauseActive || isRollingDice || cardGains.length > 0
     ) {
       return;
     }
@@ -1248,7 +1265,12 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       }
     };
 
-    const remainingHold = Math.max(0, nextBotReadyAtRef.current - Date.now());
+    const thinkKey = `${gameId}:${gs.state_index}:${gameSpeed}`;
+    if (thinkDeadlineRef.current.key !== thinkKey) {
+      thinkDeadlineRef.current = { key: thinkKey, at: Date.now() + getBotThinkDelayMs(gs.state_index, gameSpeed) };
+    }
+    const remainingHold = Math.max(0, nextBotReadyAtRef.current - Date.now(), thinkDeadlineRef.current.at - Date.now());
+    if (gameSpeed === "slow" && remainingHold > 0) setIsBotThinking(true);
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (remainingHold === 0) {
       runBotStep();
@@ -1270,6 +1292,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     gs,
     introActive,
     isTurnPauseActive,
+    isRollingDice,
+    cardGains.length,
+    gameSpeed,
     mySeatColor,
     dispatch,
     enqueueSnackbar,
@@ -1303,6 +1328,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
       {/* Fullscreen Board Canvas */}
       <ZoomableBoard
+        isRollingDice={isRollingDice}
         replayMode={replayMode}
         hudClearance={hudClearance && {
           top: hudClearance.top + (hasOceanChatSpace ? 0 : 18 + hudClearance.shortcutsHeight),
@@ -1445,45 +1471,16 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
               "is-locked": isSpeedLockedOnline,
             })}
             onClick={toggleGameSpeed}
-            title={
-              isSpeedLockedOnline
-                ? t(
-                    `Velocidade: ${formatBotSpeedLabel(gameSpeed, "pt")} (Definida nas configurações pré-partida da sala)`,
-                    `Speed: ${formatBotSpeedLabel(gameSpeed, "en")} (Set in room pre-match settings)`
-                  )
-                : gameSpeed === "normal"
-                  ? t(
-                      "Velocidade: Normal — Clique para mudar para Rápida",
-                      "Speed: Normal — Click to switch to Fast"
-                    )
-                  : gameSpeed === "fast"
-                    ? t(
-                        "Velocidade: Rápida — Clique para mudar para Turbo",
-                        "Speed: Fast — Click to switch to Turbo"
-                      )
-                    : t(
-                        "Velocidade: Turbo — Clique para voltar para Normal",
-                        "Speed: Turbo — Click to return to Normal"
-                      )
-            }
-            aria-label={
-              isSpeedLockedOnline
-                ? t(
-                    `Velocidade: ${formatBotSpeedLabel(gameSpeed, "pt")} (Travada pela sala)`,
-                    `Speed: ${formatBotSpeedLabel(gameSpeed, "en")} (Locked by room)`
-                  )
-                : gameSpeed === "normal"
-                  ? t("Velocidade: Normal", "Speed: Normal")
-                  : gameSpeed === "fast"
-                    ? t("Velocidade: Rápida", "Speed: Fast")
-                    : t("Velocidade: Turbo", "Speed: Turbo")
-            }
+            title={isSpeedLockedOnline
+              ? `Velocidade: ${formatBotSpeedLabel(gameSpeed, "pt")} (Definida pela sala)`
+              : `Velocidade: ${formatBotSpeedLabel(gameSpeed, "pt")} — Clique para mudar para ${formatBotSpeedLabel(cycleGameSpeed(gameSpeed), "pt")}`}
+            aria-label={`Velocidade: ${formatBotSpeedLabel(gameSpeed, "pt")}${isSpeedLockedOnline ? " (Travada pela sala)" : ""}`}
           >
             <span className="game-left-dock__icon" aria-hidden="true">
               <FastForward />
             </span>
             <span className="game-left-dock__tag">
-              {gameSpeed === "normal"
+              {gameSpeed === "slow" ? "Lenta" : gameSpeed === "normal"
                 ? "1×"
                 : gameSpeed === "fast"
                   ? t("Ráp", "Fast")
@@ -1738,10 +1735,12 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             {spotlightToast.icon}
           </span>
           <span className="action-spotlight-toast__text">
-            {spotlightToast.text}
+            {isRollingDice && latestActionRecord?.[0][1] === "ROLL" ? "Rolando os dados…" : spotlightToast.text}
           </span>
         </div>
       )}
+
+      {!isRollingDice && cardGains[0] && <CardGainOverlay key={cardGains[0].id} card={cardGains[0].card} onComplete={finishCardGain} />}
 
       <DiceRollOverlay
         open={Boolean(diceStage?.open)}
@@ -1818,7 +1817,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                   style={{ background: palette?.primary || "#94a3b8" }}
                 />
                 <span className="mini-action-log__text">
-                  {humanizeActionRecordPt(gs, rec, language)}
+                  {isRollingDice && rec === latestActionRecord && rec[0][1] === "ROLL" ? "Rolando os dados…" : humanizeActionRecordPt(gs, rec, language)}
                 </span>
               </div>
             );

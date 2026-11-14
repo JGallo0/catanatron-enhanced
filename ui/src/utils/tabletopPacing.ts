@@ -9,7 +9,7 @@ import { getPlayerColorMeta, getResourceMeta } from "../config/assetRegistry";
 import { resolvePlayerDisplayName } from "../config/botCatalog";
 import { getCurrentLanguage, type AppLanguage } from "../i18n";
 
-export type GameSpeed = "normal" | "fast" | "turbo";
+export type GameSpeed = "slow" | "normal" | "fast" | "turbo";
 
 export const GAME_SPEED_STORAGE_KEY = "catan_game_speed_v1";
 export const INTRO_SPLASH_MS = 10000;
@@ -18,7 +18,7 @@ export const TURN_TRANSITION_MS = 3000;
 export function getSavedGameSpeed(): GameSpeed {
   try {
     const saved = localStorage.getItem(GAME_SPEED_STORAGE_KEY);
-    if (saved === "fast" || saved === "turbo") {
+    if (saved === "slow" || saved === "fast" || saved === "turbo") {
       return saved;
     }
     return "normal";
@@ -42,16 +42,20 @@ export function cycleGameSpeed(current: GameSpeed): GameSpeed {
     case "fast":
       return "turbo";
     case "turbo":
+      return "slow";
+    case "slow":
       return "normal";
   }
 }
 
 /**
+ * Slow uses 6x pauses plus a visible thinking interval before each bot action.
  * Normal is 4x slower than the original 1x pacing (comfortable real tabletop pace);
  * Rápida matches the original 1x pacing; Turbo is 2x faster (0.5x).
  */
 export function getSpeedMultiplier(speed: GameSpeed): number {
   switch (speed) {
+    case "slow": return 6;
     case "turbo":
       return 0.5;
     case "fast":
@@ -64,6 +68,7 @@ export function getSpeedMultiplier(speed: GameSpeed): number {
 
 export function getRollSpinDurationMs(speed: GameSpeed): number {
   switch (speed) {
+    case "slow": return 4200;
     case "turbo":
       return 840;
     case "fast":
@@ -76,6 +81,7 @@ export function getRollSpinDurationMs(speed: GameSpeed): number {
 
 export function getDiceOverlayDurationMs(speed: GameSpeed): number {
   switch (speed) {
+    case "slow": return 9600;
     case "turbo":
       return 2500;
     case "fast":
@@ -542,4 +548,9 @@ export function extractBatchTransitionFX(
     robberEvent,
     turnHandoff,
   };
+}
+
+/** Stable variation keeps re-renders from restarting a bot's thinking deadline. */
+export function getBotThinkDelayMs(stateIndex: number, speed: GameSpeed): number {
+  return speed === "slow" ? 3200 + (stateIndex % 5) * 650 : 0;
 }

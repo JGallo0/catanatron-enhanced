@@ -4,6 +4,18 @@ import { expect, test } from "vitest";
 import { makeGameState } from "../test/fixtures";
 import Board from "./Board";
 
+test("waits for the dice to stop before highlighting producing numbers", () => {
+  const gameState = makeGameState({ robber_coordinate: [9, -9, 0], action_records: [[["BLUE", "ROLL", null], [5, 6]]] });
+  const props = { width: 1200, height: 900, buildOnNodeClick: () => () => undefined,
+    buildOnEdgeClick: () => () => undefined, handleTileClick: () => undefined,
+    replayMode: false, gameState, isMobile: false, show: true, isMovingRobber: false };
+  const view = render(<Board {...props} isRollingDice />);
+  expect(view.container.querySelector(".number-token--producing")).toBeNull();
+  view.rerender(<Board {...props} isRollingDice={false} />);
+  expect(view.container.querySelector(".number-token--producing")).toBeInTheDocument();
+  view.unmount();
+});
+
 test("renders the nested tile, node, and edge shapes emitted by GameEncoder", () => {
   const gameState = makeGameState();
 

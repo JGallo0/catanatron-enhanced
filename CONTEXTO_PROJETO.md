@@ -5,6 +5,16 @@ Este documento consolida **todo o histórico, arquitetura, decisões de design e
 ---
 
 ## 1. Visão Geral e Objetivos
+
+### Atualização de mecânicas — 14/11/2026
+- `CardGainOverlay` apresenta os ganhos reais da mão local (recursos e desenvolvimento) em fila, uma carta por vez, com voo para o ícone correspondente na barra inferior. Não reapresenta cartas ao carregar a partida; aguarda o fim da rolagem e respeita movimento reduzido.
+- O destaque dos números no tabuleiro e os efeitos de produção agora aguardam o estado `isRollingDice` da tela. O botão Roubar ganha destaque pulsante somente após esse intervalo.
+- O autor da proposta pode enviar `CANCEL_TRADE` durante `DECIDE_TRADE` ou `DECIDE_ACCEPTEES`, preservando os recursos e retornando à sua vez. Regra validada no motor local, Python e endpoint HTTP; espelhos em `api/catanatron` devem permanecer sincronizados.
+- Ano da Fartura usa cinco cartas ilustradas: clicar adiciona, repetir seleciona duas iguais, Desfazer remove a última escolha e Confirmar envia uma combinação legal na ordem do motor. Respeita estoque do banco e mantém a seleção em caso de falha.
+- Contagem superior usa o total público quando disponível e soma a mão visível quando a API omite esse resumo. Não inclui desenvolvimento nem revela recursos de adversários.
+- Nova velocidade `slow` / Lenta, persistida no solo e nas configurações de salas: pausas 6× e intervalo de pensamento de 3,2–5,8 segundos antes das ações dos bots. Normal, Rápida e Turbo continuam disponíveis.
+- Testes de ladrão cobrem aldeia e cidade em vértice compartilhado: apenas o hexágono ocupado perde produção, inclusive quando o adjacente tem o mesmo número e recurso.
+
 - **Base:** Fork modernizado do `bcollazo/catanatron` (mantendo licença **GPL-3.0**).
 - **Idioma:** **100% em Português Brasileiro (`pt-BR`)** em todas as telas, botões, prompts, logs de jogadas, modais e notificações.
 - **Direção Visual:** Inspirada no **Catan Universe (Steam)** — estética *Modern Tabletop Dark* (`#071526` oceano profundo), hexágonos com ilustrações ricas e praias de areia dourada (`#fde68a`), fichas numéricas estilo marfim/madeira, peças 3D claras para cada jogador (Aldeias, Cidades, Estradas) e baralho de cartas ilustradas na doca inferior.

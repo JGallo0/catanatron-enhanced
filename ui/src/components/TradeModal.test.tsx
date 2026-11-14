@@ -11,6 +11,19 @@ afterEach(() => {
   cleanup();
 });
 
+test("offers cancellation while other players are still deciding", async () => {
+  const execute = vi.fn().mockResolvedValue(undefined);
+  const state = makeGameState({ current_color: "RED", current_prompt: "DECIDE_TRADE", is_resolving_trade: true,
+    current_trade: [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+    action_records: [[["BLUE", "OFFER_TRADE", [1, 0, 0, 0, 0, 0, 1, 0, 0, 0]], null]],
+  });
+  const close = vi.fn();
+  render(<TradeModal open onClose={close} tradeActions={[]} playerState={state.player_state} playerKey="P1" playerColor="BLUE" gameState={state} reviewingActiveOffer onExecuteTrade={execute} />);
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar proposta" }));
+  await waitFor(() => expect(execute).toHaveBeenCalledWith(["BLUE", "CANCEL_TRADE", null]));
+  expect(close).not.toHaveBeenCalled();
+});
+
 describe("TradeModal", () => {
   test("builds and submits valid 10-tuple OFFER_TRADE on Entre Jogadores tab", async () => {
     const onExecuteTrade = vi.fn().mockResolvedValue(undefined);

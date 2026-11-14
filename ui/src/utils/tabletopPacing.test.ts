@@ -46,7 +46,11 @@ describe("tabletopPacing", () => {
 
     expect(cycleGameSpeed("normal")).toBe("fast");
     expect(cycleGameSpeed("fast")).toBe("turbo");
-    expect(cycleGameSpeed("turbo")).toBe("normal");
+    expect(cycleGameSpeed("turbo")).toBe("slow");
+    expect(cycleGameSpeed("slow")).toBe("normal");
+    saveGameSpeed("slow");
+    expect(getSavedGameSpeed()).toBe("slow");
+    expect(getActionDelayMs([["RED", "BUILD_SETTLEMENT", 4], null], "slow")).toBeGreaterThan(getActionDelayMs([["RED", "BUILD_SETTLEMENT", 4], null], "normal"));
 
     expect(
       getActionDelayMs([["RED", "OFFER_TRADE", [1,0,0,0,0,0,1,0,0,0]], null], "normal", {

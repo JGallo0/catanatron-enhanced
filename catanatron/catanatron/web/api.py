@@ -598,7 +598,7 @@ def post_room_endpoint():
 
     raw_bot_speed = body.get("bot_speed")
     if raw_bot_speed is not None and normalize_bot_speed(raw_bot_speed) is None:
-        abort(400, description="'bot_speed' must be one of normal, fast, or turbo")
+        abort(400, description="'bot_speed' must be one of slow, normal, fast, or turbo")
     bot_speed = normalize_bot_speed(raw_bot_speed) or "normal"
 
     auth_user = resolve_user_from_token(_extract_auth_token())
@@ -881,7 +881,7 @@ def patch_room_endpoint(room_code: str):
         if "bot_speed" in cfg:
             norm_speed = normalize_bot_speed(cfg["bot_speed"])
             if norm_speed is None:
-                abort(400, description="'bot_speed' deve ser normal, fast ou turbo")
+                abort(400, description="'bot_speed' deve ser slow, normal, fast ou turbo")
             config["bot_speed"] = norm_speed
 
     if "seats" in body and isinstance(body["seats"], list):
@@ -1288,7 +1288,13 @@ def post_action_endpoint(game_id):
             mimetype="application/json",
         )
 
-    if game.state.current_player().is_bot or body_is_empty:
+    # The proposer may withdraw an offer while the current responder is a bot.
+    is_cancel_request = (
+        isinstance(parsed_json, list)
+        and len(parsed_json) == 3
+        and parsed_json[1] == "CANCEL_TRADE"
+    )
+    if body_is_empty or (game.state.current_player().is_bot and not is_cancel_request):
         game.play_tick()
         upsert_game_state(game)
     else:

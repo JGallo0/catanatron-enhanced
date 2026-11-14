@@ -1,11 +1,36 @@
 from catanatron.apply_action import yield_resources
 from catanatron.models.board import Board
 from catanatron.models.player import Color
+from catanatron.models.enums import SETTLEMENT, CITY
+import pytest
 from catanatron.models.decks import (
     freqdeck_count,
     freqdeck_draw,
     starting_resource_bank,
 )
+
+
+@pytest.mark.parametrize("building,quantity", [(SETTLEMENT, 1), (CITY, 2)])
+def test_robber_blocks_only_occupied_hex_not_shared_adjacent_hex(building, quantity):
+    board = Board()
+    # A shared vertex belongs to both tiles. Give them the same resource and roll
+    # to catch both an accidental vertex-wide and a resource-wide blockade.
+    tiles = [(coord, tile) for coord, tile in board.map.land_tiles.items() if tile.resource is not None]
+    coordinate, blocked = tiles[0]
+    other_coordinate, adjacent = next((coord, tile) for coord, tile in tiles[1:]
+                                    if set(tile.nodes.values()) & set(blocked.nodes.values()))
+    node = next(iter(set(blocked.nodes.values()) & set(adjacent.nodes.values())))
+    for _, tile in tiles:
+        tile.number = 12
+    blocked.number = adjacent.number = 6
+    adjacent.resource = blocked.resource
+    board.buildings = {node: (Color.RED, building)}
+    for robber_coordinate in (coordinate, other_coordinate):
+        board.robber_coordinate = robber_coordinate
+        payout, depleted = yield_resources(board, starting_resource_bank(), 6)
+        assert not depleted
+        assert sum(payout[Color.RED]) == quantity
+        assert freqdeck_count(payout[Color.RED], blocked.resource) == quantity
 
 
 def test_yield_resources():

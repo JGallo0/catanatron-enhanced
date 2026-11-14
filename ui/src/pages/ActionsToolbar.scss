@@ -934,3 +934,16 @@
     }
   }
 }
+.cu-cta-orb.cu-cta-orb--robber:not(:disabled) {
+  border: 2px solid #fde68a;
+  animation: robber-call 1.6s ease-in-out infinite;
+  .cu-cta-orb__icon { animation: robber-nudge 1.6s ease-in-out infinite; }
+}
+@keyframes robber-call {
+  0%, 100% { box-shadow: 0 0 0 0 #f59e0b66, 0 0 16px #f59e0b44; }
+  60% { box-shadow: 0 0 0 9px #f59e0b00, 0 0 26px #f59e0b77; }
+}
+@keyframes robber-nudge { 0%, 70%, 100% { transform: rotate(0); } 80% { transform: rotate(-10deg); } 90% { transform: rotate(8deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cu-cta-orb.cu-cta-orb--robber:not(:disabled), .cu-cta-orb.cu-cta-orb--robber .cu-cta-orb__icon { animation: none; }
+}

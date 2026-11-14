@@ -30,6 +30,21 @@ def _complete_initial_phase(game: Game):
         game.execute(game.playable_actions[0])
 
 
+def test_proposer_can_cancel_while_waiting_for_responses():
+    game = _prepare_post_roll_game([SimplePlayer(Color.RED), SimplePlayer(Color.BLUE), SimplePlayer(Color.ORANGE)])
+    _set_hand(game, Color.RED, [2, 0, 0, 0, 0])
+    game.execute(Action(Color.RED, ActionType.OFFER_TRADE, (1, 0, 0, 0, 0, 0, 1, 0, 0, 0)))
+    assert game.state.current_prompt == ActionPrompt.DECIDE_TRADE
+    responder = game.state.current_color()
+    with pytest.raises(ValueError):
+        game.execute(Action(responder, ActionType.CANCEL_TRADE, None))
+    game.execute(Action(Color.RED, ActionType.CANCEL_TRADE, None))
+    assert game.state.current_color() == Color.RED
+    assert game.state.current_prompt == ActionPrompt.PLAY_TURN
+    assert not game.state.is_resolving_trade
+    assert get_player_freqdeck(game.state, Color.RED) == [2, 0, 0, 0, 0]
+
+
 @patch("catanatron.apply_action.roll_dice", return_value=(2, 3))
 def _prepare_post_roll_game(
     players, _mock_roll, seed=42, proposer_color=Color.RED

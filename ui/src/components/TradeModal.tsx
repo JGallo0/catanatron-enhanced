@@ -213,8 +213,8 @@ export default function TradeModal({
         (action): action is ConfirmTradeAction => action[0] === effectiveColor && action[1] === "CONFIRM_TRADE"
       )
     : [];
-  const cancelAction = reviewingActiveOffer && gameState?.current_prompt === "DECIDE_ACCEPTEES"
-    ? gameState.current_playable_actions.find((action) => action[0] === effectiveColor && action[1] === "CANCEL_TRADE")
+  const cancelAction: GameAction | undefined = reviewingActiveOffer
+    ? [effectiveColor, "CANCEL_TRADE", null]
     : undefined;
   const confirmAction = confirmActions.length === 1
     ? confirmActions[0]

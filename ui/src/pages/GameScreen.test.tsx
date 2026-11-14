@@ -50,7 +50,7 @@ vi.mock("notistack", () => ({
   useSnackbar: () => snackbar,
 }));
 vi.mock("./ZoomableBoard", () => ({
-  default: () => <div data-testid="board" className="board-container">Board</div>,
+  default: ({ isRollingDice }: { isRollingDice: boolean }) => <div data-testid="board" data-rolling={isRollingDice} className="board-container">Board</div>,
 }));
 
 const theme = createTheme();
@@ -371,6 +371,9 @@ test("cycles pacing speed across Normal, Rápida, and Turbo and persists catan_g
   expect(localStorage.getItem("catan_game_speed_v1")).toBe("turbo");
 
   fireEvent.click(turboBtn);
+  const slowBtn = screen.getByRole("button", { name: /Velocidade: Lenta/i });
+  expect(localStorage.getItem("catan_game_speed_v1")).toBe("slow");
+  fireEvent.click(slowBtn);
   expect(
     screen.getByRole("button", { name: /Velocidade: Normal/i })
   ).toBeInTheDocument();
@@ -442,7 +445,7 @@ test("shows animated DiceRollOverlay (Total 8) and .action-spotlight-toast on RO
 
   const toast = container.querySelector(".action-spotlight-toast");
   expect(toast).toBeTruthy();
-  expect(toast?.textContent).toMatch(/Creitu rolou 8 \(3\+5\)/i);
+  expect(toast?.textContent).toMatch(/Rolando os dados/i);
   expect(screen.getByText(/Rolando\.\.\./i)).toBeInTheDocument();
 
   await act(async () => {
@@ -450,6 +453,7 @@ test("shows animated DiceRollOverlay (Total 8) and .action-spotlight-toast on RO
   });
 
   expect(screen.getByText(/Total 8/i)).toBeInTheDocument();
+  expect(toast?.textContent).toMatch(/Creitu rolou 8 \(3\+5\)/i);
 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(5200);
@@ -485,6 +489,48 @@ test("reveals Roubar only when the dice animation shows the rolled seven", async
   await act(async () => vi.advanceTimersByTimeAsync(1));
   expect(screen.getByText(/Total 7 — Ladrão!/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "ROUBAR" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "ROUBAR" })).toHaveClass("cu-cta-orb--robber");
+});
+
+test("reveals gained cards only after dice stop, one card at a time, including identical cards", async () => {
+  const rollState = makeGameState({ state_index: 13,
+    player_state: { ...baseState.player_state, P1_HAS_ROLLED: true, P1_SHEEP_IN_HAND: 2, P1_WHEAT_IN_HAND: 1 },
+    current_playable_actions: [["BLUE", "END_TURN", null]],
+    action_records: [[["BLUE", "ROLL", null], [3, 3]]],
+  });
+  vi.mocked(getState).mockResolvedValue(baseState);
+  vi.mocked(postAction).mockResolvedValueOnce(rollState);
+  renderGameScreen();
+  const roll = await screen.findByRole("button", { name: "ROLAR DADOS" });
+  expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
+  vi.useFakeTimers();
+  await act(async () => fireEvent.click(roll));
+  expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
+  await act(async () => vi.advanceTimersByTimeAsync(3300));
+  expect(screen.getByTestId("board")).toHaveAttribute("data-rolling", "false");
+  expect(screen.getAllByLabelText(/Você recebeu/)).toHaveLength(1);
+  expect(screen.getByLabelText("Você recebeu: Ovelha")).toBeInTheDocument();
+  await act(async () => vi.advanceTimersByTimeAsync(1800));
+  expect(screen.getByLabelText("Você recebeu: Ovelha")).toBeInTheDocument();
+  await act(async () => vi.advanceTimersByTimeAsync(1800));
+  expect(screen.getByLabelText("Você recebeu: Trigo")).toBeInTheDocument();
+  await act(async () => vi.advanceTimersByTimeAsync(1800));
+  expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
+});
+
+test("slow mode shows thinking and waits before the first bot action", async () => {
+  localStorage.setItem("catan_game_speed_v1", "slow");
+  vi.mocked(getState).mockResolvedValue(makeGameState({ current_color: "RED" }));
+  vi.mocked(postAction).mockReturnValue(new Promise(() => {}));
+  vi.useFakeTimers();
+  await act(async () => { renderGameScreen(); });
+  expect(screen.getByRole("button", { name: "Velocidade: Lenta" })).toBeInTheDocument();
+  expect(postAction).not.toHaveBeenCalled();
+  expect(screen.getAllByText(/pensando|calculando/i).length).toBeGreaterThan(0);
+  await act(async () => vi.advanceTimersByTimeAsync(4499));
+  expect(postAction).not.toHaveBeenCalled();
+  await act(async () => vi.advanceTimersByTimeAsync(1));
+  expect(postAction).toHaveBeenCalledOnce();
 });
 
 test("supports multiplayer Sair (Bot Assume) dialog, abandonGame, Retomar Meu Assento banner, and reclaimGame", async () => {

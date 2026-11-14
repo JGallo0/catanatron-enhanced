@@ -34,7 +34,6 @@ import Prompt from "../components/Prompt";
 import ResourceCards from "../components/ResourceCards";
 import ResourceSelector from "../components/ResourceSelector";
 import DiscardPlannerDialog from "../components/DiscardPlannerDialog";
-import DevCardDrawOverlay from "../components/DevCardDrawOverlay";
 import TradeModal from "../components/TradeModal";
 import TradeOfferDecisionDialog from "../components/TradeOfferDecisionDialog";
 import Dice3D from "../components/Dice3D";
@@ -50,7 +49,6 @@ import {
   getDevCardMeta,
   getPlayerColorMeta,
   getResourceMeta,
-  type DevCardType,
 } from "../config/assetRegistry";
 import { useLanguage } from "../i18n";
 import { store } from "../store";
@@ -118,7 +116,6 @@ export default function ActionsToolbar({
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [tradeDecisionMinimized, setTradeDecisionMinimized] = useState(false);
   const [costsModalOpen, setCostsModalOpen] = useState(false);
-  const [drawnDevCard, setDrawnDevCard] = useState<DevCardType | null>(null);
   const { isSubmitting, submitDiscardBatch } = useDiscardBatchSubmission();
   const { skin: pieceSkin } = usePieceSkin();
 
@@ -245,7 +242,6 @@ export default function ActionsToolbar({
 
   const handleResourceSelection = useCallback(
     async (selectedResources: ResourceCard | ResourceCard[]) => {
-      setResourceSelectorOpen(false);
       let action: GameAction;
       if (isPlayingMonopoly) {
         action = [
@@ -316,49 +312,7 @@ export default function ActionsToolbar({
     dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
     dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
 
-    // Identify which dev card was drawn by the human player
-    const latestRecord =
-      nextState.action_records[nextState.action_records.length - 1];
-    let cardType: DevCardType | null = null;
-    if (
-      latestRecord &&
-      latestRecord[0][1] === "BUY_DEVELOPMENT_CARD" &&
-      latestRecord[0][0] === humanColor &&
-      latestRecord[1]
-    ) {
-      cardType = latestRecord[1] as DevCardType;
-    } else {
-      const devTypes: DevCardType[] = [
-        "KNIGHT",
-        "VICTORY_POINT",
-        "MONOPOLY",
-        "YEAR_OF_PLENTY",
-        "ROAD_BUILDING",
-      ];
-      for (const dt of devTypes) {
-        const prevCount =
-          gameState.player_state[`${humanKey}_${dt}_IN_HAND`] ?? 0;
-        const nextCount =
-          nextState.player_state[`${humanKey}_${dt}_IN_HAND`] ?? 0;
-        if (nextCount > prevCount) {
-          cardType = dt;
-          break;
-        }
-      }
-    }
-
-    if (cardType) {
-      setDrawnDevCard(cardType);
-    }
-  }, [
-    resolvedGameId,
-    humanColor,
-    humanKey,
-    gameState.player_state,
-    dispatch,
-    enqueueSnackbar,
-    closeSnackbar,
-  ]);
+  }, [resolvedGameId, humanColor, dispatch, enqueueSnackbar, closeSnackbar]);
 
   const playableDevCallbacks = useMemo(() => {
     if (!isInteractiveTurn || isPlayingDevCard) return undefined;
@@ -853,7 +807,7 @@ export default function ActionsToolbar({
                 isSubmitting
               }
               onClick={ctaConfig.onClick}
-              className={cn("cu-cta-orb", `cu-cta-orb--${ctaConfig.variant}`)}
+              className={cn("cu-cta-orb", `cu-cta-orb--${ctaConfig.variant}`, { "cu-cta-orb--robber": isMoveRobber && isInteractiveTurn && !isRollingDice })}
               aria-label={ctaConfig.label}
               title={ctaConfig.label}
             >
@@ -956,10 +910,7 @@ export default function ActionsToolbar({
         submitting={isSubmitting}
       />
 
-      <DevCardDrawOverlay
-        card={drawnDevCard}
-        onComplete={() => setDrawnDevCard(null)}
-      />
+
     </div>
   );
 }

@@ -83,7 +83,7 @@ BOT_DIFFICULTY_TO_KEY: dict[str, str] = {
     "hard": "CATANATRON",
 }
 
-VALID_BOT_SPEEDS: tuple[str, ...] = ("normal", "fast", "turbo")
+VALID_BOT_SPEEDS: tuple[str, ...] = ("slow", "normal", "fast", "turbo")
 
 
 def normalize_bot_speed(raw: object) -> str | None:

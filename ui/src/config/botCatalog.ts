@@ -143,6 +143,7 @@ export type BotSpeedOption = {
 };
 
 export const BOT_SPEED_OPTIONS: ReadonlyArray<BotSpeedOption> = [
+  { value: "slow", label: "Lenta", icon: "🐢", description: "Bots pensam antes de agir, com pausas para acompanhar a mesa" },
   {
     value: "normal",
     label: "Normal",
@@ -164,6 +165,7 @@ export const BOT_SPEED_OPTIONS: ReadonlyArray<BotSpeedOption> = [
 ];
 
 export const BOT_SPEED_OPTIONS_EN: ReadonlyArray<BotSpeedOption> = [
+  { value: "slow", label: "Lenta", icon: "🐢", description: "Bots pensam antes de agir, com pausas para acompanhar a mesa" },
   {
     value: "normal",
     label: "Normal",
@@ -193,7 +195,7 @@ export function getBotSpeedOptions(
 export function normalizeBotSpeed(raw: unknown): BotSpeed | null {
   if (typeof raw !== "string") return null;
   const clean = raw.trim().toLowerCase();
-  if (clean === "normal" || clean === "fast" || clean === "turbo") {
+  if (clean === "slow" || clean === "normal" || clean === "fast" || clean === "turbo") {
     return clean;
   }
   return null;

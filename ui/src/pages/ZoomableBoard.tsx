@@ -93,6 +93,7 @@ function buildEdgeActions(state: CatanState) {
 }
 
 type ZoomableBoardProps = {
+  isRollingDice?: boolean;
   replayMode: boolean;
   hudClearance?: { top: number; bottom: number };
   recentNodeId?: number | null;
@@ -125,6 +126,7 @@ function loadSavedConfirmPlacement(): boolean {
 }
 
 export default function ZoomableBoard({
+  isRollingDice = false,
   replayMode,
   hudClearance,
   recentNodeId = null,
@@ -412,6 +414,7 @@ export default function ZoomableBoard({
             </div>
             <TransformComponent>
               <Board
+                isRollingDice={isRollingDice}
                 width={width}
                 height={height}
                 containerWidth={containerSize?.width}

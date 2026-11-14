@@ -1507,6 +1507,18 @@ function applyActionToGame(game: StoredLocalGame, action: GameAction) {
   const k = pKey(state, color);
   const actionType = action[1];
 
+  if (actionType === "CANCEL_TRADE" && (
+    !state.is_resolving_trade ||
+    !["DECIDE_TRADE", "DECIDE_ACCEPTEES"].includes(state.current_prompt) ||
+    color !== state.colors[state.current_turn_index] || action[2] !== null
+  )) {
+    throw new Error("Somente quem propôs a troca pode cancelá-la enquanto estiver aberta.");
+  }
+  if ((actionType === "ACCEPT_TRADE" || actionType === "REJECT_TRADE" || actionType === "CONFIRM_TRADE") &&
+    !state.current_playable_actions.some((candidate) => JSON.stringify(candidate) === JSON.stringify(action))) {
+    throw new Error("Esta proposta já foi encerrada ou não está disponível para você.");
+  }
+
   if (actionType === "BUILD_SETTLEMENT") {
     const nodeId = action[2];
     const node = state.nodes[String(nodeId)];
@@ -4359,7 +4371,7 @@ export function localUpdateRoom(
       if (!normSpeed) {
         throw makeRoomHttpError(
           400,
-          "'bot_speed' deve ser normal, fast ou turbo"
+          "'bot_speed' deve ser slow, normal, fast ou turbo"
         );
       }
       nextConfig.bot_speed = normSpeed;

@@ -626,17 +626,17 @@ def test_room_bot_speed_pre_match_config_and_game_exposure(client):
     # Invalid PATCH rejected with 400
     bad_patch = client.patch(
         f"/api/rooms/{code}",
-        json={"token": tok, "config": {"bot_speed": "slow"}},
+        json={"token": tok, "config": {"bot_speed": "snail"}},
     )
     assert bad_patch.status_code == 400
 
-    # Valid PATCH updates room pre-match speed to turbo
+    # Valid PATCH updates room pre-match speed to slow
     good_patch = client.patch(
         f"/api/rooms/{code}",
-        json={"token": tok, "config": {"bot_speed": "turbo"}},
+        json={"token": tok, "config": {"bot_speed": "slow"}},
     )
     assert good_patch.status_code == 200
-    assert good_patch.get_json()["config"]["bot_speed"] == "turbo"
+    assert good_patch.get_json()["config"]["bot_speed"] == "slow"
 
     # Start room -> live state view exposes locked bot_speed
     start_res = client.post(f"/api/rooms/{code}/start", json={"token": tok})
@@ -644,4 +644,4 @@ def test_room_bot_speed_pre_match_config_and_game_exposure(client):
     gid = start_res.get_json()["game_id"]
     view = client.get(f"/api/games/{gid}/states/latest").get_json()
     assert view["room_code"] == code
-    assert view["bot_speed"] == "turbo"
+    assert view["bot_speed"] == "slow"

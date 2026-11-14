@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   localCreateGame,
   localGetState,
@@ -8,6 +8,47 @@ import type { Color, GameState } from "./api.types";
 
 afterEach(() => {
   localStorage.clear();
+  vi.restoreAllMocks();
+});
+
+test("proposer cancels during responses; neither another player nor a stale acceptance can change it", () => {
+  const id = localCreateGame({ players: ["HUMAN", "CATANATRON", "CATANATRON"], mapTemplate: "BASE", vpsToWin: 10, discardLimit: 7, friendlyRobber: true });
+  advanceToPostRollHumanTurn(id);
+  setHandsInLocalGame(id, { RED: [2, 0, 0, 0, 0], BLUE: [0, 2, 0, 0, 0], ORANGE: [0, 2, 0, 0, 0] });
+  const waiting = localPostAction(id, ["RED", "OFFER_TRADE", [1, 0, 0, 0, 0, 0, 1, 0, 0, 0]]);
+  const stale = waiting.current_playable_actions[0];
+  expect(() => localPostAction(id, [waiting.current_color, "CANCEL_TRADE", null])).toThrow();
+  const cancelled = localPostAction(id, ["RED", "CANCEL_TRADE", null]);
+  expect(cancelled.current_prompt).toBe("PLAY_TURN");
+  expect(cancelled.current_color).toBe("RED");
+  expect(cancelled.is_resolving_trade).toBe(false);
+  expect(() => localPostAction(id, stale)).toThrow();
+});
+
+test.each(["SETTLEMENT", "CITY"] as const)("robber blocks only its tile for a %s, even when adjacent tiles have the same resource and number", (building) => {
+  const id = localCreateGame({ players: ["HUMAN", "CATANATRON"], mapTemplate: "BASE", vpsToWin: 10, discardLimit: 7, friendlyRobber: false });
+  advanceToPostRollHumanTurn(id);
+  setHandsInLocalGame(id, { RED: [0, 0, 0, 0, 0], BLUE: [0, 0, 0, 0, 0] });
+  const raw = JSON.parse(localStorage.getItem("catan_local_games_v1")!);
+  const st: GameState = raw[id].state;
+  st.tiles = [
+    { coordinate: [0, 0, 0], tile: { id: 0, type: "RESOURCE_TILE", resource: "WOOD", number: 6 } },
+    { coordinate: [1, -1, 0], tile: { id: 1, type: "RESOURCE_TILE", resource: "WOOD", number: 6 } },
+    { coordinate: [0, -1, 1], tile: { id: 2, type: "RESOURCE_TILE", resource: "WHEAT", number: 6 } },
+  ];
+  st.robber_coordinate = [0, 0, 0];
+  st.resource_freqdeck = [19, 19, 19, 19, 19];
+  st.game.dice_mode = "random";
+  st.player_state[`P${st.colors.indexOf("RED")}_HAS_ROLLED`] = false;
+  st.nodes = { "0": { id: 0, color: "RED", building, tile_coordinate: [0, 0, 0], direction: "SOUTHWEST" } };
+  st.adjacent_tiles = { "0": st.tiles.map((pt) => pt.tile) };
+  localStorage.setItem("catan_local_games_v1", JSON.stringify(raw));
+  vi.spyOn(Math, "random").mockReturnValue(.4); // 3 + 3
+  const next = localPostAction(id, ["RED", "ROLL", null]);
+  const key = `P${next.colors.indexOf("RED")}`;
+  const amount = building === "CITY" ? 2 : 1;
+  expect(next.player_state[`${key}_WOOD_IN_HAND`]).toBe(amount);
+  expect(next.player_state[`${key}_WHEAT_IN_HAND`]).toBe(amount);
 });
 
 function setHandsInLocalGame(

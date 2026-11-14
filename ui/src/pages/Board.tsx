@@ -44,6 +44,7 @@ function getLastRolledSum(gameState: GameState): number | null {
 }
 
 type BoardProps = {
+  isRollingDice?: boolean;
   width: number;
   height: number;
   containerWidth?: number;
@@ -75,6 +76,7 @@ type BoardProps = {
 };
 
 export default function Board({
+  isRollingDice = false,
   width,
   height,
   containerWidth,
@@ -152,7 +154,7 @@ export default function Board({
     const hasRobber = coordKey === robberCoordKey;
     const isProducing =
       tile.type === "RESOURCE_TILE" &&
-      lastRolledSum !== null &&
+      !isRollingDice && lastRolledSum !== null &&
       tile.number === lastRolledSum;
 
     return (

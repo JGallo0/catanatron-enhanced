@@ -1,0 +1,20 @@
+.card-gain {
+  position: fixed; inset: 0; z-index: 1400; display: grid; place-items: center;
+  pointer-events: none;
+  &__flight { display: grid; justify-items: center; gap: 12px; animation: card-receive 1.8s both; }
+  &__card { width: clamp(150px, 22vw, 240px); border: 3px solid #d6b571; border-radius: 14px; overflow: hidden;
+    background: #071526; box-shadow: 0 14px 50px #000b, 0 0 45px #f5d77d33; }
+  &__art { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+  &__name { padding: 12px; display: flex; align-items: center; justify-content: center; gap: 12px; color: #fff0bd;
+    strong { font: 700 19px "Cinzel", serif; } span { font: 800 25px "Outfit", sans-serif; } }
+  &__caption { color: #fff0bd; padding: 5px 14px; background: #071526ef; border-radius: 20px; font: 600 14px "Outfit", sans-serif; }
+}
+@keyframes card-receive {
+  0% { opacity: 0; transform: translateY(24px) scale(.65) rotate(-6deg); }
+  20%, 65% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translate(var(--gain-x), var(--gain-y)) scale(.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-gain__flight { animation: card-receive-fade 1.8s both; }
+}
+@keyframes card-receive-fade { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
