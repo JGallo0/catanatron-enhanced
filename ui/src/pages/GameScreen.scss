@@ -1084,7 +1084,7 @@ main.catan-game-screen {
   }
 }
 
-/* Discreet Persistent Bottom-Left Mini Action Log */
+/* Discreet Persistent Mini Action Log */
 .mini-action-log {
   position: fixed;
   left: 20px;
@@ -1101,6 +1101,12 @@ main.catan-game-screen {
   backdrop-filter: blur(8px);
   border: 1px solid rgba(125, 211, 252, 0.16);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  transition: left 0.2s ease, right 0.2s ease, bottom 0.2s ease;
+
+  &--chat-open {
+    left: auto;
+    right: 72px;
+  }
 
   &__row {
     display: flex;
@@ -1224,7 +1230,7 @@ main.catan-game-screen {
   }
 }
 
-@media (max-width: 980px), (max-height: 540px) {
+@media (max-width: 640px), (max-height: 480px) {
   .mini-action-log {
     display: none;
   }

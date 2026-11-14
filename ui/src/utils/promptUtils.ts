@@ -157,12 +157,21 @@ export function humanizeActionRecordPt(
           : en
             ? "the Desert"
             : "o Deserto";
-      const robbedResource = actionRecord[1] as ResourceCard | null;
-      const stolenStr = robbedResource
+      const victimColor = (robAction[2]?.[1] as Color | null | undefined) ?? null;
+      const victimName = victimColor
+        ? resolvePlayerDisplayName(
+            gameState,
+            victimColor,
+            colorMeta[victimColor]?.label || String(victimColor)
+          )
+        : null;
+      const stolenStr = victimName
         ? en
-          ? ` and stole ${resLabel(robbedResource, lang)}`
-          : ` e roubou ${resLabel(robbedResource, lang)}`
-        : "";
+          ? ` and stole 1 resource from ${victimName}`
+          : ` e roubou 1 recurso de ${victimName}`
+        : en
+          ? " (nobody was robbed)"
+          : " (ninguém foi roubado)";
       return en
         ? `${player} moved the Robber to ${tileStr}${stolenStr}`
         : `${player} moveu o Ladrão para ${tileStr}${stolenStr}`;
@@ -338,4 +347,326 @@ export function getTileString(tile: PlacedTile): string {
 
 export function findTileById(gameState: GameState, tileId: number): PlacedTile {
   return gameState.tiles[tileId];
+}
+
+export type DetailedActionLogEntry = {
+  record: GameActionRecord;
+  color: Color;
+  text: string;
+  details: string[];
+};
+
+function formatResourceGainMap(
+  gains: Partial<Record<ResourceCard, number>>,
+  lang: AppLanguage
+): string {
+  const parts: string[] = [];
+  for (const res of TRADE_RESOURCE_ORDER) {
+    const qty = gains[res] ?? 0;
+    if (qty > 0) {
+      parts.push(`+${qty}× ${resLabel(res, lang)}`);
+    }
+  }
+  return parts.join(", ");
+}
+
+/**
+ * Reconstructs the chronological action history with player resource gains
+ * (from dice rolls, second initial settlements, and Year of Plenty) and
+ * theft victims (from rolling 7, playing a Knight card, or playing Monopoly,
+ * always showing who was robbed without revealing the stolen resource).
+ */
+export function buildDetailedActionLogEntries(
+  gameState: GameState,
+  lang: AppLanguage = getCurrentLanguage()
+): DetailedActionLogEntry[] {
+  const records = gameState.action_records || [];
+  if (records.length === 0) return [];
+
+  const en = lang === "en";
+  const colorMeta = getPlayerColorMeta(lang);
+  const buildingsByNode = new Map<
+    number,
+    { color: Color; type: "SETTLEMENT" | "CITY" }
+  >();
+  const settlementCountByColor = new Map<Color, number>();
+  let hasRolledYet = false;
+
+  let robberTileId: number | null = null;
+  for (const pt of gameState.tiles || []) {
+    if (pt.tile.type === "DESERT" && typeof pt.tile.id === "number") {
+      robberTileId = pt.tile.id;
+      break;
+    }
+  }
+
+  const hands = new Map<Color, Record<ResourceCard, number>>();
+  for (const c of gameState.colors || []) {
+    hands.set(c, { WOOD: 0, BRICK: 0, SHEEP: 0, WHEAT: 0, ORE: 0 });
+  }
+  const addRes = (c: Color, r: ResourceCard, delta: number) => {
+    const h = hands.get(c);
+    if (!h) return;
+    h[r] = Math.max(0, (h[r] ?? 0) + delta);
+  };
+
+  let lastRobberTrigger: "SEVEN" | "KNIGHT" | null = null;
+  const entries: DetailedActionLogEntry[] = [];
+
+  for (const record of records) {
+    if (!record || !record[0]) continue;
+    const [action, result] = record;
+    const color = action[0];
+    const actionType = action[1];
+    const player = resolvePlayerDisplayName(
+      gameState,
+      color,
+      colorMeta[color]?.label || color
+    );
+    let text = humanizeActionRecordPt(gameState, record, lang);
+    const details: string[] = [];
+
+    if (actionType === "BUILD_SETTLEMENT") {
+      const nodeId = Number(action[2]);
+      buildingsByNode.set(nodeId, { color, type: "SETTLEMENT" });
+      const count = (settlementCountByColor.get(color) ?? 0) + 1;
+      settlementCountByColor.set(color, count);
+
+      if (!hasRolledYet && count === 2) {
+        const adjTiles = gameState.adjacent_tiles?.[nodeId] || [];
+        const initGains: Partial<Record<ResourceCard, number>> = {};
+        for (const t of adjTiles) {
+          if (t.type === "RESOURCE_TILE") {
+            initGains[t.resource] = (initGains[t.resource] ?? 0) + 1;
+            addRes(color, t.resource, 1);
+          }
+        }
+        const gainStr = formatResourceGainMap(initGains, lang);
+        if (gainStr) {
+          details.push(
+            en
+              ? `🎁 ${player} gained starting resources: ${gainStr}`
+              : `🎁 ${player} ganhou recursos iniciais: ${gainStr}`
+          );
+        }
+      } else if (hasRolledYet) {
+        addRes(color, "WOOD", -1);
+        addRes(color, "BRICK", -1);
+        addRes(color, "SHEEP", -1);
+        addRes(color, "WHEAT", -1);
+      }
+    } else if (actionType === "BUILD_CITY") {
+      const nodeId = Number(action[2]);
+      buildingsByNode.set(nodeId, { color, type: "CITY" });
+      addRes(color, "WHEAT", -2);
+      addRes(color, "ORE", -3);
+    } else if (actionType === "BUILD_ROAD") {
+      if (hasRolledYet) {
+        addRes(color, "WOOD", -1);
+        addRes(color, "BRICK", -1);
+      }
+    } else if (actionType === "BUY_DEVELOPMENT_CARD") {
+      addRes(color, "SHEEP", -1);
+      addRes(color, "WHEAT", -1);
+      addRes(color, "ORE", -1);
+    } else if (actionType === "DISCARD_RESOURCE") {
+      const discarded = (result || action[2]) as ResourceCard | undefined;
+      if (discarded) addRes(color, discarded, -1);
+    } else if (
+      actionType === "ROLL" &&
+      Array.isArray(result) &&
+      result.length === 2
+    ) {
+      hasRolledYet = true;
+      const sum = Number(result[0]) + Number(result[1]);
+      if (sum === 7) {
+        lastRobberTrigger = "SEVEN";
+      } else {
+        const gainsByPlayer = new Map<
+          Color,
+          Partial<Record<ResourceCard, number>>
+        >();
+
+        if (buildingsByNode.size > 0) {
+          for (const [nodeId, b] of buildingsByNode.entries()) {
+            const mult = b.type === "CITY" ? 2 : 1;
+            const adjTiles = gameState.adjacent_tiles?.[nodeId] || [];
+            for (const tile of adjTiles) {
+              if (
+                tile.type === "RESOURCE_TILE" &&
+                tile.number === sum &&
+                tile.id !== robberTileId
+              ) {
+                const map = gainsByPlayer.get(b.color) ?? {};
+                map[tile.resource] = (map[tile.resource] ?? 0) + mult;
+                gainsByPlayer.set(b.color, map);
+                addRes(b.color, tile.resource, mult);
+              }
+            }
+          }
+        } else {
+          // Fallback if action_records started mid-game without initial BUILD_SETTLEMENT records
+          for (const node of Object.values(gameState.nodes || {})) {
+            if (!node.color || !node.building) continue;
+            const mult = node.building === "CITY" ? 2 : 1;
+            const adjTiles = gameState.adjacent_tiles?.[node.id] || [];
+            for (const tile of adjTiles) {
+              if (
+                tile.type === "RESOURCE_TILE" &&
+                tile.number === sum &&
+                tile.id !== robberTileId
+              ) {
+                const map = gainsByPlayer.get(node.color) ?? {};
+                map[tile.resource] = (map[tile.resource] ?? 0) + mult;
+                gainsByPlayer.set(node.color, map);
+                addRes(node.color, tile.resource, mult);
+              }
+            }
+          }
+        }
+
+        const orderedColors = gameState.colors || Array.from(gainsByPlayer.keys());
+        for (const pColor of orderedColors) {
+          const map = gainsByPlayer.get(pColor);
+          if (!map) continue;
+          const gainStr = formatResourceGainMap(map, lang);
+          if (!gainStr) continue;
+          const pName = resolvePlayerDisplayName(
+            gameState,
+            pColor,
+            colorMeta[pColor]?.label || pColor
+          );
+          details.push(
+            en ? `🎁 ${pName} gained ${gainStr}` : `🎁 ${pName} ganhou ${gainStr}`
+          );
+        }
+        if (details.length === 0) {
+          details.push(
+            en
+              ? "🎁 No player gained resources"
+              : "🎁 Nenhum jogador ganhou recursos"
+          );
+        }
+      }
+    } else if (actionType === "PLAY_KNIGHT_CARD") {
+      lastRobberTrigger = "KNIGHT";
+    } else if (actionType === "MOVE_ROBBER") {
+      const robAction = action as MoveRobberAction;
+      try {
+        const movedTile = findTileByCoordinate(gameState, robAction[2][0]);
+        if ("id" in movedTile.tile && typeof movedTile.tile.id === "number") {
+          robberTileId = movedTile.tile.id;
+        }
+      } catch {
+        // ignore coordinate lookup error in minimal mocks
+      }
+
+      const victimColor = (robAction[2]?.[1] as Color | null | undefined) ?? null;
+      const victimName = victimColor
+        ? resolvePlayerDisplayName(
+            gameState,
+            victimColor,
+            colorMeta[victimColor]?.label || String(victimColor)
+          )
+        : null;
+      const causeTag =
+        lastRobberTrigger === "KNIGHT"
+          ? en
+            ? "Knight Card"
+            : "Carta Cavaleiro"
+          : lastRobberTrigger === "SEVEN"
+            ? en
+              ? "Rolled 7"
+              : "7 nos dados"
+            : null;
+
+      if (victimName) {
+        details.push(
+          en
+            ? `🥷 ${victimName} had 1 resource stolen by ${player}${causeTag ? ` (${causeTag})` : ""}`
+            : `🥷 ${victimName} teve 1 recurso roubado por ${player}${causeTag ? ` (${causeTag})` : ""}`
+        );
+      }
+      lastRobberTrigger = null;
+    } else if (actionType === "PLAY_YEAR_OF_PLENTY") {
+      const yopAction = action as PlayYearOfPlentyAction;
+      const yopGains: Partial<Record<ResourceCard, number>> = {};
+      for (const r of yopAction[2] || []) {
+        if (r) {
+          yopGains[r] = (yopGains[r] ?? 0) + 1;
+          addRes(color, r, 1);
+        }
+      }
+      const gainStr = formatResourceGainMap(yopGains, lang);
+      if (gainStr) {
+        details.push(
+          en ? `🎁 ${player} gained ${gainStr}` : `🎁 ${player} ganhou ${gainStr}`
+        );
+      }
+    } else if (actionType === "PLAY_MONOPOLY") {
+      const monoRes = action[2] as ResourceCard;
+      const victimNames: string[] = [];
+      for (const otherColor of gameState.colors || []) {
+        if (otherColor === color) continue;
+        const held = hands.get(otherColor)?.[monoRes] ?? 0;
+        if (held > 0) {
+          addRes(otherColor, monoRes, -held);
+          addRes(color, monoRes, held);
+          victimNames.push(
+            resolvePlayerDisplayName(
+              gameState,
+              otherColor,
+              colorMeta[otherColor]?.label || otherColor
+            )
+          );
+        }
+      }
+      text = en
+        ? `${player} played Monopoly card`
+        : `${player} usou carta Monopólio`;
+      if (victimNames.length > 0) {
+        details.push(
+          en
+            ? `🥷 Stolen from: ${victimNames.join(", ")} (Monopoly Card)`
+            : `🥷 Roubou recursos de: ${victimNames.join(", ")} (Carta Monopólio)`
+        );
+      } else {
+        details.push(
+          en
+            ? `🥷 Monopoly card played by ${player} (no player had resources stolen)`
+            : `🥷 Carta Monopólio usada por ${player} (ninguém teve recursos roubados)`
+        );
+      }
+    } else if (actionType === "MARITIME_TRADE") {
+      const mt = (action[2] || []) as (ResourceCard | null)[];
+      const out = mt.slice(0, 4).filter((r): r is ResourceCard => r !== null);
+      const recv = mt[4];
+      for (const r of out) addRes(color, r, -1);
+      if (recv) addRes(color, recv, 1);
+    } else if (actionType === "CONFIRM_TRADE") {
+      const val = (action[2] as [...number[], Color]) || [];
+      const partnerColor = val[10] as Color;
+      TRADE_RESOURCE_ORDER.forEach((res, idx) => {
+        const giveQty = Number(val[idx] || 0);
+        const askQty = Number(val[idx + 5] || 0);
+        if (giveQty > 0) {
+          addRes(color, res, -giveQty);
+          addRes(partnerColor, res, giveQty);
+        }
+        if (askQty > 0) {
+          addRes(color, res, askQty);
+          addRes(partnerColor, res, -askQty);
+        }
+      });
+    }
+
+    entries.push({
+      record,
+      color,
+      text,
+      details,
+    });
+  }
+
+  return entries;
 }

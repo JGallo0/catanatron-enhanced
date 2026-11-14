@@ -1802,9 +1802,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         </div>
       )}
 
-      {!chatOpen && gs.action_records && gs.action_records.length > 0 && (
+      {gs.action_records && gs.action_records.length > 0 && (
         <aside
-          className="mini-action-log"
+          className={cn("mini-action-log", {
+            "mini-action-log--chat-open": chatOpen,
+          })}
           aria-label={t("Últimas jogadas na mesa", "Recent table actions")}
         >
           {gs.action_records.slice(-3).map((rec, idx, arr) => {

@@ -7,6 +7,7 @@ import {
   humanizeActionRecord,
   humanizeActionRecordPt,
   humanizeTradeAction,
+  buildDetailedActionLogEntries,
 } from "./promptUtils";
 import type { GameState, GameAction, GameActionRecord } from "./api.types";
 
@@ -389,5 +390,44 @@ describe("humanizeActionRecordPt domestic trade", () => {
     expect(
       humanizeActionRecordPt(gs, [["BLUE", "CANCEL_TRADE", null], null])
     ).toBe("João cancelou a proposta de troca");
+  });
+
+  test("shows who was robbed without revealing the stolen resource on MOVE_ROBBER and includes roll resource gains in buildDetailedActionLogEntries", () => {
+    const detailedState = {
+      bot_colors: ["RED"],
+      colors: ["RED", "BLUE"],
+      seat_names: { RED: "Creitu", BLUE: "João" },
+      tiles: [
+        {
+          coordinate: [0, 0, 0],
+          tile: { id: 0, type: "RESOURCE_TILE", resource: "WHEAT", number: 8 },
+        },
+        {
+          coordinate: [1, -1, 0],
+          tile: { id: 1, type: "DESERT" },
+        },
+      ],
+      adjacent_tiles: {
+        10: [{ id: 0, type: "RESOURCE_TILE", resource: "WHEAT", number: 8 }],
+      },
+      action_records: [
+        [["BLUE", "BUILD_SETTLEMENT", 10], null],
+        [["RED", "ROLL", null], [3, 5]],
+        [["RED", "PLAY_KNIGHT_CARD", null], null],
+        [["RED", "MOVE_ROBBER", [[0, 0, 0], "BLUE"]], "WHEAT"],
+      ],
+    } as unknown as GameState;
+
+    const entries = buildDetailedActionLogEntries(detailedState, "pt");
+    expect(entries).toHaveLength(4);
+    // Roll 8 yields +1x Trigo for João
+    expect(entries[1].details).toContain("🎁 João ganhou +1× Trigo");
+    // Robber shows victim (João) and never reveals the stolen resource ("Trigo")
+    expect(entries[3].text).toBe(
+      "Creitu moveu o Ladrão para 8 (Trigo) e roubou 1 recurso de João"
+    );
+    expect(entries[3].details).toContain(
+      "🥷 João teve 1 recurso roubado por Creitu (Carta Cavaleiro)"
+    );
   });
 });

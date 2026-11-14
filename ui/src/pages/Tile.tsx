@@ -12,7 +12,6 @@ import { getResourceMeta } from "../config/assetRegistry";
 import { useLanguage } from "../i18n";
 import { getTileIllustrationUrl, useBoardSkin } from "../utils/boardSkin";
 import {
-  HarborPortSvg,
   HybridIllustration,
   ResourceIcon,
   TerrainHexIllustration,
@@ -85,8 +84,8 @@ export function NumberToken({
 const calculatePortOffset = (
   direction: Direction,
   size: number
-): { x: number; y: number; angle: number } => {
-  const dist = size * 0.28;
+): { x: number; y: number; angle: number; edgeAngle: number } => {
+  const dist = size * 0.44;
   const angleByDir: Record<Direction, number> = {
     NORTH: 0,
     NORTHEAST: 30,
@@ -97,12 +96,25 @@ const calculatePortOffset = (
     WEST: 270,
     NORTHWEST: 330,
   };
+  // Angle parallel to the shared hexagon edge while keeping text upright
+  const edgeAngleByDir: Record<Direction, number> = {
+    NORTH: 0,
+    NORTHEAST: 30,
+    EAST: 90,
+    SOUTHEAST: -30,
+    SOUTH: 0,
+    SOUTHWEST: 30,
+    WEST: -90,
+    NORTHWEST: -30,
+  };
   const angle = angleByDir[direction] ?? 0;
+  const edgeAngle = edgeAngleByDir[direction] ?? 0;
   const rad = (angle * Math.PI) / 180;
   return {
     x: dist * Math.sin(rad),
     y: -dist * Math.cos(rad),
     angle,
+    edgeAngle,
   };
 };
 
@@ -119,9 +131,7 @@ const Port = ({
   const ratio = resource ? "2:1" : "3:1";
   const offset = calculatePortOffset(direction, size);
   const meta = resource ? getResourceMeta(language)[resource] : null;
-  const harborWidth = Math.max(54, Math.min(82, Math.round(size * 0.96)));
-  const harborHeight = Math.round(harborWidth * 0.78);
-  const bridgeLen = Math.max(20, Math.round(size * 0.44));
+  const bridgeLen = Math.max(18, Math.round(size * 0.4));
 
   return (
     <div
@@ -152,37 +162,22 @@ const Port = ({
         />
       </div>
 
-      {/* Illustrated Harbor Wharf + Moored Merchant Ship */}
-      <div
-        className="port-scene__artwork"
-        style={{ width: harborWidth, height: harborHeight }}
-      >
-        <HarborPortSvg
-          resource={resource}
-          width={harborWidth}
-          height={harborHeight}
-        />
-      </div>
-
-      {/* Hanging Weathered Parchment Harbor Trade Sign */}
+      {/* Physical-board style port badge aligned along the hexagon edge */}
       <div
         className="port-scene__placard"
         style={{
           borderColor: meta ? meta.borderColor : "#f59e0b",
+          transform: `rotate(${offset.edgeAngle}deg)`,
         }}
       >
-        <span className="port-scene__icon">
-          {resource ? (
+        {resource && (
+          <span className="port-scene__icon">
             <ResourceIcon
               resource={resource}
-              size={Math.max(12, Math.round(size * 0.21))}
+              size={Math.max(15, Math.round(size * 0.25))}
             />
-          ) : (
-            <span className="port-scene__anchor" aria-hidden="true">
-              ⚓
-            </span>
-          )}
-        </span>
+          </span>
+        )}
         <span className="port-scene__ratio">{ratio}</span>
       </div>
     </div>

@@ -732,12 +732,27 @@ export const ResourceIcon: React.FC<{
           className={className}
           aria-hidden="true"
         >
+          <rect
+            x="10"
+            y="17.5"
+            width="4"
+            height="4.8"
+            rx="0.8"
+            fill="#92400E"
+            stroke="#271206"
+            strokeWidth="1.5"
+          />
           <path
-            d="M12 2L5 11H9L4 18H10V22H14V18H20L15 11H19L12 2Z"
-            fill="#4ADE80"
-            stroke="#064E3B"
-            strokeWidth="1.6"
+            d="M12 1.8L4.8 10.5H8.8L3.8 18H20.2L15.2 10.5H19.2L12 1.8Z"
+            fill="#22C55E"
+            stroke="#052E16"
+            strokeWidth="1.8"
             strokeLinejoin="round"
+          />
+          <path
+            d="M12 4.2L7.5 9.8H10.2L6.8 15.8H12V4.2Z"
+            fill="#86EFAC"
+            opacity="0.45"
           />
         </svg>
       );
@@ -754,32 +769,32 @@ export const ResourceIcon: React.FC<{
           <rect
             x="2"
             y="4"
-            width="9"
-            height="6"
+            width="9.2"
+            height="6.2"
             rx="1.2"
             fill="#F87171"
-            stroke="#7F1D1D"
-            strokeWidth="1.5"
+            stroke="#450A0A"
+            strokeWidth="1.7"
           />
           <rect
-            x="13"
+            x="12.8"
             y="4"
-            width="9"
-            height="6"
+            width="9.2"
+            height="6.2"
             rx="1.2"
-            fill="#EF4444"
-            stroke="#7F1D1D"
-            strokeWidth="1.5"
+            fill="#DC2626"
+            stroke="#450A0A"
+            strokeWidth="1.7"
           />
           <rect
-            x="6"
-            y="12"
-            width="12"
-            height="6"
+            x="5.5"
+            y="12.2"
+            width="13"
+            height="6.5"
             rx="1.2"
-            fill="#FB923C"
-            stroke="#7F1D1D"
-            strokeWidth="1.5"
+            fill="#EA580C"
+            stroke="#450A0A"
+            strokeWidth="1.7"
           />
         </svg>
       );
@@ -793,16 +808,27 @@ export const ResourceIcon: React.FC<{
           className={className}
           aria-hidden="true"
         >
-          <path d="M7 15v5m7-5v5" stroke="#F3DCC0" strokeWidth="2.3" strokeLinecap="round" />
+          <path
+            d="M7 15v5.2m7-5.2v5.2"
+            stroke="#271206"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+          />
           <path
             d="M3.3 9.4A3.1 3.1 0 0 1 7.4 6a3.4 3.4 0 0 1 5.2.3 3.7 3.7 0 0 1 5.2 4.2 3.5 3.5 0 0 1-2.7 5.7H6.6a3.8 3.8 0 0 1-3.3-6.8Z"
-            fill="#FFF8E7"
-            stroke="#604C41"
-            strokeWidth="1.2"
+            fill="#FFFFFF"
+            stroke="#1E293B"
+            strokeWidth="1.7"
             strokeLinejoin="round"
           />
-          <path d="M16.1 9.1 19 6.9l.8 2 2.1 1.1-.7 4.1-2.2 1.1-3.1-2Z" fill="#796254" stroke="#3A2A27" strokeWidth="1.1" strokeLinejoin="round" />
-          <circle cx="19.4" cy="11.2" r=".75" fill="#FFF8E7" />
+          <path
+            d="M16.1 9.1 19 6.9l.8 2 2.1 1.1-.7 4.1-2.2 1.1-3.1-2Z"
+            fill="#574337"
+            stroke="#1E293B"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <circle cx="19.4" cy="11.2" r="0.9" fill="#FFFFFF" />
         </svg>
       );
     case "WHEAT":
@@ -815,13 +841,83 @@ export const ResourceIcon: React.FC<{
           className={className}
           aria-hidden="true"
         >
+          {/* Central golden wheat stalk with high-contrast dark brown outline */}
           <path
-            d="M12 21V4M12 7C9.5 7 8 5.5 8 3.5C10.5 3.5 12 5 12 7ZM12 7C14.5 7 16 5.5 16 3.5C13.5 3.5 12 5 12 7ZM12 12C9.2 12 7.5 10.2 7.5 8C10.2 8 12 9.8 12 12ZM12 12C14.8 12 16.5 10.2 16.5 8C13.8 8 12 9.8 12 12ZM12 17C9.2 17 7.5 15.2 7.5 13C10.2 13 12 14.8 12 17ZM12 17C14.8 17 16.5 15.2 16.5 13C13.8 13 12 14.8 12 17Z"
-            stroke="#FDE047"
-            strokeWidth="2"
+            d="M12 22V3.5"
+            stroke="#451A03"
+            strokeWidth="2.4"
             strokeLinecap="round"
-            strokeLinejoin="round"
+          />
+          {/* Left & right plump wheat kernels with dark contrast stroke */}
+          <ellipse
+            cx="8.6"
+            cy="6.5"
+            rx="2.3"
+            ry="3.4"
+            transform="rotate(-28 8.6 6.5)"
             fill="#FACC15"
+            stroke="#451A03"
+            strokeWidth="1.6"
+          />
+          <ellipse
+            cx="15.4"
+            cy="6.5"
+            rx="2.3"
+            ry="3.4"
+            transform="rotate(28 15.4 6.5)"
+            fill="#FACC15"
+            stroke="#451A03"
+            strokeWidth="1.6"
+          />
+          <ellipse
+            cx="8.3"
+            cy="11.6"
+            rx="2.4"
+            ry="3.6"
+            transform="rotate(-28 8.3 11.6)"
+            fill="#F59E0B"
+            stroke="#451A03"
+            strokeWidth="1.6"
+          />
+          <ellipse
+            cx="15.7"
+            cy="11.6"
+            rx="2.4"
+            ry="3.6"
+            transform="rotate(28 15.7 11.6)"
+            fill="#F59E0B"
+            stroke="#451A03"
+            strokeWidth="1.6"
+          />
+          <ellipse
+            cx="8.6"
+            cy="16.6"
+            rx="2.3"
+            ry="3.4"
+            transform="rotate(-25 8.6 16.6)"
+            fill="#FACC15"
+            stroke="#451A03"
+            strokeWidth="1.6"
+          />
+          <ellipse
+            cx="15.4"
+            cy="16.6"
+            rx="2.3"
+            ry="3.4"
+            transform="rotate(25 15.4 16.6)"
+            fill="#FACC15"
+            stroke="#451A03"
+            strokeWidth="1.6"
+          />
+          {/* Top center kernel */}
+          <ellipse
+            cx="12"
+            cy="3.8"
+            rx="2.0"
+            ry="3.0"
+            fill="#FEF08A"
+            stroke="#451A03"
+            strokeWidth="1.6"
           />
         </svg>
       );
@@ -836,14 +932,14 @@ export const ResourceIcon: React.FC<{
           aria-hidden="true"
         >
           <polygon
-            points="12,3 21,9 18,20 6,20 3,9"
+            points="12,2.5 21.2,8.8 18.2,20.2 5.8,20.2 2.8,8.8"
             fill="#94A3B8"
-            stroke="#1E293B"
-            strokeWidth="1.6"
+            stroke="#0F172A"
+            strokeWidth="1.8"
             strokeLinejoin="round"
           />
-          <polygon points="12,3 17,9 12,13 7,9" fill="#E2E8F0" />
-          <polygon points="12,13 18,20 6,20" fill="#64748B" />
+          <polygon points="12,3.4 17.2,8.8 12,13.2 6.8,8.8" fill="#E2E8F0" />
+          <polygon points="12,13.2 17.8,19.6 6.2,19.6" fill="#475569" />
         </svg>
       );
   }

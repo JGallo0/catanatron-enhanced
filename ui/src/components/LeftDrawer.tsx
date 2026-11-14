@@ -1,9 +1,9 @@
-import { useCallback, useContext } from "react";
+import { useCallback, useContext, useMemo } from "react";
 import cn from "classnames";
 import SwipeableDrawer from "@mui/material/SwipeableDrawer";
 import Button from "@mui/material/Button";
 
-import { humanizeActionRecordPt } from "../utils/promptUtils";
+import { buildDetailedActionLogEntries } from "../utils/promptUtils";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import { getHumanColor } from "../utils/stateUtils";
@@ -100,6 +100,10 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
   const { language, t } = useLanguage();
   const colorMeta = getPlayerColorMeta(language);
   const actionCount = gameState.action_records.length;
+  const detailedEntries = useMemo(
+    () => buildDetailedActionLogEntries(gameState, language),
+    [gameState, language]
+  );
 
   return (
     <div className="left-drawer__container">
@@ -134,11 +138,11 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
             </span>
           </div>
         ) : (
-          gameState.action_records
+          detailedEntries
             .slice()
             .reverse()
-            .map((actionRecord, i) => {
-              const color = actionRecord[0][0];
+            .map((entry, i) => {
+              const { record: actionRecord, color, text, details } = entry;
               const palette = colorMeta[color];
               return (
                 <div
@@ -148,16 +152,25 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
                     "action--end": actionRecord[0][1] === "END_TURN",
                   })}
                 >
-                  <span
-                    className="action__dot"
-                    style={{ background: palette.primary }}
-                  />
-                  <span className="action__icon" aria-hidden="true">
-                    {actionIcon(actionRecord)}
-                  </span>
-                  <span className="action__text">
-                    {humanizeActionRecordPt(gameState, actionRecord, language)}
-                  </span>
+                  <div className="action__main">
+                    <span
+                      className="action__dot"
+                      style={{ background: palette.primary }}
+                    />
+                    <span className="action__icon" aria-hidden="true">
+                      {actionIcon(actionRecord)}
+                    </span>
+                    <span className="action__text">{text}</span>
+                  </div>
+                  {details.length > 0 && (
+                    <div className="action__details">
+                      {details.map((detail, dIdx) => (
+                        <div key={dIdx} className="action__detail-row">
+                          {detail}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })

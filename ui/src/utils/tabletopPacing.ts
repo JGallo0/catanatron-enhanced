@@ -5,7 +5,7 @@ import type {
   ResourceCard,
 } from "./api.types";
 import { playerKey } from "./stateUtils";
-import { getPlayerColorMeta, getResourceMeta } from "../config/assetRegistry";
+import { getPlayerColorMeta } from "../config/assetRegistry";
 import { resolvePlayerDisplayName } from "../config/botCatalog";
 import { getCurrentLanguage, type AppLanguage } from "../i18n";
 
@@ -429,9 +429,8 @@ export function extractBatchTransitionFX(
   let robberEvent: RobberNoticeFX | null = null;
   if (latestRobberRecord && latestRobberRecord[0]) {
     const colorMeta = getPlayerColorMeta(lang);
-    const resMeta = getResourceMeta(lang);
     const en = lang === "en";
-    const [action, result] = latestRobberRecord;
+    const [action] = latestRobberRecord;
     const attackerColor = action[0];
     const attackerName = resolvePlayerDisplayName(
       nextState,
@@ -448,7 +447,6 @@ export function extractBatchTransitionFX(
           colorMeta[victimColor]?.label || victimColor
         )
       : null;
-    const stolenResource = (result ?? null) as ResourceCard | null;
 
     if (!victimColor) {
       const spared =
@@ -476,17 +474,15 @@ export function extractBatchTransitionFX(
       };
     } else if (
       mySeatColor !== null &&
-      attackerColor === mySeatColor &&
-      stolenResource
+      attackerColor === mySeatColor
     ) {
-      const resLabel = resMeta[stolenResource]?.label || stolenResource;
       robberEvent = {
         attackerColor,
         victimColor,
         tone: "attacker",
         message: en
-          ? `🥷 You stole 1× ${resLabel} from ${victimName}!`
-          : `🥷 Você roubou 1× ${resLabel} de ${victimName}!`,
+          ? `🥷 You stole 1 resource from ${victimName}!`
+          : `🥷 Você roubou 1 recurso de ${victimName}!`,
       };
     } else {
       const isObserverNotHit =

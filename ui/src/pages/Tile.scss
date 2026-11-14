@@ -277,18 +277,19 @@
   &__placard {
     position: relative;
     z-index: 2;
-    margin-top: -10px;
+    margin-top: 0;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 7px;
-    border-radius: 6px;
-    background: linear-gradient(180deg, #fef3c7 0%, #fde68a 60%, #d97706 100%);
-    border: 1.5px solid #78350f;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 65%, #f59e0b 100%);
+    border: 1.8px solid #451a03;
     box-shadow:
-      0 3px 8px rgba(0, 0, 0, 0.72),
-      inset 0 1px 0 rgba(255, 255, 255, 0.85);
-    color: #291507;
+      0 3px 8px rgba(0, 0, 0, 0.78),
+      inset 0 1px 0 rgba(255, 255, 255, 0.92);
+    color: #1c1917;
+    white-space: nowrap;
   }
 
   &__icon {
@@ -296,6 +297,11 @@
     align-items: center;
     justify-content: center;
     line-height: 1;
+    padding: 2px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(254, 243, 199, 0.7);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
   }
 
   &__anchor {
@@ -305,9 +311,9 @@
 
   &__ratio {
     font-family: "Cinzel", "Outfit", serif;
-    font-size: 0.68rem;
+    font-size: 0.76rem;
     font-weight: 900;
-    letter-spacing: -0.01em;
+    letter-spacing: 0.01em;
     color: #1c1917;
     line-height: 1;
   }
