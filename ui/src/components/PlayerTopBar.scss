@@ -129,24 +129,35 @@
     animation: cu-taunt-emoji-bounce 0.55s ease-in-out infinite alternate;
   }
 
-  &--furioso_ladrao {
-    background: radial-gradient(circle, rgba(239, 68, 68, 0.42) 0%, transparent 72%);
+  &--furioso_ladrao,
+  &--olha_trairagem {
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.45) 0%, transparent 72%);
     animation: cu-taunt-shake 0.36s ease-in-out 4;
   }
 
+  &--coyote {
+    background: radial-gradient(circle, rgba(251, 146, 60, 0.44) 0%, rgba(148, 163, 184, 0.28) 52%, transparent 78%);
+  }
+
   &--boa_guerra,
-  &--ouro {
+  &--ouro,
+  &--praca_nossa,
+  &--cerveja_mesa {
     background: radial-gradient(circle, rgba(250, 204, 21, 0.46) 0%, rgba(234, 88, 12, 0.16) 55%, transparent 76%);
   }
 
   &--pensando,
-  &--olho_vivo {
+  &--olho_vivo,
+  &--caixa_dados,
+  &--roda_violao {
     background: radial-gradient(circle, rgba(56, 189, 248, 0.32) 0%, transparent 74%);
   }
 
   &--brinde,
   &--negocio,
-  &--saudacao {
+  &--saudacao,
+  &--bambu_gigante,
+  &--troca_honesta {
     background: radial-gradient(circle, rgba(52, 211, 153, 0.32) 0%, transparent 74%);
   }
 }

@@ -221,7 +221,7 @@ describe("MatchSetupModal", () => {
       "Felire"
     );
     expect(screen.getByRole("combobox", { name: /Jogador 4/i })).toHaveTextContent(
-      "Guiri"
+      "Guire"
     );
 
     await user.click(screen.getByRole("button", { name: /Iniciar Partida/i }));
@@ -233,7 +233,7 @@ describe("MatchSetupModal", () => {
       discardLimit: 7,
       friendlyRobber: true,
       diceMode: "random",
-      seatNamesList: ["Anfitrião", "Creitu", "Felire", "Guiri"],
+      seatNamesList: ["Anfitrião", "Creitu", "Felire", "Guire"],
       hostName: "Anfitrião",
       hostSeatIndex: 0,
     });

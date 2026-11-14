@@ -498,7 +498,7 @@ def test_bot_difficulty_explicit_bot_names_and_assento_livre_flow(client):
             "bot_difficulty": "easy",
             "seats": [
                 {"player_key": "HUMAN", "is_host": True},
-                {"player_key": BOT_DIFFICULTY_TO_KEY["easy"], "player_name": "Guiri"},
+                {"player_key": BOT_DIFFICULTY_TO_KEY["easy"], "player_name": "Guire"},
                 {"player_key": "HUMAN"},
                 {"player_key": BOT_DIFFICULTY_TO_KEY["easy"], "player_name": "Felire"},
             ],
@@ -513,7 +513,7 @@ def test_bot_difficulty_explicit_bot_names_and_assento_livre_flow(client):
 
     seats_by_color = {s["color"]: s for s in room["seats"]}
     assert seats_by_color["RED"]["player_name"] == "Host Lucas"
-    assert seats_by_color["BLUE"]["player_name"] == "Guiri"
+    assert seats_by_color["BLUE"]["player_name"] == "Guire"
     assert seats_by_color["BLUE"]["player_key"] == "W"
     assert seats_by_color["ORANGE"]["player_name"] == OPEN_SEAT_NAME
     assert seats_by_color["ORANGE"]["claimed"] is False
@@ -539,7 +539,7 @@ def test_bot_difficulty_explicit_bot_names_and_assento_livre_flow(client):
     assert full_res.status_code == 400
     assert "assentos livres" in full_res.get_json()["description"].lower()
 
-    # Changing room difficulty updates all bot keys while preserving Guiri and Felire
+    # Changing room difficulty updates all bot keys while preserving Guire and Felire
     diff_res = client.patch(
         f"/api/rooms/{code}",
         json={"token": host_tok, "config": {"bot_difficulty": "hard"}},
@@ -549,7 +549,7 @@ def test_bot_difficulty_explicit_bot_names_and_assento_livre_flow(client):
     assert diff_room["config"]["bot_difficulty"] == "hard"
     diff_seats = {s["color"]: s for s in diff_room["seats"]}
     assert diff_seats["BLUE"]["player_key"] == "CATANATRON"
-    assert diff_seats["BLUE"]["player_name"] == "Guiri"
+    assert diff_seats["BLUE"]["player_name"] == "Guire"
     assert diff_seats["WHITE"]["player_key"] == "CATANATRON"
     assert diff_seats["WHITE"]["player_name"] == "Felire"
     assert diff_seats["ORANGE"]["player_name"] == "Marina"

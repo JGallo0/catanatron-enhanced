@@ -23,13 +23,16 @@ import {
 import { makeGameState } from "../test/fixtures";
 
 describe("botCatalog", () => {
-  test("contains the exact 5 official bot names and matching avatar profiles", () => {
+  test("contains the exact 8 official República bot names and matching avatar profiles", () => {
     expect(Array.from(OFFICIAL_BOT_NAMES)).toEqual([
       "Creitu",
       "Felire",
-      "Guiri",
+      "Guire",
       "Jaó",
       "Angeleri",
+      "Alefs Man",
+      "Cassão",
+      "Trança",
     ]);
     for (const name of OFFICIAL_BOT_NAMES) {
       expect(isOfficialBotName(name)).toBe(true);
@@ -180,12 +183,12 @@ describe("botCatalog", () => {
       { isBot: false, requestedName: "Anfitrião" },
       { isBot: true, requestedName: "Angeleri" },
       { isBot: true, requestedName: "Angeleri" },
-      { isBot: true, requestedName: "Guiri" },
+      { isBot: true, requestedName: "Guire" },
     ]);
     expect(Array.from(prescan.explicitByIndex.entries())).toEqual([
       [1, "Angeleri"],
-      [3, "Guiri"],
+      [3, "Guire"],
     ]);
-    expect(Array.from(prescan.usedNames)).toEqual(["Angeleri", "Guiri"]);
+    expect(Array.from(prescan.usedNames)).toEqual(["Angeleri", "Guire"]);
   });
 });

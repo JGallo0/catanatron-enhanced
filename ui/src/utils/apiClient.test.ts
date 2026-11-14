@@ -694,7 +694,7 @@ describe("multiplayer room closing, leaving, ownership, and lifecycle", () => {
       vpsToWin: 10,
       discardLimit: 7,
       friendlyRobber: true,
-      seatNamesList: ["Anfitrião", "Angeleri", "Guiri", "Creitu"],
+      seatNamesList: ["Anfitrião", "Angeleri", "Guire", "Creitu"],
       hostSeatIndex: 0,
     });
     const gTour2 = localCreateGame({
@@ -724,7 +724,7 @@ describe("multiplayer room closing, leaving, ownership, and lifecycle", () => {
     expect(tState.seat_names).toMatchObject({
       RED: "Anfitrião",
       BLUE: "Angeleri",
-      ORANGE: "Guiri",
+      ORANGE: "Guire",
       WHITE: "Creitu",
     });
 
@@ -736,7 +736,7 @@ describe("multiplayer room closing, leaving, ownership, and lifecycle", () => {
         { player_key: "HUMAN", player_name: "Anfitrião", is_host: true },
         { player_key: "CATANATRON", player_name: "Angeleri", is_host: false },
         { player_key: "HUMAN", player_name: "Assento livre", is_host: false },
-        { player_key: "CATANATRON", player_name: "Guiri", is_host: false },
+        { player_key: "CATANATRON", player_name: "Guire", is_host: false },
       ],
       mapTemplate: "TOURNAMENT",
       vpsToWin: 10,
@@ -796,7 +796,7 @@ describe("multiplayer room closing, leaving, ownership, and lifecycle", () => {
           color: "ORANGE",
           source_color: "WHITE",
           player_key: "CATANATRON",
-          player_name: "Guiri",
+          player_name: "Guire",
         },
       ],
     });
@@ -830,7 +830,7 @@ describe("multiplayer room closing, leaving, ownership, and lifecycle", () => {
     expect(liveGame.seat_names).toEqual({
       RED: "Anfitrião",
       BLUE: "Pedro",
-      ORANGE: "Guiri",
+      ORANGE: "Guire",
     });
   });
 });

@@ -825,7 +825,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
     color: "BLUE",
     sender_name: "João",
     kind: "TAUNT",
-    body: "[TAUNT:boa_guerra] ⚔️ Boa guerra a todos!",
+    body: "[TAUNT:coyote] 🚬 Acende um Coyote aí, Charlie! Essa mesa tá muito quieta.",
     created_at: 1700000200,
   });
 
@@ -839,18 +839,18 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
   const tauntBtn = screen.getByRole("button", { name: /^Provocações$/i });
   fireEvent.click(tauntBtn);
 
-  const boaGuerraItem = screen.getByRole("button", { name: /Boa Guerra!/i });
+  const coyoteItem = screen.getByRole("button", { name: /Acende o Coyote/i });
   await act(async () => {
-    fireEvent.click(boaGuerraItem);
+    fireEvent.click(coyoteItem);
   });
 
   expect(sendGameMessage).toHaveBeenCalledWith("game-123", {
-    body: "[TAUNT:boa_guerra] ⚔️ Boa guerra a todos!",
+    body: "[TAUNT:coyote] 🚬 Acende um Coyote aí, Charlie! Essa mesa tá muito quieta.",
     color: "BLUE",
     senderName: "João",
     kind: "TAUNT",
   });
-  expect(screen.getByText(/Boa guerra a todos!/i)).toBeInTheDocument();
+  expect(screen.getByText(/Acende um Coyote aí, Charlie!/i)).toBeInTheDocument();
   expect(tauntBtn).toBeDisabled();
 
   // Cooldown clears after 3s
@@ -858,7 +858,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
     await vi.advanceTimersByTimeAsync(3100);
   });
   expect(tauntBtn).toBeEnabled();
-  expect(screen.queryByText(/Boa guerra a todos!/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Acende um Coyote aí, Charlie!/i)).not.toBeInTheDocument();
 
   // Incoming peer TAUNT animates without adding unread chat count
   vi.mocked(getGameMessages).mockResolvedValueOnce([
@@ -868,7 +868,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
       color: "RED",
       sender_name: "Ana",
       kind: "TAUNT",
-      body: "[TAUNT:brinde] 🍻 Um brinde à ilha!",
+      body: "[TAUNT:cerveja_mesa] 🍻 Pega mais uma gelada que essa rodada vai feder pro seu lado, Charles!",
       created_at: 1700000210,
     },
   ]);
@@ -877,7 +877,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
     await vi.advanceTimersByTimeAsync(1600);
   });
 
-  expect(screen.getByText(/Um brinde à ilha!/i)).toBeInTheDocument();
+  expect(screen.getByText(/Pega mais uma gelada/i)).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: /Bate-papo \(1 não lidas\)/i })
   ).not.toBeInTheDocument();

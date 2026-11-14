@@ -25,6 +25,81 @@ export const TAUNT_DISPLAY_MS = 2700;
 
 export const TAUNT_CATALOG: TauntDefinition[] = [
   {
+    id: "coyote",
+    emoji: "🚬",
+    label: "Acende o Coyote",
+    bubbleText: "🚬 Acende um Coyote aí, Charlie! Essa mesa tá muito quieta.",
+    labelEn: "Light a Coyote",
+    bubbleTextEn: "🚬 Light up a Coyote, Charlie! This table is way too quiet.",
+    tone: "rally",
+  },
+  {
+    id: "cerveja_mesa",
+    emoji: "🍻",
+    label: "Bora de Gelada",
+    bubbleText: "🍻 Pega mais uma gelada que essa rodada vai feder pro seu lado, Charles!",
+    labelEn: "Cold Beer!",
+    bubbleTextEn: "🍻 Grab another cold one, Charles — this round is getting rough for you!",
+    tone: "cheer",
+  },
+  {
+    id: "bambu_gigante",
+    emoji: "🎋",
+    label: "Bate no Bambu",
+    bubbleText: "🎋 Bate a cinza no bambu gigante que o jogo tá tenso!",
+    labelEn: "Tap the Bamboo",
+    bubbleTextEn: "🎋 Tap that ash in the giant bamboo — this match is tense!",
+    tone: "watch",
+  },
+  {
+    id: "caixa_dados",
+    emoji: "🎲",
+    label: "Rola na Caixa",
+    bubbleText: "🎲 Joga esses dados direito dentro da caixa, Charlie!",
+    labelEn: "Roll in the Box",
+    bubbleTextEn: "🎲 Roll those dice right inside the box lid, Charlie!",
+    tone: "think",
+  },
+  {
+    id: "olha_trairagem",
+    emoji: "😤",
+    label: "Olha a Trairagem",
+    bubbleText: "😤 Mas que trairagem é essa, Charlie?! Isso não se faz na Praça!",
+    labelEn: "Betrayal!",
+    bubbleTextEn: "😤 What kind of betrayal is this, Charlie?! Not in our house!",
+    tone: "anger",
+  },
+  {
+    id: "troca_honesta",
+    emoji: "🤝",
+    label: "Negócio de Irmão",
+    bubbleText: "🤝 Bora trocar na moral, Charlie? Ninguém sai perdendo aqui!",
+    labelEn: "Brother's Deal",
+    bubbleTextEn: "🤝 Fair trade, Charlie? Nobody loses here!",
+    tone: "trade",
+  },
+  {
+    id: "roda_violao",
+    emoji: "🎸",
+    label: "Puxa a Moda",
+    bubbleText: "🎸 Quem vai puxar uma moda de viola enquanto o Charlie calcula a jogada?",
+    labelEn: "Strum a Tune",
+    bubbleTextEn: "🎸 Who's strumming a tune while Charlie calculates his move?",
+    tone: "warm",
+  },
+  {
+    id: "praca_nossa",
+    emoji: "👑",
+    label: "A Praça é Nossa",
+    bubbleText: "👑 A Praça é nossa e essa ilha também, Charles! Aceita!",
+    labelEn: "The Square is Ours",
+    bubbleTextEn: "👑 A Praça é Nossa and so is this island, Charles!",
+    tone: "crown",
+  },
+];
+
+const LEGACY_TAUNT_FALLBACKS: TauntDefinition[] = [
+  {
     id: "boa_guerra",
     emoji: "⚔️",
     label: "Boa Guerra!",
@@ -99,7 +174,7 @@ export const TAUNT_CATALOG: TauntDefinition[] = [
 ];
 
 const TAUNT_BY_ID = new Map<string, TauntDefinition>(
-  TAUNT_CATALOG.map((item) => [item.id, item])
+  [...LEGACY_TAUNT_FALLBACKS, ...TAUNT_CATALOG].map((item) => [item.id, item])
 );
 
 export function localizeTaunt(

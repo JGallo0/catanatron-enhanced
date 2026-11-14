@@ -1038,16 +1038,16 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           if (recType === "MOVE_ROBBER" && Array.isArray(recVal)) {
             const victim = recVal[1] as Color | undefined;
             if (victim && gs.bot_colors.includes(victim)) {
-              botReaction = { color: victim, tauntId: "furioso_ladrao" };
+              botReaction = { color: victim, tauntId: "olha_trairagem" };
             } else if (victim && gs.bot_colors.includes(actorColor)) {
-              botReaction = { color: actorColor, tauntId: "olho_vivo" };
+              botReaction = { color: actorColor, tauntId: "coyote" };
             }
           } else if (
             gs.winning_color &&
             !prevWinnerRef.current &&
             gs.bot_colors.includes(gs.winning_color)
           ) {
-            botReaction = { color: gs.winning_color, tauntId: "ouro" };
+            botReaction = { color: gs.winning_color, tauntId: "praca_nossa" };
           } else if (
             gs.bot_colors.includes(actorColor) &&
             (recType === "BUILD_SETTLEMENT" || recType === "BUILD_CITY")
@@ -1059,7 +1059,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
               0;
             const targetVp = gs.game?.vps_to_win ?? 10;
             if (vps >= Math.max(4, targetVp - 2)) {
-              botReaction = { color: actorColor, tauntId: "ouro" };
+              botReaction = { color: actorColor, tauntId: "praca_nossa" };
             }
           }
 

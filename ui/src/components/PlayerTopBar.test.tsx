@@ -24,7 +24,7 @@ describe("PlayerTopBar", () => {
         RED: "Capitão Convidado",
         BLUE: "Creitu",
         ORANGE: "Felire",
-        WHITE: "Guiri",
+        WHITE: "Guire",
       },
       seat_avatars: {
         RED: { seat_kind: "GUEST", username: null, avatar_config: {} },
@@ -45,7 +45,7 @@ describe("PlayerTopBar", () => {
     expect(screen.getByText("Capitão Convidado")).toBeInTheDocument();
     expect(screen.getByText("Creitu")).toBeInTheDocument();
     expect(screen.getByText("Felire")).toBeInTheDocument();
-    expect(screen.getByText("Guiri")).toBeInTheDocument();
+    expect(screen.getByText("Guire")).toBeInTheDocument();
     expect(screen.queryByText(/Bot Branco/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/IA \(/i)).not.toBeInTheDocument();
   });
@@ -150,7 +150,7 @@ describe("PlayerTopBar", () => {
         ORANGE: "Ana",
         RED: "Creitu",
         WHITE: "Felire",
-        BLUE: "Guiri",
+        BLUE: "Guire",
       },
     });
 
@@ -166,7 +166,7 @@ describe("PlayerTopBar", () => {
     const cardNames = Array.from(
       bar.querySelectorAll(".cu-player-card__name")
     ).map((el) => el.textContent);
-    expect(cardNames).toEqual(["Ana", "Creitu", "Felire", "Guiri"]);
+    expect(cardNames).toEqual(["Ana", "Creitu", "Felire", "Guire"]);
   });
 
   test("applies dynamic game.discard_limit threshold for resource danger badge and inspector warning", () => {

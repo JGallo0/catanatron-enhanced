@@ -69,7 +69,7 @@ type SeatSelection = "HOST" | "OPEN" | `BOT:${OfficialBotName}`;
 function defaultSeatsForMode(mode: MatchSetupMode): SeatSelection[] {
   return mode === "room"
     ? ["HOST", "OPEN", "BOT:Creitu", "BOT:Felire"]
-    : ["HOST", "BOT:Creitu", "BOT:Felire", "BOT:Guiri"];
+    : ["HOST", "BOT:Creitu", "BOT:Felire", "BOT:Guire"];
 }
 
 function nextUnusedBot(seats: SeatSelection[], excludeIdx = -1): OfficialBotName {

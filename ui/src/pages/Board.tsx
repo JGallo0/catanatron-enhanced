@@ -249,49 +249,36 @@ export default function Board({
         <svg viewBox="0 0 600 600" width="100%" height="100%">
           <defs>
             <radialGradient id="catanReefShallow" cx="50%" cy="50%" r="48%">
-              <stop offset="0%" stopColor="#fde68a" stopOpacity="0.46" />
-              <stop offset="46%" stopColor="#2dd4bf" stopOpacity="0.42" />
-              <stop offset="68%" stopColor="#0284c7" stopOpacity="0.28" />
-              <stop offset="86%" stopColor="#075985" stopOpacity="0.1" />
-              <stop offset="100%" stopColor="#04182b" stopOpacity="0" />
+              <stop offset="0%" stopColor="#1c0d04" stopOpacity="0.58" />
+              <stop offset="62%" stopColor="#291305" stopOpacity="0.44" />
+              <stop offset="82%" stopColor="#451a03" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#451a03" stopOpacity="0" />
             </radialGradient>
-            <radialGradient id="catanSunCaustic" cx="62%" cy="32%" r="36%">
-              <stop offset="0%" stopColor="#fef08a" stopOpacity="0.26" />
-              <stop offset="60%" stopColor="#f59e0b" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="#0284c7" stopOpacity="0" />
+            <radialGradient id="catanSunCaustic" cx="50%" cy="45%" r="42%">
+              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.14" />
+              <stop offset="70%" stopColor="#b45309" stopOpacity="0.06" />
+              <stop offset="100%" stopColor="#451a03" stopOpacity="0" />
             </radialGradient>
           </defs>
 
           <circle cx="300" cy="300" r="292" fill="url(#catanReefShallow)" />
           <circle cx="300" cy="300" r="285" fill="url(#catanSunCaustic)" />
 
-          {/* Gentle coastal surf ripples embracing Catan Island */}
+          {/* Subtle tabletop board frame rim on the wooden table */}
           <circle
             className="board__surf-ring board__surf-ring--inner"
             cx="300"
             cy="300"
-            r="204"
+            r="224"
             fill="none"
-            stroke="rgba(224, 242, 254, 0.34)"
-            strokeWidth="2.4"
-            strokeDasharray="18 14 8 16"
+            stroke="rgba(254, 243, 199, 0.18)"
+            strokeWidth="1.8"
+            strokeDasharray="24 14 10 14"
           />
-          <circle
-            className="board__surf-ring board__surf-ring--outer"
-            cx="300"
-            cy="300"
-            r="238"
-            fill="none"
-            stroke="rgba(125, 211, 252, 0.24)"
-            strokeWidth="2"
-            strokeDasharray="28 22 10 24"
-          />
-
-          {/* Faint nautical atlas rhumb ring & miniature compass rose */}
           <circle
             cx="300"
             cy="300"
-            r="268"
+            r="258"
             fill="none"
             stroke="rgba(250, 204, 21, 0.14)"
             strokeWidth="1"

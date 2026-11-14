@@ -247,9 +247,12 @@ export function formatMapTemplateLabel(
 export const OFFICIAL_BOT_NAMES = [
   "Creitu",
   "Felire",
-  "Guiri",
+  "Guire",
   "Jaó",
   "Angeleri",
+  "Alefs Man",
+  "Cassão",
+  "Trança",
 ] as const;
 
 export type OfficialBotName = (typeof OFFICIAL_BOT_NAMES)[number];
@@ -279,7 +282,7 @@ export const BOT_AVATAR_PROFILES: Record<OfficialBotName, AvatarConfig> = {
     background: "forest",
     frame: "bronze",
   },
-  Guiri: {
+  Guire: {
     skin: "tan",
     eyes: "wise",
     hair: "curly",
@@ -315,7 +318,49 @@ export const BOT_AVATAR_PROFILES: Record<OfficialBotName, AvatarConfig> = {
     background: "gold",
     frame: "silver",
   },
+  "Alefs Man": {
+    skin: "warm",
+    eyes: "cheerful",
+    hair: "curly",
+    hairColor: "black",
+    beard: "goatee",
+    hat: "bandana",
+    outfit: "settler",
+    outfitColor: "royal",
+    background: "sunset",
+    frame: "bronze",
+  },
+  Cassão: {
+    skin: "fair",
+    eyes: "wise",
+    hair: "short",
+    hairColor: "brown",
+    beard: "full",
+    hat: "captain",
+    outfit: "armor",
+    outfitColor: "emerald",
+    background: "forest",
+    frame: "silver",
+  },
+  Trança: {
+    skin: "tan",
+    eyes: "calm",
+    hair: "braids",
+    hairColor: "black",
+    beard: "mustache",
+    hat: "explorer",
+    outfit: "merchant",
+    outfitColor: "amber",
+    background: "ocean",
+    frame: "bronze",
+  },
 };
+
+export function normalizeLegacyBotName(name?: string | null): string {
+  const clean = (name ?? "").trim();
+  if (clean === "Guiri") return "Guire";
+  return clean;
+}
 
 export function isOfficialBotName(name?: string | null): name is OfficialBotName {
   if (!name) return false;
@@ -329,7 +374,7 @@ export function prescanRequestedBotNames(
   const usedNames = new Set<OfficialBotName>();
   entries.forEach((entry, idx) => {
     if (!entry.isBot) return;
-    const clean = (entry.requestedName ?? "").trim();
+    const clean = normalizeLegacyBotName(entry.requestedName);
     if (isOfficialBotName(clean) && !usedNames.has(clean)) {
       explicitByIndex.set(idx, clean);
       usedNames.add(clean);
@@ -399,7 +444,7 @@ export function resolveBotDisplayName(
   gameState: Pick<GameState, "colors" | "bot_colors" | "seat_names">,
   color: Color
 ): OfficialBotName {
-  const raw = gameState.seat_names?.[color]?.trim();
+  const raw = normalizeLegacyBotName(gameState.seat_names?.[color]);
   if (isOfficialBotName(raw)) {
     return raw;
   }
@@ -408,7 +453,7 @@ export function resolveBotDisplayName(
   const used = new Set<string>();
   for (const c of botColors) {
     if (c === color) break;
-    const prevRaw = gameState.seat_names?.[c]?.trim();
+    const prevRaw = normalizeLegacyBotName(gameState.seat_names?.[c]);
     if (isOfficialBotName(prevRaw)) {
       used.add(prevRaw);
     } else {
@@ -503,8 +548,9 @@ export function resolveSeatAvatarProps(options: {
   }
 
   if (isBot || seatAvatar?.seat_kind === "BOT") {
-    const botName = isOfficialBotName(seatName)
-      ? seatName
+    const normalizedSeatName = normalizeLegacyBotName(seatName);
+    const botName = isOfficialBotName(normalizedSeatName)
+      ? normalizedSeatName
       : pickBotNameDeterministic(seatIndex);
     const metaCfg = sanitizeAvatarConfig(seatAvatar?.avatar_config);
     return {

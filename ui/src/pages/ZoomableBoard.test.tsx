@@ -77,7 +77,7 @@ describe("ZoomableBoard robber victim selector", () => {
         RED: "Anfitrião",
         BLUE: "Creitu",
         ORANGE: "Jaó",
-        WHITE: "Guiri",
+        WHITE: "Guire",
       },
       player_state: {
         ...makeGameState().player_state,
@@ -130,7 +130,7 @@ describe("ZoomableBoard robber victim selector", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Creitu")).toBeInTheDocument();
     expect(screen.getByText("Jaó")).toBeInTheDocument();
-    expect(screen.getByText("Guiri")).toBeInTheDocument();
+    expect(screen.getByText("Guire")).toBeInTheDocument();
     expect(screen.getByText("19 carta(s) na mão")).toBeInTheDocument();
     expect(screen.queryByText("Azul")).not.toBeInTheDocument();
     expect(screen.queryByText("Laranja")).not.toBeInTheDocument();
