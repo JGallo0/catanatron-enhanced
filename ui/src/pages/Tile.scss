@@ -103,15 +103,10 @@
 
   &__sea-surface {
     position: absolute;
-    inset: -2px;
+    inset: 1px;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     overflow: hidden;
-    background: radial-gradient(
-      circle at 50% 48%,
-      rgba(20, 184, 166, 0.14) 0%,
-      rgba(14, 116, 144, 0.08) 56%,
-      transparent 100%
-    );
+    background: linear-gradient(160deg, #2b95cc 0%, #1d74a8 58%, #145580 100%);
     pointer-events: none;
   }
 
@@ -120,14 +115,13 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    opacity: 0.52;
-    animation: sea-hex-ripple 8s ease-in-out infinite alternate;
+    opacity: 1;
   }
 
   &__sea-bevel {
     fill: none;
-    stroke: rgba(186, 230, 253, 0.04);
-    stroke-width: 0.7;
+    stroke: rgba(186, 230, 253, 0.42);
+    stroke-width: 1.5;
   }
 
   &__artwork {

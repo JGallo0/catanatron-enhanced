@@ -43,7 +43,7 @@ h6.MuiTypography-h6 {
 
 main.catan-game-screen {
   position: relative;
-  background: #031222;
+  background: #120803;
   color: #f8fafc;
   height: 100%;
   width: 100%;
@@ -377,7 +377,7 @@ main.catan-game-screen {
     height: 100%;
     width: 100%;
     touch-action: none;
-    contain: layout size style;
+    overflow: visible !important;
 
     .react-transform-element {
       height: 100%;
@@ -386,6 +386,7 @@ main.catan-game-screen {
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: visible !important;
       will-change: transform;
       transform: translate3d(0, 0, 0);
       backface-visibility: hidden;
@@ -397,6 +398,7 @@ main.catan-game-screen {
     opacity: 0;
     height: 100%;
     width: 100%;
+    overflow: visible;
     transition: opacity 0.35s ease;
     will-change: transform;
     transform: translate3d(0, 0, 0);

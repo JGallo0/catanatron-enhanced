@@ -13,6 +13,7 @@ import Tile from "./Tile";
 import Node from "./Node";
 import Edge, { toEdgeId, type EdgeId } from "./Edge";
 import Robber from "./Robber";
+import OceanBackdrop from "../components/OceanBackdrop";
 
 import "./Board.scss";
 
@@ -235,64 +236,19 @@ export default function Board({
         height: canvasHeight,
       }}
     >
-      {/* Realistic Sunset Ocean Lagoons, Turquoise Coastal Shoals & Nautical Chart */}
+      {/* Tabletop scene rendered inside Board so Zoom In / Zoom Out scales both the wooden table and the board together */}
+      <OceanBackdrop center={center} size={size} />
+
       <div
         className="board__seascape-underlay"
         style={{
           left: center[0],
           top: center[1],
-          width: size * 10.6,
-          height: size * 10.6,
+          width: 0,
+          height: 0,
         }}
         aria-hidden="true"
-      >
-        <svg viewBox="0 0 600 600" width="100%" height="100%">
-          <defs>
-            <radialGradient id="catanReefShallow" cx="50%" cy="50%" r="48%">
-              <stop offset="0%" stopColor="#1c0d04" stopOpacity="0.58" />
-              <stop offset="62%" stopColor="#291305" stopOpacity="0.44" />
-              <stop offset="82%" stopColor="#451a03" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#451a03" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="catanSunCaustic" cx="50%" cy="45%" r="42%">
-              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.14" />
-              <stop offset="70%" stopColor="#b45309" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="#451a03" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-
-          <circle cx="300" cy="300" r="292" fill="url(#catanReefShallow)" />
-          <circle cx="300" cy="300" r="285" fill="url(#catanSunCaustic)" />
-
-          {/* Subtle tabletop board frame rim on the wooden table */}
-          <circle
-            className="board__surf-ring board__surf-ring--inner"
-            cx="300"
-            cy="300"
-            r="224"
-            fill="none"
-            stroke="rgba(254, 243, 199, 0.18)"
-            strokeWidth="1.8"
-            strokeDasharray="24 14 10 14"
-          />
-          <circle
-            cx="300"
-            cy="300"
-            r="258"
-            fill="none"
-            stroke="rgba(250, 204, 21, 0.14)"
-            strokeWidth="1"
-            strokeDasharray="4 8"
-          />
-          <g transform="translate(506, 492)" opacity="0.34">
-            <circle cx="0" cy="0" r="22" fill="none" stroke="#fde68a" strokeWidth="1" />
-            <polygon points="0,-24 4,-4 0,-8 -4,-4" fill="#facc15" />
-            <polygon points="0,24 4,4 0,8 -4,4" fill="#bae6fd" />
-            <polygon points="24,0 4,4 8,0 4,-4" fill="#bae6fd" />
-            <polygon points="-24,0 -4,4 -8,0 -4,-4" fill="#bae6fd" />
-          </g>
-        </svg>
-      </div>
+      />
       {tiles}
       {edges}
       {nodes}

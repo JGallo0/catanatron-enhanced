@@ -330,10 +330,10 @@ export default function ZoomableBoard({
     <>
       <TransformWrapper
         initialScale={1}
-        minScale={0.65}
-        maxScale={2.5}
+        minScale={0.5}
+        maxScale={2.6}
         centerOnInit={true}
-        limitToBounds={true}
+        limitToBounds={false}
         smooth={true}
         wheel={{ step: 0.05, smoothStep: 0.002 }}
         pinch={{ step: 5 }}

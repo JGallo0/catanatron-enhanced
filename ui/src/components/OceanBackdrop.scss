@@ -3,8 +3,8 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  overflow: hidden;
-  background: #4a2206;
+  overflow: visible;
+  background: transparent;
 
   &__svg {
     position: absolute;
@@ -12,6 +12,7 @@
     width: 100%;
     height: 100%;
     display: block;
+    overflow: visible;
   }
 
   &__ember-pulse {
@@ -30,45 +31,6 @@
     &--2 {
       animation: rep-smoke-drift-2 9.5s ease-in-out infinite alternate;
     }
-  }
-
-  &__smoke-haze {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(
-        ellipse at 24% 76%,
-        rgba(226, 232, 240, 0.08) 0%,
-        rgba(226, 232, 240, 0.03) 32%,
-        transparent 62%
-      ),
-      radial-gradient(
-        ellipse at 50% 46%,
-        rgba(251, 191, 36, 0.07) 0%,
-        transparent 60%
-      );
-    animation: rep-room-haze 12s ease-in-out infinite alternate;
-  }
-
-  &__vignette {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(
-        ellipse at 50% 52%,
-        rgba(28, 12, 3, 0.04) 0%,
-        rgba(28, 12, 3, 0.18) 62%,
-        rgba(10, 4, 1, 0.56) 100%
-      ),
-      linear-gradient(
-        180deg,
-        rgba(15, 7, 2, 0.52) 0%,
-        transparent 14%,
-        transparent 84%,
-        rgba(12, 5, 1, 0.54) 100%
-      );
   }
 }
 
@@ -105,22 +67,10 @@
   }
 }
 
-@keyframes rep-room-haze {
-  0% {
-    opacity: 0.72;
-    transform: translate3d(-8px, 2px, 0);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(8px, -4px, 0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .ocean-panorama-backdrop__ember-pulse,
   .ocean-panorama-backdrop__smoke-wisp--1,
-  .ocean-panorama-backdrop__smoke-wisp--2,
-  .ocean-panorama-backdrop__smoke-haze {
+  .ocean-panorama-backdrop__smoke-wisp--2 {
     animation: none;
   }
 }

@@ -1324,9 +1324,12 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         "--match-bottom-clearance": `${hudClearance.bottom}px`,
       } as React.CSSProperties) : undefined}
     >
-      <OceanBackdrop />
+      <div
+        className="ocean-panorama-backdrop ocean-panorama-backdrop--room-floor"
+        aria-hidden="true"
+      />
 
-      {/* Fullscreen Board Canvas */}
+      {/* Fullscreen Board + Tabletop Canvas (Zoom In/Out scales both table and board) */}
       <ZoomableBoard
         isRollingDice={isRollingDice}
         replayMode={replayMode}

@@ -46,8 +46,8 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 0;
-  filter: drop-shadow(0 12px 32px rgba(15, 6, 1, 0.65));
-  will-change: transform;
+  filter: none;
+  opacity: 0;
 }
 
 .board__surf-ring {

@@ -399,42 +399,14 @@ export const TerrainHexIllustration: React.FC<{
           preserveAspectRatio="xMidYMid slice"
           aria-hidden="true"
         >
-          {/* Soft teal caustic highlight + dusk gold surface glints */}
-          <ellipse
-            cx="102"
-            cy="96"
-            rx="68"
-            ry="34"
-            fill="rgba(56, 189, 248, 0.08)"
-          />
-          <path
-            d="M32 62 Q68 54 100 63 T168 60"
-            stroke="rgba(224, 242, 254, 0.24)"
-            strokeWidth="2.4"
-            fill="none"
-            strokeLinecap="round"
-          />
-          <path
-            d="M24 108 Q64 98 102 108 T178 106"
-            stroke="rgba(254, 240, 138, 0.16)"
-            strokeWidth="2.1"
-            fill="none"
-            strokeLinecap="round"
-          />
-          <path
-            d="M42 148 Q84 139 124 148 T166 146"
-            stroke="rgba(125, 211, 252, 0.22)"
-            strokeWidth="2.2"
-            fill="none"
-            strokeLinecap="round"
-          />
-          <path
-            d="M58 182 Q96 175 138 184"
-            stroke="rgba(165, 243, 252, 0.16)"
-            strokeWidth="1.8"
-            fill="none"
-            strokeLinecap="round"
-          />
+          <defs>
+            <radialGradient id="classicSeaHexBg" cx="50%" cy="48%" r="58%">
+              <stop offset="0%" stopColor="#2b95cc" />
+              <stop offset="62%" stopColor="#1d74a8" />
+              <stop offset="100%" stopColor="#145580" />
+            </radialGradient>
+          </defs>
+          <rect width="200" height="230" fill="url(#classicSeaHexBg)" />
         </svg>
       );
   }

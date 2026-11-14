@@ -1,76 +1,84 @@
-import { useId } from "react";
+import React, { useId } from "react";
 import "./OceanBackdrop.scss";
+
+export type OceanBackdropProps = {
+  center?: [number, number];
+  size?: number;
+};
 
 /**
  * Edição República "A Praça é Nossa" (Viçosa-MG):
- * Full-bleed varnished honey-amber wooden tabletop scene inspired by the
- * real photos from the student house:
- * - Warm varnished wood planks with knots, cup condensation rings & ember burn marks
- * - Two matte-black board game box halves (Grow style with scuffed white cardboard corners),
- *   one on each side of the Catan island (used to roll the dice inside)
- * - The iconic Giant Bamboo Ashtray ("cinzeiro de bambu gigante") with bottom node ring,
- *   carved sun emblem on the front, dark ash cavity, and a lit Coyote straw cigarette with rising smoke
- * - Red COYOTE Artisanal Straw Cigarette pack (yellow moon + howling coyote + yellow warning bar),
- *   loose palheiros with the classic red rubber band ("liguinha vermelha"), and a white/red Bic lighter
- * - Cold beer glasses (copo lagoinha/americano) on the table
+ * Full wooden tabletop scene rendered inside the zoomable Board container so
+ * Zoom In / Zoom Out scales the entire table and Catan board together:
+ * - Honey-amber varnished wooden table with bevelled outer edges ("borda da mesa")
+ * - Human bite mark ("marca de mordida humana") chewed into the right edge of the table
+ * - Bottle of Toni Lourenço & bottle of Fofinha on the table border
+ * - Two matte-black board game box halves (one on each side of the board) with
+ *   realistic 3D sloped inner walls, darker recessed floor, scuffed white corners, and no text
+ * - Giant Bamboo Ashtray ("cinzeiro de bambu gigante") with bottom node ring,
+ *   carved sun emblem, dark ash cavity, and lit Coyote straw cigarette with rising smoke
+ * - Red COYOTE pack, loose palheiros with red rubber band, white Bic lighter, and beer glasses
  */
-export default function OceanBackdrop() {
+export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
   const uid = useId().replace(/:/g, "");
 
   const woodBaseId = `rep-wood-base-${uid}`;
-  const woodLampGlowId = `rep-wood-glow-${uid}`;
-  const woodVignetteId = `rep-wood-vig-${uid}`;
-  const boxInnerId = `rep-box-inner-${uid}`;
+  const boxFloorLeftId = `rep-box-floor-l-${uid}`;
+  const boxFloorRightId = `rep-box-floor-r-${uid}`;
   const bambooBodyId = `rep-bamboo-body-${uid}`;
   const bambooCavityId = `rep-bamboo-cavity-${uid}`;
   const beerLiquidId = `rep-beer-liquid-${uid}`;
   const emberGlowId = `rep-ember-glow-${uid}`;
+  const toniGlassId = `rep-toni-glass-${uid}`;
+  const fofinhaGlassId = `rep-fofinha-glass-${uid}`;
+
+  const positionedStyle: React.CSSProperties | undefined =
+    center && size
+      ? {
+          left: center[0],
+          top: center[1],
+          width: size * 25,
+          height: size * 15,
+          transform: "translate(-50%, -50%)",
+        }
+      : undefined;
 
   return (
     <div
       className="ocean-panorama-backdrop ocean-panorama-backdrop--republica-table"
+      style={positionedStyle}
       aria-hidden="true"
     >
       <svg
         className="ocean-panorama-backdrop__svg"
-        viewBox="0 0 1600 900"
-        preserveAspectRatio="xMidYMid slice"
+        viewBox="0 0 2000 1200"
+        preserveAspectRatio="xMidYMid meet"
       >
         <defs>
-          {/* Honey-amber varnished wooden table base (matching photos 1.jpeg, 7.jpeg, 8.jpeg) */}
+          {/* Honey-amber varnished wooden table surface */}
           <linearGradient id={woodBaseId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#6e380b" />
-            <stop offset="16%" stopColor="#8f4c14" />
-            <stop offset="36%" stopColor="#b36822" />
-            <stop offset="52%" stopColor="#c4762b" />
-            <stop offset="68%" stopColor="#a95f1d" />
-            <stop offset="86%" stopColor="#854510" />
-            <stop offset="100%" stopColor="#5a2b07" />
+            <stop offset="0%" stopColor="#8a4813" />
+            <stop offset="18%" stopColor="#a85c1b" />
+            <stop offset="42%" stopColor="#bd6e24" />
+            <stop offset="58%" stopColor="#c47529" />
+            <stop offset="80%" stopColor="#a65a1a" />
+            <stop offset="100%" stopColor="#824310" />
           </linearGradient>
 
-          {/* Overhead dining table warm bulb reflection */}
-          <radialGradient id={woodLampGlowId} cx="50%" cy="48%" r="54%">
-            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.34" />
-            <stop offset="38%" stopColor="#d97706" stopOpacity="0.16" />
-            <stop offset="72%" stopColor="#78350f" stopOpacity="0.06" />
-            <stop offset="100%" stopColor="#1c0d04" stopOpacity="0" />
+          {/* Deep dark recessed floor for the left & right box halves (darker than inner walls) */}
+          <radialGradient id={boxFloorLeftId} cx="50%" cy="50%" r="65%">
+            <stop offset="0%" stopColor="#101115" />
+            <stop offset="65%" stopColor="#0a0b0e" />
+            <stop offset="100%" stopColor="#050507" />
           </radialGradient>
 
-          {/* Outer room night vignette */}
-          <radialGradient id={woodVignetteId} cx="50%" cy="50%" r="68%">
-            <stop offset="52%" stopColor="#000000" stopOpacity="0" />
-            <stop offset="84%" stopColor="#1a0b03" stopOpacity="0.46" />
-            <stop offset="100%" stopColor="#0c0501" stopOpacity="0.78" />
+          <radialGradient id={boxFloorRightId} cx="50%" cy="50%" r="65%">
+            <stop offset="0%" stopColor="#101115" />
+            <stop offset="65%" stopColor="#0a0b0e" />
+            <stop offset="100%" stopColor="#050507" />
           </radialGradient>
 
-          {/* Matte black board game box interior */}
-          <linearGradient id={boxInnerId} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#141417" />
-            <stop offset="50%" stopColor="#202127" />
-            <stop offset="100%" stopColor="#101114" />
-          </linearGradient>
-
-          {/* Giant dried bamboo cylinder gradient (matching Cinzeiro de bambu.png) */}
+          {/* Giant dried bamboo cylinder gradient */}
           <linearGradient id={bambooBodyId} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="#6b5b35" />
             <stop offset="22%" stopColor="#9d8b58" />
@@ -100,39 +108,103 @@ export default function OceanBackdrop() {
             <stop offset="70%" stopColor="#dc2626" stopOpacity="0.55" />
             <stop offset="100%" stopColor="#dc2626" stopOpacity="0" />
           </radialGradient>
+
+          {/* Toni Lourenço amber glass bottle gradient */}
+          <linearGradient id={toniGlassId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#2e1305" />
+            <stop offset="28%" stopColor="#6b2f0b" />
+            <stop offset="55%" stopColor="#8f4212" />
+            <stop offset="82%" stopColor="#4c1f06" />
+            <stop offset="100%" stopColor="#240d02" />
+          </linearGradient>
+
+          {/* Fofinha golden cachaça glass bottle gradient */}
+          <linearGradient id={fofinhaGlassId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#713f12" />
+            <stop offset="25%" stopColor="#ca8a04" />
+            <stop offset="52%" stopColor="#facc15" />
+            <stop offset="80%" stopColor="#a16207" />
+            <stop offset="100%" stopColor="#522c06" />
+          </linearGradient>
         </defs>
 
         {/* ================================================================ */}
-        {/* 1. HONEY-AMBER VARNISHED WOODEN TABLE PLANK SURFACE              */}
+        {/* 0. DARK FLOOR AROUND THE TABLE (visible when zooming out)        */}
         {/* ================================================================ */}
-        <rect width="1600" height="900" fill={`url(#${woodBaseId})`} />
+        <rect width="2000" height="1200" fill="#120803" />
+
+        {/* Table drop shadow on the room floor */}
+        <rect
+          x="74"
+          y="64"
+          width="1868"
+          height="1092"
+          rx="22"
+          fill="rgba(0, 0, 0, 0.72)"
+        />
+
+        {/* ================================================================ */}
+        {/* 1. WOODEN TABLE WITH 3D BEVELLED BORDER ("BORDA DA MESA")        */}
+        {/* ================================================================ */}
+        {/* Outer 3D wooden skirt/apron thickness */}
+        <rect
+          x="64"
+          y="48"
+          width="1872"
+          height="1104"
+          rx="18"
+          fill="#3d1c03"
+          stroke="#240f01"
+          strokeWidth="4"
+        />
+        {/* Bevelled solid wood border frame */}
+        <rect
+          x="72"
+          y="56"
+          width="1856"
+          height="1084"
+          rx="14"
+          fill="#633008"
+          stroke="#8c4812"
+          strokeWidth="3"
+        />
+
+        {/* Main honey-amber varnished plank surface */}
+        <rect
+          x="90"
+          y="74"
+          width="1820"
+          height="1048"
+          rx="8"
+          fill={`url(#${woodBaseId})`}
+        />
 
         {/* Alternating warm wood plank tonal bands */}
-        <rect x="0" y="0" width="1600" height="148" fill="#5e2e08" opacity="0.22" />
-        <rect x="0" y="148" width="1600" height="156" fill="#d9822b" opacity="0.08" />
-        <rect x="0" y="304" width="1600" height="162" fill="#78390b" opacity="0.12" />
-        <rect x="0" y="466" width="1600" height="154" fill="#e08e36" opacity="0.09" />
-        <rect x="0" y="620" width="1600" height="152" fill="#6b3309" opacity="0.16" />
-        <rect x="0" y="772" width="1600" height="128" fill="#472004" opacity="0.28" />
+        <rect x="90" y="74" width="1820" height="174" fill="#6b3409" opacity="0.18" />
+        <rect x="90" y="248" width="1820" height="176" fill="#e08b32" opacity="0.08" />
+        <rect x="90" y="424" width="1820" height="176" fill="#7c3c0b" opacity="0.11" />
+        <rect x="90" y="600" width="1820" height="176" fill="#e5933a" opacity="0.08" />
+        <rect x="90" y="776" width="1820" height="174" fill="#703509" opacity="0.14" />
+        <rect x="90" y="950" width="1820" height="172" fill="#592806" opacity="0.2" />
 
         {/* Horizontal plank grooves (table seams) */}
-        {[148, 304, 466, 620, 772].map((y) => (
+        {[248, 424, 600, 776, 950].map((y) => (
           <g key={y}>
             <line
-              x1="0"
+              x1="90"
               y1={y}
-              x2="1600"
+              x2="1910"
               y2={y}
-              stroke="#361804"
-              strokeWidth="2.6"
+              stroke="#3b1a04"
+              strokeWidth="2.8"
               opacity="0.72"
             />
             <line
-              x1="0"
+              x1="90"
               y1={y + 2}
-              x2="1600"
+              x2="1910"
               y2={y + 2}
-              stroke="#eab308"
+              stroke="#fbbf24"
               strokeWidth="1"
               opacity="0.16"
             />
@@ -140,245 +212,594 @@ export default function OceanBackdrop() {
         ))}
 
         {/* Vertical board-end join lines on planks */}
-        <line x1="420" y1="0" x2="412" y2="148" stroke="#3b1a04" strokeWidth="2" opacity="0.52" />
-        <line x1="1190" y1="148" x2="1198" y2="304" stroke="#3b1a04" strokeWidth="2" opacity="0.5" />
-        <line x1="310" y1="466" x2="304" y2="620" stroke="#3b1a04" strokeWidth="2" opacity="0.48" />
-        <line x1="1270" y1="620" x2="1276" y2="772" stroke="#3b1a04" strokeWidth="2" opacity="0.52" />
+        <line x1="510" y1="74" x2="504" y2="248" stroke="#3b1a04" strokeWidth="2.2" opacity="0.5" />
+        <line x1="1460" y1="248" x2="1468" y2="424" stroke="#3b1a04" strokeWidth="2.2" opacity="0.48" />
+        <line x1="420" y1="600" x2="414" y2="776" stroke="#3b1a04" strokeWidth="2.2" opacity="0.48" />
+        <line x1="1540" y1="776" x2="1546" y2="950" stroke="#3b1a04" strokeWidth="2.2" opacity="0.5" />
 
-        {/* Organic wood grain cathedral curves & knots */}
-        <g stroke="#4a2206" fill="none" opacity="0.28">
-          <path d="M-20 72 Q380 48 820 78 T1620 68" strokeWidth="1.8" />
-          <path d="M-20 112 Q440 134 910 102 T1620 118" strokeWidth="1.4" />
-          <path d="M-20 196 Q290 170 640 202 T1280 184 T1620 205" strokeWidth="1.9" />
-          <path d="M-20 256 Q510 282 980 246 T1620 264" strokeWidth="1.5" />
-          <path d="M-20 356 Q340 330 760 364 T1620 348" strokeWidth="2.1" />
-          <path d="M-20 418 Q520 442 1040 408 T1620 426" strokeWidth="1.6" />
-          <path d="M-20 518 Q410 492 840 526 T1620 512" strokeWidth="2.0" />
-          <path d="M-20 578 Q580 598 1120 566 T1620 584" strokeWidth="1.5" />
-          <path d="M-20 668 Q360 646 790 676 T1620 662" strokeWidth="1.9" />
-          <path d="M-20 726 Q490 748 1020 718 T1620 732" strokeWidth="1.5" />
-          <path d="M-20 828 Q460 806 940 834 T1620 820" strokeWidth="2.1" />
+        {/* Organic wood grain curves & knots */}
+        <g stroke="#4a2206" fill="none" opacity="0.26">
+          <path d="M90 138 Q520 112 1020 144 T1910 132" strokeWidth="2" />
+          <path d="M90 198 Q610 222 1140 188 T1910 204" strokeWidth="1.5" />
+          <path d="M90 312 Q440 284 860 318 T1560 298 T1910 318" strokeWidth="2" />
+          <path d="M90 378 Q640 404 1220 368 T1910 386" strokeWidth="1.6" />
+          <path d="M90 488 Q490 462 960 496 T1910 480" strokeWidth="2.1" />
+          <path d="M90 554 Q660 578 1280 544 T1910 562" strokeWidth="1.6" />
+          <path d="M90 664 Q530 638 1040 672 T1910 658" strokeWidth="2" />
+          <path d="M90 732 Q700 754 1340 720 T1910 738" strokeWidth="1.5" />
+          <path d="M90 842 Q480 818 980 850 T1910 834" strokeWidth="2" />
+          <path d="M90 908 Q620 932 1240 900 T1910 914" strokeWidth="1.6" />
+          <path d="M90 1028 Q580 1004 1160 1036 T1910 1020" strokeWidth="2.1" />
 
           {/* Wood knots */}
-          <ellipse cx="248" cy="228" rx="28" ry="9" strokeWidth="2" />
-          <ellipse cx="248" cy="228" rx="14" ry="4.5" strokeWidth="1.5" fill="#4a2206" opacity="0.45" />
-          <ellipse cx="1352" cy="542" rx="32" ry="10" strokeWidth="2" />
-          <ellipse cx="1352" cy="542" rx="15" ry="4.5" strokeWidth="1.5" fill="#4a2206" opacity="0.45" />
-          <ellipse cx="520" cy="696" rx="24" ry="8" strokeWidth="1.8" />
+          <ellipse cx="348" cy="336" rx="30" ry="10" strokeWidth="2.2" />
+          <ellipse cx="348" cy="336" rx="15" ry="4.8" strokeWidth="1.6" fill="#4a2206" opacity="0.45" />
+          <ellipse cx="1610" cy="792" rx="34" ry="11" strokeWidth="2.2" />
+          <ellipse cx="1610" cy="792" rx="16" ry="5" strokeWidth="1.6" fill="#4a2206" opacity="0.45" />
+          <ellipse cx="640" cy="988" rx="26" ry="8.5" strokeWidth="1.8" />
         </g>
 
-        {/* Varnish specular glow & cup water stain rings + cigarette ember scars (from real table photos) */}
-        <rect width="1600" height="900" fill={`url(#${woodLampGlowId})`} />
+        {/* Subtle cup water stain rings & small palheiro ember burn dots */}
         <g opacity="0.24" fill="none">
-          {/* Old beer cup condensation rings */}
-          <circle cx="388" cy="364" r="36" stroke="#fde68a" strokeWidth="2.2" strokeDasharray="48 14 82 18" />
-          <circle cx="1186" cy="284" r="34" stroke="#fde68a" strokeWidth="1.8" strokeDasharray="60 18 44 12" />
-          <circle cx="432" cy="688" r="38" stroke="#3b1a04" strokeWidth="2.5" strokeDasharray="72 16 54 20" />
-          {/* Tiny black palheiro ember burn dots on the table varnish */}
-          <ellipse cx="354" cy="498" rx="4.5" ry="2.8" fill="#1c0d04" opacity="0.85" transform="rotate(-18 354 498)" />
-          <ellipse cx="366" cy="512" rx="3.2" ry="2.1" fill="#1c0d04" opacity="0.75" transform="rotate(12 366 512)" />
-          <ellipse cx="1168" cy="628" rx="4" ry="2.4" fill="#1c0d04" opacity="0.8" transform="rotate(-28 1168 628)" />
+          <circle cx="496" cy="442" r="38" stroke="#fde68a" strokeWidth="2.2" strokeDasharray="48 14 82 18" />
+          <circle cx="1510" cy="368" r="36" stroke="#fde68a" strokeWidth="1.8" strokeDasharray="60 18 44 12" />
+          <ellipse cx="458" cy="642" rx="4.8" ry="3" fill="#1c0d04" opacity="0.85" transform="rotate(-18 458 642)" />
+          <ellipse cx="472" cy="658" rx="3.4" ry="2.2" fill="#1c0d04" opacity="0.75" transform="rotate(12 472 658)" />
+          <ellipse cx="1488" cy="748" rx="4.2" ry="2.5" fill="#1c0d04" opacity="0.8" transform="rotate(-28 1488 748)" />
         </g>
 
-        {/* Central warm shadow where the Catan board rests on the wooden table */}
-        <ellipse
-          cx="800"
-          cy="455"
-          rx="315"
-          ry="295"
-          fill="#241003"
-          opacity="0.42"
-        />
-
         {/* ================================================================ */}
-        {/* 2. LEFT BLACK GAME BOX HALF (Grow style with scuffed corners)    */}
+        {/* 2. HUMAN BITE MARK ON THE RIGHT EDGE OF THE TABLE                */}
+        {/*    ("Marca de mordida humana na borda direita da mesa")          */}
         {/* ================================================================ */}
-        <g transform="translate(172, 378) rotate(-5)">
-          {/* Drop shadow on wood */}
-          <rect
-            x="-126"
-            y="-172"
-            width="256"
-            height="348"
-            rx="8"
-            fill="rgba(12, 5, 1, 0.62)"
-            transform="translate(10, 14)"
-          />
-          {/* Outer matte black cardboard wall */}
-          <rect
-            x="-126"
-            y="-172"
-            width="256"
-            height="348"
-            rx="6"
-            fill="#17171b"
-            stroke="#2f3037"
+        <g transform="translate(1936, 468)">
+          {/* Outer splintered raw wood halo where teeth tore the varnish */}
+          <path
+            d="M 0 -64
+               C -36 -58, -68 -36, -72 0
+               C -68 36, -36 58, 0 64 Z"
+            fill="#d99b52"
+            stroke="#5c2c06"
             strokeWidth="2.5"
           />
-          {/* Worn/scuffed white cardboard corners & edges (exact detail from photos 5.jpeg & 11.jpeg) */}
+          {/* Inner lighter raw sapwood layer */}
           <path
-            d="M-126 -144 L-126 -170 L-98 -172 M102 -172 L130 -170 L130 -142 M-126 146 L-126 176 L-96 176 M100 176 L130 176 L130 144"
-            stroke="#d1d5db"
+            d="M 0 -55
+               C -28 -50, -56 -30, -60 0
+               C -56 30, -28 50, 0 55 Z"
+            fill="#eec082"
+          />
+          {/* Scalloped dental arch tooth impressions (incisors, canines, premolars) */}
+          <path
+            d="M -4 -52
+               Q -24 -48, -28 -36
+               Q -42 -32, -46 -20
+               Q -56 -14, -56 -2
+               Q -58 0, -56 2
+               Q -56 14, -46 20
+               Q -42 32, -28 36
+               Q -24 48, -4 52"
+            fill="none"
+            stroke="#6e3509"
             strokeWidth="3.2"
             strokeLinecap="round"
+          />
+          {/* Individual tooth gouge craters along the dental arch */}
+          {[
+            [-18, -43, 6.5, 4.2, -28],
+            [-35, -31, 7, 4.5, -18],
+            [-47, -17, 6.2, 4, -8],
+            [-51, -5, 6, 3.8, -2],
+            [-51, 6, 6, 3.8, 2],
+            [-47, 18, 6.2, 4, 8],
+            [-35, 31, 7, 4.5, 18],
+            [-18, 43, 6.5, 4.2, 28],
+          ].map(([tx, ty, rx, ry, rot], idx) => (
+            <ellipse
+              key={idx}
+              cx={tx}
+              cy={ty}
+              rx={rx}
+              ry={ry}
+              transform={`rotate(${rot} ${tx} ${ty})`}
+              fill="#b4712c"
+              stroke="#5c2c06"
+              strokeWidth="1.4"
+            />
+          ))}
+          {/* Tooth scrape grooves radiating toward the edge */}
+          <g stroke="#8a4b14" strokeWidth="1.4" strokeLinecap="round" opacity="0.75">
+            <line x1="-45" y1="-14" x2="-22" y2="-11" />
+            <line x1="-48" y1="-3" x2="-20" y2="-2" />
+            <line x1="-48" y1="5" x2="-20" y2="4" />
+            <line x1="-44" y1="16" x2="-22" y2="13" />
+            <line x1="-33" y1="-28" x2="-14" y2="-22" />
+            <line x1="-33" y1="28" x2="-14" y2="22" />
+          </g>
+          {/* Dark 3D wood thickness bevel inside the bitten cutout */}
+          <path
+            d="M 2 -46
+               C -18 -42, -38 -24, -41 0
+               C -38 24, -18 42, 2 46 Z"
+            fill="#3d1c03"
+          />
+          {/* Room floor void where the chunk of table edge was bitten off */}
+          <path
+            d="M 4 -38
+               C -12 -34, -28 -20, -31 0
+               C -28 20, -12 34, 4 38 Z"
+            fill="#120803"
+          />
+        </g>
+
+        {/* ================================================================ */}
+        {/* 3. BOTTLES OF "TONI LOURENÇO" & "FOFINHA" ON THE TABLE BORDER    */}
+        {/* ================================================================ */}
+        {/* 3A. Garrafa de Toni Lourenço (top-right border of the table) */}
+        <g transform="translate(1662, 232) rotate(-11)">
+          {/* Bottle drop shadow on table border */}
+          <rect
+            x="-34"
+            y="-78"
+            width="72"
+            height="176"
+            rx="18"
+            fill="rgba(12, 5, 1, 0.58)"
+            transform="translate(8, 12)"
+          />
+          {/* Bottle neck */}
+          <rect
+            x="-11"
+            y="-108"
+            width="22"
+            height="38"
+            rx="4"
+            fill={`url(#${toniGlassId})`}
+            stroke="#1f0b02"
+            strokeWidth="1.8"
+          />
+          {/* Metallic red/gold bottle cap */}
+          <rect
+            x="-13"
+            y="-118"
+            width="26"
+            height="13"
+            rx="3"
+            fill="#b91c1c"
+            stroke="#facc15"
+            strokeWidth="1.4"
+          />
+          {/* Neck collar label */}
+          <rect x="-11" y="-88" width="22" height="8" fill="#fef3c7" stroke="#92400e" strokeWidth="0.9" />
+          {/* Bottle body & rounded shoulders */}
+          <path
+            d="M -11 -72
+               C -26 -64, -34 -48, -34 -28
+               L -34 78
+               A 12 12 0 0 0 -22 90
+               L 22 90
+               A 12 12 0 0 0 34 78
+               L 34 -28
+               C 34 -48, 26 -64, 11 -72 Z"
+            fill={`url(#${toniGlassId})`}
+            stroke="#1f0b02"
+            strokeWidth="2.2"
+          />
+          {/* Glass specular highlight along left side */}
+          <path
+            d="M -24 -38 L -24 74"
+            stroke="rgba(254, 243, 199, 0.34)"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
+          {/* Vintage Toni Lourenço paper label */}
+          <rect
+            x="-30"
+            y="-22"
+            width="60"
+            height="76"
+            rx="4"
+            fill="#fffbeb"
+            stroke="#b45309"
+            strokeWidth="2"
+          />
+          <rect
+            x="-26"
+            y="-18"
+            width="52"
+            height="68"
+            rx="2"
             fill="none"
-            opacity="0.72"
+            stroke="#dc2626"
+            strokeWidth="1.2"
+          />
+          {/* Ornate red banner crest */}
+          <rect x="-22" y="-11" width="44" height="14" rx="2" fill="#b91c1c" />
+          <text
+            x="0"
+            y="-1"
+            textAnchor="middle"
+            fill="#fef08a"
+            fontSize="9.5"
+            fontWeight="900"
+            letterSpacing="0.8"
+            fontFamily="Cinzel, Georgia, serif"
+          >
+            TONI
+          </text>
+          <text
+            x="0"
+            y="16"
+            textAnchor="middle"
+            fill="#7f1d1d"
+            fontSize="8.8"
+            fontWeight="900"
+            letterSpacing="0.3"
+            fontFamily="Cinzel, Georgia, serif"
+          >
+            LOURENÇO
+          </text>
+          <line x1="-18" y1="23" x2="18" y2="23" stroke="#d97706" strokeWidth="1.2" />
+          <text
+            x="0"
+            y="34"
+            textAnchor="middle"
+            fill="#451a03"
+            fontSize="6.2"
+            fontWeight="800"
+            letterSpacing="0.6"
+            fontFamily="Plus Jakarta Sans, sans-serif"
+          >
+            CACHAÇA DE MINAS
+          </text>
+          <text
+            x="0"
+            y="44"
+            textAnchor="middle"
+            fill="#92400e"
+            fontSize="5.6"
+            fontWeight="700"
+            fontFamily="Plus Jakarta Sans, sans-serif"
+          >
+             SAFRA ESPECIAL
+          </text>
+        </g>
+
+        {/* 3B. Garrafa de Fofinha (next to Toni Lourenço on the right table border) */}
+        <g transform="translate(1796, 258) rotate(12)">
+          {/* Bottle drop shadow */}
+          <rect
+            x="-32"
+            y="-74"
+            width="68"
+            height="168"
+            rx="16"
+            fill="rgba(12, 5, 1, 0.56)"
+            transform="translate(8, 12)"
+          />
+          {/* Bottle neck */}
+          <rect
+            x="-10"
+            y="-102"
+            width="20"
+            height="36"
+            rx="4"
+            fill="rgba(254, 249, 195, 0.42)"
+            stroke="#713f12"
+            strokeWidth="1.6"
+          />
+          {/* Classic yellow/red screw cap */}
+          <rect
+            x="-12"
+            y="-112"
+            width="24"
+            height="12"
+            rx="3"
+            fill="#eab308"
+            stroke="#991b1b"
+            strokeWidth="1.4"
+          />
+          {/* Clear glass bottle filled with golden Fofinha cachaça */}
+          <path
+            d="M -10 -68
+               C -24 -60, -32 -44, -32 -25
+               L -32 74
+               A 12 12 0 0 0 -20 86
+               L 20 86
+               A 12 12 0 0 0 32 74
+               L 32 -25
+               C 32 -44, 24 -60, 10 -68 Z"
+            fill={`url(#${fofinhaGlassId})`}
+            stroke="#451a03"
+            strokeWidth="2"
+          />
+          {/* Glass highlight */}
+          <path
+            d="M -22 -34 L -22 68"
+            stroke="rgba(255, 255, 255, 0.45)"
+            strokeWidth="3.8"
+            strokeLinecap="round"
+          />
+          {/* Iconic Fofinha label */}
+          <rect
+            x="-28"
+            y="-18"
+            width="56"
+            height="68"
+            rx="5"
+            fill="#dc2626"
+            stroke="#fef08a"
+            strokeWidth="2"
+          />
+          <ellipse cx="0" cy="4" rx="23" ry="16" fill="#facc15" stroke="#7f1d1d" strokeWidth="1.2" />
+          <text
+            x="0"
+            y="8"
+            textAnchor="middle"
+            fill="#991b1b"
+            fontSize="9.8"
+            fontWeight="900"
+            letterSpacing="0.4"
+            fontFamily="Cinzel, Georgia, serif"
+          >
+            FOFINHA
+          </text>
+          <text
+            x="0"
+            y="32"
+            textAnchor="middle"
+            fill="#fef9c3"
+            fontSize="6.2"
+            fontWeight="800"
+            letterSpacing="0.5"
+            fontFamily="Plus Jakarta Sans, sans-serif"
+          >
+            A RAINHA DA PRAÇA
+          </text>
+          <text
+            x="0"
+            y="43"
+            textAnchor="middle"
+            fill="#fde047"
+            fontSize="5.6"
+            fontWeight="700"
+            fontFamily="Plus Jakarta Sans, sans-serif"
+          >
+            VIÇOSA • MG
+          </text>
+        </g>
+
+        {/* Small cachaça shot glass ("copinho de dose") beside Toni Lourenço & Fofinha */}
+        <g transform="translate(1726, 366)">
+          <ellipse cx="4" cy="6" rx="22" ry="20" fill="rgba(12, 5, 1, 0.5)" />
+          <circle
+            cx="0"
+            cy="0"
+            r="20"
+            fill="rgba(255, 255, 255, 0.24)"
+            stroke="rgba(255, 255, 255, 0.65)"
+            strokeWidth="2.2"
+          />
+          <circle cx="0" cy="0" r="14" fill="#eab308" opacity="0.88" />
+          <path d="M-8 -6 A10 10 0 0 1 8 -6" stroke="#fef9c3" strokeWidth="2" fill="none" />
+        </g>
+
+        {/* ================================================================ */}
+        {/* 4. LEFT BLACK GAME BOX HALF (3D Sloped Walls + Darker Floor)     */}
+        {/*    No text inside, per user request                              */}
+        {/* ================================================================ */}
+        <g transform="translate(278, 468) rotate(-4)">
+          {/* Heavy drop shadow on wood */}
+          <rect
+            x="-134"
+            y="-182"
+            width="268"
+            height="364"
+            rx="8"
+            fill="rgba(8, 3, 0, 0.68)"
+            transform="translate(12, 16)"
+          />
+
+          {/* Outer cardboard rim frame */}
+          <rect
+            x="-134"
+            y="-182"
+            width="268"
+            height="364"
+            rx="5"
+            fill="#272830"
+            stroke="#3a3b45"
+            strokeWidth="2.5"
+          />
+
+          {/* 4 Sloped 3D Inner Side Walls (lighter than the bottom floor for realistic depth) */}
+          {/* Top sloped inner wall */}
+          <polygon
+            points="-130,-178 130,-178 96,-142 -96,-142"
+            fill="#23242b"
+          />
+          {/* Right sloped inner wall (illuminated by central table light) */}
+          <polygon
+            points="130,-178 130,178 96,142 96,-142"
+            fill="#32343e"
+          />
+          {/* Bottom sloped inner wall */}
+          <polygon
+            points="-96,142 96,142 130,178 -130,178"
+            fill="#1c1d23"
+          />
+          {/* Left sloped inner wall */}
+          <polygon
+            points="-130,-178 -96,-142 -96,142 -130,178"
+            fill="#282932"
+          />
+
+          {/* Deep Recessed Bottom Floor (noticeably darker than the 4 inner walls) */}
+          <rect
+            x="-96"
+            y="-142"
+            width="192"
+            height="284"
+            rx="2"
+            fill={`url(#${boxFloorLeftId})`}
+          />
+          {/* Ambient occlusion shadow where the 4 sloped walls meet the recessed floor */}
+          <rect
+            x="-96"
+            y="-142"
+            width="192"
+            height="284"
+            fill="none"
+            stroke="rgba(0, 0, 0, 0.85)"
+            strokeWidth="7"
+          />
+          <rect
+            x="-96"
+            y="-142"
+            width="192"
+            height="284"
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.06)"
+            strokeWidth="1.2"
+          />
+
+          {/* 3D Corner Fold Crease Lines connecting outer rim to recessed floor */}
+          <line x1="-130" y1="-178" x2="-96" y2="-142" stroke="#111115" strokeWidth="2.2" />
+          <line x1="130" y1="-178" x2="96" y2="-142" stroke="#464854" strokeWidth="1.8" />
+          <line x1="-130" y1="178" x2="-96" y2="142" stroke="#111115" strokeWidth="2.2" />
+          <line x1="130" y1="178" x2="96" y2="142" stroke="#3d3f4a" strokeWidth="1.8" />
+
+          {/* Worn/scuffed white cardboard corners & edges (exact detail from photos 5.jpeg & 11.jpeg) */}
+          <path
+            d="M-134 -150 L-134 -180 L-102 -182 M102 -182 L134 -180 L134 -148 M-134 150 L-134 182 L-100 182 M100 182 L134 182 L134 148"
+            stroke="#d1d5db"
+            strokeWidth="3.4"
+            strokeLinecap="round"
+            fill="none"
+            opacity="0.76"
           />
           <path
-            d="M-65 -172 L-18 -172 M42 176 L88 176 M-126 -40 L-126 18 M130 -25 L130 35"
+            d="M-68 -182 L-16 -182 M42 182 L90 182 M-134 -44 L-134 20 M134 -28 L134 36"
             stroke="#9ca3af"
             strokeWidth="2"
             strokeDasharray="12 6 4 8"
             fill="none"
-            opacity="0.48"
+            opacity="0.5"
           />
-          {/* Inner recessed black cardboard tray cavity */}
-          <rect
-            x="-112"
-            y="-158"
-            width="228"
-            height="320"
-            rx="4"
-            fill={`url(#${boxInnerId})`}
-            stroke="#09090b"
-            strokeWidth="3"
-          />
-          {/* Inner cardboard wall bevel lines */}
-          <line x1="-126" y1="-172" x2="-112" y2="-158" stroke="#9ca3af" strokeWidth="1.5" opacity="0.5" />
-          <line x1="130" y1="-172" x2="116" y2="-158" stroke="#9ca3af" strokeWidth="1.5" opacity="0.5" />
-          <line x1="-126" y1="176" x2="-112" y2="162" stroke="#9ca3af" strokeWidth="1.5" opacity="0.5" />
-          <line x1="130" y1="176" x2="116" y2="162" stroke="#9ca3af" strokeWidth="1.5" opacity="0.5" />
-
-          {/* Subtle Ziploc spare pieces bag & Catan manual corner resting inside left box */}
-          <g transform="translate(-26, -68) rotate(8)" opacity="0.82">
-            <rect
-              x="-52"
-              y="-36"
-              width="104"
-              height="72"
-              rx="4"
-              fill="rgba(255, 255, 255, 0.07)"
-              stroke="rgba(226, 232, 240, 0.24)"
-              strokeWidth="1.2"
-            />
-            <line x1="-48" y1="-26" x2="48" y2="-26" stroke="rgba(248, 113, 113, 0.45)" strokeWidth="1.5" />
-            {/* Spare wooden settlements/roads inside plastic baggie */}
-            <rect x="-24" y="-8" width="14" height="6" rx="1.5" fill="#dc2626" transform="rotate(18 -17 -5)" />
-            <rect x="4" y="6" width="14" height="6" rx="1.5" fill="#2563eb" transform="rotate(-22 11 9)" />
-            <rect x="-8" y="12" width="14" height="6" rx="1.5" fill="#ea580c" transform="rotate(9 -1 15)" />
-            <polygon points="18,-12 25,-18 32,-12 32,-2 18,-2" fill="#f8fafc" opacity="0.85" />
-          </g>
-
-          {/* Subtle República stamp inside the box floor */}
-          <text
-            x="2"
-            y="112"
-            textAnchor="middle"
-            fill="rgba(229, 231, 235, 0.22)"
-            fontSize="10.5"
-            fontWeight="800"
-            letterSpacing="2.5"
-            fontFamily="Cinzel, serif"
-          >
-            A PRAÇA É NOSSA
-          </text>
-          <text
-            x="2"
-            y="128"
-            textAnchor="middle"
-            fill="rgba(250, 204, 21, 0.18)"
-            fontSize="8.5"
-            fontWeight="700"
-            letterSpacing="1.8"
-            fontFamily="Plus Jakarta Sans, sans-serif"
-          >
-            CAIXA DE DADOS • VIÇOSA-MG
-          </text>
         </g>
 
         {/* ================================================================ */}
-        {/* 3. RIGHT BLACK GAME BOX HALF (Dice Rolling Tray on Right Side)   */}
+        {/* 5. RIGHT BLACK GAME BOX HALF (3D Sloped Walls + Darker Floor)    */}
+        {/*    Positioned on the right side for rolling the dice inside      */}
         {/* ================================================================ */}
-        <g transform="translate(1418, 446) rotate(3)">
-          {/* Drop shadow on wood */}
+        <g transform="translate(1712, 628) rotate(3)">
+          {/* Heavy drop shadow on wood */}
           <rect
-            x="-134"
-            y="-164"
-            width="268"
-            height="328"
+            x="-138"
+            y="-174"
+            width="276"
+            height="348"
             rx="8"
-            fill="rgba(12, 5, 1, 0.64)"
-            transform="translate(10, 14)"
+            fill="rgba(8, 3, 0, 0.68)"
+            transform="translate(12, 16)"
           />
-          {/* Outer matte black cardboard wall */}
+
+          {/* Outer cardboard rim frame */}
           <rect
-            x="-134"
-            y="-164"
-            width="268"
-            height="328"
-            rx="6"
-            fill="#17171b"
-            stroke="#2f3037"
+            x="-138"
+            y="-174"
+            width="276"
+            height="348"
+            rx="5"
+            fill="#272830"
+            stroke="#3a3b45"
             strokeWidth="2.5"
           />
+
+          {/* 4 Sloped 3D Inner Side Walls (lighter than the bottom floor) */}
+          {/* Top sloped inner wall */}
+          <polygon
+            points="-134,-170 134,-170 100,-134 -100,-134"
+            fill="#24252c"
+          />
+          {/* Left sloped inner wall (illuminated by central table light) */}
+          <polygon
+            points="-134,-170 -100,-134 -100,134 -134,170"
+            fill="#333540"
+          />
+          {/* Right sloped inner wall */}
+          <polygon
+            points="134,-170 134,170 100,134 100,-134"
+            fill="#26272f"
+          />
+          {/* Bottom sloped inner wall */}
+          <polygon
+            points="-100,134 100,134 134,170 -134,170"
+            fill="#1c1d23"
+          />
+
+          {/* Deep Recessed Bottom Floor (darker than the inner walls) */}
+          <rect
+            x="-100"
+            y="-134"
+            width="200"
+            height="268"
+            rx="2"
+            fill={`url(#${boxFloorRightId})`}
+          />
+          {/* Ambient occlusion shadow along floor perimeter */}
+          <rect
+            x="-100"
+            y="-134"
+            width="200"
+            height="268"
+            fill="none"
+            stroke="rgba(0, 0, 0, 0.85)"
+            strokeWidth="7"
+          />
+          <rect
+            x="-100"
+            y="-134"
+            width="200"
+            height="268"
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.06)"
+            strokeWidth="1.2"
+          />
+
+          {/* 3D Corner Fold Crease Lines */}
+          <line x1="-134" y1="-170" x2="-100" y2="-134" stroke="#464854" strokeWidth="1.8" />
+          <line x1="134" y1="-170" x2="100" y2="-134" stroke="#111115" strokeWidth="2.2" />
+          <line x1="-134" y1="170" x2="-100" y2="134" stroke="#3d3f4a" strokeWidth="1.8" />
+          <line x1="134" y1="170" x2="100" y2="134" stroke="#111115" strokeWidth="2.2" />
+
           {/* Worn/scuffed white cardboard corners & edges */}
           <path
-            d="M-134 -134 L-134 -162 L-104 -164 M104 -164 L134 -162 L134 -132 M-134 134 L-134 164 L-102 164 M102 164 L134 164 L134 134"
+            d="M-138 -142 L-138 -172 L-106 -174 M106 -174 L138 -172 L138 -140 M-138 142 L-138 174 L-104 174 M104 174 L138 174 L138 140"
             stroke="#d1d5db"
-            strokeWidth="3.2"
+            strokeWidth="3.4"
             strokeLinecap="round"
             fill="none"
-            opacity="0.74"
+            opacity="0.76"
           />
           <path
-            d="M-54 -164 L12 -164 M-82 164 L-24 164 M134 -44 L134 24"
+            d="M-58 -174 L14 -174 M-84 174 L-22 174 M138 -46 L138 26"
             stroke="#9ca3af"
             strokeWidth="2"
             strokeDasharray="14 6 5 9"
             fill="none"
-            opacity="0.46"
+            opacity="0.48"
           />
-          {/* Inner recessed black cardboard tray cavity where dice roll */}
-          <rect
-            x="-118"
-            y="-148"
-            width="236"
-            height="296"
-            rx="4"
-            fill={`url(#${boxInnerId})`}
-            stroke="#09090b"
-            strokeWidth="3"
-          />
-          {/* Corner crease lines */}
-          <line x1="-134" y1="-164" x2="-118" y2="-148" stroke="#9ca3af" strokeWidth="1.5" opacity="0.5" />
-          <line x1="134" y1="-164" x2="118" y2="-148" stroke="#9ca3af" strokeWidth="1.5" opacity="0.5" />
-          <line x1="-134" y1="164" x2="-118" y2="148" stroke="#9ca3af" strokeWidth="1.5" opacity="0.5" />
-          <line x1="134" y1="164" x2="118" y2="148" stroke="#9ca3af" strokeWidth="1.5" opacity="0.5" />
-
-          {/* Subtle Grow-style triangular corner scuff & dice tray watermark */}
-          <text
-            x="0"
-            y="124"
-            textAnchor="middle"
-            fill="rgba(229, 231, 235, 0.2)"
-            fontSize="9.5"
-            fontWeight="800"
-            letterSpacing="2.2"
-            fontFamily="Cinzel, serif"
-          >
-            TAMPA DOS DADOS
-          </text>
         </g>
 
         {/* ================================================================ */}
-        {/* 4. GIANT BAMBOO ASHTRAY ("CINZEIRO DE BAMBU GIGANTE")            */}
-        {/*    Modeled after Cinzeiro de bambu.png & 1.jpeg / 3.jpeg         */}
+        {/* 6. GIANT BAMBOO ASHTRAY ("CINZEIRO DE BAMBU GIGANTE")            */}
         {/* ================================================================ */}
-        <g transform="translate(318, 692)">
+        <g transform="translate(392, 868)">
           {/* Warm ambient shadow on the wood table */}
-          <ellipse cx="8" cy="44" rx="92" ry="38" fill="rgba(12, 5, 1, 0.65)" />
+          <ellipse cx="8" cy="44" rx="94" ry="39" fill="rgba(12, 5, 1, 0.65)" />
 
-          {/* Protruding bottom bamboo node ring (the thick diaphragm rim at the base) */}
+          {/* Protruding bottom bamboo node ring */}
           <ellipse
             cx="0"
             cy="34"
@@ -406,7 +827,7 @@ export default function OceanBackdrop() {
             strokeWidth="2"
           />
 
-          {/* Natural vertical bamboo fiber striations & age cracks */}
+          {/* Natural vertical bamboo fiber striations */}
           <g stroke="#574726" strokeWidth="1.1" opacity="0.48">
             <line x1="-54" y1="-16" x2="-55" y2="28" />
             <line x1="-36" y1="-14" x2="-36" y2="32" />
@@ -416,7 +837,7 @@ export default function OceanBackdrop() {
             <line x1="56" y1="-16" x2="57" y2="28" />
           </g>
 
-          {/* Carved Sun Emblem on the front of the bamboo ashtray (exact detail from Cinzeiro de bambu.png!) */}
+          {/* Carved Sun Emblem on the front of the bamboo ashtray */}
           <g transform="translate(0, 12)" opacity="0.78">
             <circle
               cx="0"
@@ -465,24 +886,21 @@ export default function OceanBackdrop() {
             strokeWidth="2"
           />
 
-          {/* Ash piles & extinguished palheiro butts inside the bamboo cavity */}
+          {/* Ash piles & extinguished palheiro butt inside the bamboo cavity */}
           <ellipse cx="-12" cy="-20" rx="26" ry="8" fill="#4b5563" opacity="0.55" />
           <ellipse cx="14" cy="-23" rx="18" ry="6" fill="#6b7280" opacity="0.48" />
           <circle cx="-18" cy="-22" r="2.2" fill="#9ca3af" opacity="0.7" />
           <circle cx="6" cy="-19" r="1.8" fill="#d1d5db" opacity="0.65" />
           <circle cx="22" cy="-24" r="2" fill="#9ca3af" opacity="0.6" />
-          {/* Extinguished straw cigarette butt inside ashtray */}
           <g transform="translate(-18, -23) rotate(22)">
             <rect x="-14" y="-2.5" width="24" height="5" rx="2" fill="#d6c79c" />
             <line x1="-2" y1="-2.5" x2="-2" y2="2.5" stroke="#dc2626" strokeWidth="1.6" />
             <rect x="8" y="-2.5" width="5" height="5" rx="1" fill="#1f2937" />
           </g>
 
-          {/* Lit Coyote Straw Cigarette (Palheiro) resting on the right rim of the bamboo */}
+          {/* Lit Coyote Straw Cigarette (Palheiro) resting on the right rim */}
           <g transform="translate(46, -28) rotate(-16)">
-            {/* Shadow on rim */}
             <rect x="-34" y="1" width="68" height="7" rx="3" fill="rgba(0,0,0,0.45)" />
-            {/* Corn-husk straw body (palha de milho) */}
             <rect
               x="-34"
               y="-3.5"
@@ -493,9 +911,7 @@ export default function OceanBackdrop() {
               stroke="#bca36b"
               strokeWidth="1"
             />
-            {/* Characteristic red rubber band ("liguinha vermelha" do Coyote) */}
             <rect x="-2" y="-4" width="3.2" height="8" rx="1" fill="#dc2626" />
-            {/* Glowing ash tip & burning ember pointing into the bamboo cavity */}
             <rect x="-38" y="-3.5" width="6" height="7" rx="1.5" fill="#9ca3af" />
             <circle
               cx="-38"
@@ -529,11 +945,9 @@ export default function OceanBackdrop() {
         </g>
 
         {/* ================================================================ */}
-        {/* 5. RED "COYOTE" PACK + LOOSE PALHEIROS + WHITE BIC LIGHTER       */}
-        {/*    Modeled directly after Coyote.jpg & 1.jpeg                    */}
+        {/* 7. RED "COYOTE" PACK + LOOSE PALHEIROS + WHITE BIC LIGHTER       */}
         {/* ================================================================ */}
-        <g transform="translate(142, 716) rotate(14)">
-          {/* Pack drop shadow */}
+        <g transform="translate(212, 902) rotate(14)">
           <rect
             x="-46"
             y="-68"
@@ -543,7 +957,6 @@ export default function OceanBackdrop() {
             fill="rgba(12, 5, 1, 0.6)"
             transform="translate(6, 9)"
           />
-          {/* Crimson red Coyote box */}
           <rect
             x="-46"
             y="-68"
@@ -554,19 +967,9 @@ export default function OceanBackdrop() {
             stroke="#7f1d1d"
             strokeWidth="2"
           />
-          {/* Inner red gradient sheen */}
-          <rect
-            x="-42"
-            y="-64"
-            width="84"
-            height="92"
-            rx="3"
-            fill="#dc2626"
-          />
-          {/* Flip-top lid seam */}
+          <rect x="-42" y="-64" width="84" height="92" rx="3" fill="#dc2626" />
           <path d="M-44 -34 L44 -34" stroke="#7f1d1d" strokeWidth="1.8" opacity="0.85" />
 
-          {/* Yellow "COYOTE" western title */}
           <text
             x="0"
             y="-44"
@@ -582,17 +985,13 @@ export default function OceanBackdrop() {
             COYOTE
           </text>
 
-          {/* Yellow full moon + howling black coyote silhouette on rock (from Coyote.jpg) */}
           <circle cx="0" cy="-8" r="19" fill="#fde047" stroke="#ca8a04" strokeWidth="1" />
-          {/* Dark mountain crag */}
           <polygon points="-16,10 -4,-1 10,10" fill="#1c1917" />
-          {/* Howling coyote silhouette */}
           <path
             d="M-6 2 L-3 -9 L1 -14 L5 -19 L7 -16 L4 -11 L6 -3 L2 4 L-6 4 Z"
             fill="#09090b"
           />
 
-          {/* "PRODUTO ARTESANAL" & "20 Unidades" */}
           <text
             x="0"
             y="21"
@@ -606,7 +1005,6 @@ export default function OceanBackdrop() {
             PRODUTO ARTESANAL
           </text>
 
-          {/* Yellow health warning bar at bottom of pack (exact detail from Coyote.jpg) */}
           <rect
             x="-43"
             y="28"
@@ -652,8 +1050,8 @@ export default function OceanBackdrop() {
           </text>
         </g>
 
-        {/* Two loose Coyote straw cigarettes (palheiros) with red rubber band on the wood */}
-        <g transform="translate(226, 774) rotate(-28)">
+        {/* Two loose Coyote straw cigarettes (palheiros) with red rubber band */}
+        <g transform="translate(296, 956) rotate(-28)">
           <rect x="-32" y="2" width="64" height="6.5" rx="3" fill="rgba(0,0,0,0.42)" />
           <rect
             x="-32"
@@ -665,10 +1063,9 @@ export default function OceanBackdrop() {
             stroke="#c4ab72"
             strokeWidth="0.9"
           />
-          {/* Red rubber band ("liguinha vermelha") */}
           <rect x="-1.5" y="-3.4" width="3" height="7.3" rx="0.8" fill="#dc2626" />
         </g>
-        <g transform="translate(242, 792) rotate(-8)">
+        <g transform="translate(312, 974) rotate(-8)">
           <rect x="-32" y="2" width="64" height="6.5" rx="3" fill="rgba(0,0,0,0.42)" />
           <rect
             x="-32"
@@ -680,14 +1077,12 @@ export default function OceanBackdrop() {
             stroke="#bfa56a"
             strokeWidth="0.9"
           />
-          {/* Red rubber band ("liguinha vermelha") */}
           <rect x="-1.5" y="-3.4" width="3" height="7.3" rx="0.8" fill="#dc2626" />
         </g>
 
-        {/* White Bic Lighter with Red Button & Silver Hood (from photo 1.jpeg) */}
-        <g transform="translate(218, 632) rotate(-36)">
+        {/* White Bic Lighter with Red Button & Silver Hood */}
+        <g transform="translate(286, 804) rotate(-36)">
           <rect x="-13" y="-34" width="28" height="70" rx="12" fill="rgba(0,0,0,0.48)" transform="translate(4, 6)" />
-          {/* White oval Bic body */}
           <rect
             x="-13"
             y="-22"
@@ -698,7 +1093,6 @@ export default function OceanBackdrop() {
             stroke="#cbd5e1"
             strokeWidth="1.5"
           />
-          {/* Silver metal wind hood */}
           <rect
             x="-9"
             y="-35"
@@ -709,7 +1103,6 @@ export default function OceanBackdrop() {
             stroke="#475569"
             strokeWidth="1.2"
           />
-          {/* Red thumb Piezo/fork button */}
           <rect
             x="2"
             y="-30"
@@ -723,18 +1116,13 @@ export default function OceanBackdrop() {
         </g>
 
         {/* ================================================================ */}
-        {/* 6. COLD BEER GLASSES ("COPO LAGOINHA / AMERICANO")               */}
+        {/* 8. COLD BEER GLASSES ("COPO LAGOINHA / AMERICANO")               */}
         {/* ================================================================ */}
-        {/* Top-left beer glass near player bar */}
-        <g transform="translate(362, 196)">
-          {/* Wet condensation ring around base */}
+        <g transform="translate(456, 224)">
           <circle cx="0" cy="6" r="46" fill="none" stroke="rgba(254, 243, 199, 0.25)" strokeWidth="2.5" strokeDasharray="58 14 76 18" />
           <ellipse cx="6" cy="10" rx="42" ry="38" fill="rgba(12, 5, 1, 0.55)" />
-          {/* Faceted glass rim (Copo Americano top-down perspective) */}
           <circle cx="0" cy="0" r="39" fill="rgba(255, 255, 255, 0.18)" stroke="rgba(255, 255, 255, 0.55)" strokeWidth="2.5" />
-          {/* Golden beer body */}
           <circle cx="0" cy="0" r="33" fill={`url(#${beerLiquidId})`} />
-          {/* Creamy white beer foam collar & bubbles */}
           <path
             d="M-24 -16 C-12 -28, 16 -28, 26 -12 C32 -2, 22 18, 6 22 C-14 26, -30 8, -24 -16 Z"
             fill="#fffbeb"
@@ -746,8 +1134,7 @@ export default function OceanBackdrop() {
           <circle cx="-14" cy="8" r="2.2" fill="#ffffff" />
         </g>
 
-        {/* Bottom-right beer glass */}
-        <g transform="translate(1248, 718)">
+        <g transform="translate(1548, 924)">
           <circle cx="0" cy="4" r="44" fill="none" stroke="rgba(254, 243, 199, 0.22)" strokeWidth="2.2" strokeDasharray="64 16 48 14" />
           <ellipse cx="6" cy="10" rx="40" ry="36" fill="rgba(12, 5, 1, 0.55)" />
           <circle cx="0" cy="0" r="37" fill="rgba(255, 255, 255, 0.18)" stroke="rgba(255, 255, 255, 0.52)" strokeWidth="2.4" />
@@ -761,14 +1148,7 @@ export default function OceanBackdrop() {
           <circle cx="7" cy="-8" r="2.8" fill="#fef3c7" />
           <circle cx="2" cy="5" r="3" fill="#fef3c7" />
         </g>
-
-        {/* Ambient late-night smoky haze & warm table edge vignette */}
-        <rect width="1600" height="900" fill={`url(#${woodVignetteId})`} />
       </svg>
-
-      {/* Subtle ambient smoke drift overlay across the república table */}
-      <div className="ocean-panorama-backdrop__smoke-haze" />
-      <div className="ocean-panorama-backdrop__vignette" />
     </div>
   );
 }
