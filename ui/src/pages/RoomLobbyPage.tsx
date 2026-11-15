@@ -1,7 +1,6 @@
-import { lazy, Suspense, useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { Button, IconButton, MenuItem, Select, Tooltip } from "@mui/material";
-import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Button } from "@mui/material";
 import { GridLoader } from "react-spinners";
 import {
   closeRoom,
@@ -11,11 +10,7 @@ import {
   joinRoom,
   leaveRoom,
   saveGameRoomCode,
-  updateRoom,
   startRoomGame,
-  type BotDifficulty,
-  type BotSpeed,
-  type DiceMode,
   type PlayerAccount,
 } from "../utils/apiClient";
 import type { Color, RoomState } from "../utils/api.types";
@@ -26,29 +21,16 @@ import {
   type GuestProfile,
 } from "../config/avatarCatalog";
 import {
-  BOT_AVATAR_PROFILES,
-  difficultyFromPlayerKey,
-  formatBotDifficultyLabel,
-  formatBotSpeedLabel,
-  formatMapTemplateLabel,
-  getBotDifficultyOptions,
-  getBotSpeedOptions,
   getOpenSeatLabel,
   isOfficialBotName,
   localizeSeatLabel,
-  normalizeBotSpeed,
-  OFFICIAL_BOT_NAMES,
-  OPEN_SEAT_LABEL,
   pickBotNameDeterministic,
-  pickBotNames,
-  playerKeyForDifficulty,
   resolveSeatAvatarProps,
 } from "../config/botCatalog";
 import { useLanguage } from "../i18n";
 import LanguageToggle from "../components/LanguageToggle";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
-import MapTemplatePreview from "../components/home/MapTemplatePreview";
 import { getSavedGameSeat, saveGameSeat } from "../utils/seatStorage";
 
 import "./RoomLobbyPage.scss";
@@ -56,8 +38,6 @@ import "./RoomLobbyPage.scss";
 const LazyAvatar3DCanvas = lazy(
   () => import("../components/avatar3d/Avatar3DCanvas")
 );
-
-const SEAT_COLORS: Color[] = ["RED", "BLUE", "ORANGE", "WHITE"];
 
 function getStoredToken(roomCode: string): string | null {
   try {
@@ -84,8 +64,6 @@ export { getSavedGameSeat, saveGameSeat };
 export default function RoomLobbyPage() {
   const { language, t } = useLanguage();
   const colorMeta = getPlayerColorMeta(language);
-  const botDifficultyOptions = getBotDifficultyOptions(language);
-  const botSpeedOptions = getBotSpeedOptions(language);
   const openSeatLabel = getOpenSeatLabel(language);
 
   const { roomCode = "" } = useParams();
@@ -104,6 +82,7 @@ export default function RoomLobbyPage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [claimingColor, setClaimingColor] = useState<Color | "AUTO" | null>(null);
   const [roomGone, setRoomGone] = useState(false);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [closingRoom, setClosingRoom] = useState(false);
@@ -181,6 +160,7 @@ export default function RoomLobbyPage() {
   const handleClaimSeat = async (preferredColor?: Color) => {
     if (!roomCode) return;
     roomEpochRef.current += 1;
+    setClaimingColor(preferredColor ?? "AUTO");
     try {
       setError("");
       const cleanName = playerName.trim() || t("Amigo", "Friend");
@@ -200,221 +180,8 @@ export default function RoomLobbyPage() {
             "Could not claim this seat."
           )
       );
-    }
-  };
-
-  const resolveRoomDifficulty = (currentRoom: RoomState): BotDifficulty => {
-    if (currentRoom.config.bot_difficulty) {
-      return currentRoom.config.bot_difficulty;
-    }
-    const firstBot = currentRoom.seats.find((s) => s.is_bot);
-    return firstBot ? difficultyFromPlayerKey(firstBot.player_key) : "medium";
-  };
-
-  const handleDifficultyChange = async (nextDiff: BotDifficulty) => {
-    if (!room || !room.is_host || room.status !== "WAITING") return;
-    if (resolveRoomDifficulty(room) === nextDiff) return;
-    roomEpochRef.current += 1;
-    try {
-      setError("");
-      const updated = await updateRoom(room.room_code, {
-        token: getStoredToken(room.room_code),
-        config: { bot_difficulty: nextDiff },
-      });
-      setRoom(updated);
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.description ||
-          t(
-            "Não foi possível alterar a dificuldade dos bots.",
-            "Could not update bot difficulty."
-          )
-      );
-    }
-  };
-
-  const resolveRoomDiceMode = (currentRoom: RoomState): DiceMode => {
-    return currentRoom.config.dice_mode === "balanced" ? "balanced" : "random";
-  };
-
-  const resolveRoomBotSpeed = (currentRoom: RoomState): BotSpeed => {
-    return normalizeBotSpeed(currentRoom.config.bot_speed) ?? "normal";
-  };
-
-  const handleBotSpeedChange = async (nextSpeed: BotSpeed) => {
-    if (!room || !room.is_host || room.status !== "WAITING") return;
-    if (resolveRoomBotSpeed(room) === nextSpeed) return;
-    roomEpochRef.current += 1;
-    try {
-      setError("");
-      const updated = await updateRoom(room.room_code, {
-        token: getStoredToken(room.room_code),
-        config: { bot_speed: nextSpeed },
-      });
-      setRoom(updated);
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.description ||
-          t(
-            "Não foi possível alterar a velocidade dos bots.",
-            "Could not update bot speed."
-          )
-      );
-    }
-  };
-
-  const handleDiceModeChange = async (nextMode: DiceMode) => {
-    if (!room || !room.is_host || room.status !== "WAITING") return;
-    if (resolveRoomDiceMode(room) === nextMode) return;
-    roomEpochRef.current += 1;
-    try {
-      setError("");
-      const updated = await updateRoom(room.room_code, {
-        token: getStoredToken(room.room_code),
-        config: { dice_mode: nextMode },
-      });
-      setRoom(updated);
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.description ||
-          t(
-            "Não foi possível alterar o modo dos dados.",
-            "Could not update dice mode."
-          )
-      );
-    }
-  };
-
-  const handleSeatChange = async (index: number, selectionValue: string) => {
-    if (!room || !room.is_host || room.status !== "WAITING") return;
-    const roomDiff = resolveRoomDifficulty(room);
-    const botKey = playerKeyForDifficulty(roomDiff);
-
-    if (selectionValue.startsWith("BOT:")) {
-      const targetBot = selectionValue.slice(4);
-      const dupOther = room.seats.some(
-        (s, idx) => idx !== index && s.is_bot && s.player_name === targetBot
-      );
-      if (dupOther) return;
-    }
-
-    roomEpochRef.current += 1;
-    try {
-      setError("");
-      const nextSeats = room.seats.map((s, idx) => {
-        if (idx !== index) {
-          return {
-            color: SEAT_COLORS[idx],
-            source_color: s.color,
-            player_key: s.player_key,
-            player_name: s.player_name,
-          };
-        }
-        if (selectionValue === "HUMAN") {
-          return {
-            color: SEAT_COLORS[idx],
-            source_color: s.color,
-            player_key: "HUMAN",
-            player_name: s.claimed ? s.player_name : OPEN_SEAT_LABEL,
-          };
-        }
-        if (selectionValue === "RELEASE_HUMAN") {
-          return {
-            color: SEAT_COLORS[idx],
-            source_color: s.color,
-            player_key: "HUMAN",
-            player_name: OPEN_SEAT_LABEL,
-            release_claim: true,
-          };
-        }
-        const chosenBot = selectionValue.startsWith("BOT:")
-          ? selectionValue.slice(4)
-          : pickBotNames(1)[0];
-        return {
-          color: SEAT_COLORS[idx],
-          source_color: s.color,
-          player_key: botKey,
-          player_name: chosenBot,
-        };
-      });
-
-      const updated = await updateRoom(room.room_code, {
-        token: getStoredToken(room.room_code),
-        seats: nextSeats,
-      });
-      setRoom(updated);
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.description ||
-          t("Não foi possível atualizar o assento.", "Could not update seat.")
-      );
-    }
-  };
-
-  const handleAddSeat = async () => {
-    if (!room || !room.is_host || room.seats.length >= 4) return;
-    const nextColor = SEAT_COLORS[room.seats.length];
-    const usedBotNames = new Set(
-      room.seats
-        .filter((s) => s.is_bot)
-        .map((s) => s.player_name)
-        .filter((n) => isOfficialBotName(n))
-    );
-    const nextBotName = pickBotNames(1, usedBotNames)[0];
-    const botKey = playerKeyForDifficulty(resolveRoomDifficulty(room));
-    const nextSeats = [
-      ...room.seats.map((s) => ({
-        color: s.color,
-        source_color: s.color,
-        player_key: s.player_key,
-        player_name: s.player_name,
-      })),
-      {
-        color: nextColor,
-        player_key: botKey,
-        player_name: nextBotName,
-      },
-    ];
-    roomEpochRef.current += 1;
-    try {
-      setError("");
-      const updated = await updateRoom(room.room_code, {
-        token: getStoredToken(room.room_code),
-        seats: nextSeats,
-      });
-      setRoom(updated);
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.description ||
-          t("Não foi possível adicionar um assento.", "Could not add a seat.")
-      );
-    }
-  };
-
-  const handleRemoveSeat = async (index: number) => {
-    if (!room || !room.is_host || room.seats.length <= 2) return;
-    if (room.seats[index]?.is_me) return;
-    const filtered = room.seats
-      .filter((_, idx) => idx !== index)
-      .map((s, idx) => ({
-        color: SEAT_COLORS[idx],
-        source_color: s.color,
-        player_key: s.player_key,
-        player_name: s.player_name,
-      }));
-    roomEpochRef.current += 1;
-    try {
-      setError("");
-      const updated = await updateRoom(room.room_code, {
-        token: getStoredToken(room.room_code),
-        seats: filtered,
-      });
-      setRoom(updated);
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.description ||
-          t("Não foi possível remover o assento.", "Could not remove the seat.")
-      );
+    } finally {
+      setClaimingColor(null);
     }
   };
 
@@ -422,7 +189,10 @@ export default function RoomLobbyPage() {
     if (!room || !room.is_host) return;
     try {
       setStarting(true);
-      const res = await startRoomGame(room.room_code, getStoredToken(room.room_code));
+      const res = await startRoomGame(
+        room.room_code,
+        getStoredToken(room.room_code)
+      );
       saveGameSeat(res.game_id, res.room.my_color);
       saveGameRoomCode(res.game_id, res.room.room_code || room.room_code);
       const query = res.room.my_color ? `?seat=${res.room.my_color}` : "";
@@ -484,116 +254,335 @@ export default function RoomLobbyPage() {
 
   if (!room && !error) {
     return (
-      <div className="room-lobby-page">
+      <div
+        className="room-lobby-page room-lobby-stage room-lobby-stage--centered"
+        data-testid="room-lobby-stage"
+      >
         <GridLoader color="#FACC15" size={60} />
       </div>
     );
   }
 
-  const roomDifficulty = room ? resolveRoomDifficulty(room) : "medium";
-  const roomBotSpeed = room ? resolveRoomBotSpeed(room) : "normal";
-  const roomDiceMode = room ? resolveRoomDiceMode(room) : "random";
+  const normalizedCode = roomCode.toUpperCase();
+  const hasOpenHumanSlot = Boolean(
+    room?.seats.some((seat) => seat.player_key === "HUMAN" && !seat.claimed)
+  );
 
   return (
-    <div className="room-lobby-page">
-      <div className="room-lobby-card">
-        <div className="room-lobby-header">
+    <div
+      className="room-lobby-page room-lobby-stage"
+      data-testid="room-lobby-stage"
+    >
+      <header className="room-lobby-topbar">
+        <div className="room-lobby-topbar__left">
           <Link to="/" className="room-lobby-back">
             ← {t("Voltar", "Back")}
           </Link>
-          <div className="room-lobby-title-group">
-            <h1>
-              {t(
-                `Sala Privada #${roomCode.toUpperCase()}`,
-                `Private Room #${roomCode.toUpperCase()}`
-              )}
-            </h1>
-            <p>
-              {t(
-                `Envie o link abaixo para seus amigos entrarem no ${openSeatLabel} ou escolha os bots da mesa`,
-                `Share the link below so friends can join an ${openSeatLabel}, or pick table bots`
-              )}
-            </p>
-          </div>
-          <div className="room-lobby-header__actions">
-            <LanguageToggle compact />
-            {room &&
-              room.is_host &&
-              (confirmCloseOpen ? (
-                <div
-                  className="room-lobby-confirm-close"
-                  role="group"
-                  aria-label={t(
-                    `Confirmar encerramento da sala ${room.room_code}`,
-                    `Confirm closing room ${room.room_code}`
-                  )}
-                >
-                  <Button
-                    size="small"
-                    variant="contained"
-                    color="error"
-                    className="room-lobby-confirm-btn"
-                    disabled={closingRoom}
-                    onClick={handleCloseRoom}
-                  >
-                    {closingRoom
-                      ? t("Encerrando...", "Closing...")
-                      : t("Confirmar", "Confirm")}
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="text"
-                    className="room-lobby-cancel-btn"
-                    disabled={closingRoom}
-                    onClick={() => setConfirmCloseOpen(false)}
-                  >
-                    {t("Cancelar", "Cancel")}
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  className="room-lobby-close-btn"
-                  onClick={() => setConfirmCloseOpen(true)}
-                >
-                  🗑️ {t("Encerrar Sala", "Close Room")}
-                </Button>
-              ))}
-            {room &&
-              !room.is_host &&
-              room.my_color &&
-              room.status === "WAITING" && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  className="room-lobby-leave-btn"
-                  disabled={leavingRoom}
-                  onClick={handleLeaveRoom}
-                >
-                  {leavingRoom
-                    ? t("Saindo...", "Leaving...")
-                    : t("🚪 Sair da Sala", "🚪 Leave Room")}
-                </Button>
-              )}
-          </div>
+          <span className="room-lobby-code-pill">
+            {t(`Sala #${normalizedCode}`, `Room #${normalizedCode}`)}
+          </span>
         </div>
 
-        {error && <div className="room-lobby-error">{error}</div>}
+        <div className="room-lobby-topbar__brand">
+          <span className="room-lobby-brand-title">RULE THE ISLE</span>
+          <small className="room-lobby-brand-sub">
+            {t("Lobby Pré-Partida", "Pre-Match Lobby")}
+          </small>
+        </div>
 
-        {room && (
-          <>
-            {/* Shareable Link Box */}
-            <div className="invite-link-box">
-              <div className="invite-link-box__url">
-                <span className="invite-link-box__badge">
-                  {t("LINK DE CONVITE", "INVITE LINK")}
-                </span>
-                <code>{inviteUrl}</code>
+        <div className="room-lobby-topbar__actions">
+          <LanguageToggle compact />
+          {room &&
+            room.is_host &&
+            (confirmCloseOpen ? (
+              <div
+                className="room-lobby-confirm-close"
+                role="group"
+                aria-label={t(
+                  `Confirmar encerramento da sala ${room.room_code}`,
+                  `Confirm closing room ${room.room_code}`
+                )}
+              >
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="error"
+                  className="room-lobby-confirm-btn"
+                  disabled={closingRoom}
+                  onClick={handleCloseRoom}
+                >
+                  {closingRoom
+                    ? t("Encerrando...", "Closing...")
+                    : t("Confirmar", "Confirm")}
+                </Button>
+                <Button
+                  size="small"
+                  variant="text"
+                  className="room-lobby-cancel-btn"
+                  disabled={closingRoom}
+                  onClick={() => setConfirmCloseOpen(false)}
+                >
+                  {t("Cancelar", "Cancel")}
+                </Button>
               </div>
+            ) : (
               <Button
-                variant="contained"
+                size="small"
+                variant="outlined"
+                color="error"
+                className="room-lobby-close-btn"
+                onClick={() => setConfirmCloseOpen(true)}
+              >
+                🗑️ {t("Encerrar Sala", "Close Room")}
+              </Button>
+            ))}
+          {room &&
+            !room.is_host &&
+            room.my_color &&
+            room.status === "WAITING" && (
+              <Button
+                size="small"
+                variant="outlined"
+                className="room-lobby-leave-btn"
+                disabled={leavingRoom}
+                onClick={handleLeaveRoom}
+              >
+                {leavingRoom
+                  ? t("Saindo...", "Leaving...")
+                  : t("🚪 Sair da Sala", "🚪 Leave Room")}
+              </Button>
+            )}
+        </div>
+      </header>
+
+      {error && (
+        <div
+          className={
+            room
+              ? "room-lobby-error room-lobby-error--floating"
+              : "room-lobby-error-panel"
+          }
+          role="alert"
+        >
+          <div className="room-lobby-error">{error}</div>
+          {!room && (
+            <Link to="/" className="room-lobby-back room-lobby-back--cta">
+              ← {t("Voltar para o Início", "Back to Home")}
+            </Link>
+          )}
+        </div>
+      )}
+
+      {room && (
+        <>
+          <main className="lobby-stage-window">
+            <div
+              className="lobby-hero-lineup"
+              style={
+                { "--seat-count": room.seats.length } as React.CSSProperties
+              }
+            >
+              {room.seats.map((seat, idx) => {
+                const palette = colorMeta[seat.color];
+                const isOpenHuman =
+                  seat.player_key === "HUMAN" && !seat.claimed;
+                const displaySeatName = seat.is_bot
+                  ? isOfficialBotName(seat.player_name)
+                    ? seat.player_name
+                    : pickBotNameDeterministic(idx)
+                  : isOpenHuman
+                    ? openSeatLabel
+                    : localizeGuestDisplayName(
+                        localizeSeatLabel(seat.player_name, language),
+                        language
+                      );
+
+                const resolvedAvatar = !isOpenHuman
+                  ? resolveSeatAvatarProps({
+                      color: seat.color,
+                      isBot: seat.is_bot,
+                      seatIndex: idx,
+                      seatName: displaySeatName,
+                      seatAvatar: {
+                        seat_kind:
+                          seat.seat_kind ||
+                          (seat.is_bot
+                            ? "BOT"
+                            : seat.username
+                              ? "USER"
+                              : "GUEST"),
+                        username: seat.username ?? null,
+                        avatar_config: seat.avatar_config,
+                      },
+                      isMySeat: seat.is_me,
+                      accountAvatar: account?.avatar_config,
+                      accountUsername: account?.username,
+                      guestCustomAvatar: guestProfile.customized
+                        ? guestProfile.avatar_config
+                        : undefined,
+                    })
+                  : null;
+
+                const seatRoleText = seat.is_bot
+                  ? t("🤖 Bot", "🤖 Bot")
+                  : isOpenHuman
+                    ? t("🔓 Livre", "🔓 Open")
+                    : seat.is_me
+                      ? t("★ Você", "★ You")
+                      : seat.seat_kind === "USER"
+                        ? t("👤 Conta", "👤 Account")
+                        : t("👤 Jogador", "👤 Player");
+
+                return (
+                  <div
+                    key={seat.color}
+                    className={`lobby-lineup-slot ${
+                      seat.is_me ? "lobby-lineup-slot--me" : ""
+                    } ${isOpenHuman ? "lobby-lineup-slot--open" : ""}`}
+                    data-testid={`lobby-hero-card-${seat.color}`}
+                    style={
+                      { "--seat-color": palette.primary } as React.CSSProperties
+                    }
+                  >
+                    <div className="lobby-lineup-slot__stage">
+                      {resolvedAvatar ? (
+                        <Suspense
+                          fallback={
+                            <div
+                              className="lobby-lineup-slot__suspense"
+                              aria-hidden="true"
+                            >
+                              <PlayerAvatar
+                                config={resolvedAvatar.config ?? {}}
+                                username={resolvedAvatar.username}
+                                size={92}
+                                testId={`lobby-seat-suspense-${idx}`}
+                              />
+                            </div>
+                          }
+                        >
+                          <LazyAvatar3DCanvas
+                            config={resolvedAvatar.config ?? {}}
+                            username={resolvedAvatar.username}
+                            mode="hero"
+                            backgroundMode="transparent"
+                            cameraFocus="full"
+                            interactive={true}
+                            fallbackSize={92}
+                            fallbackTestId={`lobby-seat-fallback-${idx}`}
+                          />
+                        </Suspense>
+                      ) : (
+                        <div className="lobby-open-pedestal">
+                          <span
+                            className="lobby-open-pedestal__icon"
+                            style={{
+                              borderColor: palette.primary,
+                              color: palette.primary,
+                            }}
+                          >
+                            ➕
+                          </span>
+                          <strong>{t("Vaga Aberta", "Open Slot")}</strong>
+                          <small>
+                            {t(
+                              "Espaço reservado para amigo",
+                              "Reserved spot for a friend"
+                            )}
+                          </small>
+                          {room.status === "WAITING" && (
+                            <Button
+                              variant="contained"
+                              size="small"
+                              className="lobby-seat-claim-btn"
+                              disabled={claimingColor === seat.color}
+                              onClick={() => handleClaimSeat(seat.color)}
+                            >
+                              {claimingColor === seat.color
+                                ? t("Entrando...", "Joining...")
+                                : t("🪑 Sentar Aqui", "🪑 Take Seat")}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="lobby-lineup-pill">
+                      <div className="lobby-lineup-pill__top">
+                        <span
+                          className="lobby-lineup-pill__dot"
+                          style={{ backgroundColor: palette.primary }}
+                        />
+                        <strong className="lobby-lineup-pill__name">
+                          {displaySeatName}
+                        </strong>
+                      </div>
+                      <div className="lobby-lineup-pill__meta">
+                        <span className="lobby-lineup-pill__color">
+                          {palette.label}
+                        </span>
+                        <span className="lobby-lineup-pill__role">
+                          {seatRoleText}
+                        </span>
+                      </div>
+                      {seat.is_me && room.status === "WAITING" && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          className="lobby-edit-avatar-btn"
+                          onClick={() => setAvatarStudioOpen(true)}
+                        >
+                          🎨 {t("Editar Avatar", "Edit Avatar")}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </main>
+
+          <footer className="lobby-dock-wrap">
+            {!room.my_color &&
+              hasOpenHumanSlot &&
+              room.status === "WAITING" && (
+                <div className="lobby-guest-join-pill">
+                  <label htmlFor="player-nickname-input">
+                    {t("Seu Nome:", "Your Name:")}
+                  </label>
+                  <input
+                    id="player-nickname-input"
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    placeholder={t("Seu apelido...", "Your nickname...")}
+                    maxLength={24}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    className="identity-save-btn"
+                    disabled={claimingColor !== null}
+                    onClick={() => handleClaimSeat()}
+                  >
+                    {claimingColor === "AUTO"
+                      ? t("Entrando...", "Joining...")
+                      : t("🪑 Ocupar Assento Livre", "🪑 Claim Open Seat")}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    className="identity-avatar-btn"
+                    onClick={() => setAvatarStudioOpen(true)}
+                  >
+                    🎨 {t("Editar Meu Avatar", "Edit My Avatar")}
+                  </Button>
+                </div>
+              )}
+
+            <div className="lobby-action-dock">
+              <Button
+                variant="outlined"
                 className="invite-copy-btn"
                 onClick={handleCopyInvite}
               >
@@ -601,567 +590,31 @@ export default function RoomLobbyPage() {
                   ? t("✅ Link Copiado!", "✅ Link Copied!")
                   : t("📋 Copiar Link", "📋 Copy Link")}
               </Button>
-            </div>
 
-            {/* Player Name Input & Quick Claim */}
-            <div className="guest-identity-bar">
-              <label htmlFor="player-nickname-input">
-                {t("Seu Nome na Mesa:", "Your Table Name:")}
-              </label>
-              <input
-                id="player-nickname-input"
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder={t("Digite seu apelido...", "Enter your nickname...")}
-                maxLength={24}
-              />
-              <Button
-                variant="outlined"
-                size="small"
-                className="identity-save-btn"
-                onClick={() => handleClaimSeat(room.my_color ?? undefined)}
-              >
-                {room.my_color
-                  ? t(
-                      `Atualizar Nome (${colorMeta[room.my_color].label})`,
-                      `Update Name (${colorMeta[room.my_color].label})`
-                    )
-                  : t("🪑 Ocupar Assento Livre", "🪑 Claim Open Seat")}
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                className="identity-avatar-btn"
-                onClick={() => setAvatarStudioOpen(true)}
-              >
-                🎨 {t("Editar Meu Avatar", "Edit My Avatar")}
-              </Button>
-            </div>
-
-            {/* Bot Difficulty Selector (Single Global Room Setting) */}
-            <div className="lobby-difficulty-bar">
-              <div className="lobby-difficulty-bar__header">
-                <span>{t("Dificuldade dos Bots", "Bot Difficulty")}</span>
-                <strong>{formatBotDifficultyLabel(roomDifficulty, language)}</strong>
-              </div>
-              <div
-                className="lobby-difficulty-bar__options"
-                role="group"
-                aria-label={t("Dificuldade dos Bots", "Bot Difficulty")}
-              >
-                {botDifficultyOptions.map((opt) => (
-                  <Button
-                    key={opt.value}
-                    variant="contained"
-                    size="small"
-                    disabled={!room.is_host || room.status !== "WAITING"}
-                    aria-pressed={roomDifficulty === opt.value}
-                    title={opt.description}
-                    className={`lobby-difficulty-btn ${
-                      roomDifficulty === opt.value ? "selected" : ""
-                    }`}
-                    onClick={() => handleDifficultyChange(opt.value)}
-                  >
-                    {opt.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Bot Speed Selector (Locked Pre-Match Room Setting) */}
-            <div className="lobby-speed-bar">
-              <div className="lobby-speed-bar__header">
-                <span className="lobby-inline-title">
-                  {t("Velocidade dos Bots", "Bot Speed")}
-                  <Tooltip
-                    title={t(
-                      "Define o ritmo das animações e jogadas dos bots durante toda esta partida online. Depois de iniciada, não poderá ser alterada.",
-                      "Sets bot animation and move pacing for this entire online match. Cannot be changed once started."
-                    )}
-                    arrow
-                    enterTouchDelay={0}
-                    leaveTouchDelay={3000}
-                  >
-                    <IconButton
-                      size="small"
-                      className="lobby-help-btn"
-                      aria-label={t(
-                        "Ajuda sobre Velocidade dos Bots",
-                        "Help about Bot Speed"
-                      )}
-                    >
-                      <HelpOutlineRoundedIcon fontSize="inherit" />
-                    </IconButton>
-                  </Tooltip>
-                </span>
-                <strong>{formatBotSpeedLabel(roomBotSpeed, language)}</strong>
-              </div>
-              <div
-                className="lobby-speed-bar__options"
-                role="group"
-                aria-label={t("Velocidade dos Bots", "Bot Speed")}
-              >
-                {botSpeedOptions.map((opt) => (
-                  <Button
-                    key={opt.value}
-                    variant="contained"
-                    size="small"
-                    disabled={!room.is_host || room.status !== "WAITING"}
-                    aria-pressed={roomBotSpeed === opt.value}
-                    title={opt.description}
-                    className={`lobby-speed-btn ${
-                      roomBotSpeed === opt.value ? "selected" : ""
-                    }`}
-                    onClick={() => handleBotSpeedChange(opt.value)}
-                  >
-                    {opt.icon} {opt.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Dice Mode Selector */}
-            <div className="lobby-dice-bar">
-              <div className="lobby-dice-bar__header">
-                <span className="lobby-inline-title">
-                  {t("Modo dos Dados", "Dice Mode")}
-                  <Tooltip
-                    title={t(
-                      "Padrão usa 2 dados clássicos (2d6). Equilibrados usa um baralho de 36 pares embaralhados, reembaralhando ao restarem 5 cartas.",
-                      "Standard uses 2 classic dice (2d6). Balanced uses a shuffled 36-pair deck, reshuffling when 5 cards remain."
-                    )}
-                    arrow
-                    enterTouchDelay={0}
-                    leaveTouchDelay={3000}
-                  >
-                    <IconButton
-                      size="small"
-                      className="lobby-help-btn"
-                      aria-label={t(
-                        "Ajuda sobre Modo dos Dados",
-                        "Help about Dice Mode"
-                      )}
-                    >
-                      <HelpOutlineRoundedIcon fontSize="inherit" />
-                    </IconButton>
-                  </Tooltip>
-                </span>
-                <strong>
-                  {roomDiceMode === "balanced"
-                    ? t("Equilibrados (Baralho 36)", "Balanced (36-Card Deck)")
-                    : t("Padrão (2d6)", "Standard (2d6)")}
-                </strong>
-              </div>
-              <div
-                className="lobby-dice-bar__options"
-                role="group"
-                aria-label={t("Modo dos Dados", "Dice Mode")}
-              >
+              {room.is_host ? (
                 <Button
                   variant="contained"
-                  size="small"
-                  disabled={!room.is_host || room.status !== "WAITING"}
-                  aria-pressed={roomDiceMode === "random"}
-                  className={`lobby-dice-btn ${
-                    roomDiceMode === "random" ? "selected" : ""
-                  }`}
-                  onClick={() => handleDiceModeChange("random")}
+                  className="start-room-btn"
+                  disabled={starting}
+                  onClick={handleStartGame}
                 >
-                  🎲 {t("Padrão (2d6)", "Standard (2d6)")}
+                  {starting
+                    ? t("Iniciando Partida...", "Starting Match...")
+                    : t("🚀 Iniciar Partida", "🚀 Start Match")}
                 </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={!room.is_host || room.status !== "WAITING"}
-                  aria-pressed={roomDiceMode === "balanced"}
-                  className={`lobby-dice-btn ${
-                    roomDiceMode === "balanced" ? "selected" : ""
-                  }`}
-                  onClick={() => handleDiceModeChange("balanced")}
-                >
-                  🎴 {t("Equilibrados (Baralho 36)", "Balanced (36-Card Deck)")}
-                </Button>
-              </div>
-            </div>
-
-            {/* Seats List */}
-            <div className="lobby-seats-section">
-              <div className="lobby-seats-header">
-                <span>
+              ) : (
+                <div className="lobby-waiting-host-note" role="status">
+                  ⏳{" "}
                   {t(
-                    `Assentos da Partida (${room.seats.length}/4)`,
-                    `Match Seats (${room.seats.length}/4)`
+                    "Aguardando quem criou a sala iniciar a partida...",
+                    "Waiting for the room creator to start the match..."
                   )}
-                </span>
-                <small>
-                  {t(
-                    `Deixe em ${openSeatLabel} para amigos entrarem pelo link ou selecione um perfil de bot`,
-                    `Leave as ${openSeatLabel} for friends to join via link, or pick a bot profile`
-                  )}
-                </small>
-              </div>
-
-              <div className="lobby-seats-grid lobby-seats-grid--cards">
-                {room.seats.map((seat, idx) => {
-                  const palette = colorMeta[seat.color];
-                  const isOpenHuman =
-                    seat.player_key === "HUMAN" && !seat.claimed;
-                  const displaySeatName = seat.is_bot
-                    ? isOfficialBotName(seat.player_name)
-                      ? seat.player_name
-                      : pickBotNameDeterministic(idx)
-                    : isOpenHuman
-                      ? openSeatLabel
-                      : localizeGuestDisplayName(
-                          localizeSeatLabel(seat.player_name, language),
-                          language
-                        );
-                  const resolvedAvatar = !isOpenHuman
-                    ? resolveSeatAvatarProps({
-                        color: seat.color,
-                        isBot: seat.is_bot,
-                        seatIndex: idx,
-                        seatName: displaySeatName,
-                        seatAvatar: {
-                          seat_kind:
-                            seat.seat_kind ||
-                            (seat.is_bot
-                              ? "BOT"
-                              : seat.username
-                                ? "USER"
-                                : "GUEST"),
-                          username: seat.username ?? null,
-                          avatar_config: seat.avatar_config,
-                        },
-                        isMySeat: seat.is_me,
-                        accountAvatar: account?.avatar_config,
-                        accountUsername: account?.username,
-                        guestCustomAvatar: guestProfile.customized
-                          ? guestProfile.avatar_config
-                          : undefined,
-                      })
-                    : null;
-
-                  const selectValue = seat.is_bot
-                    ? `BOT:${displaySeatName}`
-                    : "HUMAN";
-
-                  const canEditSeat =
-                    room.is_host &&
-                    room.status === "WAITING" &&
-                    !seat.is_me;
-
-                  const seatBadgeText = seat.is_bot
-                    ? t("🤖 Bot", "🤖 Bot")
-                    : isOpenHuman
-                      ? t("🔓 Livre", "🔓 Open")
-                      : seat.seat_kind === "USER"
-                        ? t("👤 Conta", "👤 Account")
-                        : t("👤 Jogador", "👤 Player");
-
-                  return (
-                    <div
-                      key={seat.color}
-                      className={`lobby-seat-row lobby-hero-card ${
-                        seat.is_me
-                          ? "lobby-seat-row--me lobby-hero-card--me"
-                          : ""
-                      }`}
-                      data-testid={`lobby-hero-card-${seat.color}`}
-                      style={{
-                        borderTopColor: palette.primary,
-                      }}
-                    >
-                      <div className="lobby-hero-card__header">
-                        <span className="lobby-hero-card__color-pill">
-                          <span
-                            className="lobby-hero-card__color-dot"
-                            style={{ backgroundColor: palette.primary }}
-                          />
-                          <strong>{palette.label}</strong>
-                        </span>
-                        <span className="lobby-hero-card__role-tag">
-                          {seatBadgeText}
-                        </span>
-                      </div>
-
-                      <div className="lobby-hero-card__nameplate">
-                        {seat.is_me ? (
-                          <span>
-                            {t(
-                              `★ Seu Assento (${displaySeatName})`,
-                              `★ Your Seat (${displaySeatName})`
-                            )}
-                          </span>
-                        ) : isOpenHuman ? (
-                          <span>🔓 {openSeatLabel}</span>
-                        ) : (
-                          <span>{displaySeatName}</span>
-                        )}
-                      </div>
-
-                      <div
-                        className="lobby-hero-card__stage"
-                        style={{
-                          boxShadow: `inset 0 24px 36px -22px ${palette.primary}`,
-                        }}
-                      >
-                        {resolvedAvatar ? (
-                          <Suspense
-                            fallback={
-                              <div
-                                className="lobby-hero-card__open-slot"
-                                aria-hidden="true"
-                              >
-                                <PlayerAvatar
-                                  config={resolvedAvatar.config ?? {}}
-                                  username={resolvedAvatar.username}
-                                  size={84}
-                                  testId={`lobby-seat-suspense-${idx}`}
-                                />
-                              </div>
-                            }
-                          >
-                            <LazyAvatar3DCanvas
-                              config={resolvedAvatar.config ?? {}}
-                              username={resolvedAvatar.username}
-                              mode="card"
-                              backgroundMode="themed"
-                              cameraFocus="full"
-                              interactive={false}
-                              fallbackSize={84}
-                              fallbackTestId={`lobby-seat-fallback-${idx}`}
-                            />
-                          </Suspense>
-                        ) : (
-                          <div className="lobby-hero-card__open-slot">
-                            <span
-                              className="lobby-seat-row__open-badge"
-                              style={{
-                                borderColor: palette.primary,
-                                background: palette.primary,
-                                color: palette.textOnFill,
-                              }}
-                            >
-                              ➕
-                            </span>
-                            <small>
-                              {t("Vaga Aberta", "Open Slot")}
-                            </small>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="lobby-hero-card__controls">
-                        <div className="lobby-seat-row__selector">
-                          <Select
-                            size="small"
-                            fullWidth
-                            SelectDisplayProps={{
-                              "aria-label": t(
-                                `Assento ${palette.label}`,
-                                `${palette.label} Seat`
-                              ),
-                            }}
-                            disabled={!canEditSeat}
-                            value={selectValue}
-                            onChange={(e) =>
-                              handleSeatChange(idx, e.target.value as string)
-                            }
-                          >
-                            {!seat.is_bot && seat.claimed ? (
-                              <MenuItem value="HUMAN">
-                                <span className="lobby-select-option">
-                                  <span>
-                                    👤 {displaySeatName}
-                                    {seat.is_me ? t(" (Você)", " (You)") : ""}
-                                  </span>
-                                </span>
-                              </MenuItem>
-                            ) : (
-                              <MenuItem value="HUMAN">
-                                <span className="lobby-select-option">
-                                  <span>🪑 {openSeatLabel}</span>
-                                </span>
-                              </MenuItem>
-                            )}
-
-                            {!seat.is_bot && seat.claimed && !seat.is_me && (
-                              <MenuItem value="RELEASE_HUMAN">
-                                <span className="lobby-select-option">
-                                  <span>
-                                    🪑 {openSeatLabel} (
-                                    {t("Liberar vaga", "Release seat")})
-                                  </span>
-                                </span>
-                              </MenuItem>
-                            )}
-
-                            {OFFICIAL_BOT_NAMES.map((botName) => {
-                              const botVal = `BOT:${botName}`;
-                              const takenElsewhere = room.seats.some(
-                                (other, otherIdx) =>
-                                  otherIdx !== idx &&
-                                  other.is_bot &&
-                                  other.player_name === botName
-                              );
-                              return (
-                                <MenuItem
-                                  key={botVal}
-                                  value={botVal}
-                                  disabled={takenElsewhere}
-                                >
-                                  <span className="lobby-select-option">
-                                    <PlayerAvatar
-                                      config={BOT_AVATAR_PROFILES[botName]}
-                                      username={botName}
-                                      size={22}
-                                      testId={`lobby-option-avatar-${botName}`}
-                                    />
-                                    <span>{botName}</span>
-                                    {takenElsewhere && (
-                                      <span className="lobby-option-hint">
-                                        ({t("na mesa", "at table")})
-                                      </span>
-                                    )}
-                                  </span>
-                                </MenuItem>
-                              );
-                            })}
-                          </Select>
-                        </div>
-
-                        <div className="lobby-seat-row__actions">
-                          {seat.is_me && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              className="lobby-hero-card__edit-btn"
-                              onClick={() => setAvatarStudioOpen(true)}
-                            >
-                              🎨 {t("Editar Avatar", "Edit Avatar")}
-                            </Button>
-                          )}
-                          {seat.player_key === "HUMAN" &&
-                            !seat.claimed &&
-                            !seat.is_me && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                className="claim-seat-btn"
-                                onClick={() => handleClaimSeat(seat.color)}
-                              >
-                                {t("Sentar Aqui", "Take Seat")}
-                              </Button>
-                            )}
-                          {room.is_host &&
-                            room.seats.length > 2 &&
-                            !seat.is_me && (
-                              <Button
-                                size="small"
-                                variant="text"
-                                className="remove-seat-btn"
-                                onClick={() => handleRemoveSeat(idx)}
-                              >
-                                {t("Remover", "Remove")}
-                              </Button>
-                            )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {room.is_host && room.seats.length < 4 && (
-                <Button
-                  variant="outlined"
-                  className="add-seat-btn"
-                  onClick={handleAddSeat}
-                >
-                  {t(
-                    `+ Adicionar Jogador ou Bot (${room.seats.length}/4)`,
-                    `+ Add Player or Bot (${room.seats.length}/4)`
-                  )}
-                </Button>
+                </div>
               )}
             </div>
-
-            {/* Map Preview & Rules Summary */}
-            <MapTemplatePreview template={room.config.map_template} compact />
-
-            <div className="lobby-rules-summary">
-              <span>
-                🗺️ {t("Mapa", "Map")}:{" "}
-                <strong>
-                  {formatMapTemplateLabel(room.config.map_template, language)}
-                </strong>
-              </span>
-              <span>
-                🤖 {t("Bots", "Bots")}:{" "}
-                <strong>{formatBotDifficultyLabel(roomDifficulty, language)}</strong>
-              </span>
-              <span>
-                ⚡ {t("Velocidade", "Speed")}:{" "}
-                <strong>{formatBotSpeedLabel(roomBotSpeed, language)}</strong>
-              </span>
-              <span>
-                🎲 {t("Dados", "Dice")}:{" "}
-                <strong>
-                  {roomDiceMode === "balanced"
-                    ? t("Equilibrados", "Balanced")
-                    : t("Padrão (2d6)", "Standard (2d6)")}
-                </strong>
-              </span>
-              <span>
-                🏆 {t("Vitória", "Victory")}:{" "}
-                <strong>
-                  {room.config.vps_to_win} {t("PV", "VP")}
-                </strong>
-              </span>
-              <span>
-                🃏 {t("Limite Descarte", "Discard Limit")}:{" "}
-                <strong>
-                  {room.config.discard_limit} {t("cartas", "cards")}
-                </strong>
-              </span>
-              <span>
-                🥷 {t("Ladrão Amigável", "Friendly Robber")}:{" "}
-                <strong>
-                  {room.config.friendly_robber
-                    ? t("Ativo", "Active")
-                    : t("Desativado", "Disabled")}
-                </strong>
-              </span>
-            </div>
-
-            {room.is_host ? (
-              <Button
-                variant="contained"
-                className="start-room-btn"
-                disabled={starting}
-                onClick={handleStartGame}
-              >
-                {starting
-                  ? t("Iniciando Partida...", "Starting Match...")
-                  : t(
-                      "🚀 Iniciar Partida (Todos na Sala entram juntos)",
-                      "🚀 Start Match (Everyone in Room joins together)"
-                    )}
-              </Button>
-            ) : (
-              <div className="lobby-waiting-host-note" role="status">
-                ⏳{" "}
-                {t(
-                  "Aguardando quem criou a sala iniciar a partida...",
-                  "Waiting for the room creator to start the match..."
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          </footer>
+        </>
+      )}
 
       <AvatarStudioModal
         open={avatarStudioOpen}
