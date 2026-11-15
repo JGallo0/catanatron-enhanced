@@ -176,10 +176,10 @@
 
 @keyframes dice3d-land-settle-a {
   0% {
-    transform: rotateX(-55deg) rotateZ(-14deg) scale(1.12);
+    transform: translateY(-8px) scale(1.1) var(--dice-camera-tilt);
   }
   65% {
-    transform: rotateX(-68deg) rotateZ(-4deg) scale(0.97);
+    transform: translateY(2px) scale(0.97) var(--dice-camera-tilt);
   }
   100% {
     transform: var(--dice-camera-tilt);
@@ -188,10 +188,10 @@
 
 @keyframes dice3d-land-settle-b {
   0% {
-    transform: rotateX(-55deg) rotateZ(18deg) scale(1.12);
+    transform: translateY(-10px) scale(1.1) var(--dice-camera-tilt);
   }
   65% {
-    transform: rotateX(-70deg) rotateZ(8deg) scale(0.97);
+    transform: translateY(2px) scale(0.97) var(--dice-camera-tilt);
   }
   100% {
     transform: var(--dice-camera-tilt);
@@ -200,9 +200,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .dice3d-scene.is-rolling .dice3d-cube,
-  .dice3d-scene.is-rolling.is-alt .dice3d-cube,
+  .dice3d-scene.is-rolling.is-alt .dice3d-cube {
+    animation-duration: 1.8s;
+  }
+
   .dice3d-scene.is-settled .dice3d-tilt,
   .dice3d-scene.is-settled.is-alt .dice3d-tilt {
-    animation-duration: 1.8s;
+    animation: none;
   }
 }

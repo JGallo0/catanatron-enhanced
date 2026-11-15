@@ -151,24 +151,17 @@ describe("HomePage A2 Stage", () => {
     expect(screen.getByText(/Avatar personalizado \(visitante\)/i)).toBeInTheDocument();
   });
 
-  test("opens AlmanacModal from the Home dock button", async () => {
-    const user = userEvent.setup();
+  test("does not duplicate the Almanac shortcut in the Home dock", () => {
     render(
       <MemoryRouter>
         <HomePage />
       </MemoryRouter>
     );
 
-    const almanacBtn = screen.getByRole("button", { name: /Almanaque/i });
-    await user.click(almanacBtn);
+    expect(screen.queryByRole("button", { name: /Almanaque/i })).not.toBeInTheDocument();
+  });
 
-    expect(
-      await screen.findByText(/Almanaque & Regras — Rule the Isle/i)
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Fechar almanaque/i }));
-  }, 15000);
-
-  test("LanguageToggle switches HomePage, MatchSetupModal, and AlmanacModal between PT and EN cleanly", async () => {
+  test("LanguageToggle switches HomePage and MatchSetupModal between PT and EN cleanly", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -221,7 +214,7 @@ describe("HomePage A2 Stage", () => {
     expect(
       screen.getByRole("button", { name: /Customize Avatar/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Almanac/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Almanac/i })).not.toBeInTheDocument();
 
     // MatchSetupModal in EN
     await user.click(
@@ -236,18 +229,6 @@ describe("HomePage A2 Stage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Players at Table/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^Close$/i }));
-    await waitForElementToBeRemoved(() => screen.queryByRole("dialog"));
-
-    // AlmanacModal in EN
-    await user.click(await screen.findByRole("button", { name: /Almanac/i }));
-    expect(
-      await screen.findByText(/Almanac & Rules — Rule the Isle/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText("Settlement")).toBeInTheDocument();
-    expect(
-      screen.getByRole("tab", { name: /Buildings & Trade/i })
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Close almanac/i }));
     await waitForElementToBeRemoved(() => screen.queryByRole("dialog"));
 
     // Switch back to PT
@@ -265,7 +246,7 @@ describe("HomePage A2 Stage", () => {
     ).toBeInTheDocument();
   }, 15000);
 
-  test("clicking Estúdio 3D pill on central hero stage opens AvatarStudioModal", async () => {
+  test("opens AvatarStudioModal only from the dock shortcut", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -275,7 +256,8 @@ describe("HomePage A2 Stage", () => {
 
     const heroStage = screen.getByTestId("home-hero-stage");
     expect(heroStage).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Estúdio 3D/i }));
+    expect(screen.queryByRole("button", { name: /Estúdio 3D/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Personalizar Avatar/i }));
     expect(
       await screen.findByText(/Personalizar Avatar & Perfil/i)
     ).toBeInTheDocument();

@@ -441,8 +441,11 @@ describe("multiplayer room closing, leaving, ownership, and lifecycle", () => {
       [waiting.room_code, started.room_code].sort()
     );
 
-    // Convidado sem token de anfitrião recebe 403
+    // Convidado sem token de anfitrião recebe 403 ao tentar iniciar ou encerrar
     const joined = localJoinRoom(waiting.room_code, { playerName: "Convidada Bia" });
+    expect(() => localStartRoomGame(waiting.room_code, joined.seat_token)).toThrow(
+      /criou a sala/i
+    );
     expect(() => localCloseRoom(waiting.room_code, joined.seat_token)).toThrow(
       /anfitrião/i
     );

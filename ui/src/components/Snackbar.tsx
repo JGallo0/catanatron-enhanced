@@ -30,7 +30,7 @@ export function dispatchSnackbar(
   gameState: GameState
 ) {
   const latestRecord = gameState.action_records.slice(-1)[0];
-  if (!latestRecord) return;
+  if (!latestRecord || latestRecord[0]?.[1] === "ROLL") return;
   enqueueSnackbar(
     humanizeActionRecordPt(gameState, latestRecord, getCurrentLanguage()),
     {

@@ -50,7 +50,30 @@ vi.mock("notistack", () => ({
   useSnackbar: () => snackbar,
 }));
 vi.mock("./ZoomableBoard", () => ({
-  default: ({ isRollingDice }: { isRollingDice: boolean }) => <div data-testid="board" data-rolling={isRollingDice} className="board-container">Board</div>,
+  default: ({
+    isRollingDice,
+    diceStage,
+  }: {
+    isRollingDice: boolean;
+    diceStage?: {
+      open: boolean;
+      rolling: boolean;
+      dice: [number, number] | null;
+    } | null;
+  }) => (
+    <div data-testid="board" data-rolling={isRollingDice} className="board-container">
+      Board
+      {diceStage?.open && diceStage?.dice && (
+        <div>
+          {diceStage.rolling
+            ? "🎲 Rolando..."
+            : diceStage.dice[0] + diceStage.dice[1] === 7
+              ? "⚡ Total 7 — Ladrão! ⚡"
+              : `✦ Total ${diceStage.dice[0] + diceStage.dice[1]} ✦`}
+        </div>
+      )}
+    </div>
+  ),
 }));
 
 const theme = createTheme();
@@ -344,9 +367,7 @@ test("keeps the trade center open from the offer through confirmation with a cho
   fireEvent.click(center.getByRole("radio", { name: /Beto/i }));
   expect(postAction).toHaveBeenCalledTimes(1);
   fireEvent.click(confirmButton);
-  expect(await center.findByText(/Troca concluída com Beto/i)).toBeInTheDocument();
-  expect(postAction).toHaveBeenLastCalledWith("game-123", confirm);
-  fireEvent.click(center.getByRole("button", { name: "Fechar" }));
+  await waitFor(() => expect(postAction).toHaveBeenLastCalledWith("game-123", confirm));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: /Central de Negociação/i })).not.toBeInTheDocument());
 });
 
@@ -481,20 +502,29 @@ test("reveals Roubar only when the dice animation shows the rolled seven", async
   await act(async () => fireEvent.click(rollButton));
   expect(screen.getByText(/Rolando\.\.\./i)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "ROUBAR" })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Ladrão Ativo/i)).not.toBeInTheDocument();
 
   await act(async () => vi.advanceTimersByTimeAsync(3299));
   expect(screen.queryByText(/Total 7/i)).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "ROUBAR" })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Ladrão Ativo/i)).not.toBeInTheDocument();
 
   await act(async () => vi.advanceTimersByTimeAsync(1));
   expect(screen.getByText(/Total 7 — Ladrão!/i)).toBeInTheDocument();
+  expect(screen.getByText(/Ladrão Ativo/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "ROUBAR" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "ROUBAR" })).toHaveClass("cu-cta-orb--robber");
 });
 
-test("reveals gained cards only after dice stop, one card at a time, including identical cards", async () => {
+test("reveals gained cards and increases resource counters only after dice stop, showing all gained cards side by side at once", async () => {
   const rollState = makeGameState({ state_index: 13,
-    player_state: { ...baseState.player_state, P1_HAS_ROLLED: true, P1_SHEEP_IN_HAND: 2, P1_WHEAT_IN_HAND: 1 },
+    player_state: {
+      ...baseState.player_state,
+      P0_ORE_IN_HAND: 2,
+      P1_HAS_ROLLED: true,
+      P1_SHEEP_IN_HAND: 2,
+      P1_WHEAT_IN_HAND: 1,
+    },
     current_playable_actions: [["BLUE", "END_TURN", null]],
     action_records: [[["BLUE", "ROLL", null], [3, 3]]],
   });
@@ -503,18 +533,26 @@ test("reveals gained cards only after dice stop, one card at a time, including i
   renderGameScreen();
   const roll = await screen.findByRole("button", { name: "ROLAR DADOS" });
   expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
+  expect(screen.getByText("2/7")).toBeInTheDocument();
+  expect(screen.getAllByTitle("Cartas de Recurso na mão")[0]).toHaveTextContent(/^0Recursos$/);
   vi.useFakeTimers();
   await act(async () => fireEvent.click(roll));
   expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
-  await act(async () => vi.advanceTimersByTimeAsync(3300));
+  expect(screen.getByText("2/7")).toBeInTheDocument();
+  expect(screen.getAllByTitle("Cartas de Recurso na mão")[0]).toHaveTextContent(/^0Recursos$/);
+  await act(async () => vi.advanceTimersByTimeAsync(3299));
+  expect(screen.getByText("2/7")).toBeInTheDocument();
+  expect(screen.getAllByTitle("Cartas de Recurso na mão")[0]).toHaveTextContent(/^0Recursos$/);
+  await act(async () => vi.advanceTimersByTimeAsync(1));
   expect(screen.getByTestId("board")).toHaveAttribute("data-rolling", "false");
-  expect(screen.getAllByLabelText(/Você recebeu/)).toHaveLength(1);
-  expect(screen.getByLabelText("Você recebeu: Ovelha")).toBeInTheDocument();
-  await act(async () => vi.advanceTimersByTimeAsync(1800));
-  expect(screen.getByLabelText("Você recebeu: Ovelha")).toBeInTheDocument();
-  await act(async () => vi.advanceTimersByTimeAsync(1800));
+  expect(screen.getByText("5/7")).toBeInTheDocument();
+  expect(screen.getAllByTitle("Cartas de Recurso na mão")[0]).toHaveTextContent(/^2Recursos$/);
+  expect(screen.getAllByLabelText(/Você recebeu/)).toHaveLength(3);
+  expect(screen.getAllByLabelText("Você recebeu: Ovelha")).toHaveLength(2);
   expect(screen.getByLabelText("Você recebeu: Trigo")).toBeInTheDocument();
   await act(async () => vi.advanceTimersByTimeAsync(1800));
+  expect(screen.getAllByLabelText(/Você recebeu/)).toHaveLength(3);
+  await act(async () => vi.advanceTimersByTimeAsync(500));
   expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
 });
 
@@ -527,7 +565,7 @@ test("slow mode shows thinking and waits before the first bot action", async () 
   expect(screen.getByRole("button", { name: "Velocidade: Lenta" })).toBeInTheDocument();
   expect(postAction).not.toHaveBeenCalled();
   expect(screen.getAllByText(/pensando|calculando/i).length).toBeGreaterThan(0);
-  await act(async () => vi.advanceTimersByTimeAsync(4499));
+  await act(async () => vi.advanceTimersByTimeAsync(2249));
   expect(postAction).not.toHaveBeenCalled();
   await act(async () => vi.advanceTimersByTimeAsync(1));
   expect(postAction).toHaveBeenCalledOnce();
@@ -825,7 +863,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
     color: "BLUE",
     sender_name: "João",
     kind: "TAUNT",
-    body: "[TAUNT:boa_guerra] ⚔️ Boa guerra a todos!",
+    body: "[TAUNT:olho_vivo] 🧐 De olho nessa sua estrada!",
     created_at: 1700000200,
   });
 
@@ -839,18 +877,18 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
   const tauntBtn = screen.getByRole("button", { name: /^Provocações$/i });
   fireEvent.click(tauntBtn);
 
-  const boaGuerraItem = screen.getByRole("button", { name: /Boa Guerra!/i });
+  const paiaItem = screen.getByRole("button", { name: /Olho Vivo!/i });
   await act(async () => {
-    fireEvent.click(boaGuerraItem);
+    fireEvent.click(paiaItem);
   });
 
   expect(sendGameMessage).toHaveBeenCalledWith("game-123", {
-    body: "[TAUNT:boa_guerra] ⚔️ Boa guerra a todos!",
+    body: "[TAUNT:olho_vivo] 🧐 De olho nessa sua estrada!",
     color: "BLUE",
     senderName: "João",
     kind: "TAUNT",
   });
-  expect(screen.getByText(/Boa guerra a todos!/i)).toBeInTheDocument();
+  expect(screen.getByText(/De olho nessa sua estrada!/i)).toBeInTheDocument();
   expect(tauntBtn).toBeDisabled();
 
   // Cooldown clears after 3s
@@ -858,7 +896,7 @@ test("sends animated portrait taunt with TAUNT kind, shows cooldown, and animate
     await vi.advanceTimersByTimeAsync(3100);
   });
   expect(tauntBtn).toBeEnabled();
-  expect(screen.queryByText(/Boa guerra a todos!/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/De olho nessa sua estrada!/i)).not.toBeInTheDocument();
 
   // Incoming peer TAUNT animates without adding unread chat count
   vi.mocked(getGameMessages).mockResolvedValueOnce([
@@ -1074,4 +1112,55 @@ test("renders game-top-hud-container enclosing top hud and player top bar, with 
     hudContainer?.querySelector(".cu-player-top-bar, .player-top-bar")
   ).toBeInTheDocument();
   expect(container.querySelector(".board-container")).toBeInTheDocument();
+});
+
+test("displays RobbedOverlay with crossed swords and lost card when the local player is robbed", async () => {
+  const beforeRob = makeGameState({
+    state_index: 10,
+    current_color: "RED",
+    bot_colors: [],
+    current_prompt: "MOVE_ROBBER",
+    seat_names: { RED: "Creitu", BLUE: "João" },
+    player_state: {
+      ...baseState.player_state,
+      P1_ORE_IN_HAND: 1,
+      P1_NUM_RESOURCES_IN_HAND: 1,
+    },
+    action_records: [
+      [["RED", "PLAY_KNIGHT_CARD", null], null],
+    ] as GameState["action_records"],
+  });
+  const afterRob = makeGameState({
+    state_index: 11,
+    current_color: "RED",
+    bot_colors: [],
+    current_prompt: "PLAY_TURN",
+    seat_names: { RED: "Creitu", BLUE: "João" },
+    player_state: {
+      ...baseState.player_state,
+      P1_ORE_IN_HAND: 0,
+      P1_NUM_RESOURCES_IN_HAND: 0,
+    },
+    action_records: [
+      [["RED", "PLAY_KNIGHT_CARD", null], null],
+      [["RED", "MOVE_ROBBER", [[0, 0, 0], "BLUE"]], null],
+    ] as GameState["action_records"],
+  });
+
+  vi.mocked(getState)
+    .mockResolvedValueOnce(beforeRob)
+    .mockResolvedValue(afterRob);
+
+  renderGameScreen({ initialEntry: "/games/game-rob?seat=BLUE" });
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+
+  const overlay = await screen.findByTestId(
+    "robbed-overlay",
+    {},
+    { timeout: 6000 }
+  );
+  expect(overlay).toHaveTextContent(/Você foi roubado/i);
+  expect(overlay).toHaveTextContent(/Creitu.*Cavaleiro/i);
+  expect(overlay).toHaveTextContent(/Minério/i);
+  expect(overlay.querySelector(".robbed-overlay__swords")).toBeInTheDocument();
 });

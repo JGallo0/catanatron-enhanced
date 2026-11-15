@@ -98,6 +98,15 @@
     background: #0f172a;
   }
 
+  &--full-body &__frame {
+    border-radius: 20px;
+    padding: 4px;
+  }
+
+  &--full-body &__svg {
+    border-radius: 16px;
+  }
+
   &__snapshot {
     object-fit: cover;
   }

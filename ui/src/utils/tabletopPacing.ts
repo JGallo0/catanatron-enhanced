@@ -49,13 +49,13 @@ export function cycleGameSpeed(current: GameSpeed): GameSpeed {
 }
 
 /**
- * Slow uses 6x pauses plus a visible thinking interval before each bot action.
+ * Slow uses 5x pauses (midpoint between 1x/normal 4x and old 6x slow) plus a moderate thinking interval before each bot action.
  * Normal is 4x slower than the original 1x pacing (comfortable real tabletop pace);
  * Rápida matches the original 1x pacing; Turbo is 2x faster (0.5x).
  */
 export function getSpeedMultiplier(speed: GameSpeed): number {
   switch (speed) {
-    case "slow": return 6;
+    case "slow": return 5;
     case "turbo":
       return 0.5;
     case "fast":
@@ -68,7 +68,7 @@ export function getSpeedMultiplier(speed: GameSpeed): number {
 
 export function getRollSpinDurationMs(speed: GameSpeed): number {
   switch (speed) {
-    case "slow": return 4200;
+    case "slow": return 3750;
     case "turbo":
       return 840;
     case "fast":
@@ -81,7 +81,7 @@ export function getRollSpinDurationMs(speed: GameSpeed): number {
 
 export function getDiceOverlayDurationMs(speed: GameSpeed): number {
   switch (speed) {
-    case "slow": return 9600;
+    case "slow": return 9000;
     case "turbo":
       return 2500;
     case "fast":
@@ -309,14 +309,83 @@ export type TurnHandoffFX = {
   isLocal: boolean;
 };
 
+export type AwardConquestFX = {
+  type: "ROAD" | "ARMY";
+  color: Color;
+  playerName: string;
+  previousHolderName: string | null;
+  metricCount: number;
+};
+
+export type VictimRobbedFX = {
+  attackerColor: Color;
+  attackerName: string;
+  victimColor: Color;
+  resource: ResourceCard;
+  source: "SEVEN" | "KNIGHT";
+};
+
 export type BatchTransitionFX = {
   newRecords: GameActionRecord[];
   discards: DiscardDropItem[];
   yields: ResourceYieldItem[];
   vpDeltas: VpDeltaItem[];
   robberEvent: RobberNoticeFX | null;
+  stolenEvent: VictimRobbedFX | null;
   turnHandoff: TurnHandoffFX | null;
+  awardEvents: AwardConquestFX[];
 };
+
+function resolveStolenResource(
+  robberRecord: GameActionRecord,
+  victimColor: Color,
+  prevState: GameState | null,
+  nextState: GameState,
+  discards: DiscardDropItem[]
+): ResourceCard | null {
+  const direct = robberRecord[1] as ResourceCard | null | undefined;
+  if (direct && VALID_RESOURCES.has(direct)) {
+    return direct;
+  }
+  if (!prevState) {
+    return null;
+  }
+  const kPrev = playerKey(prevState, victimColor);
+  const kNext = playerKey(nextState, victimColor);
+  for (const res of VALID_RESOURCES) {
+    const prevCount = Number(prevState.player_state?.[`${kPrev}_${res}_IN_HAND`] ?? 0);
+    const nextCount = Number(nextState.player_state?.[`${kNext}_${res}_IN_HAND`] ?? 0);
+    const discardedCount = discards.filter(
+      (d) => d.color === victimColor && d.resource === res
+    ).length;
+    if (prevCount - nextCount - discardedCount > 0) {
+      return res;
+    }
+  }
+  return null;
+}
+
+function resolveRobberySource(
+  allRecords: GameActionRecord[],
+  robberRecord: GameActionRecord
+): "SEVEN" | "KNIGHT" {
+  const idx = allRecords.lastIndexOf(robberRecord);
+  for (let i = idx - 1; i >= 0; i--) {
+    const rec = allRecords[i];
+    const actionType = rec?.[0]?.[1];
+    if (!actionType || actionType === "DISCARD_RESOURCE") {
+      continue;
+    }
+    if (actionType === "PLAY_KNIGHT_CARD") {
+      return "KNIGHT";
+    }
+    if (actionType === "ROLL") {
+      return "SEVEN";
+    }
+    break;
+  }
+  return "SEVEN";
+}
 
 export function extractBatchTransitionFX(
   prevState: GameState | null,
@@ -406,7 +475,21 @@ export function extractBatchTransitionFX(
   }
 
   const vpDeltas: VpDeltaItem[] = [];
+  const awardEvents: AwardConquestFX[] = [];
   if (prevState) {
+    const colorMeta = getPlayerColorMeta(lang);
+    let prevRoadHolder: Color | null = null;
+    let prevArmyHolder: Color | null = null;
+    for (const c of prevState.colors || []) {
+      const kPrev = playerKey(prevState, c);
+      if (prevState.player_state?.[`${kPrev}_HAS_ROAD`]) {
+        prevRoadHolder = c;
+      }
+      if (prevState.player_state?.[`${kPrev}_HAS_ARMY`]) {
+        prevArmyHolder = c;
+      }
+    }
+
     for (const c of nextState.colors) {
       const kPrev = playerKey(prevState, c);
       const kNext = playerKey(nextState, c);
@@ -423,15 +506,72 @@ export function extractBatchTransitionFX(
       if (nextVp > prevVp) {
         vpDeltas.push({ color: c, delta: nextVp - prevVp });
       }
+
+      const hadRoad = Boolean(prevState.player_state?.[`${kPrev}_HAS_ROAD`]);
+      const hasRoad = Boolean(nextState.player_state?.[`${kNext}_HAS_ROAD`]);
+      if (!hadRoad && hasRoad) {
+        const playerName = resolvePlayerDisplayName(
+          nextState,
+          c,
+          colorMeta[c]?.label || c
+        );
+        const previousHolderName =
+          prevRoadHolder && prevRoadHolder !== c
+            ? resolvePlayerDisplayName(
+                nextState,
+                prevRoadHolder,
+                colorMeta[prevRoadHolder]?.label || prevRoadHolder
+              )
+            : null;
+        const roadLength = Number(
+          nextState.player_state?.[`${kNext}_LONGEST_ROAD_LENGTH`] ?? 5
+        );
+        awardEvents.push({
+          type: "ROAD",
+          color: c,
+          playerName,
+          previousHolderName,
+          metricCount: roadLength,
+        });
+      }
+
+      const hadArmy = Boolean(prevState.player_state?.[`${kPrev}_HAS_ARMY`]);
+      const hasArmy = Boolean(nextState.player_state?.[`${kNext}_HAS_ARMY`]);
+      if (!hadArmy && hasArmy) {
+        const playerName = resolvePlayerDisplayName(
+          nextState,
+          c,
+          colorMeta[c]?.label || c
+        );
+        const previousHolderName =
+          prevArmyHolder && prevArmyHolder !== c
+            ? resolvePlayerDisplayName(
+                nextState,
+                prevArmyHolder,
+                colorMeta[prevArmyHolder]?.label || prevArmyHolder
+              )
+            : null;
+        const knightsCount = Number(
+          nextState.player_state?.[`${kNext}_PLAYED_KNIGHT`] ?? 3
+        );
+        awardEvents.push({
+          type: "ARMY",
+          color: c,
+          playerName,
+          previousHolderName,
+          metricCount: knightsCount,
+        });
+      }
     }
   }
 
   let robberEvent: RobberNoticeFX | null = null;
+  let stolenEvent: VictimRobbedFX | null = null;
   if (latestRobberRecord && latestRobberRecord[0]) {
     const colorMeta = getPlayerColorMeta(lang);
     const resMeta = getResourceMeta(lang);
     const en = lang === "en";
-    const [action, result] = latestRobberRecord;
+    const [action] = latestRobberRecord;
     const attackerColor = action[0];
     const attackerName = resolvePlayerDisplayName(
       nextState,
@@ -439,6 +579,21 @@ export function extractBatchTransitionFX(
       colorMeta[attackerColor]?.label || attackerColor
     );
     const moveVal = Array.isArray(action[2]) ? action[2] : [];
+    const targetCoordKey = JSON.stringify(moveVal[0]);
+    let tileDesc = "";
+    for (const pt of nextState.tiles || []) {
+      if (JSON.stringify(pt.coordinate) === targetCoordKey) {
+        if (pt.tile.type === "RESOURCE_TILE") {
+          const rLabel = resMeta[pt.tile.resource]?.label || pt.tile.resource;
+          tileDesc = en
+            ? ` to ${pt.tile.number} (${rLabel})`
+            : ` para ${pt.tile.number} (${rLabel})`;
+        } else if (pt.tile.type === "DESERT") {
+          tileDesc = en ? " to the Desert" : " para o Deserto";
+        }
+        break;
+      }
+    }
     const rawVictim = moveVal[1] as Color | null | undefined;
     const victimColor = rawVictim ?? null;
     const victimName = victimColor
@@ -448,7 +603,6 @@ export function extractBatchTransitionFX(
           colorMeta[victimColor]?.label || victimColor
         )
       : null;
-    const stolenResource = (result ?? null) as ResourceCard | null;
 
     if (!victimColor) {
       const spared =
@@ -459,11 +613,11 @@ export function extractBatchTransitionFX(
         tone: "safe",
         message: spared
           ? en
-            ? `🛡️ You were spared! (${attackerName} moved the Robber)`
-            : `🛡️ Você não foi roubado! (${attackerName} moveu o Ladrão)`
+            ? `🛡️ You were spared! (${attackerName} moved the Robber${tileDesc})`
+            : `🛡️ Você não foi roubado! (${attackerName} moveu o Ladrão${tileDesc})`
           : en
-            ? `🥷 ${attackerName} moved the Robber (nobody was robbed)`
-            : `🥷 ${attackerName} moveu o Ladrão (ninguém foi roubado)`,
+            ? `🥷 ${attackerName} moved the Robber${tileDesc} (nobody was robbed)`
+            : `🥷 ${attackerName} moveu o Ladrão${tileDesc} (ninguém foi roubado)`,
       };
     } else if (mySeatColor !== null && victimColor === mySeatColor) {
       robberEvent = {
@@ -471,22 +625,36 @@ export function extractBatchTransitionFX(
         victimColor,
         tone: "victim",
         message: en
-          ? `🥷 ${attackerName} stole 1 card from You!`
-          : `🥷 ${attackerName} roubou 1 carta de Você!`,
+          ? `🥷 ${attackerName} moved the Robber${tileDesc} and stole 1 resource from You!`
+          : `🥷 ${attackerName} moveu o Ladrão${tileDesc} e roubou 1 recurso de Você!`,
       };
+      const stolenResource = resolveStolenResource(
+        latestRobberRecord,
+        victimColor,
+        prevState,
+        nextState,
+        discards
+      );
+      if (stolenResource) {
+        stolenEvent = {
+          attackerColor,
+          attackerName,
+          victimColor,
+          resource: stolenResource,
+          source: resolveRobberySource(allRecords, latestRobberRecord),
+        };
+      }
     } else if (
       mySeatColor !== null &&
-      attackerColor === mySeatColor &&
-      stolenResource
+      attackerColor === mySeatColor
     ) {
-      const resLabel = resMeta[stolenResource]?.label || stolenResource;
       robberEvent = {
         attackerColor,
         victimColor,
         tone: "attacker",
         message: en
-          ? `🥷 You stole 1× ${resLabel} from ${victimName}!`
-          : `🥷 Você roubou 1× ${resLabel} de ${victimName}!`,
+          ? `🥷 You moved the Robber${tileDesc} and stole 1 resource from ${victimName}!`
+          : `🥷 Você moveu o Ladrão${tileDesc} e roubou 1 recurso de ${victimName}!`,
       };
     } else {
       const isObserverNotHit =
@@ -497,11 +665,11 @@ export function extractBatchTransitionFX(
         tone: isObserverNotHit ? "safe" : "neutral",
         message: isObserverNotHit
           ? en
-            ? `🥷 ${attackerName} stole 1 card from ${victimName} • You were spared!`
-            : `🥷 ${attackerName} roubou 1 carta de ${victimName} • Você não foi roubado!`
+            ? `🥷 ${attackerName} moved the Robber${tileDesc} and stole 1 resource from ${victimName} • You were spared!`
+            : `🥷 ${attackerName} moveu o Ladrão${tileDesc} e roubou 1 recurso de ${victimName} • Você não foi roubado!`
           : en
-            ? `🥷 ${attackerName} stole 1 card from ${victimName}!`
-            : `🥷 ${attackerName} roubou 1 carta de ${victimName}!`,
+            ? `🥷 ${attackerName} moved the Robber${tileDesc} and stole 1 resource from ${victimName}!`
+            : `🥷 ${attackerName} moveu o Ladrão${tileDesc} e roubou 1 recurso de ${victimName}!`,
       };
     }
   }
@@ -546,11 +714,13 @@ export function extractBatchTransitionFX(
     yields,
     vpDeltas,
     robberEvent,
+    stolenEvent,
     turnHandoff,
+    awardEvents,
   };
 }
 
 /** Stable variation keeps re-renders from restarting a bot's thinking deadline. */
 export function getBotThinkDelayMs(stateIndex: number, speed: GameSpeed): number {
-  return speed === "slow" ? 3200 + (stateIndex % 5) * 650 : 0;
+  return speed === "slow" ? 1600 + (stateIndex % 5) * 325 : 0;
 }

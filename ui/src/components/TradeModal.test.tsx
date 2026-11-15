@@ -144,13 +144,10 @@ describe("TradeModal", () => {
     await waitFor(() => {
       expect(onExecuteTrade).toHaveBeenCalledWith(maritimeAction);
     });
-    expect(await screen.findByRole("status")).toHaveTextContent("Troca com Porto ou Banco concluída");
-    expect(onClose).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  test.each([true, false])("keeps the offer open after the last response (accepted: %s)", async (accepted) => {
+  test.each([true, false])("keeps refusals visible and closes after a confirmed trade (accepted: %s)", async (accepted) => {
     const offer: OfferTradeAction = ["BLUE", "OFFER_TRADE", [1, 0, 0, 0, 0, 0, 0, 0, 1, 0]];
     const confirm: ConfirmTradeAction = ["BLUE", "CONFIRM_TRADE", [...offer[2], "RED"]];
     const state = makeGameState({
@@ -208,6 +205,10 @@ describe("TradeModal", () => {
       expect(screen.getByRole("status")).toHaveTextContent("Todos os jogadores recusaram");
       expect(screen.queryByRole("button", { name: "Confirmar troca" })).not.toBeInTheDocument();
     }
-    expect(onClose).not.toHaveBeenCalled();
+    if (accepted) {
+      expect(onClose).toHaveBeenCalledOnce();
+    } else {
+      expect(onClose).not.toHaveBeenCalled();
+    }
   });
 });

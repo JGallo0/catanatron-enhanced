@@ -24,6 +24,7 @@ from catanatron.web.models import (
     LockedAvatarItemsError,
     StoredGame,
     StoredRoom,
+    _is_room_host,
     _load_avatars_by_username,
     authenticate_user,
     authorize_seat_caller,
@@ -591,7 +592,7 @@ def post_room_endpoint():
 
     vps_to_win = int(body.get("vps_to_win", 10))
     discard_limit = int(body.get("discard_limit", 7))
-    friendly_robber = bool(body.get("friendly_robber", True))
+    friendly_robber = bool(body.get("friendly_robber", False))
     dice_mode = body.get("dice_mode", "random")
     if dice_mode not in VALID_DICE_MODES:
         abort(400, description="'dice_mode' must be 'random' or 'balanced'")
@@ -1008,6 +1009,16 @@ def start_room_endpoint(room_code: str):
             }
         )
 
+    effective_tokens = list(caller_tokens)
+    if token:
+        effective_tokens.append(str(token))
+    if not _is_room_host(
+        room,
+        caller_tokens=effective_tokens,
+        auth_user=auth_user,
+    ):
+        abort(403, description="Apenas quem criou a sala pode iniciar a partida.")
+
     config = json.loads(room.config_json)
     seats = json.loads(room.seats_json)
     player_keys = [seat["player_key"] for seat in seats]
@@ -1026,7 +1037,7 @@ def start_room_endpoint(room_code: str):
         players=players,
         seed=seed,
         discard_limit=int(config.get("discard_limit", 7)),
-        friendly_robber=bool(config.get("friendly_robber", True)),
+        friendly_robber=bool(config.get("friendly_robber", False)),
         vps_to_win=int(config.get("vps_to_win", 10)),
         catan_map=catan_map,
         dice_mode=dice_mode,

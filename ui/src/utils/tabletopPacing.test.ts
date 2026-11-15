@@ -165,5 +165,110 @@ describe("tabletopPacing", () => {
     const robFx = extractBatchTransitionFX(next, robberNext, "BLUE");
     expect(robFx.robberEvent?.tone).toBe("safe");
     expect(robFx.robberEvent?.message).toMatch(/Você não foi roubado!/i);
+
+    // Longest Road & Largest Army award events
+    const awardState = makeGameState({
+      state_index: 16,
+      current_color: "BLUE",
+      seat_names: { RED: "Creitu", BLUE: "João" },
+      player_state: {
+        ...robberNext.player_state,
+        P1_HAS_ROAD: true,
+        P1_LONGEST_ROAD_LENGTH: 6,
+        P0_HAS_ARMY: true,
+        P0_PLAYED_KNIGHT: 3,
+      },
+    });
+    const awardFx = extractBatchTransitionFX(robberNext, awardState, "BLUE");
+    expect(awardFx.awardEvents).toEqual([
+      {
+        type: "ARMY",
+        color: "RED",
+        playerName: "Creitu",
+        previousHolderName: null,
+        metricCount: 3,
+      },
+      {
+        type: "ROAD",
+        color: "BLUE",
+        playerName: "João",
+        previousHolderName: null,
+        metricCount: 6,
+      },
+    ]);
+  });
+
+  test("extracts stolenEvent for victim after Knight and infers redacted resource after 7 roll", () => {
+    const preKnight = makeGameState({
+      state_index: 20,
+      current_color: "RED",
+      seat_names: { RED: "Creitu", BLUE: "João" },
+      player_state: {
+        P1_ORE_IN_HAND: 2,
+      },
+      action_records: [[["RED", "PLAY_KNIGHT_CARD", null], null]],
+    });
+    const afterKnightRob = makeGameState({
+      state_index: 21,
+      current_color: "RED",
+      seat_names: { RED: "Creitu", BLUE: "João" },
+      player_state: {
+        P1_ORE_IN_HAND: 1,
+      },
+      action_records: [
+        ...preKnight.action_records,
+        [["RED", "MOVE_ROBBER", [[0, 0, 0], "BLUE"]], "ORE"],
+      ] as any,
+    });
+
+    const knightFx = extractBatchTransitionFX(preKnight, afterKnightRob, "BLUE");
+    expect(knightFx.stolenEvent).toEqual({
+      attackerColor: "RED",
+      attackerName: "Creitu",
+      victimColor: "BLUE",
+      resource: "ORE",
+      source: "KNIGHT",
+    });
+
+    const preSevenDiscard = makeGameState({
+      state_index: 22,
+      current_color: "RED",
+      seat_names: { RED: "Creitu", BLUE: "João" },
+      player_state: {
+        P1_WHEAT_IN_HAND: 2,
+        P1_WOOD_IN_HAND: 1,
+      },
+      action_records: [
+        ...afterKnightRob.action_records,
+        [["RED", "ROLL", null], [3, 4]],
+      ] as any,
+    });
+    const afterRedactedRob = makeGameState({
+      state_index: 24,
+      current_color: "RED",
+      seat_names: { RED: "Creitu", BLUE: "João" },
+      player_state: {
+        P1_WHEAT_IN_HAND: 0,
+        P1_WOOD_IN_HAND: 1,
+      },
+      action_records: [
+        ...preSevenDiscard.action_records,
+        [["BLUE", "DISCARD_RESOURCE", "WHEAT"], "WHEAT"],
+        [["RED", "MOVE_ROBBER", [[0, 0, 0], "BLUE"]], null],
+      ] as any,
+    });
+
+    const sevenFx = extractBatchTransitionFX(
+      preSevenDiscard,
+      afterRedactedRob,
+      "BLUE"
+    );
+    expect(sevenFx.stolenEvent).toEqual({
+      attackerColor: "RED",
+      attackerName: "Creitu",
+      victimColor: "BLUE",
+      resource: "WHEAT",
+      source: "SEVEN",
+    });
   });
 });

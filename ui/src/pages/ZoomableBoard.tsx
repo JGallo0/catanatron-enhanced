@@ -27,6 +27,7 @@ import ACTIONS from "../actions";
 import Board from "./Board";
 import type {
   Color,
+  GameState,
   GameAction,
   MoveRobberAction,
   TileCoordinate,
@@ -94,6 +95,7 @@ function buildEdgeActions(state: CatanState) {
 
 type ZoomableBoardProps = {
   isRollingDice?: boolean;
+  displayGameState?: GameState | null;
   replayMode: boolean;
   hudClearance?: { top: number; bottom: number };
   recentNodeId?: number | null;
@@ -127,6 +129,7 @@ function loadSavedConfirmPlacement(): boolean {
 
 export default function ZoomableBoard({
   isRollingDice = false,
+  displayGameState = null,
   replayMode,
   hudClearance,
   recentNodeId = null,
@@ -155,7 +158,7 @@ export default function ZoomableBoard({
     height: number;
   } | null>(null);
 
-  const gameState = state.gameState;
+  const gameState = displayGameState ?? state.gameState;
   if (!gameState) throw new Error("GameState is not ready!");
   if (!gameId) throw new Error("expecting gameId in URL");
 
@@ -260,6 +263,7 @@ export default function ZoomableBoard({
 
   const handleTileClick = useCallback(
     (coordinate: TileCoordinate) => {
+      if (isRollingDice) return;
       if (
         !state.isMovingRobber &&
         gameState.current_prompt !== "MOVE_ROBBER"
@@ -292,6 +296,7 @@ export default function ZoomableBoard({
       dispatch,
       enqueueSnackbar,
       closeSnackbar,
+      isRollingDice,
     ]
   );
 
@@ -302,12 +307,13 @@ export default function ZoomableBoard({
     dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
   };
 
-  const nodeActions = replayMode ? {} : buildNodeActions(state);
-  const edgeActions = replayMode ? {} : buildEdgeActions(state);
+  const effectiveState = { ...state, gameState };
+  const nodeActions = replayMode || isRollingDice ? {} : buildNodeActions(effectiveState);
+  const edgeActions = replayMode || isRollingDice ? {} : buildEdgeActions(effectiveState);
   const isRobberPhase =
-    state.isMovingRobber ||
+    !isRollingDice && (state.isMovingRobber ||
     (isPlayersTurn(gameState, state.perspective) &&
-      gameState.current_prompt === "MOVE_ROBBER");
+      gameState.current_prompt === "MOVE_ROBBER"));
 
   const robberCoordinates = new Set(
     isRobberPhase

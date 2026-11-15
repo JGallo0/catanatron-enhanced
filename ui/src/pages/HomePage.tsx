@@ -30,7 +30,6 @@ import LanguageToggle from "../components/LanguageToggle";
 import LeaderboardModal from "../components/LeaderboardModal";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
-import AlmanacModal from "../components/AlmanacModal";
 import AuthModal from "../components/home/AuthModal";
 import MatchSetupModal, {
   type MatchSetupMode,
@@ -65,7 +64,6 @@ export default function HomePage() {
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [avatarStudioOpen, setAvatarStudioOpen] = useState(false);
-  const [almanacOpen, setAlmanacOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authPromptBanner, setAuthPromptBanner] = useState<string | undefined>(
     undefined
@@ -274,21 +272,6 @@ export default function HomePage() {
                     ? `#${account.leaderboard_rank} ${t("no Ranking", "Ranked")}`
                     : t("Ranking Ativo", "Ranked Active")}
                 </span>
-                <small>
-                  {account.stats?.wins ?? 0}{" "}
-                  {t(
-                    (account.stats?.wins ?? 0) === 1 ? "vitória" : "vitórias",
-                    (account.stats?.wins ?? 0) === 1 ? "win" : "wins"
-                  )}{" "}
-                  • {account.stats?.games_played ?? 0}{" "}
-                  {t(
-                    (account.stats?.games_played ?? 0) === 1
-                      ? "partida"
-                      : "partidas",
-                    (account.stats?.games_played ?? 0) === 1 ? "match" : "matches"
-                  )}{" "}
-                  • {account.stats?.win_rate ?? 0}%
-                </small>
               </div>
               <Button
                 size="small"
@@ -354,24 +337,6 @@ export default function HomePage() {
               />
             </Suspense>
           </div>
-          <div className="home-hero-stage__footer">
-            <span
-              className="home-hero-stage__orbit-hint"
-              title={t(
-                "Arraste para girar o herói em 360°",
-                "Drag to rotate 3D hero"
-              )}
-            >
-              ↻ 360°
-            </span>
-            <button
-              type="button"
-              className="home-hero-stage__studio-pill"
-              onClick={handleOpenAvatarStudio}
-            >
-              ✨ {t("Estúdio 3D", "3D Studio")}
-            </button>
-          </div>
         </div>
       </main>
 
@@ -426,13 +391,6 @@ export default function HomePage() {
           </Button>
           <Button variant="outlined" className="home-dock-btn home-dock-btn--friends" startIcon={<Users size={19} />} onClick={() => setFriendsOpen(true)}>
             Amigos
-          </Button>
-          <Button
-            variant="outlined"
-            className="home-dock-btn home-dock-btn--almanac"
-            onClick={() => setAlmanacOpen(true)}
-          >
-            📖 {t("Almanaque", "Almanac")}
           </Button>
         </nav>
 
@@ -552,10 +510,6 @@ export default function HomePage() {
         }}
       />
 
-      <AlmanacModal
-        open={almanacOpen}
-        onClose={() => setAlmanacOpen(false)}
-      />
     </div>
   );
 }

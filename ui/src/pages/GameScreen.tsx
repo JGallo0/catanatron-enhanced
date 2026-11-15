@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import { GridLoader } from "react-spinners";
 import { useSnackbar } from "notistack";
@@ -31,11 +31,13 @@ import PlayerTopBar, {
   type FloatingVpFX,
   type FloatingYieldFX,
 } from "../components/PlayerTopBar";
-import DiceRollOverlay from "../components/DiceRollOverlay";
 import CardGainOverlay from "../components/CardGainOverlay";
+import RobbedOverlay from "../components/RobbedOverlay";
+import DiceRollOverlay from "../components/DiceRollOverlay";
 import { getCardGains } from "../utils/cardGains";
 import GameChatPanel from "../components/GameChatPanel";
 import MatchIntroOverlay from "../components/MatchIntroOverlay";
+import VictoryScreenOverlay from "../components/VictoryScreenOverlay";
 import AlmanacModal from "../components/AlmanacModal";
 import DiceHistogram from "../components/DiceHistogram";
 import OceanBackdrop from "../components/OceanBackdrop";
@@ -95,9 +97,11 @@ import {
   LOCAL_MESSAGES_STORAGE_KEY,
 } from "../utils/localEngine";
 import {
+  type AwardConquestFX,
   type GameSpeed,
   type RobberNoticeFX,
   type TurnHandoffFX,
+  type VictimRobbedFX,
   INTRO_SPLASH_MS,
   TURN_TRANSITION_MS,
   cycleGameSpeed,
@@ -177,6 +181,7 @@ function describePromptBanner(
 
 function GameScreen({ replayMode }: { replayMode: boolean }) {
   const { gameId, stateIndex } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { state, dispatch } = useContext(store);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
@@ -186,8 +191,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   languageRef.current = language;
   const [isBotThinking, setIsBotThinking] = useState(false);
   const thinkDeadlineRef = useRef({ key: "", at: 0 });
-  const [cardGains, setCardGains] = useState<{ id: number; card: Card }[]>([]);
-  const finishCardGain = useCallback(() => setCardGains((queue) => queue.slice(1)), []);
+  const [cardGainBatches, setCardGainBatches] = useState<
+    { id: number; cards: Card[] }[]
+  >([]);
+  const finishCardGain = useCallback(
+    () => setCardGainBatches((queue) => queue.slice(1)),
+    []
+  );
   const [muted, setMuted] = useState(() => isSoundMuted());
   const [localGameSpeed, setLocalGameSpeed] = useState<GameSpeed>(() =>
     getSavedGameSpeed()
@@ -208,9 +218,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [diceStage, setDiceStage] = useState<{
     open: boolean;
     rolling: boolean;
+    settling?: boolean;
     dice: [number, number] | null;
     rollerName: string;
     rollerColor: Color;
+    preRollState?: GameState | null;
   } | null>(null);
   const [recentNodeId, setRecentNodeId] = useState<number | null>(null);
   const [recentEdgeId, setRecentEdgeId] = useState<string | null>(null);
@@ -226,6 +238,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [yieldFX, setYieldFX] = useState<FloatingYieldFX[]>([]);
   const [vpFX, setVpFX] = useState<FloatingVpFX[]>([]);
   const [robberNotice, setRobberNotice] = useState<RobberNoticeFX | null>(null);
+  const [robbedEvent, setRobbedEvent] = useState<
+    (VictimRobbedFX & { id: number }) | null
+  >(null);
+  const handleRobbedComplete = useCallback(() => {
+    setRobbedEvent(null);
+  }, []);
+  const [awardNotice, setAwardNotice] = useState<AwardConquestFX | null>(null);
 
   const hasOceanChatSpace = useMediaQuery("(min-width: 1100px) and (min-height: 640px)");
   const [chatPreference, setChatOpen] = useState<boolean | null>(null);
@@ -268,6 +287,10 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const robberNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const awardNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const diceSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const diceSpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const diceHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -297,6 +320,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     latestActionRecord?.[0][1] === "ROLL" &&
     Boolean(extractTransitionVisuals(latestActionRecord).rollDice);
   const isRollingDice = isDiceRollStarting || Boolean(diceStage?.rolling);
+  const activePreRollState = isDiceRollStarting
+    ? prevStateRef.current
+    : diceStage?.rolling
+      ? (diceStage.preRollState ?? null)
+      : null;
+  const displayGameState =
+    isRollingDice && activePreRollState ? activePreRollState : gs;
   const introActive = Boolean(
     gs &&
       !replayMode &&
@@ -479,9 +509,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     setTurnPauseBanner(null);
     setDiscardDrops([]);
     setYieldFX([]);
-    setCardGains([]);
+    setCardGainBatches([]);
     setVpFX([]);
     setRobberNotice(null);
+    setRobbedEvent(null);
+    setAwardNotice(null);
     setChatMessages([]);
     setUnreadChatCount(0);
     setChatPreview(null);
@@ -499,6 +531,8 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       if (introTimerRef.current) clearTimeout(introTimerRef.current);
       if (turnPauseTimerRef.current) clearTimeout(turnPauseTimerRef.current);
       if (robberNoticeTimerRef.current) clearTimeout(robberNoticeTimerRef.current);
+      if (awardNoticeTimerRef.current) clearTimeout(awardNoticeTimerRef.current);
+      if (diceSettleTimerRef.current) clearTimeout(diceSettleTimerRef.current);
       if (diceSpinTimerRef.current) clearTimeout(diceSpinTimerRef.current);
       if (diceHideTimerRef.current) clearTimeout(diceHideTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -883,17 +917,30 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     if (gs.state_index > prevStateIndexRef.current && !replayMode) {
       const activeLang = languageRef.current;
       const activeColorMeta = getPlayerColorMeta(activeLang);
+      const localTargetColor =
+        mySeatColor ?? getHumanColor(gs, state.perspective) ?? null;
       const batchFx = extractBatchTransitionFX(
         prevStateRef.current,
         gs,
-        mySeatColor,
+        localTargetColor,
         activeLang
       );
       const latestRecord = latestActionRecord;
-      const gainedCards = getCardGains(prevStateRef.current, gs, mySeatColor ?? getHumanColor(gs, state.perspective) ?? null);
+      const gainedCards = getCardGains(prevStateRef.current, gs, localTargetColor);
       if (gainedCards.length) {
-        const entries = gainedCards.map((card) => ({ id: fxCounterRef.current++, card }));
-        setCardGains((queue) => [...queue, ...entries]);
+        const batchId = fxCounterRef.current++;
+        setCardGainBatches((queue) => {
+          if (queue.length > 0) {
+            return [
+              {
+                id: queue[0].id,
+                cards: [...queue[0].cards, ...gainedCards],
+              },
+              ...queue.slice(1),
+            ];
+          }
+          return [{ id: batchId, cards: gainedCards }];
+        });
       }
       playActionRecordSound(latestRecord);
       if (gs.winning_color && !prevWinnerRef.current) {
@@ -956,7 +1003,29 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         setRobberNotice(batchFx.robberEvent);
         robberNoticeTimerRef.current = setTimeout(() => {
           setRobberNotice(null);
-        }, 4800);
+        }, 6200);
+      }
+
+      if (batchFx.stolenEvent) {
+        setRobbedEvent({
+          ...batchFx.stolenEvent,
+          id: fxCounterRef.current++,
+        });
+      }
+
+      if (batchFx.awardEvents && batchFx.awardEvents.length > 0) {
+        const latestAward =
+          batchFx.awardEvents[batchFx.awardEvents.length - 1];
+        if (awardNoticeTimerRef.current) {
+          clearTimeout(awardNoticeTimerRef.current);
+        }
+        setAwardNotice(latestAward);
+        if (!gs.winning_color) {
+          playVictorySound();
+        }
+        awardNoticeTimerRef.current = setTimeout(() => {
+          setAwardNotice(null);
+        }, 5600);
       }
 
       if (batchFx.turnHandoff) {
@@ -977,23 +1046,44 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         );
 
         if (visuals.rollDice) {
+          if (diceSettleTimerRef.current) clearTimeout(diceSettleTimerRef.current);
           if (diceSpinTimerRef.current) clearTimeout(diceSpinTimerRef.current);
           if (diceHideTimerRef.current) clearTimeout(diceHideTimerRef.current);
 
+          const snapshotBeforeRoll = prevStateRef.current;
           setDiceStage({
             open: true,
             rolling: true,
+            settling: false,
             dice: visuals.rollDice,
             rollerName: actorName,
             rollerColor: visuals.rollColor ?? actorColor,
+            preRollState: snapshotBeforeRoll,
           });
 
           const spinMs = getRollSpinDurationMs(gameSpeedRef.current);
+          const settleAtMs = Math.max(
+            0,
+            spinMs - Math.min(650, Math.floor(spinMs * 0.35))
+          );
           const overlayMs = getDiceOverlayDurationMs(gameSpeedRef.current);
+
+          diceSettleTimerRef.current = setTimeout(() => {
+            setDiceStage((prev) =>
+              prev && prev.rolling ? { ...prev, settling: true } : prev
+            );
+          }, settleAtMs);
 
           diceSpinTimerRef.current = setTimeout(() => {
             setDiceStage((prev) =>
-              prev ? { ...prev, rolling: false } : null
+              prev
+                ? {
+                    ...prev,
+                    rolling: false,
+                    settling: false,
+                    preRollState: null,
+                  }
+                : null
             );
           }, spinMs);
 
@@ -1209,7 +1299,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       !gameId ||
       gs.winning_color ||
       introActive ||
-      isTurnPauseActive || isRollingDice || cardGains.length > 0
+      isTurnPauseActive || isRollingDice || cardGainBatches.length > 0
     ) {
       return;
     }
@@ -1293,7 +1383,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     introActive,
     isTurnPauseActive,
     isRollingDice,
-    cardGains.length,
+    cardGainBatches.length,
     gameSpeed,
     mySeatColor,
     dispatch,
@@ -1326,16 +1416,26 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     >
       <OceanBackdrop />
 
-      {/* Fullscreen Board Canvas */}
+      {/* Fullscreen Board + Tabletop Canvas (Zoom In/Out scales table, board, and dice inside the box together) */}
       <ZoomableBoard
         isRollingDice={isRollingDice}
+        displayGameState={displayGameState}
         replayMode={replayMode}
         hudClearance={hudClearance && {
-          top: hudClearance.top + (hasOceanChatSpace ? 0 : 18 + hudClearance.shortcutsHeight),
+          top: hudClearance.top,
           bottom: hudClearance.bottom,
         }}
         recentNodeId={recentNodeId}
         recentEdgeId={recentEdgeId}
+      />
+
+      <DiceRollOverlay
+        open={Boolean(diceStage?.open)}
+        rolling={Boolean(diceStage?.rolling)}
+        settling={Boolean(diceStage?.settling)}
+        dice={diceStage?.dice ?? null}
+        rollerName={diceStage?.rollerName ?? ""}
+        rollerColor={diceStage?.rollerColor ?? gs.current_color}
       />
 
       {/* Floating Top HUD Container (Glassmorphism over sea) */}
@@ -1374,7 +1474,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                 boxShadow: `0 0 10px ${currentPalette.glow}`,
               }}
             />
-            <span>{describePromptBanner(gs, isBotThinking, language)}</span>
+            <span>{describePromptBanner(displayGameState ?? gs, isBotThinking, language)}</span>
           </div>
 
           <div className="game-top-hud__right">
@@ -1417,7 +1517,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         </header>
 
         <PlayerTopBar
-          gameState={gs}
+          gameState={displayGameState ?? gs}
           recentDevColor={recentDevColor}
           discardDrops={discardDrops}
           yieldFX={yieldFX}
@@ -1740,15 +1840,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         </div>
       )}
 
-      {!isRollingDice && cardGains[0] && <CardGainOverlay key={cardGains[0].id} card={cardGains[0].card} onComplete={finishCardGain} />}
-
-      <DiceRollOverlay
-        open={Boolean(diceStage?.open)}
-        rolling={Boolean(diceStage?.rolling)}
-        dice={diceStage?.dice ?? null}
-        rollerName={diceStage?.rollerName ?? ""}
-        rollerColor={diceStage?.rollerColor ?? gs.current_color}
-      />
+      {!isRollingDice && cardGainBatches.length > 0 && (
+        <CardGainOverlay
+          key={cardGainBatches[0].id}
+          cards={cardGainBatches[0].cards}
+          onComplete={finishCardGain}
+        />
+      )}
 
       {turnPauseBanner && !introActive && (
         <div
@@ -1767,13 +1865,15 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           role="status"
           aria-live="polite"
         >
-          <span
-            className="turn-transition-banner__dot"
-            style={{
-              background:
-                colorMeta[turnPauseBanner.color]?.primary || "#facc15",
-            }}
-          />
+          <span className="turn-transition-banner__crest" aria-hidden="true">
+            <span
+              className="turn-transition-banner__dot"
+              style={{
+                background:
+                  colorMeta[turnPauseBanner.color]?.primary || "#facc15",
+              }}
+            />
+          </span>
           <span className="turn-transition-banner__text">
             {turnPauseBanner.isLocal
               ? t(
@@ -1785,6 +1885,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                   `${turnPauseBanner.name}'s Turn`
                 )}
           </span>
+          <span className="turn-transition-banner__shimmer" aria-hidden="true" />
         </div>
       )}
 
@@ -1797,24 +1898,122 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           role="status"
           aria-live="polite"
         >
-          {robberNotice.message}
+          <span className="game-robber-notice__badge" aria-hidden="true">
+            🥷 LADRÃO
+          </span>
+          <span className="game-robber-notice__text">
+            {robberNotice.message}
+          </span>
         </div>
       )}
 
-      {!chatOpen && gs.action_records && gs.action_records.length > 0 && (
+      {robbedEvent && (
+        <RobbedOverlay
+          key={robbedEvent.id}
+          resource={robbedEvent.resource}
+          attackerName={robbedEvent.attackerName}
+          source={robbedEvent.source}
+          onComplete={handleRobbedComplete}
+        />
+      )}
+
+      {awardNotice && (
+        <div
+          className={cn(
+            "award-conquest-banner",
+            `award-conquest-banner--${awardNotice.type.toLowerCase()}`
+          )}
+          data-testid="award-conquest-banner"
+          style={
+            {
+              "--award-player-color":
+                colorMeta[awardNotice.color]?.primary || "#facc15",
+            } as React.CSSProperties
+          }
+          role="status"
+          aria-live="assertive"
+        >
+          <div className="award-conquest-banner__rays" aria-hidden="true" />
+          <div className="award-conquest-banner__emblem" aria-hidden="true">
+            {awardNotice.type === "ROAD" ? "🛤️" : "⚔️"}
+          </div>
+          <div className="award-conquest-banner__body">
+            <span className="award-conquest-banner__eyebrow">
+              🏆{" "}
+              {t(
+                "TÍTULO ESPECIAL CONQUISTADO • +2 PONTOS DE VITÓRIA",
+                "SPECIAL TITLE CONQUERED • +2 VICTORY POINTS"
+              )}
+            </span>
+            <strong className="award-conquest-banner__title">
+              {awardNotice.type === "ROAD"
+                ? t("MAIOR ESTRADA COMERCIAL!", "LONGEST TRADE ROAD!")
+                : t("MAIOR EXÉRCITO DA ILHA!", "LARGEST ARMY OF THE ISLE!")}
+            </strong>
+            <span className="award-conquest-banner__desc">
+              {awardNotice.type === "ROAD"
+                ? t(
+                    `${awardNotice.playerName} assumiu a Maior Estrada com ${awardNotice.metricCount} estradas conectadas${
+                      awardNotice.previousHolderName
+                        ? ` (tomou de ${awardNotice.previousHolderName}!)`
+                        : "!"
+                    }`,
+                    `${awardNotice.playerName} claimed Longest Road with ${awardNotice.metricCount} connected roads${
+                      awardNotice.previousHolderName
+                        ? ` (taken from ${awardNotice.previousHolderName}!)`
+                        : "!"
+                    }`
+                  )
+                : t(
+                    `${awardNotice.playerName} assumiu o Maior Exército com ${awardNotice.metricCount} cavaleiros em campo${
+                      awardNotice.previousHolderName
+                        ? ` (tomou de ${awardNotice.previousHolderName}!)`
+                        : "!"
+                    }`,
+                    `${awardNotice.playerName} claimed Largest Army with ${awardNotice.metricCount} knights played${
+                      awardNotice.previousHolderName
+                        ? ` (taken from ${awardNotice.previousHolderName}!)`
+                        : "!"
+                    }`
+                  )}
+            </span>
+          </div>
+          <div className="award-conquest-banner__vp-pill" aria-hidden="true">
+            +2 PV
+          </div>
+        </div>
+      )}
+
+      {gs.action_records && gs.action_records.length > 0 && (
         <aside
-          className="mini-action-log"
+          className={cn("mini-action-log", {
+            "mini-action-log--chat-open": chatOpen,
+          })}
           aria-label={t("Últimas jogadas na mesa", "Recent table actions")}
         >
           {gs.action_records.slice(-3).map((rec, idx, arr) => {
             const c = rec[0]?.[0];
+            const actionType = rec[0]?.[1];
+            const isRobberRow =
+              actionType === "MOVE_ROBBER" ||
+              actionType === "PLAY_KNIGHT_CARD" ||
+              actionType === "PLAY_MONOPOLY";
             const palette = c ? colorMeta[c] : null;
             const globalIdx = gs.action_records.length - arr.length + idx;
             return (
-              <div key={globalIdx} className="mini-action-log__row">
+              <div
+                key={globalIdx}
+                className={cn("mini-action-log__row", {
+                  "mini-action-log__row--robber": isRobberRow,
+                })}
+              >
                 <span
                   className="mini-action-log__dot"
-                  style={{ background: palette?.primary || "#94a3b8" }}
+                  style={{
+                    background: isRobberRow
+                      ? "#f87171"
+                      : palette?.primary || "#94a3b8",
+                  }}
                 />
                 <span className="mini-action-log__text">
                   {isRollingDice && rec === latestActionRecord && rec[0][1] === "ROLL" ? "Rolando os dados…" : humanizeActionRecordPt(gs, rec, language)}
@@ -1831,6 +2030,14 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         perspective={state.perspective}
         onDismiss={handleDismissIntro}
       />
+
+      {Boolean(gs.winning_color) && (
+        <VictoryScreenOverlay
+          gameState={gs}
+          mySeatColor={mySeatColor}
+          onReturnLobby={() => navigate("/")}
+        />
+      )}
 
       {!chatOpen && chatPreview && (
         <button
@@ -1886,13 +2093,14 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         replayMode={replayMode}
         mySeatColor={mySeatColor}
         isRollingDice={isRollingDice}
+        displayGameState={displayGameState}
         onSendChatMessage={handleSendChat}
       />
-      <LeftDrawer />
+      <LeftDrawer displayGameState={displayGameState} />
       <RightDrawer>
         <AnalysisBox stateIndex={"latest"} />
         <Divider />
-        <DiceHistogram gameState={gs} />
+        <DiceHistogram gameState={displayGameState ?? gs} />
       </RightDrawer>
 
       <AlmanacModal

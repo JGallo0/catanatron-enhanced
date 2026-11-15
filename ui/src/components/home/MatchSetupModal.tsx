@@ -105,7 +105,7 @@ export default function MatchSetupModal({
   const [diceMode, setDiceMode] = useState<DiceMode>("random");
   const [vpsToWin, setVpsToWin] = useState(10);
   const [discardLimit, setDiscardLimit] = useState(7);
-  const [friendlyRobber, setFriendlyRobber] = useState(true);
+  const [friendlyRobber, setFriendlyRobber] = useState(false);
   const [hostName, setHostName] = useState(() =>
     account?.display_name ||
     localizeGuestDisplayName(
@@ -129,6 +129,7 @@ export default function MatchSetupModal({
     setBotDifficulty("medium");
     setBotSpeed(mode === "solo" ? getSavedGameSpeed() : "normal");
     setDiceMode("random");
+    setFriendlyRobber(false);
   }, [mode]);
 
   useEffect(() => {

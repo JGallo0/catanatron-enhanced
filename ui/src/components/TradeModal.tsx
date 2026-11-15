@@ -22,7 +22,6 @@ import {
   resolvePlayerDisplayName,
   resolveSeatAvatarProps,
 } from "../config/botCatalog";
-import { formatTradeBundlePt } from "../utils/promptUtils";
 import PlayerAvatar from "./PlayerAvatar";
 import { ResourceIcon } from "./icons/GameIcons";
 import "./TradeModal.scss";
@@ -84,7 +83,6 @@ export default function TradeModal({
   const [askCounts, setAskCounts] = useState<number[]>([0, 0, 0, 0, 0]);
   const [submitting, setSubmitting] = useState(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
-  const [maritimeTradeCompleted, setMaritimeTradeCompleted] = useState(false);
   const [trackedOffer, setTrackedOffer] = useState<number | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<Color | null>(null);
   const submittingRef = useRef(false);
@@ -248,7 +246,6 @@ export default function TradeModal({
     setSelectedPartner(null);
     setTrackedOffer(null);
     setTradeError(null);
-    setMaritimeTradeCompleted(false);
     onClose();
   };
 
@@ -261,6 +258,12 @@ export default function TradeModal({
 
   const totalOffer = offerCounts.reduce((a, b) => a + b, 0);
   const totalAsk = askCounts.reduce((a, b) => a + b, 0);
+  const shownOfferCounts =
+    reviewingOffer && offerBundle ? offerBundle.slice(0, 5) : offerCounts;
+  const shownAskCounts =
+    reviewingOffer && offerBundle ? offerBundle.slice(5, 10) : askCounts;
+  const shownTotalOffer = shownOfferCounts.reduce((a, b) => a + b, 0);
+  const shownTotalAsk = shownAskCounts.reduce((a, b) => a + b, 0);
   const hasOverlap = offerCounts.some(
     (qty, idx) => qty > 0 && askCounts[idx] > 0
   );
@@ -276,9 +279,14 @@ export default function TradeModal({
     handValid;
 
   const adjustOffer = (idx: number, delta: number) => {
+    if (reviewingActiveOffer) return;
     const res = RESOURCE_ORDER[idx];
     const inHand = Number(playerState?.[`${playerKey}_${res}_IN_HAND`]) || 0;
     setTradeError(null);
+    if (trackedOffer !== null) {
+      setTrackedOffer(null);
+      setSelectedPartner(null);
+    }
     setOfferCounts((prev) => {
       const next = [...prev];
       next[idx] = Math.max(0, Math.min(inHand, prev[idx] + delta));
@@ -295,7 +303,12 @@ export default function TradeModal({
   };
 
   const adjustAsk = (idx: number, delta: number) => {
+    if (reviewingActiveOffer) return;
     setTradeError(null);
+    if (trackedOffer !== null) {
+      setTrackedOffer(null);
+      setSelectedPartner(null);
+    }
     setAskCounts((prev) => {
       const next = [...prev];
       next[idx] = Math.max(0, Math.min(9, prev[idx] + delta));
@@ -316,10 +329,12 @@ export default function TradeModal({
     submittingRef.current = true;
     setSubmitting(true);
     setTradeError(null);
-    setMaritimeTradeCompleted(false);
     try {
       await onExecuteTrade(action);
-      if (action[1] === "MARITIME_TRADE") setMaritimeTradeCompleted(true);
+      if (action[1] === "CONFIRM_TRADE" || action[1] === "MARITIME_TRADE") {
+        handleClose();
+        return;
+      }
     } catch {
       setTradeError(t(
         "Não foi possível enviar a jogada de troca. Tente novamente.",
@@ -356,16 +371,16 @@ export default function TradeModal({
     >
       <DialogTitle className="catan-modal-title">
         <span>⚖️ {t("Central de Negociação", "Trade Center")}</span>
-        {!reviewingOffer && <small className="catan-modal-subtitle">
+        <small className="catan-modal-subtitle">
           {t(
             "Proponha trocas diretas com jogadores ou negocie com o Banco & Portos",
             "Propose direct trades with players or trade with the Bank & Ports"
           )}
-        </small>}
+        </small>
       </DialogTitle>
 
       <DialogContent className="catan-modal-content">
-        {!reviewingOffer && <div
+        <div
           className="trade-tabs"
           role="tablist"
           aria-label={t("Tipo de negociação", "Trade type")}
@@ -377,7 +392,6 @@ export default function TradeModal({
             className={`trade-tab-btn ${activeTab === "player" ? "is-active" : ""}`}
             onClick={() => {
               setTradeError(null);
-              setMaritimeTradeCompleted(false);
               setActiveTab("player");
             }}
           >
@@ -386,94 +400,122 @@ export default function TradeModal({
           <button
             type="button"
             role="tab"
+            disabled={reviewingActiveOffer}
             aria-selected={activeTab === "maritime"}
             className={`trade-tab-btn ${activeTab === "maritime" ? "is-active" : ""}`}
             onClick={() => {
+              if (reviewingActiveOffer) return;
               setTradeError(null);
+              setTrackedOffer(null);
+              setSelectedPartner(null);
               setActiveTab("maritime");
             }}
           >
             ⚓ {t("Porto & Banco", "Bank / Port")}
           </button>
-        </div>}
+        </div>
 
         {tradeError && (
           <div className="trade-p2p-warning" role="alert">
             ⚠️ {tradeError}
           </div>
         )}
-        {activeTab === "maritime" && maritimeTradeCompleted && (
-          <p className="trade-offer-status" role="status">
-            {t("Troca com Porto ou Banco concluída.", "Bank or port trade completed.")}
-          </p>
-        )}
 
-        {reviewingOffer ? (
-          <div className="trade-workbench">
-            {offerBundle && (
-              <div className="trade-summary-pill">
-                <span>{t("Você oferece", "You offer")} <strong>{formatTradeBundlePt(offerBundle.slice(0, 5), language)}</strong></span>
-                <span aria-hidden="true">⇄</span>
-                <span>{t("Você pede", "You request")} <strong>{formatTradeBundlePt(offerBundle.slice(5, 10), language)}</strong></span>
-              </div>
-            )}
-            <p className="trade-offer-status" role="status">{offerStatus}</p>
-            <div className="trade-response-list" role="group" aria-label={t("Respostas à proposta", "Offer responses")}>
-              {opponents.map(({ color, name, avatarProps }) => {
-                const canSelect = confirmActions.some((action) => action[2][10] === color);
-                const accepted = responses.get(color) === "accepted" || canSelect ||
-                  Boolean(reviewingActiveOffer && gameState?.acceptees?.[gameState.colors.indexOf(color)]);
-                const declined = responses.get(color) === "declined";
-                const status = accepted ? t("aceitou", "accepted") : declined ? t("recusou", "declined") : t("aguardando", "waiting");
-                return (
-                  <label className="trade-response-row" key={color}>
-                    <PlayerAvatar config={avatarProps.config} username={avatarProps.username} size={30} />
-                    <span>{name} · {status}</span>
-                    {confirmActions.length > 1 && canSelect && (
-                      <input
-                        type="radio"
-                        name={partnerGroup}
-                        checked={selectedPartner === color}
-                        disabled={submitting}
-                        onChange={() => setSelectedPartner(color)}
-                      />
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        ) : activeTab === "player" ? (
+        {activeTab === "player" ? (
           <div className="trade-workbench">
             {opponents.length > 0 && (
               <div
                 className="trade-partners-strip"
-                aria-label={t("Adversários na mesa", "Opponents at the table")}
+                role="group"
+                aria-label={
+                  reviewingOffer
+                    ? t("Respostas à proposta", "Offer responses")
+                    : t("Adversários na mesa", "Opponents at the table")
+                }
               >
-                {opponents.map((opp) => (
-                  <div
-                    key={opp.color}
-                    className={`trade-partner-chip ${opp.cardCount === 0 ? "is-empty" : ""}`}
-                  >
-                    <PlayerAvatar
-                      config={opp.avatarProps.config}
-                      username={opp.avatarProps.username}
-                      size={24}
-                    />
-                    <strong>{opp.name}</strong>
-                    <span>
-                      ({opp.cardCount}{" "}
-                      {opp.cardCount === 1
-                        ? t("carta", "card")
-                        : t("cartas", "cards")}
-                      )
-                    </span>
-                  </div>
-                ))}
+                {opponents.map((opp) => {
+                  const canSelect = confirmActions.some(
+                    (action) => action[2][10] === opp.color
+                  );
+                  const accepted =
+                    responses.get(opp.color) === "accepted" ||
+                    canSelect ||
+                    Boolean(
+                      reviewingActiveOffer &&
+                        gameState?.acceptees?.[
+                          gameState.colors.indexOf(opp.color)
+                        ]
+                    );
+                  const declined = responses.get(opp.color) === "declined";
+                  const status = accepted
+                    ? t("aceitou", "accepted")
+                    : declined
+                      ? t("recusou", "declined")
+                      : t("aguardando", "waiting");
+                  const statusClass = reviewingOffer
+                    ? accepted
+                      ? "is-accepted"
+                      : declined
+                        ? "is-declined"
+                        : "is-waiting"
+                    : "";
+
+                  return (
+                    <label
+                      key={opp.color}
+                      className={`trade-partner-chip ${
+                        opp.cardCount === 0 && !reviewingOffer ? "is-empty" : ""
+                      } ${statusClass}`}
+                    >
+                      <PlayerAvatar
+                        config={opp.avatarProps.config}
+                        username={opp.avatarProps.username}
+                        size={24}
+                      />
+                      {reviewingOffer ? (
+                        <span className="trade-partner-chip__summary">
+                          {opp.name} ({opp.cardCount}{" "}
+                          {opp.cardCount === 1
+                            ? t("carta", "card")
+                            : t("cartas", "cards")}
+                          ) · {status}
+                        </span>
+                      ) : (
+                        <>
+                          <strong>{opp.name}</strong>
+                          <span>
+                            ({opp.cardCount}{" "}
+                            {opp.cardCount === 1
+                              ? t("carta", "card")
+                              : t("cartas", "cards")}
+                            )
+                          </span>
+                        </>
+                      )}
+                      {reviewingOffer &&
+                        confirmActions.length > 1 &&
+                        canSelect && (
+                          <input
+                            type="radio"
+                            name={partnerGroup}
+                            checked={selectedPartner === opp.color}
+                            disabled={submitting}
+                            onChange={() => setSelectedPartner(opp.color)}
+                          />
+                        )}
+                    </label>
+                  );
+                })}
               </div>
             )}
 
-            {opponents.length > 0 && !anyOpponentHasCards && (
+            {reviewingOffer && (
+              <p className="trade-offer-status" role="status">
+                {offerStatus}
+              </p>
+            )}
+
+            {!reviewingOffer && opponents.length > 0 && !anyOpponentHasCards && (
               <div className="trade-p2p-warning">
                 {t(
                   "Nenhum adversário tem cartas na mão agora. Você ainda pode enviar a proposta ou usar a aba",
@@ -484,48 +526,190 @@ export default function TradeModal({
               </div>
             )}
 
+            {/* Visual Trade Balance Tray (Você Entrega ⇄ Você Recebe) */}
+            <div
+              className="trade-balance-board"
+              data-testid="trade-balance-board"
+            >
+              <div
+                className={`trade-balance-side trade-balance-side--give ${
+                  shownTotalOffer > 0 ? "has-items" : ""
+                }`}
+              >
+                <div className="trade-balance-side__header">
+                  <span className="trade-balance-side__tag">
+                    📤 {t("VOCÊ ENTREGA", "YOU GIVE")}
+                  </span>
+                  {shownTotalOffer > 0 && (
+                    <span className="trade-balance-side__count">
+                      {shownTotalOffer}{" "}
+                      {shownTotalOffer === 1
+                        ? t("carta", "card")
+                        : t("cartas", "cards")}
+                    </span>
+                  )}
+                </div>
+                <div className="trade-balance-side__items">
+                  {shownTotalOffer > 0 ? (
+                    RESOURCE_ORDER.map((res, idx) => {
+                      const qty = shownOfferCounts[idx];
+                      if (qty <= 0) return null;
+                      const meta = resourceMeta[res];
+                      return (
+                        <button
+                          key={res}
+                          type="button"
+                          disabled={reviewingActiveOffer || submitting}
+                          className="trade-bundle-chip trade-bundle-chip--give"
+                          title={t(
+                            `Clique para remover 1 ${meta.label}`,
+                            `Click to remove 1 ${meta.label}`
+                          )}
+                          onClick={() => adjustOffer(idx, -1)}
+                        >
+                          <ResourceIcon resource={res} size={20} />
+                          <span>
+                            {qty}× {meta.label}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <span className="trade-balance-side__empty">
+                      {t(
+                        "Toque nas cartas da sua mão abaixo",
+                        "Tap cards from your hand below"
+                      )}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="trade-balance-center" aria-hidden="true">
+                <span className="trade-balance-center__icon">⇄</span>
+              </div>
+
+              <div
+                className={`trade-balance-side trade-balance-side--ask ${
+                  shownTotalAsk > 0 ? "has-items" : ""
+                }`}
+              >
+                <div className="trade-balance-side__header">
+                  <span className="trade-balance-side__tag">
+                    📥 {t("VOCÊ PEDE", "YOU REQUEST")}
+                  </span>
+                  {shownTotalAsk > 0 && (
+                    <span className="trade-balance-side__count">
+                      {shownTotalAsk}{" "}
+                      {shownTotalAsk === 1
+                        ? t("carta", "card")
+                        : t("cartas", "cards")}
+                    </span>
+                  )}
+                </div>
+                <div className="trade-balance-side__items">
+                  {shownTotalAsk > 0 ? (
+                    RESOURCE_ORDER.map((res, idx) => {
+                      const qty = shownAskCounts[idx];
+                      if (qty <= 0) return null;
+                      const meta = resourceMeta[res];
+                      return (
+                        <button
+                          key={res}
+                          type="button"
+                          disabled={reviewingActiveOffer || submitting}
+                          className="trade-bundle-chip trade-bundle-chip--ask"
+                          title={t(
+                            `Clique para remover 1 ${meta.label}`,
+                            `Click to remove 1 ${meta.label}`
+                          )}
+                          onClick={() => adjustAsk(idx, -1)}
+                        >
+                          <ResourceIcon resource={res} size={20} />
+                          <span>
+                            {qty}× {meta.label}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <span className="trade-balance-side__empty">
+                      {t(
+                        "Escolha o que deseja receber abaixo",
+                        "Choose what you want to receive below"
+                      )}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Step 1: Offer from Hand */}
-            <div className="trade-section">
+            <div className="trade-section trade-section--give">
               <div className="trade-section__header">
                 <span>
+                  📤{" "}
                   {t(
                     "1. Você Oferece da sua Mão",
                     "1. You Offer from Your Hand"
                   )}
                 </span>
-                {(totalOffer > 0 || totalAsk > 0) && (
-                  <button
-                    type="button"
-                    className="trade-clear-link"
-                    onClick={() => {
-                      setOfferCounts([0, 0, 0, 0, 0]);
-                      setAskCounts([0, 0, 0, 0, 0]);
-                    }}
-                  >
-                    {t("Limpar proposta", "Clear offer")}
-                  </button>
-                )}
+                {!reviewingActiveOffer &&
+                  (shownTotalOffer > 0 || shownTotalAsk > 0) && (
+                    <button
+                      type="button"
+                      className="trade-clear-link"
+                      onClick={() => {
+                        setTrackedOffer(null);
+                        setSelectedPartner(null);
+                        setOfferCounts([0, 0, 0, 0, 0]);
+                        setAskCounts([0, 0, 0, 0, 0]);
+                      }}
+                    >
+                      🧹 {t("Limpar proposta", "Clear offer")}
+                    </button>
+                  )}
               </div>
               <div className="trade-resource-grid">
                 {RESOURCE_ORDER.map((res, idx) => {
                   const meta = resourceMeta[res];
                   const inHand =
                     Number(playerState?.[`${playerKey}_${res}_IN_HAND`]) || 0;
-                  const qty = offerCounts[idx];
+                  const qty = shownOfferCounts[idx];
 
                   return (
                     <div
                       key={res}
-                      className={`trade-res-card trade-res-card--p2p ${qty > 0 ? "selected" : ""}`}
-                      style={{
-                        borderColor: qty > 0 ? meta.accentColor : undefined,
-                      }}
+                      className={`trade-res-card trade-res-card--p2p ${
+                        qty > 0 ? "selected" : ""
+                      } ${inHand === 0 ? "is-depleted" : ""}`}
+                      style={
+                        {
+                          "--res-accent": meta.accentColor,
+                          borderColor: qty > 0 ? meta.accentColor : undefined,
+                        } as React.CSSProperties
+                      }
                     >
-                      <ResourceIcon resource={res} size={28} />
-                      <span className="trade-res-card__name">{meta.label}</span>
-                      <span className="trade-res-card__hand">
-                        {t("Na mão:", "In hand:")} <strong>{inHand}</strong>
-                      </span>
+                      <div
+                        className="trade-res-card__tap-area"
+                        onClick={() => {
+                          if (
+                            !reviewingActiveOffer &&
+                            qty < inHand &&
+                            !submitting
+                          ) {
+                            adjustOffer(idx, 1);
+                          }
+                        }}
+                      >
+                        <span className="trade-res-card__hand-pill">
+                          {t("Na mão:", "In hand:")} <strong>{inHand}</strong>
+                        </span>
+                        <ResourceIcon resource={res} size={34} />
+                        <span className="trade-res-card__name">
+                          {meta.label}
+                        </span>
+                      </div>
                       <div className="trade-stepper">
                         <button
                           type="button"
@@ -534,7 +718,9 @@ export default function TradeModal({
                             `Remover oferta de ${meta.label}`,
                             `Decrease ${meta.label} offer`
                           )}
-                          disabled={qty <= 0 || submitting}
+                          disabled={
+                            reviewingActiveOffer || qty <= 0 || submitting
+                          }
                           onClick={() => adjustOffer(idx, -1)}
                         >
                           −
@@ -552,7 +738,9 @@ export default function TradeModal({
                             `Adicionar oferta de ${meta.label}`,
                             `Increase ${meta.label} offer`
                           )}
-                          disabled={qty >= inHand || submitting}
+                          disabled={
+                            reviewingActiveOffer || qty >= inHand || submitting
+                          }
                           onClick={() => adjustOffer(idx, 1)}
                         >
                           +
@@ -564,57 +752,54 @@ export default function TradeModal({
               </div>
             </div>
 
-            {/* P2P Summary */}
-            <div className="trade-exchange-divider">
-              {totalOffer > 0 && totalAsk > 0 ? (
-                <div className="trade-summary-pill">
-                  <span>
-                    {t("Oferece:", "You offer:")}{" "}
-                    <strong>{formatTradeBundlePt(offerCounts, language)}</strong>
-                  </span>
-                  <span className="trade-summary-pill__arrow">➔</span>
-                  <span>
-                    {t("Pede:", "You receive:")}{" "}
-                    <strong>{formatTradeBundlePt(askCounts, language)}</strong>
-                  </span>
-                </div>
-              ) : (
-                <span>
-                  {t(
-                    "Escolha ao menos 1 recurso para oferecer e 1 para pedir",
-                    "Choose at least 1 resource to offer and 1 to receive"
-                  )}
-                </span>
-              )}
-            </div>
-
             {/* Step 2: Ask from Table */}
-            <div className="trade-section">
+            <div className="trade-section trade-section--ask">
               <div className="trade-section__header">
                 <span>
-                  {t("2. Você Pede em Troca", "2. You Request in Return")}
+                  📥 {t("2. Você Pede em Troca", "2. You Request in Return")}
                 </span>
               </div>
               <div className="trade-resource-grid">
                 {RESOURCE_ORDER.map((res, idx) => {
                   const meta = resourceMeta[res];
-                  const qty = askCounts[idx];
+                  const qty = shownAskCounts[idx];
+                  const isBeingOffered = shownOfferCounts[idx] > 0;
 
                   return (
                     <div
                       key={res}
-                      className={`trade-res-card trade-res-card--p2p ${qty > 0 ? "selected" : ""}`}
-                      style={{
-                        borderColor: qty > 0 ? meta.accentColor : undefined,
-                      }}
+                      className={`trade-res-card trade-res-card--p2p ${
+                        qty > 0 ? "selected" : ""
+                      } ${isBeingOffered ? "is-offered-elsewhere" : ""}`}
+                      style={
+                        {
+                          "--res-accent": meta.accentColor,
+                          borderColor: qty > 0 ? meta.accentColor : undefined,
+                        } as React.CSSProperties
+                      }
                     >
-                      <ResourceIcon resource={res} size={28} />
-                      <span className="trade-res-card__name">{meta.label}</span>
-                      <span className="trade-res-card__hand">
-                        {offerCounts[idx] > 0
-                          ? t("Em oferta", "Offering")
-                          : t("Pedir", "Request")}
-                      </span>
+                      <div
+                        className="trade-res-card__tap-area"
+                        onClick={() => {
+                          if (
+                            !reviewingActiveOffer &&
+                            qty < 9 &&
+                            !submitting
+                          ) {
+                            adjustAsk(idx, 1);
+                          }
+                        }}
+                      >
+                        <span className="trade-res-card__hand-pill">
+                          {isBeingOffered
+                            ? t("Em oferta", "Offering")
+                            : t("Pedir", "Request")}
+                        </span>
+                        <ResourceIcon resource={res} size={34} />
+                        <span className="trade-res-card__name">
+                          {meta.label}
+                        </span>
+                      </div>
                       <div className="trade-stepper">
                         <button
                           type="button"
@@ -623,7 +808,9 @@ export default function TradeModal({
                             `Remover pedido de ${meta.label}`,
                             `Decrease ${meta.label} request`
                           )}
-                          disabled={qty <= 0 || submitting}
+                          disabled={
+                            reviewingActiveOffer || qty <= 0 || submitting
+                          }
                           onClick={() => adjustAsk(idx, -1)}
                         >
                           −
@@ -641,7 +828,9 @@ export default function TradeModal({
                             `Adicionar pedido de ${meta.label}`,
                             `Increase ${meta.label} request`
                           )}
-                          disabled={qty >= 9 || submitting}
+                          disabled={
+                            reviewingActiveOffer || qty >= 9 || submitting
+                          }
                           onClick={() => adjustAsk(idx, 1)}
                         >
                           +

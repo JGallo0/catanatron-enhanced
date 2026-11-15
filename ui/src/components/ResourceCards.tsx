@@ -135,13 +135,23 @@ export default function ResourceCards({
             <div
               key={res}
               data-card-destination={res}
-              className={cn("hand-resource-icon", { "is-empty": count === 0 })}
+              data-resource-label={meta.label}
+              className={cn(
+                "hand-resource-icon",
+                `hand-resource-icon--${lower}`,
+                {
+                  "is-empty": count === 0,
+                  "has-cards": count > 0,
+                }
+              )}
               role="img"
               aria-label={`${meta.label} (${count})`}
               title={`${meta.label} · ${count}`}
             >
-              <ResourceIcon resource={res} size={23} />
-              <span>{count}</span>
+              <span className="hand-resource-icon__emblem" aria-hidden="true">
+                <ResourceIcon resource={res} size={36} />
+              </span>
+              <span className="hand-resource-icon__count">{count}</span>
             </div>
           );
         }
@@ -263,9 +273,12 @@ export default function ResourceCards({
                 : undefined
             }
             data-card-destination={id}
+            data-resource-label={shortName}
             className={cn(
               "dev-cards",
-              iconOnly ? "hand-resource-icon hand-resource-icon--dev" : "center-text card resource-card-item resource-card-item--dev",
+              iconOnly
+                ? "hand-resource-icon hand-resource-icon--dev has-cards"
+                : "center-text card resource-card-item resource-card-item--dev",
               {
                 "resource-card-item--deck": showEmptySlots && !iconOnly,
                 "resource-card-item--playable": canPlay,
@@ -279,8 +292,10 @@ export default function ResourceCards({
           >
             {iconOnly ? (
               <>
-                <DevCardIcon card={id} size={22} />
-                <span>{count}</span>
+                <span className="hand-resource-icon__emblem" aria-hidden="true">
+                  <DevCardIcon card={id} size={34} />
+                </span>
+                <span className="hand-resource-icon__count">{count}</span>
               </>
             ) : <>
             <CardArtIllustration
