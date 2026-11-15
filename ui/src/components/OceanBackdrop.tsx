@@ -31,6 +31,11 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
   const emberGlowId = `rep-ember-glow-${uid}`;
   const toniGlassId = `rep-toni-glass-${uid}`;
   const fofinhaGlassId = `rep-fofinha-glass-${uid}`;
+  const fofinhaCapId = `rep-fofinha-cap-${uid}`;
+  const fofinhaLabelBlueId = `rep-fofinha-blue-${uid}`;
+  const fofinhaLabelGreenId = `rep-fofinha-green-${uid}`;
+  const fofinhaCylinderShadeId = `rep-fofinha-shade-${uid}`;
+  const fofinhaLabelClipId = `rep-fofinha-clip-${uid}`;
 
   const positionedStyle: React.CSSProperties | undefined =
     center && size
@@ -118,14 +123,52 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
             <stop offset="100%" stopColor="#240d02" />
           </linearGradient>
 
-          {/* Fofinha golden cachaça glass bottle gradient */}
+          {/* Fofinha clear glass bottle with pale straw-tinted cachaça */}
           <linearGradient id={fofinhaGlassId} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#713f12" />
-            <stop offset="25%" stopColor="#ca8a04" />
-            <stop offset="52%" stopColor="#facc15" />
-            <stop offset="80%" stopColor="#a16207" />
-            <stop offset="100%" stopColor="#522c06" />
+            <stop offset="0%" stopColor="rgba(186, 230, 253, 0.52)" />
+            <stop offset="16%" stopColor="rgba(255, 255, 255, 0.48)" />
+            <stop offset="38%" stopColor="rgba(241, 245, 249, 0.18)" />
+            <stop offset="68%" stopColor="rgba(226, 232, 240, 0.16)" />
+            <stop offset="88%" stopColor="rgba(248, 250, 252, 0.42)" />
+            <stop offset="100%" stopColor="rgba(148, 163, 184, 0.55)" />
           </linearGradient>
+
+          <linearGradient id={fofinhaCapId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#075985" />
+            <stop offset="28%" stopColor="#0ea5e9" />
+            <stop offset="56%" stopColor="#38bdf8" />
+            <stop offset="84%" stopColor="#0284c7" />
+            <stop offset="100%" stopColor="#0c4a6e" />
+          </linearGradient>
+
+          <linearGradient id={fofinhaLabelBlueId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#0369a1" />
+            <stop offset="22%" stopColor="#0284c7" />
+            <stop offset="48%" stopColor="#0ea5e9" />
+            <stop offset="78%" stopColor="#0284c7" />
+            <stop offset="100%" stopColor="#075985" />
+          </linearGradient>
+
+          <linearGradient id={fofinhaLabelGreenId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#14532d" />
+            <stop offset="25%" stopColor="#15803d" />
+            <stop offset="52%" stopColor="#16a34a" />
+            <stop offset="80%" stopColor="#15803d" />
+            <stop offset="100%" stopColor="#052e16" />
+          </linearGradient>
+
+          <linearGradient id={fofinhaCylinderShadeId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="rgba(2, 6, 23, 0.34)" />
+            <stop offset="15%" stopColor="rgba(255, 255, 255, 0.14)" />
+            <stop offset="26%" stopColor="rgba(255, 255, 255, 0.3)" />
+            <stop offset="42%" stopColor="rgba(255, 255, 255, 0)" />
+            <stop offset="78%" stopColor="rgba(2, 6, 23, 0.06)" />
+            <stop offset="100%" stopColor="rgba(2, 6, 23, 0.38)" />
+          </linearGradient>
+
+          <clipPath id={fofinhaLabelClipId}>
+            <rect x="-32" y="-22" width="64" height="90" rx="1.5" />
+          </clipPath>
         </defs>
 
         {/* ================================================================ */}
@@ -467,106 +510,344 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
 
         {/* 3B. Garrafa de Fofinha (next to Toni Lourenço on the right table border) */}
         <g transform="translate(1796, 258) rotate(12)">
-          {/* Bottle drop shadow */}
-          <rect
-            x="-32"
-            y="-74"
-            width="68"
-            height="168"
-            rx="16"
+          {/* Bottle drop shadow on the table border */}
+          <path
+            d="M -11 -116
+               L 11 -116
+               L 11 -66
+               C 25 -56, 33 -41, 33 -22
+               L 33 76
+               A 11 11 0 0 1 22 87
+               L -22 87
+               A 11 11 0 0 1 -33 76
+               L -33 -22
+               C -33 -41, -25 -56, -11 -66 Z"
             fill="rgba(12, 5, 1, 0.56)"
             transform="translate(8, 12)"
           />
-          {/* Bottle neck */}
-          <rect
-            x="-10"
-            y="-102"
-            width="20"
-            height="36"
-            rx="4"
-            fill="rgba(254, 249, 195, 0.42)"
-            stroke="#713f12"
+
+          {/* Clear glass bottle silhouette (tall cachaça bottle with smooth shoulders) */}
+          <path
+            d="M -10.5 -92
+               L -10.5 -64
+               C -24.5 -54, -32.5 -40, -32.5 -22
+               L -32.5 76
+               A 10.5 10.5 0 0 0 -22 86.5
+               L 22 86.5
+               A 10.5 10.5 0 0 0 32.5 76
+               L 32.5 -22
+               C 32.5 -40, 24.5 -54, 10.5 -64
+               L 10.5 -92 Z"
+            fill={`url(#${fofinhaGlassId})`}
+            stroke="rgba(226, 232, 240, 0.65)"
             strokeWidth="1.6"
           />
-          {/* Classic yellow/red screw cap */}
+
+          {/* Pale straw-tinted crystal cachaça visible in the glass base & shoulders */}
+          <path
+            d="M -30.5 64
+               L 30.5 64
+               L 30.5 73.5
+               A 8.5 8.5 0 0 1 22 82
+               L -22 82
+               A 8.5 8.5 0 0 1 -30.5 73.5 Z"
+            fill="rgba(254, 240, 138, 0.34)"
+          />
+          <ellipse cx="0" cy="80.5" rx="23" ry="3.2" fill="rgba(255, 255, 255, 0.28)" />
+          <path
+            d="M -18 -54 C -10 -46, 10 -46, 18 -54"
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.28)"
+            strokeWidth="1.5"
+          />
+
+          {/* Tall vibrant blue heat-shrink cap / seal ("Fofinha - Cachaça de Minas") */}
           <rect
-            x="-12"
-            y="-112"
-            width="24"
-            height="12"
-            rx="3"
-            fill="#eab308"
-            stroke="#991b1b"
-            strokeWidth="1.4"
+            x="-11.5"
+            y="-124"
+            width="23"
+            height="33"
+            rx="2.5"
+            fill={`url(#${fofinhaCapId})`}
+            stroke="#082f49"
+            strokeWidth="1.2"
           />
-          {/* Clear glass bottle filled with golden Fofinha cachaça */}
-          <path
-            d="M -10 -68
-               C -24 -60, -32 -44, -32 -25
-               L -32 74
-               A 12 12 0 0 0 -20 86
-               L 20 86
-               A 12 12 0 0 0 32 74
-               L 32 -25
-               C 32 -44, 24 -60, 10 -68 Z"
-            fill={`url(#${fofinhaGlassId})`}
-            stroke="#451a03"
-            strokeWidth="2"
+          {/* Knurled screw-top band at very top */}
+          <rect
+            x="-11.8"
+            y="-124.5"
+            width="23.6"
+            height="8.5"
+            rx="2"
+            fill="#0284c7"
+            stroke="#0c4a6e"
+            strokeWidth="0.9"
           />
-          {/* Glass highlight */}
           <path
-            d="M -22 -34 L -22 68"
-            stroke="rgba(255, 255, 255, 0.45)"
-            strokeWidth="3.8"
+            d="M -9 -123.5 V -117 M -6 -123.5 V -117 M -3 -123.5 V -117 M 0 -123.5 V -117 M 3 -123.5 V -117 M 6 -123.5 V -117 M 9 -123.5 V -117"
+            stroke="rgba(255, 255, 255, 0.25)"
+            strokeWidth="0.8"
+          />
+          <text
+            x="0"
+            y="-105.5"
+            textAnchor="middle"
+            fill="#0f172a"
+            fontSize="6.4"
+            fontWeight="900"
+            fontFamily="'UnifrakturMaguntia', 'Old English Text MT', Georgia, serif"
+          >
+            Fofinha
+          </text>
+          <text
+            x="0"
+            y="-98"
+            textAnchor="middle"
+            fill="#0f172a"
+            fontSize="2.2"
+            fontWeight="800"
+            fontFamily="Georgia, serif"
+          >
+            Cachaça de Minas
+          </text>
+
+          {/* Wrap-around Fofinha Paper Label */}
+          <g clipPath={`url(#${fofinhaLabelClipId})`}>
+            {/* Vibrant sky/royal blue upper background */}
+            <rect x="-32" y="-22" width="64" height="90" fill={`url(#${fofinhaLabelBlueId})`} />
+
+            {/* Top black rim trim */}
+            <rect x="-32" y="-22" width="64" height="2.4" fill="#090d16" />
+
+            {/* Gothic "Fofinha" wordmark with gold outline & winged filigree */}
+            <text
+              x="0"
+              y="-5.5"
+              textAnchor="middle"
+              fill="#090d16"
+              stroke="#eab308"
+              strokeWidth="1.35"
+              paintOrder="stroke fill"
+              fontSize="16"
+              fontWeight="900"
+              letterSpacing="-0.3"
+              fontFamily="'UnifrakturMaguntia', 'Old English Text MT', Georgia, serif"
+            >
+              Fofinha
+            </text>
+            {/* Ornamental V-shaped gold & black flourish beneath the wordmark */}
+            <path
+              d="M -27 -2 C -16 -3.5, -7 -1.5, -1.5 2.5 L -3.5 4 C -9 1.5, -17 0.5, -26 -0.2 Z"
+              fill="#ca8a04"
+              stroke="#090d16"
+              strokeWidth="0.8"
+            />
+            <path
+              d="M 27 -2 C 16 -3.5, 7 -1.5, 1.5 2.5 L 3.5 4 C 9 1.5, 17 0.5, 26 -0.2 Z"
+              fill="#ca8a04"
+              stroke="#090d16"
+              strokeWidth="0.8"
+            />
+            <circle cx="0" cy="2.6" r="1.4" fill="#090d16" stroke="#eab308" strokeWidth="0.6" />
+
+            {/* Left copy: CACHAÇA DE MINAS */}
+            <text
+              x="-27.5"
+              y="10.5"
+              fill="#090d16"
+              fontSize="5.4"
+              fontWeight="900"
+              letterSpacing="0.2"
+              fontFamily="Plus Jakarta Sans, sans-serif"
+            >
+              CACHAÇA
+            </text>
+            <text
+              x="-27.5"
+              y="16.2"
+              fill="#090d16"
+              fontSize="5.1"
+              fontWeight="900"
+              letterSpacing="0.2"
+              fontFamily="Plus Jakarta Sans, sans-serif"
+            >
+              DE MINAS
+            </text>
+            <text
+              x="-27.5"
+              y="19.6"
+              fill="#0f172a"
+              fontSize="2.05"
+              fontWeight="700"
+              fontFamily="Plus Jakarta Sans, sans-serif"
+            >
+              Produzida em alambique de cobre
+            </text>
+
+            {/* Rural Minas landscape: distant dark tree line & winding white path */}
+            <path
+              d="M -32 28 Q -15 24, 3 27 T 32 25 L 32 34 L -32 34 Z"
+              fill="#0f172a"
+            />
+            <path
+              d="M -32 27 C -18 28, -8 32, 32 29 L 32 48 L -32 48 Z"
+              fill="#f8fafc"
+              stroke="#334155"
+              strokeWidth="0.5"
+            />
+            {/* Winding rural lane outline */}
+            <path
+              d="M -32 31 C -20 34, -14 38, -10 44 M -22 31 C -14 34, -9 38, -6 44"
+              fill="none"
+              stroke="#334155"
+              strokeWidth="0.6"
+            />
+            {/* Little yellow farmhouse with red roof on the left */}
+            <g transform="translate(-23, 25)">
+              <polygon points="-4,2 4,2 5,6 -5,6" fill="#facc15" stroke="#090d16" strokeWidth="0.6" />
+              <polygon points="-5.2,2.2 0,-1.5 5.2,2.2" fill="#dc2626" stroke="#090d16" strokeWidth="0.6" />
+              <rect x="-1.2" y="3.4" width="1.6" height="2.6" fill="#7c2d12" />
+            </g>
+            {/* Tiny field flowers along the white slope */}
+            <circle cx="-24" cy="39" r="1.1" fill="#ef4444" />
+            <circle cx="-17" cy="40" r="1.1" fill="#f97316" />
+            <circle cx="-13" cy="37" r="0.9" fill="#eab308" />
+
+            {/* Lower forest-green band */}
+            <path
+              d="M -32 44 Q -10 39, 8 44 T 32 40 L 32 68 L -32 68 Z"
+              fill={`url(#${fofinhaLabelGreenId})`}
+            />
+
+            {/* THE ICONIC WOMAN ("A MOÇA DA FOFINHA") on the right side */}
+            <g transform="translate(15, 22)">
+              {/* Hair waves framing face */}
+              <path
+                d="M -6 -6 C -9 -3, -9.5 2, -6.5 5 L 4.5 5 C 6.5 1, 6 -3, 3.5 -6 Z"
+                fill="#fde047"
+                stroke="#090d16"
+                strokeWidth="0.7"
+              />
+              {/* Yellow straw hat with black band & red flower */}
+              <ellipse cx="-1" cy="-6.8" rx="9.5" ry="2.4" transform="rotate(-8 -1 -6.8)" fill="#facc15" stroke="#090d16" strokeWidth="0.7" />
+              <path d="M -5.5 -7.5 C -4.5 -12, 2.5 -12, 4 -8.2 Z" fill="#eab308" stroke="#090d16" strokeWidth="0.7" />
+              <path d="M -5 -7.8 Q -0.8 -6.8, 3.8 -8.2" fill="none" stroke="#090d16" strokeWidth="1.2" />
+              {/* Red flower on the hat */}
+              <circle cx="1.8" cy="-9.2" r="2.2" fill="#ef4444" stroke="#090d16" strokeWidth="0.45" />
+              <circle cx="1.8" cy="-9.2" r="0.75" fill="#fde047" />
+              {/* Face, neck & shoulders */}
+              <ellipse cx="-1" cy="-1.5" rx="3.8" ry="4.4" fill="#fed7aa" stroke="#090d16" strokeWidth="0.6" />
+              <circle cx="-2.4" cy="-2" r="0.55" fill="#090d16" />
+              <circle cx="0.3" cy="-2.1" r="0.55" fill="#090d16" />
+              <path d="M -1.8 0.8 Q -0.9 1.4, 0 0.8" fill="none" stroke="#991b1b" strokeWidth="0.6" />
+              <path d="M -2.5 2.6 L -5.5 6.8 L 4.5 6.8 L 1.5 2.6 Z" fill="#fed7aa" />
+              {/* Red dress bodice & skirt */}
+              <path
+                d="M -5.2 6.4 L 3.8 6.4 L 6.5 24 L -7.8 24 Z"
+                fill="#dc2626"
+                stroke="#090d16"
+                strokeWidth="0.6"
+              />
+              {/* Blue diagonal sash across right shoulder */}
+              <path
+                d="M 1.2 4.8 L 5.6 6.2 L -4.2 19 L -7.2 16.5 Z"
+                fill="#0284c7"
+                stroke="#090d16"
+                strokeWidth="0.55"
+              />
+              {/* Bare arms clasping the bundle of sugarcane */}
+              <path d="M -5 7 L -7.2 12 L -2.5 14" fill="none" stroke="#fed7aa" strokeWidth="2.1" strokeLinecap="round" />
+              <path d="M 4.5 7.5 L 6.8 11 L 1 13.5" fill="none" stroke="#fed7aa" strokeWidth="2.1" strokeLinecap="round" />
+              {/* Diagonal bundle of sugarcane stalks held across body */}
+              <g stroke="#090d16" strokeWidth="0.45">
+                <line x1="12.5" y1="-3" x2="-11" y2="25" stroke="#fde047" strokeWidth="1.9" strokeLinecap="round" />
+                <line x1="10.8" y1="-4" x2="-12.5" y2="24" stroke="#ca8a04" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="13.8" y1="-1" x2="-9.2" y2="26.5" stroke="#a3e635" strokeWidth="1.4" strokeLinecap="round" />
+                <line x1="12.5" y1="-3" x2="-11" y2="25" stroke="#090d16" strokeWidth="0.55" strokeDasharray="3 2" />
+              </g>
+            </g>
+
+            {/* Producer text on dark green band */}
+            <text
+              x="3.2"
+              y="51.2"
+              textAnchor="middle"
+              fill="#fde047"
+              fontSize="2.7"
+              fontWeight="800"
+              fontFamily="Plus Jakarta Sans, sans-serif"
+            >
+              Agostinho Belgo Militão e Irmã Ltda
+            </text>
+            <text
+              x="-11"
+              y="58.5"
+              textAnchor="middle"
+              fill="#facc15"
+              fontSize="2.7"
+              fontWeight="700"
+              fontFamily="Plus Jakarta Sans, sans-serif"
+            >
+              Inhapim - MG
+            </text>
+            <text
+              x="14"
+              y="58.5"
+              textAnchor="middle"
+              fill="#facc15"
+              fontSize="2.4"
+              fontWeight="700"
+              fontFamily="Plus Jakarta Sans, sans-serif"
+            >
+              Indústria Brasileira
+            </text>
+            {/* Tiny barcode corner on bottom left */}
+            <rect x="-31.5" y="47" width="5.5" height="14" rx="0.6" fill="#f8fafc" />
+            <path
+              d="M -30 49 H -27.5 M -30 51 H -27.5 M -30 53.5 H -27.5 M -30 56 H -27.5 M -30 58.5 H -27.5"
+              stroke="#0f172a"
+              strokeWidth="0.8"
+            />
+            {/* Thin white bottom footer strip */}
+            <rect x="-32" y="63.5" width="64" height="3.2" fill="#f8fafc" />
+            <text
+              x="0"
+              y="66"
+              textAnchor="middle"
+              fill="#14532d"
+              fontSize="2.2"
+              fontWeight="800"
+              letterSpacing="0.25"
+              fontFamily="Plus Jakarta Sans, sans-serif"
+            >
+              ARMAZENADA EM TONÉIS DE JEQUITIBÁ
+            </text>
+            <rect x="-32" y="66.7" width="64" height="1.5" fill="#090d16" />
+
+            {/* Cylindrical paper highlight/shading */}
+            <rect x="-32" y="-22" width="64" height="90" fill={`url(#${fofinhaCylinderShadeId})`} />
+          </g>
+
+          {/* Crisp vertical glass specular highlights over neck, shoulder, and label edge */}
+          <path
+            d="M -18 -54 C -24 -45, -24.5 -34, -24.5 -24 L -24.5 76"
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.42)"
+            strokeWidth="3.2"
             strokeLinecap="round"
           />
-          {/* Iconic Fofinha label */}
-          <rect
-            x="-28"
-            y="-18"
-            width="56"
-            height="68"
-            rx="5"
-            fill="#dc2626"
-            stroke="#fef08a"
-            strokeWidth="2"
+          <path
+            d="M -6.5 -89 L -6.5 -66"
+            stroke="rgba(255, 255, 255, 0.5)"
+            strokeWidth="2.2"
+            strokeLinecap="round"
           />
-          <ellipse cx="0" cy="4" rx="23" ry="16" fill="#facc15" stroke="#7f1d1d" strokeWidth="1.2" />
-          <text
-            x="0"
-            y="8"
-            textAnchor="middle"
-            fill="#991b1b"
-            fontSize="9.8"
-            fontWeight="900"
-            letterSpacing="0.4"
-            fontFamily="Cinzel, Georgia, serif"
-          >
-            FOFINHA
-          </text>
-          <text
-            x="0"
-            y="32"
-            textAnchor="middle"
-            fill="#fef9c3"
-            fontSize="6.2"
-            fontWeight="800"
-            letterSpacing="0.5"
-            fontFamily="Plus Jakarta Sans, sans-serif"
-          >
-            A RAINHA DA PRAÇA
-          </text>
-          <text
-            x="0"
-            y="43"
-            textAnchor="middle"
-            fill="#fde047"
-            fontSize="5.6"
-            fontWeight="700"
-            fontFamily="Plus Jakarta Sans, sans-serif"
-          >
-            VIÇOSA • MG
-          </text>
+          <path
+            d="M 24 -42 L 24 72"
+            stroke="rgba(255, 255, 255, 0.18)"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
         </g>
 
         {/* Small cachaça shot glass ("copinho de dose") beside Toni Lourenço & Fofinha */}
@@ -580,7 +861,7 @@ export default function OceanBackdrop({ center, size }: OceanBackdropProps) {
             stroke="rgba(255, 255, 255, 0.65)"
             strokeWidth="2.2"
           />
-          <circle cx="0" cy="0" r="14" fill="#eab308" opacity="0.88" />
+          <circle cx="0" cy="0" r="14" fill="rgba(254, 240, 138, 0.58)" />
           <path d="M-8 -6 A10 10 0 0 1 8 -6" stroke="#fef9c3" strokeWidth="2" fill="none" />
         </g>
 
