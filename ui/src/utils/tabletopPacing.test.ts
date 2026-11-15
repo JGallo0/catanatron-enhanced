@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
 import {
+  AWARD_CONQUEST_DURATION_MS,
   INTRO_SPLASH_MS,
   TURN_TRANSITION_MS,
   cycleGameSpeed,
@@ -179,6 +180,10 @@ describe("tabletopPacing", () => {
         P0_PLAYED_KNIGHT: 3,
       },
     });
+    const initialAwardFx = extractBatchTransitionFX(null, awardState, "BLUE");
+    expect(initialAwardFx.awardEvents).toEqual([]);
+    expect(AWARD_CONQUEST_DURATION_MS).toBe(5300);
+
     const awardFx = extractBatchTransitionFX(robberNext, awardState, "BLUE");
     expect(awardFx.awardEvents).toEqual([
       {

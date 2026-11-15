@@ -14,6 +14,7 @@ export type GameSpeed = "slow" | "normal" | "fast" | "turbo";
 export const GAME_SPEED_STORAGE_KEY = "catan_game_speed_v1";
 export const INTRO_SPLASH_MS = 10000;
 export const TURN_TRANSITION_MS = 3000;
+export const AWARD_CONQUEST_DURATION_MS = 5300;
 
 export function getSavedGameSpeed(): GameSpeed {
   try {

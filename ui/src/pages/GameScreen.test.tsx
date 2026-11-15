@@ -1164,3 +1164,72 @@ test("displays RobbedOverlay with crossed swords and lost card when the local pl
   expect(overlay).toHaveTextContent(/Minério/i);
   expect(overlay.querySelector(".robbed-overlay__swords")).toBeInTheDocument();
 });
+
+test("queues simultaneous award conquests FIFO with cinematic overlay and cleans up timer on unmount", async () => {
+  vi.useFakeTimers();
+  const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  const preAward = makeGameState({
+    state_index: 15,
+    room_code: "AWD1",
+    colors: ["RED", "BLUE"],
+    current_color: "RED",
+    bot_colors: [],
+    seat_names: { RED: "Creitu", BLUE: "João" },
+  });
+  const dualAward = makeGameState({
+    state_index: 16,
+    room_code: "AWD1",
+    colors: ["RED", "BLUE"],
+    current_color: "RED",
+    bot_colors: [],
+    seat_names: { RED: "Creitu", BLUE: "João" },
+    player_state: {
+      ...preAward.player_state,
+      P0_HAS_ARMY: true,
+      P0_PLAYED_KNIGHT: 3,
+      P1_HAS_ROAD: true,
+      P1_LONGEST_ROAD_LENGTH: 6,
+    },
+  });
+
+  vi.mocked(getState)
+    .mockResolvedValueOnce(preAward)
+    .mockResolvedValue(dualAward);
+
+  const { container, unmount } = renderGameScreen({
+    initialEntry: "/games/game-award-fifo?seat=BLUE",
+  });
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
+  expect(screen.getByTestId("board")).toBeInTheDocument();
+
+  // Trigger multiplayer poll for dualAward state (poll interval is 700ms)
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(800);
+  });
+
+  const firstOverlay = screen.getByTestId("award-conquest-overlay");
+  expect(firstOverlay).toHaveTextContent("Creitu");
+  expect(screen.queryByTestId("award-conquest-banner")).toBeNull();
+  expect(container.querySelector(".award-conquest-banner__rays")).toBeNull();
+
+  // Advance full duration of first award (5300ms) -> FIFO advances to second award
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5300);
+  });
+
+  const secondOverlay = screen.getByTestId("award-conquest-overlay");
+  expect(secondOverlay).toHaveTextContent("João");
+
+  // Unmount while second timer is active and advance past timeout
+  unmount();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(6000);
+  });
+
+  expect(consoleErrorSpy).not.toHaveBeenCalled();
+  consoleErrorSpy.mockRestore();
+});
