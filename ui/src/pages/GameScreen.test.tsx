@@ -367,9 +367,7 @@ test("keeps the trade center open from the offer through confirmation with a cho
   fireEvent.click(center.getByRole("radio", { name: /Beto/i }));
   expect(postAction).toHaveBeenCalledTimes(1);
   fireEvent.click(confirmButton);
-  expect(await center.findByText(/Troca concluída com Beto/i)).toBeInTheDocument();
-  expect(postAction).toHaveBeenLastCalledWith("game-123", confirm);
-  fireEvent.click(center.getByRole("button", { name: "Fechar" }));
+  await waitFor(() => expect(postAction).toHaveBeenLastCalledWith("game-123", confirm));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: /Central de Negociação/i })).not.toBeInTheDocument());
 });
 

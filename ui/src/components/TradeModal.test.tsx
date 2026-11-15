@@ -204,14 +204,16 @@ describe("TradeModal", () => {
       expect(button).toBeEnabled();
       fireEvent.click(button);
       expect(await screen.findByRole("alert")).toHaveTextContent("Tente novamente");
+      expect(onClose).not.toHaveBeenCalled();
       fireEvent.click(button);
       await waitFor(() => expect(onExecuteTrade).toHaveBeenCalledTimes(2));
       expect(onExecuteTrade).toHaveBeenLastCalledWith(confirm);
+      await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     } else {
       expect(screen.getByText(/Creitu.*recusou/i)).toBeInTheDocument();
       expect(screen.getByRole("status")).toHaveTextContent("Todos os jogadores recusaram");
       expect(screen.queryByRole("button", { name: "Confirmar troca" })).not.toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
     }
-    expect(onClose).not.toHaveBeenCalled();
   });
 });

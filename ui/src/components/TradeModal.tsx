@@ -334,6 +334,10 @@ export default function TradeModal({
     setMaritimeTradeCompleted(false);
     try {
       await onExecuteTrade(action);
+      if (action[1] === "CONFIRM_TRADE") {
+        handleClose();
+        return;
+      }
       if (action[1] === "MARITIME_TRADE") setMaritimeTradeCompleted(true);
     } catch {
       setTradeError(t(
