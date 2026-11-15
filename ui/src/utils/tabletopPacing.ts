@@ -317,15 +317,75 @@ export type AwardConquestFX = {
   metricCount: number;
 };
 
+export type VictimRobbedFX = {
+  attackerColor: Color;
+  attackerName: string;
+  victimColor: Color;
+  resource: ResourceCard;
+  source: "SEVEN" | "KNIGHT";
+};
+
 export type BatchTransitionFX = {
   newRecords: GameActionRecord[];
   discards: DiscardDropItem[];
   yields: ResourceYieldItem[];
   vpDeltas: VpDeltaItem[];
   robberEvent: RobberNoticeFX | null;
+  stolenEvent: VictimRobbedFX | null;
   turnHandoff: TurnHandoffFX | null;
   awardEvents: AwardConquestFX[];
 };
+
+function resolveStolenResource(
+  robberRecord: GameActionRecord,
+  victimColor: Color,
+  prevState: GameState | null,
+  nextState: GameState,
+  discards: DiscardDropItem[]
+): ResourceCard | null {
+  const direct = robberRecord[1] as ResourceCard | null | undefined;
+  if (direct && VALID_RESOURCES.has(direct)) {
+    return direct;
+  }
+  if (!prevState) {
+    return null;
+  }
+  const kPrev = playerKey(prevState, victimColor);
+  const kNext = playerKey(nextState, victimColor);
+  for (const res of VALID_RESOURCES) {
+    const prevCount = Number(prevState.player_state?.[`${kPrev}_${res}_IN_HAND`] ?? 0);
+    const nextCount = Number(nextState.player_state?.[`${kNext}_${res}_IN_HAND`] ?? 0);
+    const discardedCount = discards.filter(
+      (d) => d.color === victimColor && d.resource === res
+    ).length;
+    if (prevCount - nextCount - discardedCount > 0) {
+      return res;
+    }
+  }
+  return null;
+}
+
+function resolveRobberySource(
+  allRecords: GameActionRecord[],
+  robberRecord: GameActionRecord
+): "SEVEN" | "KNIGHT" {
+  const idx = allRecords.lastIndexOf(robberRecord);
+  for (let i = idx - 1; i >= 0; i--) {
+    const rec = allRecords[i];
+    const actionType = rec?.[0]?.[1];
+    if (!actionType || actionType === "DISCARD_RESOURCE") {
+      continue;
+    }
+    if (actionType === "PLAY_KNIGHT_CARD") {
+      return "KNIGHT";
+    }
+    if (actionType === "ROLL") {
+      return "SEVEN";
+    }
+    break;
+  }
+  return "SEVEN";
+}
 
 export function extractBatchTransitionFX(
   prevState: GameState | null,
@@ -506,6 +566,7 @@ export function extractBatchTransitionFX(
   }
 
   let robberEvent: RobberNoticeFX | null = null;
+  let stolenEvent: VictimRobbedFX | null = null;
   if (latestRobberRecord && latestRobberRecord[0]) {
     const colorMeta = getPlayerColorMeta(lang);
     const resMeta = getResourceMeta(lang);
@@ -567,6 +628,22 @@ export function extractBatchTransitionFX(
           ? `🥷 ${attackerName} moved the Robber${tileDesc} and stole 1 resource from You!`
           : `🥷 ${attackerName} moveu o Ladrão${tileDesc} e roubou 1 recurso de Você!`,
       };
+      const stolenResource = resolveStolenResource(
+        latestRobberRecord,
+        victimColor,
+        prevState,
+        nextState,
+        discards
+      );
+      if (stolenResource) {
+        stolenEvent = {
+          attackerColor,
+          attackerName,
+          victimColor,
+          resource: stolenResource,
+          source: resolveRobberySource(allRecords, latestRobberRecord),
+        };
+      }
     } else if (
       mySeatColor !== null &&
       attackerColor === mySeatColor
@@ -637,6 +714,7 @@ export function extractBatchTransitionFX(
     yields,
     vpDeltas,
     robberEvent,
+    stolenEvent,
     turnHandoff,
     awardEvents,
   };

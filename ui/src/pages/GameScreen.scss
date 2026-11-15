@@ -372,6 +372,7 @@ main.catan-game-screen {
     height: 100%;
     width: 100%;
     touch-action: none;
+    transform: none;
   }
   .react-transform-component {
     height: 100%;
@@ -387,9 +388,6 @@ main.catan-game-screen {
       align-items: center;
       justify-content: center;
       overflow: visible !important;
-      will-change: transform;
-      transform: translate3d(0, 0, 0);
-      backface-visibility: hidden;
     }
   }
 
@@ -400,9 +398,6 @@ main.catan-game-screen {
     width: 100%;
     overflow: visible;
     transition: opacity 0.35s ease;
-    will-change: transform;
-    transform: translate3d(0, 0, 0);
-    backface-visibility: hidden;
   }
   .board.show {
     opacity: 1;

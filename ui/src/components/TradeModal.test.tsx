@@ -106,8 +106,8 @@ describe("TradeModal", () => {
     });
   });
 
-  test("switches to Porto & Banco tab and executes maritime trade", async () => {
-    const onExecuteTrade = vi.fn().mockResolvedValue(undefined);
+  test("switches to Porto & Banco tab, executes maritime trade, and closes automatically", async () => {
+    const onExecuteTrade = vi.fn().mockRejectedValueOnce(new Error("fail")).mockResolvedValueOnce(undefined);
     const onClose = vi.fn();
     const maritimeAction: MaritimeTradeAction = [
       "BLUE",
@@ -141,13 +141,15 @@ describe("TradeModal", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Porto & Banco/i }));
     fireEvent.click(screen.getByRole("button", { name: /Confirmar Troca/i }));
 
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar Troca/i }));
+
     await waitFor(() => {
       expect(onExecuteTrade).toHaveBeenCalledWith(maritimeAction);
+      expect(onClose).toHaveBeenCalledOnce();
     });
-    expect(await screen.findByRole("status")).toHaveTextContent("Troca com Porto ou Banco concluída");
-    expect(onClose).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
-    expect(onClose).toHaveBeenCalledOnce();
   });
 
   test.each([true, false])("keeps the offer open after the last response (accepted: %s)", async (accepted) => {

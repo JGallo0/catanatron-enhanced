@@ -32,6 +32,7 @@ import PlayerTopBar, {
   type FloatingYieldFX,
 } from "../components/PlayerTopBar";
 import CardGainOverlay from "../components/CardGainOverlay";
+import RobbedOverlay from "../components/RobbedOverlay";
 import { getCardGains } from "../utils/cardGains";
 import GameChatPanel from "../components/GameChatPanel";
 import MatchIntroOverlay from "../components/MatchIntroOverlay";
@@ -99,6 +100,7 @@ import {
   type GameSpeed,
   type RobberNoticeFX,
   type TurnHandoffFX,
+  type VictimRobbedFX,
   INTRO_SPLASH_MS,
   TURN_TRANSITION_MS,
   cycleGameSpeed,
@@ -235,6 +237,12 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [yieldFX, setYieldFX] = useState<FloatingYieldFX[]>([]);
   const [vpFX, setVpFX] = useState<FloatingVpFX[]>([]);
   const [robberNotice, setRobberNotice] = useState<RobberNoticeFX | null>(null);
+  const [robbedEvent, setRobbedEvent] = useState<
+    (VictimRobbedFX & { id: number }) | null
+  >(null);
+  const handleRobbedComplete = useCallback(() => {
+    setRobbedEvent(null);
+  }, []);
   const [awardNotice, setAwardNotice] = useState<AwardConquestFX | null>(null);
 
   const hasOceanChatSpace = useMediaQuery("(min-width: 1100px) and (min-height: 640px)");
@@ -503,6 +511,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     setCardGainBatches([]);
     setVpFX([]);
     setRobberNotice(null);
+    setRobbedEvent(null);
     setAwardNotice(null);
     setChatMessages([]);
     setUnreadChatCount(0);
@@ -907,14 +916,16 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     if (gs.state_index > prevStateIndexRef.current && !replayMode) {
       const activeLang = languageRef.current;
       const activeColorMeta = getPlayerColorMeta(activeLang);
+      const localTargetColor =
+        mySeatColor ?? getHumanColor(gs, state.perspective) ?? null;
       const batchFx = extractBatchTransitionFX(
         prevStateRef.current,
         gs,
-        mySeatColor,
+        localTargetColor,
         activeLang
       );
       const latestRecord = latestActionRecord;
-      const gainedCards = getCardGains(prevStateRef.current, gs, mySeatColor ?? getHumanColor(gs, state.perspective) ?? null);
+      const gainedCards = getCardGains(prevStateRef.current, gs, localTargetColor);
       if (gainedCards.length) {
         const batchId = fxCounterRef.current++;
         setCardGainBatches((queue) => {
@@ -992,6 +1003,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         robberNoticeTimerRef.current = setTimeout(() => {
           setRobberNotice(null);
         }, 6200);
+      }
+
+      if (batchFx.stolenEvent) {
+        setRobbedEvent({
+          ...batchFx.stolenEvent,
+          id: fxCounterRef.current++,
+        });
       }
 
       if (batchFx.awardEvents && batchFx.awardEvents.length > 0) {
@@ -1888,6 +1906,16 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
             {robberNotice.message}
           </span>
         </div>
+      )}
+
+      {robbedEvent && (
+        <RobbedOverlay
+          key={robbedEvent.id}
+          resource={robbedEvent.resource}
+          attackerName={robbedEvent.attackerName}
+          source={robbedEvent.source}
+          onComplete={handleRobbedComplete}
+        />
       )}
 
       {awardNotice && (

@@ -1113,3 +1113,54 @@ test("renders game-top-hud-container enclosing top hud and player top bar, with 
   ).toBeInTheDocument();
   expect(container.querySelector(".board-container")).toBeInTheDocument();
 });
+
+test("displays RobbedOverlay with crossed swords and lost card when the local player is robbed", async () => {
+  const beforeRob = makeGameState({
+    state_index: 10,
+    current_color: "RED",
+    bot_colors: [],
+    current_prompt: "MOVE_ROBBER",
+    seat_names: { RED: "Creitu", BLUE: "João" },
+    player_state: {
+      ...baseState.player_state,
+      P1_ORE_IN_HAND: 1,
+      P1_NUM_RESOURCES_IN_HAND: 1,
+    },
+    action_records: [
+      [["RED", "PLAY_KNIGHT_CARD", null], null],
+    ] as GameState["action_records"],
+  });
+  const afterRob = makeGameState({
+    state_index: 11,
+    current_color: "RED",
+    bot_colors: [],
+    current_prompt: "PLAY_TURN",
+    seat_names: { RED: "Creitu", BLUE: "João" },
+    player_state: {
+      ...baseState.player_state,
+      P1_ORE_IN_HAND: 0,
+      P1_NUM_RESOURCES_IN_HAND: 0,
+    },
+    action_records: [
+      [["RED", "PLAY_KNIGHT_CARD", null], null],
+      [["RED", "MOVE_ROBBER", [[0, 0, 0], "BLUE"]], null],
+    ] as GameState["action_records"],
+  });
+
+  vi.mocked(getState)
+    .mockResolvedValueOnce(beforeRob)
+    .mockResolvedValue(afterRob);
+
+  renderGameScreen({ initialEntry: "/games/game-rob?seat=BLUE" });
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+
+  const overlay = await screen.findByTestId(
+    "robbed-overlay",
+    {},
+    { timeout: 6000 }
+  );
+  expect(overlay).toHaveTextContent(/Você foi roubado/i);
+  expect(overlay).toHaveTextContent(/Creitu.*Cavaleiro/i);
+  expect(overlay).toHaveTextContent(/Pedra/i);
+  expect(overlay.querySelector(".robbed-overlay__swords")).toBeInTheDocument();
+});

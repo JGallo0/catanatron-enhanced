@@ -83,7 +83,6 @@ export default function TradeModal({
   const [askCounts, setAskCounts] = useState<number[]>([0, 0, 0, 0, 0]);
   const [submitting, setSubmitting] = useState(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
-  const [maritimeTradeCompleted, setMaritimeTradeCompleted] = useState(false);
   const [trackedOffer, setTrackedOffer] = useState<number | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<Color | null>(null);
   const submittingRef = useRef(false);
@@ -247,7 +246,6 @@ export default function TradeModal({
     setSelectedPartner(null);
     setTrackedOffer(null);
     setTradeError(null);
-    setMaritimeTradeCompleted(false);
     onClose();
   };
 
@@ -331,14 +329,12 @@ export default function TradeModal({
     submittingRef.current = true;
     setSubmitting(true);
     setTradeError(null);
-    setMaritimeTradeCompleted(false);
     try {
       await onExecuteTrade(action);
-      if (action[1] === "CONFIRM_TRADE") {
+      if (action[1] === "CONFIRM_TRADE" || action[1] === "MARITIME_TRADE") {
         handleClose();
         return;
       }
-      if (action[1] === "MARITIME_TRADE") setMaritimeTradeCompleted(true);
     } catch {
       setTradeError(t(
         "Não foi possível enviar a jogada de troca. Tente novamente.",
@@ -396,7 +392,6 @@ export default function TradeModal({
             className={`trade-tab-btn ${activeTab === "player" ? "is-active" : ""}`}
             onClick={() => {
               setTradeError(null);
-              setMaritimeTradeCompleted(false);
               setActiveTab("player");
             }}
           >
@@ -424,11 +419,6 @@ export default function TradeModal({
           <div className="trade-p2p-warning" role="alert">
             ⚠️ {tradeError}
           </div>
-        )}
-        {activeTab === "maritime" && maritimeTradeCompleted && (
-          <p className="trade-offer-status" role="status">
-            {t("Troca com Porto ou Banco concluída.", "Bank or port trade completed.")}
-          </p>
         )}
 
         {activeTab === "player" ? (
