@@ -1,0 +1,241 @@
+.award-conquest-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 92;
+  pointer-events: none;
+
+  &__scrim {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0.08) 18%,
+      rgba(0, 4, 9, 0.68) 92%
+    );
+    backdrop-filter: brightness(0.67) saturate(0.8) blur(1px);
+    animation: award-conquest-scrim-in 650ms ease-out both;
+  }
+
+  &__stage {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    perspective: 1400px;
+  }
+
+  &__halo {
+    position: absolute;
+    width: min(660px, 62vw);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(244, 199, 103, 0.2),
+      rgba(214, 142, 47, 0.05) 45%,
+      transparent 70%
+    );
+    filter: blur(10px);
+    animation: award-conquest-halo-in 5.3s ease-out both;
+  }
+
+  &__crest {
+    position: relative;
+    width: min(760px, 70vw);
+    height: min(70vh, 760px);
+    object-fit: contain;
+    filter:
+      drop-shadow(0 34px 32px rgba(0, 0, 0, 0.82))
+      drop-shadow(0 0 17px rgba(235, 173, 65, 0.24));
+    animation: award-conquest-crest-in 5.3s cubic-bezier(0.17, 0.79, 0.18, 1) both;
+    will-change: transform, filter;
+  }
+
+  &__glint {
+    position: absolute;
+    width: min(760px, 70vw);
+    height: min(70vh, 760px);
+    background: linear-gradient(
+      108deg,
+      transparent 38%,
+      rgba(255, 230, 157, 0.06) 44%,
+      rgba(255, 240, 194, 0.72) 49%,
+      rgba(255, 255, 255, 0.12) 52%,
+      transparent 58%
+    );
+    mask: var(--award-crest-mask) center / contain no-repeat;
+    -webkit-mask: var(--award-crest-mask) center / contain no-repeat;
+    mix-blend-mode: screen;
+    transform: translateX(-75%);
+    animation: award-conquest-glint 2.1s 1.25s ease-in-out both;
+  }
+
+  &__particles {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+
+    i {
+      position: absolute;
+      bottom: 17%;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #ffd57d;
+      box-shadow: 0 0 8px #f49a31;
+      animation: award-conquest-particle-drift var(--particle-time) var(--particle-delay) linear infinite;
+
+      &:nth-child(1) { left: 35%; --particle-time: 5s; --particle-delay: -1s; }
+      &:nth-child(2) { left: 43%; --particle-time: 4.1s; --particle-delay: -3s; }
+      &:nth-child(3) { left: 58%; --particle-time: 5.6s; --particle-delay: -2s; }
+      &:nth-child(4) { left: 66%; --particle-time: 4.7s; --particle-delay: -4s; }
+    }
+  }
+
+  &__identity-plate {
+    position: absolute;
+    left: 50%;
+    bottom: 8.5%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    max-width: min(520px, 88vw);
+    padding: 9px 18px 9px 10px;
+    border: 1px solid rgba(239, 200, 110, 0.48);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(4, 14, 23, 0.96), rgba(17, 26, 33, 0.92));
+    box-shadow:
+      0 15px 36px rgba(0, 0, 0, 0.76),
+      inset 0 1px rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(14px);
+    animation: award-conquest-identity-in 750ms 2s both;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: -9px;
+      width: 1px;
+      height: 9px;
+      background: linear-gradient(#e4b85a, rgba(228, 184, 90, 0.1));
+    }
+  }
+
+  &__avatar {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    display: grid;
+    place-items: center;
+    border: 2px solid #efc469;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--award-player-color), #07111c 32%);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--award-player-color), transparent 45%);
+    color: #fff8df;
+    font: 700 17px Georgia, serif;
+  }
+
+  &__identity-copy {
+    min-width: 0;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+
+    small {
+      color: #c9a85f;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+  }
+
+  &__player-name {
+    overflow: hidden;
+    color: #fff1c9;
+    font: 700 18px Georgia, serif;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__points {
+    flex: none;
+    padding-left: 15px;
+    border-left: 1px solid rgba(239, 199, 111, 0.3);
+    color: #f3ca70;
+    font: 700 16px Georgia, serif;
+    white-space: nowrap;
+  }
+}
+
+@keyframes award-conquest-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes award-conquest-halo-in {
+  from { opacity: 0; transform: scale(0.3); }
+  40% { opacity: 1; }
+  to { opacity: 0.72; transform: scale(1.04); }
+}
+
+@keyframes award-conquest-crest-in {
+  0% { opacity: 0; transform: translateY(38px) translateZ(-430px) scale(0.68); filter: blur(13px) brightness(0.4); }
+  22% { opacity: 1; filter: blur(0) brightness(0.8); }
+  58% { transform: translateY(-8px) translateZ(20px) scale(1.025); filter: brightness(1.08); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes award-conquest-glint {
+  0% { opacity: 0; transform: translateX(-75%); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(75%); }
+}
+
+@keyframes award-conquest-identity-in {
+  from { opacity: 0; transform: translate(-50%, 20px); filter: blur(5px); }
+  to { opacity: 1; transform: translateX(-50%); filter: none; }
+}
+
+@keyframes award-conquest-particle-drift {
+  from { opacity: 0; transform: translate(0, 20px); }
+  25% { opacity: 0.9; }
+  to { opacity: 0; transform: translate(35px, -210px); }
+}
+
+@media (max-width: 760px) {
+  .award-conquest-overlay {
+    &__crest,
+    &__glint {
+      width: 94vw;
+    }
+
+    &__identity-plate {
+      bottom: 9%;
+      max-width: 92vw;
+      transform: translateX(-50%) scale(0.88);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .award-conquest-overlay {
+    &__scrim,
+    &__halo,
+    &__crest,
+    &__identity-plate {
+      animation: award-conquest-reduced-fade 180ms ease-out both;
+    }
+
+    &__glint,
+    &__particles {
+      display: none;
+    }
+  }
+}
+
+@keyframes award-conquest-reduced-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
