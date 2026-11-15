@@ -29,6 +29,7 @@ import type { DiceRollOverlayProps } from "../components/DiceRollOverlay";
 import type {
   Color,
   GameAction,
+  GameState,
   MoveRobberAction,
   TileCoordinate,
 } from "../utils/api.types";
@@ -95,6 +96,7 @@ function buildEdgeActions(state: CatanState) {
 
 type ZoomableBoardProps = {
   isRollingDice?: boolean;
+  displayGameState?: GameState | null;
   replayMode: boolean;
   hudClearance?: { top: number; bottom: number };
   recentNodeId?: number | null;
@@ -129,6 +131,7 @@ function loadSavedConfirmPlacement(): boolean {
 
 export default function ZoomableBoard({
   isRollingDice = false,
+  displayGameState = null,
   replayMode,
   hudClearance,
   recentNodeId = null,
@@ -158,7 +161,7 @@ export default function ZoomableBoard({
     height: number;
   } | null>(null);
 
-  const gameState = state.gameState;
+  const gameState = displayGameState ?? state.gameState;
   if (!gameState) throw new Error("GameState is not ready!");
   if (!gameId) throw new Error("expecting gameId in URL");
 
@@ -263,6 +266,9 @@ export default function ZoomableBoard({
 
   const handleTileClick = useCallback(
     (coordinate: TileCoordinate) => {
+      if (isRollingDice) {
+        return;
+      }
       if (
         !state.isMovingRobber &&
         gameState.current_prompt !== "MOVE_ROBBER"
@@ -288,6 +294,7 @@ export default function ZoomableBoard({
       }
     },
     [
+      isRollingDice,
       state.isMovingRobber,
       gameState.current_prompt,
       gameState.current_playable_actions,
@@ -305,12 +312,16 @@ export default function ZoomableBoard({
     dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
   };
 
-  const nodeActions = replayMode ? {} : buildNodeActions(state);
-  const edgeActions = replayMode ? {} : buildEdgeActions(state);
+  const effectiveBoardState = { ...state, gameState };
+  const nodeActions =
+    replayMode || isRollingDice ? {} : buildNodeActions(effectiveBoardState);
+  const edgeActions =
+    replayMode || isRollingDice ? {} : buildEdgeActions(effectiveBoardState);
   const isRobberPhase =
-    state.isMovingRobber ||
-    (isPlayersTurn(gameState, state.perspective) &&
-      gameState.current_prompt === "MOVE_ROBBER");
+    !isRollingDice &&
+    (state.isMovingRobber ||
+      (isPlayersTurn(gameState, state.perspective) &&
+        gameState.current_prompt === "MOVE_ROBBER"));
 
   const robberCoordinates = new Set(
     isRobberPhase

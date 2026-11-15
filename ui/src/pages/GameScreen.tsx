@@ -215,9 +215,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [diceStage, setDiceStage] = useState<{
     open: boolean;
     rolling: boolean;
+    settling?: boolean;
     dice: [number, number] | null;
     rollerName: string;
     rollerColor: Color;
+    preRollState?: GameState | null;
   } | null>(null);
   const [recentNodeId, setRecentNodeId] = useState<number | null>(null);
   const [recentEdgeId, setRecentEdgeId] = useState<string | null>(null);
@@ -279,6 +281,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const awardNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const diceSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const diceSpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const diceHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -308,6 +311,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     latestActionRecord?.[0][1] === "ROLL" &&
     Boolean(extractTransitionVisuals(latestActionRecord).rollDice);
   const isRollingDice = isDiceRollStarting || Boolean(diceStage?.rolling);
+  const activePreRollState = isDiceRollStarting
+    ? prevStateRef.current
+    : diceStage?.rolling
+      ? (diceStage.preRollState ?? null)
+      : null;
+  const displayGameState =
+    isRollingDice && activePreRollState ? activePreRollState : gs;
   const introActive = Boolean(
     gs &&
       !replayMode &&
@@ -512,6 +522,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       if (turnPauseTimerRef.current) clearTimeout(turnPauseTimerRef.current);
       if (robberNoticeTimerRef.current) clearTimeout(robberNoticeTimerRef.current);
       if (awardNoticeTimerRef.current) clearTimeout(awardNoticeTimerRef.current);
+      if (diceSettleTimerRef.current) clearTimeout(diceSettleTimerRef.current);
       if (diceSpinTimerRef.current) clearTimeout(diceSpinTimerRef.current);
       if (diceHideTimerRef.current) clearTimeout(diceHideTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -1016,23 +1027,44 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         );
 
         if (visuals.rollDice) {
+          if (diceSettleTimerRef.current) clearTimeout(diceSettleTimerRef.current);
           if (diceSpinTimerRef.current) clearTimeout(diceSpinTimerRef.current);
           if (diceHideTimerRef.current) clearTimeout(diceHideTimerRef.current);
 
+          const snapshotBeforeRoll = prevStateRef.current;
           setDiceStage({
             open: true,
             rolling: true,
+            settling: false,
             dice: visuals.rollDice,
             rollerName: actorName,
             rollerColor: visuals.rollColor ?? actorColor,
+            preRollState: snapshotBeforeRoll,
           });
 
           const spinMs = getRollSpinDurationMs(gameSpeedRef.current);
+          const settleAtMs = Math.max(
+            0,
+            spinMs - Math.min(650, Math.floor(spinMs * 0.35))
+          );
           const overlayMs = getDiceOverlayDurationMs(gameSpeedRef.current);
+
+          diceSettleTimerRef.current = setTimeout(() => {
+            setDiceStage((prev) =>
+              prev && prev.rolling ? { ...prev, settling: true } : prev
+            );
+          }, settleAtMs);
 
           diceSpinTimerRef.current = setTimeout(() => {
             setDiceStage((prev) =>
-              prev ? { ...prev, rolling: false } : null
+              prev
+                ? {
+                    ...prev,
+                    rolling: false,
+                    settling: false,
+                    preRollState: null,
+                  }
+                : null
             );
           }, spinMs);
 
@@ -1371,6 +1403,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       {/* Fullscreen Board + Tabletop Canvas (Zoom In/Out scales table, board, and dice inside the box together) */}
       <ZoomableBoard
         isRollingDice={isRollingDice}
+        displayGameState={displayGameState}
         replayMode={replayMode}
         hudClearance={hudClearance && {
           top: hudClearance.top,
@@ -1381,6 +1414,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         diceStage={{
           open: Boolean(diceStage?.open),
           rolling: Boolean(diceStage?.rolling),
+          settling: Boolean(diceStage?.settling),
           dice: diceStage?.dice ?? null,
           rollerName: diceStage?.rollerName ?? "",
           rollerColor: diceStage?.rollerColor ?? gs.current_color,
@@ -1423,7 +1457,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
                 boxShadow: `0 0 10px ${currentPalette.glow}`,
               }}
             />
-            <span>{describePromptBanner(gs, isBotThinking, language)}</span>
+            <span>{describePromptBanner(displayGameState ?? gs, isBotThinking, language)}</span>
           </div>
 
           <div className="game-top-hud__right">
@@ -1466,7 +1500,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         </header>
 
         <PlayerTopBar
-          gameState={gs}
+          gameState={displayGameState ?? gs}
           recentDevColor={recentDevColor}
           discardDrops={discardDrops}
           yieldFX={yieldFX}
@@ -2032,13 +2066,14 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         replayMode={replayMode}
         mySeatColor={mySeatColor}
         isRollingDice={isRollingDice}
+        displayGameState={displayGameState}
         onSendChatMessage={handleSendChat}
       />
-      <LeftDrawer />
+      <LeftDrawer displayGameState={displayGameState} />
       <RightDrawer>
         <AnalysisBox stateIndex={"latest"} />
         <Divider />
-        <DiceHistogram gameState={gs} />
+        <DiceHistogram gameState={displayGameState ?? gs} />
       </RightDrawer>
 
       <AlmanacModal

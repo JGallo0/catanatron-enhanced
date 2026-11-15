@@ -189,7 +189,11 @@ function DrawerContent({ gameState }: { gameState: GameState }) {
   );
 }
 
-export default function LeftDrawer() {
+export default function LeftDrawer({
+  displayGameState = null,
+}: {
+  displayGameState?: GameState | null;
+} = {}) {
   const { state, dispatch } = useContext(store);
   const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
@@ -223,7 +227,7 @@ export default function LeftDrawer() {
       disableBackdropTransition={!iOS}
       disableDiscovery={iOS}
     >
-      <DrawerContent gameState={state.gameState as GameState} />
+      <DrawerContent gameState={(displayGameState ?? state.gameState) as GameState} />
     </SwipeableDrawer>
   );
 }

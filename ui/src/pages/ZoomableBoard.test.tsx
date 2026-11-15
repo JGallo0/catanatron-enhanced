@@ -45,13 +45,19 @@ vi.mock("react-zoom-pan-pinch", () => ({
 
 const theme = createTheme();
 
-function SeedState({ gameState }: { gameState: GameState }) {
+function SeedState({
+  gameState,
+  isRollingDice = false,
+}: {
+  gameState: GameState;
+  isRollingDice?: boolean;
+}) {
   const { state, dispatch } = useContext(store);
   useEffect(() => {
     dispatch({ type: ACTIONS.SET_GAME_STATE, data: gameState });
   }, [dispatch, gameState]);
   if (!state.gameState) return null;
-  return <ZoomableBoard replayMode={false} />;
+  return <ZoomableBoard replayMode={false} isRollingDice={isRollingDice} />;
 }
 
 beforeEach(() => {
@@ -279,5 +285,76 @@ describe("ZoomableBoard robber victim selector", () => {
 
     fireEvent.click(resetBtn);
     expect(zoomControls.resetTransform).toHaveBeenCalledWith(250, "easeOutCubic");
+  });
+
+  test("suppresses producing-number highlight and robber-placement flashing/clicks while isRollingDice is true", () => {
+    const sevenRollState = makeGameState({
+      colors: ["RED", "BLUE"],
+      bot_colors: ["RED"],
+      current_color: "BLUE",
+      current_player_index: 1,
+      current_turn_index: 1,
+      current_prompt: "MOVE_ROBBER",
+      robber_coordinate: [1, -1, 0],
+      tiles: [
+        {
+          coordinate: [0, 0, 0],
+          tile: { id: 0, type: "RESOURCE_TILE", resource: "ORE", number: 6 },
+        },
+        {
+          coordinate: [1, -1, 0],
+          tile: { id: 1, type: "DESERT" },
+        },
+      ],
+      current_playable_actions: [["BLUE", "MOVE_ROBBER", [[0, 0, 0], undefined]]],
+      action_records: [[["BLUE", "ROLL", null], [3, 4]]],
+    });
+
+    const producingRollState = makeGameState({
+      ...sevenRollState,
+      current_prompt: "PLAY_TURN",
+      current_playable_actions: [["BLUE", "END_TURN", null]],
+      action_records: [[["BLUE", "ROLL", null], [3, 3]]],
+    });
+
+    const renderRolling = (gameState: GameState, isRollingDice: boolean) => (
+      <ThemeProvider theme={theme}>
+        <StateProvider>
+          <MemoryRouter initialEntries={["/games/game-123?seat=BLUE"]}>
+            <Routes>
+              <Route
+                path="/games/:gameId"
+                element={
+                  <SeedState
+                    gameState={gameState}
+                    isRollingDice={isRollingDice}
+                  />
+                }
+              />
+            </Routes>
+          </MemoryRouter>
+        </StateProvider>
+      </ThemeProvider>
+    );
+
+    const { container, rerender } = render(renderRolling(sevenRollState, true));
+    expect(container.querySelector(".tile--flashing")).toBeNull();
+    expect(container.querySelector(".tile__robber-target-ring")).toBeNull();
+    const firstTile = container.querySelector(".tile");
+    expect(firstTile).toBeTruthy();
+    fireEvent.click(firstTile!);
+    expect(postAction).not.toHaveBeenCalled();
+
+    rerender(renderRolling(sevenRollState, false));
+    expect(container.querySelector(".tile--flashing")).not.toBeNull();
+    expect(container.querySelector(".tile__robber-target-ring")).not.toBeNull();
+
+    rerender(renderRolling(producingRollState, true));
+    expect(container.querySelector(".tile--producing")).toBeNull();
+    expect(container.querySelector(".number-token--producing")).toBeNull();
+
+    rerender(renderRolling(producingRollState, false));
+    expect(container.querySelector(".tile--producing")).not.toBeNull();
+    expect(container.querySelector(".number-token--producing")).not.toBeNull();
   });
 });

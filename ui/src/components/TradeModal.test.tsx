@@ -191,11 +191,15 @@ describe("TradeModal", () => {
     );
 
     const { rerender } = render(renderModal(state, true));
-    expect(screen.getByText(/Creitu.*aguardando/i)).toBeInTheDocument();
+    expect(screen.getByTestId("trade-balance-board")).toBeInTheDocument();
+    expect(screen.getByTestId("offer-qty-WOOD")).toHaveTextContent("1");
+    expect(screen.getByTestId("ask-qty-WHEAT")).toHaveTextContent("1");
+    expect(screen.getByText(/Creitu.*cartas.*aguardando/i)).toBeInTheDocument();
     rerender(renderModal(answered, accepted));
+    expect(screen.getByTestId("trade-balance-board")).toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     if (accepted) {
-      expect(screen.getByText(/Creitu.*aceitou/i)).toBeInTheDocument();
+      expect(screen.getByText(/Creitu.*cartas.*aceitou/i)).toBeInTheDocument();
       const button = screen.getByRole("button", { name: "Confirmar troca" });
       expect(button).toBeEnabled();
       fireEvent.click(button);

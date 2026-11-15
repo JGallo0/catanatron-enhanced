@@ -93,6 +93,7 @@ export default function ActionsToolbar({
   mySeatColor,
   consoleRef,
   isRollingDice = false,
+  displayGameState = null,
   onSendChatMessage,
 }: {
   isBotThinking: boolean;
@@ -100,6 +101,7 @@ export default function ActionsToolbar({
   mySeatColor: Color | null;
   consoleRef?: React.Ref<HTMLDivElement>;
   isRollingDice?: boolean;
+  displayGameState?: GameState | null;
   onSendChatMessage?: (body: string) => Promise<void> | void;
 }) {
   const { gameId } = useParams();
@@ -120,7 +122,7 @@ export default function ActionsToolbar({
   const { skin: pieceSkin } = usePieceSkin();
 
   const {
-    gameState,
+    gameState: rawGameState,
     isBuildingRoad,
     isBuildingSettlement,
     isBuildingCity,
@@ -128,6 +130,8 @@ export default function ActionsToolbar({
     isPlayingYearOfPlenty,
     isRoadBuilding,
   } = state;
+
+  const gameState = displayGameState ?? rawGameState;
 
   if (!gameState) {
     return null;
@@ -168,7 +172,7 @@ export default function ActionsToolbar({
     !gameState.player_state[`${activeKey}_HAS_ROLLED`];
   const isDiscard = gameState.current_prompt === "DISCARD";
   const isMoveRobber = gameState.current_prompt === "MOVE_ROBBER";
-  const showPrimaryAction = !(isMoveRobber && isRollingDice);
+  const showPrimaryAction = !isRollingDice;
   const isDecideTrade = gameState.current_prompt === "DECIDE_TRADE";
   const isDecideAcceptees = gameState.current_prompt === "DECIDE_ACCEPTEES";
   const isOwnTrade = !replayMode && mySeatColor !== null &&
@@ -315,7 +319,7 @@ export default function ActionsToolbar({
   }, [resolvedGameId, humanColor, dispatch, enqueueSnackbar, closeSnackbar]);
 
   const playableDevCallbacks = useMemo(() => {
-    if (!isInteractiveTurn || isPlayingDevCard) return undefined;
+    if (!isInteractiveTurn || isPlayingDevCard || isRollingDice) return undefined;
     const map: Partial<
       Record<
         "KNIGHT" | "MONOPOLY" | "YEAR_OF_PLENTY" | "ROAD_BUILDING",
@@ -339,6 +343,7 @@ export default function ActionsToolbar({
   }, [
     isInteractiveTurn,
     isPlayingDevCard,
+    isRollingDice,
     playableDevCardTypes,
     playKnightCard,
     playRoadBuilding,
@@ -393,6 +398,7 @@ export default function ActionsToolbar({
   const hasRolled = Boolean(gameState.player_state[`${activeKey}_HAS_ROLLED`]);
   const canOfferDomesticTrade =
     isInteractiveTurn &&
+    !isRollingDice &&
     !gameState.is_initial_build_phase &&
     !isPlayingDevCard &&
     !gameState.is_resolving_trade &&
@@ -507,15 +513,23 @@ export default function ActionsToolbar({
           : null;
 
   const canRoad =
-    isInteractiveTurn && !isPlayingDevCard && buildActionTypes.has("BUILD_ROAD");
+    isInteractiveTurn &&
+    !isRollingDice &&
+    !isPlayingDevCard &&
+    buildActionTypes.has("BUILD_ROAD");
   const canSettlement =
     isInteractiveTurn &&
+    !isRollingDice &&
     !isPlayingDevCard &&
     buildActionTypes.has("BUILD_SETTLEMENT");
   const canCity =
-    isInteractiveTurn && !isPlayingDevCard && buildActionTypes.has("BUILD_CITY");
+    isInteractiveTurn &&
+    !isRollingDice &&
+    !isPlayingDevCard &&
+    buildActionTypes.has("BUILD_CITY");
   const canBuyDev =
     isInteractiveTurn &&
+    !isRollingDice &&
     !isPlayingDevCard &&
     buildActionTypes.has("BUY_DEVELOPMENT_CARD");
 

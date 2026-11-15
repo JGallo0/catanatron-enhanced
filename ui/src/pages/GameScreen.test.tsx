@@ -504,20 +504,29 @@ test("reveals Roubar only when the dice animation shows the rolled seven", async
   await act(async () => fireEvent.click(rollButton));
   expect(screen.getByText(/Rolando\.\.\./i)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "ROUBAR" })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Ladrão Ativo/i)).not.toBeInTheDocument();
 
   await act(async () => vi.advanceTimersByTimeAsync(3299));
   expect(screen.queryByText(/Total 7/i)).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "ROUBAR" })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Ladrão Ativo/i)).not.toBeInTheDocument();
 
   await act(async () => vi.advanceTimersByTimeAsync(1));
   expect(screen.getByText(/Total 7 — Ladrão!/i)).toBeInTheDocument();
+  expect(screen.getByText(/Ladrão Ativo/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "ROUBAR" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "ROUBAR" })).toHaveClass("cu-cta-orb--robber");
 });
 
-test("reveals gained cards only after dice stop, showing all gained cards side by side at once", async () => {
+test("reveals gained cards and increases resource counters only after dice stop, showing all gained cards side by side at once", async () => {
   const rollState = makeGameState({ state_index: 13,
-    player_state: { ...baseState.player_state, P1_HAS_ROLLED: true, P1_SHEEP_IN_HAND: 2, P1_WHEAT_IN_HAND: 1 },
+    player_state: {
+      ...baseState.player_state,
+      P0_ORE_IN_HAND: 2,
+      P1_HAS_ROLLED: true,
+      P1_SHEEP_IN_HAND: 2,
+      P1_WHEAT_IN_HAND: 1,
+    },
     current_playable_actions: [["BLUE", "END_TURN", null]],
     action_records: [[["BLUE", "ROLL", null], [3, 3]]],
   });
@@ -526,11 +535,20 @@ test("reveals gained cards only after dice stop, showing all gained cards side b
   renderGameScreen();
   const roll = await screen.findByRole("button", { name: "ROLAR DADOS" });
   expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
+  expect(screen.getByText("2/7")).toBeInTheDocument();
+  expect(screen.getAllByTitle("Cartas de Recurso na mão")[0]).toHaveTextContent(/^0Recursos$/);
   vi.useFakeTimers();
   await act(async () => fireEvent.click(roll));
   expect(screen.queryByLabelText(/Você recebeu/)).not.toBeInTheDocument();
-  await act(async () => vi.advanceTimersByTimeAsync(3300));
+  expect(screen.getByText("2/7")).toBeInTheDocument();
+  expect(screen.getAllByTitle("Cartas de Recurso na mão")[0]).toHaveTextContent(/^0Recursos$/);
+  await act(async () => vi.advanceTimersByTimeAsync(3299));
+  expect(screen.getByText("2/7")).toBeInTheDocument();
+  expect(screen.getAllByTitle("Cartas de Recurso na mão")[0]).toHaveTextContent(/^0Recursos$/);
+  await act(async () => vi.advanceTimersByTimeAsync(1));
   expect(screen.getByTestId("board")).toHaveAttribute("data-rolling", "false");
+  expect(screen.getByText("5/7")).toBeInTheDocument();
+  expect(screen.getAllByTitle("Cartas de Recurso na mão")[0]).toHaveTextContent(/^2Recursos$/);
   expect(screen.getAllByLabelText(/Você recebeu/)).toHaveLength(3);
   expect(screen.getAllByLabelText("Você recebeu: Ovelha")).toHaveLength(2);
   expect(screen.getByLabelText("Você recebeu: Trigo")).toBeInTheDocument();

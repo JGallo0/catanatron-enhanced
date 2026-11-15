@@ -8,6 +8,7 @@ import "./DiceRollOverlay.scss";
 export type DiceRollOverlayProps = {
   open: boolean;
   rolling: boolean;
+  settling?: boolean;
   dice: [number, number] | null;
   rollerName: string;
   rollerColor: Color;
@@ -18,6 +19,7 @@ export type DiceRollOverlayProps = {
 export default function DiceRollOverlay({
   open,
   rolling,
+  settling = false,
   dice,
   rollerName,
   rollerColor,
@@ -28,6 +30,7 @@ export default function DiceRollOverlay({
   if (!open || !dice) return null;
 
   const sum = dice[0] + dice[1];
+  const isPhysicallySpinning = rolling && !settling;
   const isHot = !rolling && (sum === 6 || sum === 8);
   const isSeven = !rolling && sum === 7;
   const palette = getPlayerColorMeta(language)[rollerColor];
@@ -49,8 +52,8 @@ export default function DiceRollOverlay({
     <div
       className={cn("tabletop-dice-stage", {
         "tabletop-dice-stage--board-anchored": Boolean(center && size),
-        "is-rolling": rolling,
-        "is-settled": !rolling,
+        "is-rolling": isPhysicallySpinning,
+        "is-settled": !isPhysicallySpinning,
         "is-hot": isHot,
         "is-seven": isSeven,
       })}
@@ -90,7 +93,7 @@ export default function DiceRollOverlay({
             <span className="tabletop-dice-stage__die tabletop-dice-stage__die--first">
               <Dice3D
                 value={dice[0]}
-                rolling={rolling}
+                rolling={isPhysicallySpinning}
                 isHot={isHot || isSeven}
                 size={52}
                 dieIndex={0}
@@ -103,7 +106,7 @@ export default function DiceRollOverlay({
             <span className="tabletop-dice-stage__die tabletop-dice-stage__die--second">
               <Dice3D
                 value={dice[1]}
-                rolling={rolling}
+                rolling={isPhysicallySpinning}
                 isHot={isHot || isSeven}
                 size={52}
                 dieIndex={1}
