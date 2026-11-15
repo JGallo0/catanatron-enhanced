@@ -12,8 +12,6 @@ export type DiceRollOverlayProps = {
   dice: [number, number] | null;
   rollerName: string;
   rollerColor: Color;
-  center?: [number, number];
-  size?: number;
 };
 
 export default function DiceRollOverlay({
@@ -23,8 +21,6 @@ export default function DiceRollOverlay({
   dice,
   rollerName,
   rollerColor,
-  center,
-  size,
 }: DiceRollOverlayProps) {
   const { language, t } = useLanguage();
   if (!open || !dice) return null;
@@ -35,29 +31,15 @@ export default function DiceRollOverlay({
   const isSeven = !rolling && sum === 7;
   const palette = getPlayerColorMeta(language)[rollerColor];
 
-  // Anchor directly inside the enlarged right black box half on the 1.5x table (1560, 616 in 2000x1200 SVG)
-  const boardAnchoredStyle: React.CSSProperties =
-    center && size
-      ? {
-          "--roller-color": palette.primary,
-          position: "absolute",
-          left: center[0] + size * 10.5,
-          top: center[1] + size * 0.3,
-          right: "auto",
-          transform: `translate(-50%, -50%) scale(${Math.max(0.48, size / 70)})`,
-        } as React.CSSProperties
-      : ({ "--roller-color": palette.primary } as React.CSSProperties);
-
   return (
     <div
       className={cn("tabletop-dice-stage", {
-        "tabletop-dice-stage--board-anchored": Boolean(center && size),
         "is-rolling": isPhysicallySpinning,
         "is-settled": !isPhysicallySpinning,
         "is-hot": isHot,
         "is-seven": isSeven,
       })}
-      style={boardAnchoredStyle}
+      style={{ "--roller-color": palette.primary } as React.CSSProperties}
       role="status"
       aria-live="polite"
     >

@@ -103,10 +103,15 @@
 
   &__sea-surface {
     position: absolute;
-    inset: 1px;
+    inset: -2px;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     overflow: hidden;
-    background: linear-gradient(160deg, #2b95cc 0%, #1d74a8 58%, #145580 100%);
+    background: radial-gradient(
+      circle at 50% 48%,
+      rgba(20, 184, 166, 0.14) 0%,
+      rgba(14, 116, 144, 0.08) 56%,
+      transparent 100%
+    );
     pointer-events: none;
   }
 
@@ -115,13 +120,14 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    opacity: 1;
+    opacity: 0.52;
+    animation: sea-hex-ripple 8s ease-in-out infinite alternate;
   }
 
   &__sea-bevel {
     fill: none;
-    stroke: rgba(186, 230, 253, 0.42);
-    stroke-width: 1.5;
+    stroke: rgba(186, 230, 253, 0.04);
+    stroke-width: 0.7;
   }
 
   &__artwork {
@@ -281,20 +287,18 @@
   &__placard {
     position: relative;
     z-index: 2;
-    margin-top: 0;
-    box-sizing: border-box;
+    margin-top: -10px;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 0;
-    border-radius: 7px;
-    background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 65%, #f59e0b 100%);
-    border: 1.8px solid #451a03;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #fef3c7 0%, #fde68a 60%, #d97706 100%);
+    border: 1.5px solid #78350f;
     box-shadow:
-      0 3px 8px rgba(0, 0, 0, 0.78),
-      inset 0 1px 0 rgba(255, 255, 255, 0.92);
-    color: #1c1917;
-    white-space: nowrap;
+      0 3px 8px rgba(0, 0, 0, 0.72),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    color: #291507;
   }
 
   &__icon {
@@ -302,11 +306,6 @@
     align-items: center;
     justify-content: center;
     line-height: 1;
-    padding: 2px;
-    border-radius: 50%;
-    background: rgba(15, 23, 42, 0.88);
-    border: 1px solid rgba(254, 243, 199, 0.7);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
   }
 
   &__anchor {
@@ -316,9 +315,9 @@
 
   &__ratio {
     font-family: "Cinzel", "Outfit", serif;
-    font-size: 0.76rem;
+    font-size: 0.68rem;
     font-weight: 900;
-    letter-spacing: 0.01em;
+    letter-spacing: -0.01em;
     color: #1c1917;
     line-height: 1;
   }
