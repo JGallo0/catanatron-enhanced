@@ -30,7 +30,6 @@ import LanguageToggle from "../components/LanguageToggle";
 import LeaderboardModal from "../components/LeaderboardModal";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
-import AlmanacModal from "../components/AlmanacModal";
 import AuthModal from "../components/home/AuthModal";
 import MatchSetupModal, {
   type MatchSetupMode,
@@ -62,7 +61,6 @@ export default function HomePage() {
   const [openLobbyOpen, setOpenLobbyOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [avatarStudioOpen, setAvatarStudioOpen] = useState(false);
-  const [almanacOpen, setAlmanacOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authPromptBanner, setAuthPromptBanner] = useState<string | undefined>(
     undefined
@@ -387,13 +385,6 @@ export default function HomePage() {
           >
             🎨 {t("Personalizar Avatar", "Customize Avatar")}
           </Button>
-          <Button
-            variant="outlined"
-            className="home-dock-btn home-dock-btn--almanac"
-            onClick={() => setAlmanacOpen(true)}
-          >
-            📖 {t("Almanaque", "Almanac")}
-          </Button>
         </nav>
 
         <footer className="home-page__legal-footer">
@@ -502,11 +493,6 @@ export default function HomePage() {
           setGuestProfile(saved);
           setHostName(saved.display_name);
         }}
-      />
-
-      <AlmanacModal
-        open={almanacOpen}
-        onClose={() => setAlmanacOpen(false)}
       />
     </div>
   );
