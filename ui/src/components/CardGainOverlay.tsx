@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from "react";
 import type { Card, ResourceCard } from "../utils/api.types";
 import { getDevCardMeta, getResourceMeta, type DevCardType } from "../config/assetRegistry";
 import { RESOURCE_TYPES } from "../utils/cardGains";
@@ -20,13 +20,42 @@ export default function CardGainOverlay({
 }: CardGainOverlayProps) {
   const done = useRef(onComplete);
   done.current = onComplete;
+  const flightRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const resolvedCards = cards && cards.length > 0 ? cards : card ? [card] : [];
 
   useEffect(() => {
     const timer = setTimeout(() => done.current(), CARD_GAIN_DURATION_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [resolvedCards.length]);
+
+  useLayoutEffect(() => {
+    flightRefs.current.forEach((el, idx) => {
+      const itemCard = resolvedCards[idx];
+      if (!el || !itemCard) return;
+      const target =
+        document.querySelector(`[data-card-destination="${itemCard}"]`) ??
+        document.querySelector(".resource-cards");
+      const destBounds = target?.getBoundingClientRect();
+      const cardBounds = el.getBoundingClientRect();
+      const originX =
+        cardBounds.width > 0
+          ? cardBounds.left + cardBounds.width / 2
+          : window.innerWidth / 2;
+      const originY =
+        cardBounds.height > 0
+          ? cardBounds.top + cardBounds.height / 2
+          : window.innerHeight / 2;
+      const gainX = destBounds
+        ? destBounds.left + destBounds.width / 2 - originX
+        : 0;
+      const gainY = destBounds
+        ? destBounds.top + destBounds.height / 2 - originY
+        : window.innerHeight * 0.42;
+      el.style.setProperty("--gain-x", `${Math.round(gainX)}px`);
+      el.style.setProperty("--gain-y", `${Math.round(gainY)}px`);
+    });
+  }, [resolvedCards]);
 
   if (resolvedCards.length === 0) return null;
 
@@ -42,7 +71,14 @@ export default function CardGainOverlay({
 
   return (
     <aside className="card-gain" role="status">
-      <div className="card-gain__batch">
+      <div
+        className="card-gain__batch"
+        style={
+          {
+            "--batch-size": Math.max(1, resolvedCards.length),
+          } as CSSProperties
+        }
+      >
         <span className="card-gain__caption">{captionText}</span>
         <div className="card-gain__row">
           {resolvedCards.map((itemCard, idx) => {
@@ -64,6 +100,9 @@ export default function CardGainOverlay({
             return (
               <div
                 key={`${itemCard}-${idx}`}
+                ref={(node) => {
+                  flightRefs.current[idx] = node;
+                }}
                 className="card-gain__flight"
                 aria-label={`Você recebeu: ${meta.label}`}
                 style={cardStyle}

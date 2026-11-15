@@ -188,8 +188,13 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   languageRef.current = language;
   const [isBotThinking, setIsBotThinking] = useState(false);
   const thinkDeadlineRef = useRef({ key: "", at: 0 });
-  const [cardGains, setCardGains] = useState<{ id: number; card: Card }[]>([]);
-  const finishCardGain = useCallback(() => setCardGains([]), []);
+  const [cardGainBatches, setCardGainBatches] = useState<
+    { id: number; cards: Card[] }[]
+  >([]);
+  const finishCardGain = useCallback(
+    () => setCardGainBatches((queue) => queue.slice(1)),
+    []
+  );
   const [muted, setMuted] = useState(() => isSoundMuted());
   const [localGameSpeed, setLocalGameSpeed] = useState<GameSpeed>(() =>
     getSavedGameSpeed()
@@ -485,7 +490,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     setTurnPauseBanner(null);
     setDiscardDrops([]);
     setYieldFX([]);
-    setCardGains([]);
+    setCardGainBatches([]);
     setVpFX([]);
     setRobberNotice(null);
     setAwardNotice(null);
@@ -900,8 +905,19 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       const latestRecord = latestActionRecord;
       const gainedCards = getCardGains(prevStateRef.current, gs, mySeatColor ?? getHumanColor(gs, state.perspective) ?? null);
       if (gainedCards.length) {
-        const entries = gainedCards.map((card) => ({ id: fxCounterRef.current++, card }));
-        setCardGains((queue) => [...queue, ...entries]);
+        const batchId = fxCounterRef.current++;
+        setCardGainBatches((queue) => {
+          if (queue.length > 0) {
+            return [
+              {
+                id: queue[0].id,
+                cards: [...queue[0].cards, ...gainedCards],
+              },
+              ...queue.slice(1),
+            ];
+          }
+          return [{ id: batchId, cards: gainedCards }];
+        });
       }
       playActionRecordSound(latestRecord);
       if (gs.winning_color && !prevWinnerRef.current) {
@@ -1232,7 +1248,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       !gameId ||
       gs.winning_color ||
       introActive ||
-      isTurnPauseActive || isRollingDice || cardGains.length > 0
+      isTurnPauseActive || isRollingDice || cardGainBatches.length > 0
     ) {
       return;
     }
@@ -1316,7 +1332,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     introActive,
     isTurnPauseActive,
     isRollingDice,
-    cardGains.length,
+    cardGainBatches.length,
     gameSpeed,
     mySeatColor,
     dispatch,
@@ -1773,10 +1789,10 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         </div>
       )}
 
-      {!isRollingDice && cardGains.length > 0 && (
+      {!isRollingDice && cardGainBatches.length > 0 && (
         <CardGainOverlay
-          key={cardGains[0].id}
-          cards={cardGains.map((item) => item.card)}
+          key={cardGainBatches[0].id}
+          cards={cardGainBatches[0].cards}
           onComplete={finishCardGain}
         />
       )}

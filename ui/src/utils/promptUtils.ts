@@ -401,8 +401,10 @@ export function buildDetailedActionLogEntries(
   }
 
   const hands = new Map<Color, Record<ResourceCard, number>>();
+  const freeRoadsByColor = new Map<Color, number>();
   for (const c of gameState.colors || []) {
     hands.set(c, { WOOD: 0, BRICK: 0, SHEEP: 0, WHEAT: 0, ORE: 0 });
+    freeRoadsByColor.set(c, 0);
   }
   const addRes = (c: Color, r: ResourceCard, delta: number) => {
     const h = hands.get(c);
@@ -460,8 +462,13 @@ export function buildDetailedActionLogEntries(
       buildingsByNode.set(nodeId, { color, type: "CITY" });
       addRes(color, "WHEAT", -2);
       addRes(color, "ORE", -3);
+    } else if (actionType === "PLAY_ROAD_BUILDING") {
+      freeRoadsByColor.set(color, (freeRoadsByColor.get(color) ?? 0) + 2);
     } else if (actionType === "BUILD_ROAD") {
-      if (hasRolledYet) {
+      const freeRoads = freeRoadsByColor.get(color) ?? 0;
+      if (freeRoads > 0) {
+        freeRoadsByColor.set(color, freeRoads - 1);
+      } else if (hasRolledYet) {
         addRes(color, "WOOD", -1);
         addRes(color, "BRICK", -1);
       }
@@ -562,6 +569,15 @@ export function buildDetailedActionLogEntries(
       }
 
       const victimColor = (robAction[2]?.[1] as Color | null | undefined) ?? null;
+      if (
+        victimColor &&
+        typeof result === "string" &&
+        (TRADE_RESOURCE_ORDER as readonly string[]).includes(result)
+      ) {
+        const stolenRes = result as ResourceCard;
+        addRes(victimColor, stolenRes, -1);
+        addRes(color, stolenRes, 1);
+      }
       const victimName = victimColor
         ? resolvePlayerDisplayName(
             gameState,

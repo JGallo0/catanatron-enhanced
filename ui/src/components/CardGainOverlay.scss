@@ -19,18 +19,25 @@
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
-    gap: 14px;
+    flex-wrap: nowrap;
+    gap: clamp(8px, 1.4vw, 14px);
+    max-width: 94vw;
   }
 
   &__flight {
     display: grid;
     justify-items: center;
+    flex-shrink: 1;
+    min-width: 0;
     animation: card-receive 2.3s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   &__card {
-    width: clamp(118px, 14vw, 176px);
+    width: clamp(
+      84px,
+      min(14vw, calc((90vw - 56px) / var(--batch-size, 3))),
+      168px
+    );
     border: 3px solid #d6b571;
     border-radius: 14px;
     overflow: hidden;
