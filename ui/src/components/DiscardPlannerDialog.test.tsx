@@ -28,10 +28,10 @@ describe("DiscardPlannerDialog", () => {
 
     // Verify labels for the cards
     expect(screen.getByText("Madeira")).toBeInTheDocument();
-    expect(screen.getByText("Argila")).toBeInTheDocument();
+    expect(screen.getByText("Barro")).toBeInTheDocument();
     expect(screen.getByText("Ovelha")).toBeInTheDocument();
     expect(screen.getByText("Trigo")).toBeInTheDocument();
-    expect(screen.getByText("Minério")).toBeInTheDocument();
+    expect(screen.getByText("Pedra")).toBeInTheDocument();
 
     // Confirm button should initially be disabled since 0/4 selected
     const confirmBtn = screen.getByRole("button", { name: /Confirmar Descarte/i });
@@ -57,7 +57,7 @@ describe("DiscardPlannerDialog", () => {
     // Check subtitle updated
     expect(screen.getByText(/1 de 2 cartas selecionada/i)).toBeInTheDocument();
 
-    // Click '+' on Minério (index 4)
+    // Click '+' on Pedra (index 4)
     fireEvent.click(plusButtons[4]);
 
     // Now 2 of 2 selected!

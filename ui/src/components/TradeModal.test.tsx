@@ -76,9 +76,9 @@ describe("TradeModal", () => {
     // Still disabled without asking resource
     expect(submitBtn).toBeDisabled();
 
-    // Ask 1 Minério
+    // Ask 1 Pedra
     fireEvent.click(
-      screen.getByRole("button", { name: "Adicionar pedido de Minério" })
+      screen.getByRole("button", { name: "Adicionar pedido de Pedra" })
     );
     expect(screen.getByTestId("ask-qty-ORE")).toHaveTextContent("1");
 

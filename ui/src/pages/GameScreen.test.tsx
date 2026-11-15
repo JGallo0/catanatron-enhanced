@@ -827,7 +827,7 @@ test("shows 3s 'Vez de ...' turn transition banner and visible discarded resourc
   });
 
   expect(screen.getByText(/Vez de João — Sua vez!/i)).toBeInTheDocument();
-  expect(screen.getByText("−Argila")).toBeInTheDocument();
+  expect(screen.getByText("−Barro")).toBeInTheDocument();
   expect(screen.getByText("−Madeira")).toBeInTheDocument();
   expect(
     screen.getByRole("complementary", { name: /Últimas jogadas na mesa/i })

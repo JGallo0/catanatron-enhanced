@@ -553,7 +553,7 @@ export default function ActionsToolbar({
               >
                 <Tooltip
                   title={t(
-                    "Construir Estrada (1 Madeira + 1 Argila) — Maior Estrada (+2 PV)",
+                    "Construir Estrada (1 Madeira + 1 Barro) — Maior Estrada (+2 PV)",
                     "Build Road (1 Lumber + 1 Brick) — Longest Road (+2 VP)"
                   )}
                   arrow
@@ -593,7 +593,7 @@ export default function ActionsToolbar({
 
                 <Tooltip
                   title={t(
-                    "Fundar Aldeia (1 Madeira + 1 Argila + 1 Ovelha + 1 Trigo) — +1 PV",
+                    "Fundar Aldeia (1 Madeira + 1 Barro + 1 Ovelha + 1 Trigo) — +1 PV",
                     "Build Settlement (1 Lumber + 1 Brick + 1 Sheep + 1 Grain) — +1 VP"
                   )}
                   arrow
@@ -624,7 +624,7 @@ export default function ActionsToolbar({
 
                 <Tooltip
                   title={t(
-                    "Evoluir para Cidade (2 Trigos + 3 Minérios) — +2 PV & coleta em dobro",
+                    "Evoluir para Cidade (2 Trigos + 3 Pedras) — +2 PV & coleta em dobro",
                     "Upgrade to City (2 Grain + 3 Ore) — +2 VP & double yield"
                   )}
                   arrow
@@ -655,7 +655,7 @@ export default function ActionsToolbar({
 
                 <Tooltip
                   title={t(
-                    "Comprar Carta de Desenvolvimento (1 Ovelha + 1 Trigo + 1 Minério)",
+                    "Comprar Carta de Desenvolvimento (1 Ovelha + 1 Trigo + 1 Pedra)",
                     "Buy Development Card (1 Sheep + 1 Grain + 1 Ore)"
                   )}
                   arrow

@@ -46,8 +46,8 @@ export const RESOURCE_META: Record<ResourceCard, ResourceMeta> = {
   },
   BRICK: {
     id: "BRICK",
-    label: "Argila",
-    shortLabel: "ARG",
+    label: "Barro",
+    shortLabel: "BAR",
     terrainName: "Colinas",
     primaryColor: "#7C2D12",
     secondaryColor: "#EA580C",
@@ -88,8 +88,8 @@ export const RESOURCE_META: Record<ResourceCard, ResourceMeta> = {
   },
   ORE: {
     id: "ORE",
-    label: "Minério",
-    shortLabel: "MIN",
+    label: "Pedra",
+    shortLabel: "PED",
     terrainName: "Montanha",
     primaryColor: "#1E293B",
     secondaryColor: "#475569",

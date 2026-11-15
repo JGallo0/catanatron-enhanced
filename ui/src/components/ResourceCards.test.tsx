@@ -111,7 +111,7 @@ test("shows the five resource counters and keeps development cards playable in t
   );
 
   expect(screen.getByRole("img", { name: "Madeira (2)" })).toHaveTextContent("2");
-  expect(screen.getByRole("img", { name: "Argila (0)" })).toHaveTextContent("0");
+  expect(screen.getByRole("img", { name: "Barro (0)" })).toHaveTextContent("0");
   expect(screen.getAllByRole("img")).toHaveLength(5);
   expect(container.querySelector(".resource-card-item__bg-art")).not.toBeInTheDocument();
 

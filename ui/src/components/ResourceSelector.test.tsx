@@ -12,7 +12,7 @@ test("selects two identical cards, supports undo, and only submits on confirmati
   expect(onSelect).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
   expect(screen.getByRole("button", { name: "Confirmar recursos" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Selecionar Minério" }));
+  fireEvent.click(screen.getByRole("button", { name: "Selecionar Pedra" }));
   fireEvent.click(screen.getByRole("button", { name: "Confirmar recursos" }));
   await waitFor(() => expect(onSelect).toHaveBeenCalledWith(["WOOD", "ORE"]));
 });
@@ -21,8 +21,8 @@ test("respects bank stock, canonical ordering and a bank with only one resource"
   const onSelect = vi.fn();
   const props = { open: true, onClose: vi.fn(), onSelect, mode: "yearOfPlenty" as const };
   const view = render(<ResourceSelector {...props} options={[["WOOD", "ORE"]]} />);
-  fireEvent.click(screen.getByRole("button", { name: "Selecionar Minério" }));
-  expect(screen.getByRole("button", { name: "Selecionar Minério" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Selecionar Pedra" }));
+  expect(screen.getByRole("button", { name: "Selecionar Pedra" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Selecionar Madeira" }));
   fireEvent.click(screen.getByRole("button", { name: "Confirmar recursos" }));
   await waitFor(() => expect(onSelect).toHaveBeenCalledWith(["WOOD", "ORE"]));
