@@ -309,6 +309,14 @@ export type TurnHandoffFX = {
   isLocal: boolean;
 };
 
+export type AwardConquestFX = {
+  type: "ROAD" | "ARMY";
+  color: Color;
+  playerName: string;
+  previousHolderName: string | null;
+  metricCount: number;
+};
+
 export type BatchTransitionFX = {
   newRecords: GameActionRecord[];
   discards: DiscardDropItem[];
@@ -316,6 +324,7 @@ export type BatchTransitionFX = {
   vpDeltas: VpDeltaItem[];
   robberEvent: RobberNoticeFX | null;
   turnHandoff: TurnHandoffFX | null;
+  awardEvents: AwardConquestFX[];
 };
 
 export function extractBatchTransitionFX(
@@ -406,7 +415,21 @@ export function extractBatchTransitionFX(
   }
 
   const vpDeltas: VpDeltaItem[] = [];
+  const awardEvents: AwardConquestFX[] = [];
   if (prevState) {
+    const colorMeta = getPlayerColorMeta(lang);
+    let prevRoadHolder: Color | null = null;
+    let prevArmyHolder: Color | null = null;
+    for (const c of prevState.colors || []) {
+      const kPrev = playerKey(prevState, c);
+      if (prevState.player_state?.[`${kPrev}_HAS_ROAD`]) {
+        prevRoadHolder = c;
+      }
+      if (prevState.player_state?.[`${kPrev}_HAS_ARMY`]) {
+        prevArmyHolder = c;
+      }
+    }
+
     for (const c of nextState.colors) {
       const kPrev = playerKey(prevState, c);
       const kNext = playerKey(nextState, c);
@@ -422,6 +445,62 @@ export function extractBatchTransitionFX(
       );
       if (nextVp > prevVp) {
         vpDeltas.push({ color: c, delta: nextVp - prevVp });
+      }
+
+      const hadRoad = Boolean(prevState.player_state?.[`${kPrev}_HAS_ROAD`]);
+      const hasRoad = Boolean(nextState.player_state?.[`${kNext}_HAS_ROAD`]);
+      if (!hadRoad && hasRoad) {
+        const playerName = resolvePlayerDisplayName(
+          nextState,
+          c,
+          colorMeta[c]?.label || c
+        );
+        const previousHolderName =
+          prevRoadHolder && prevRoadHolder !== c
+            ? resolvePlayerDisplayName(
+                nextState,
+                prevRoadHolder,
+                colorMeta[prevRoadHolder]?.label || prevRoadHolder
+              )
+            : null;
+        const roadLength = Number(
+          nextState.player_state?.[`${kNext}_LONGEST_ROAD_LENGTH`] ?? 5
+        );
+        awardEvents.push({
+          type: "ROAD",
+          color: c,
+          playerName,
+          previousHolderName,
+          metricCount: roadLength,
+        });
+      }
+
+      const hadArmy = Boolean(prevState.player_state?.[`${kPrev}_HAS_ARMY`]);
+      const hasArmy = Boolean(nextState.player_state?.[`${kNext}_HAS_ARMY`]);
+      if (!hadArmy && hasArmy) {
+        const playerName = resolvePlayerDisplayName(
+          nextState,
+          c,
+          colorMeta[c]?.label || c
+        );
+        const previousHolderName =
+          prevArmyHolder && prevArmyHolder !== c
+            ? resolvePlayerDisplayName(
+                nextState,
+                prevArmyHolder,
+                colorMeta[prevArmyHolder]?.label || prevArmyHolder
+              )
+            : null;
+        const knightsCount = Number(
+          nextState.player_state?.[`${kNext}_PLAYED_KNIGHT`] ?? 3
+        );
+        awardEvents.push({
+          type: "ARMY",
+          color: c,
+          playerName,
+          previousHolderName,
+          metricCount: knightsCount,
+        });
       }
     }
   }
@@ -559,6 +638,7 @@ export function extractBatchTransitionFX(
     vpDeltas,
     robberEvent,
     turnHandoff,
+    awardEvents,
   };
 }
 

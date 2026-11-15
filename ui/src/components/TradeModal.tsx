@@ -484,10 +484,121 @@ export default function TradeModal({
               </div>
             )}
 
+            {/* Visual Trade Balance Tray (Você Entrega ⇄ Você Recebe) */}
+            <div
+              className="trade-balance-board"
+              data-testid="trade-balance-board"
+            >
+              <div
+                className={`trade-balance-side trade-balance-side--give ${
+                  totalOffer > 0 ? "has-items" : ""
+                }`}
+              >
+                <div className="trade-balance-side__header">
+                  <span className="trade-balance-side__tag">
+                    📤 {t("VOCÊ ENTREGA", "YOU GIVE")}
+                  </span>
+                  {totalOffer > 0 && (
+                    <span className="trade-balance-side__count">
+                      {totalOffer} {totalOffer === 1 ? t("carta", "card") : t("cartas", "cards")}
+                    </span>
+                  )}
+                </div>
+                <div className="trade-balance-side__items">
+                  {totalOffer > 0 ? (
+                    RESOURCE_ORDER.map((res, idx) => {
+                      const qty = offerCounts[idx];
+                      if (qty <= 0) return null;
+                      const meta = resourceMeta[res];
+                      return (
+                        <button
+                          key={res}
+                          type="button"
+                          className="trade-bundle-chip trade-bundle-chip--give"
+                          title={t(
+                            `Clique para remover 1 ${meta.label}`,
+                            `Click to remove 1 ${meta.label}`
+                          )}
+                          onClick={() => adjustOffer(idx, -1)}
+                        >
+                          <ResourceIcon resource={res} size={20} />
+                          <span>
+                            {qty}× {meta.label}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <span className="trade-balance-side__empty">
+                      {t(
+                        "Toque nas cartas da sua mão abaixo",
+                        "Tap cards from your hand below"
+                      )}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="trade-balance-center" aria-hidden="true">
+                <span className="trade-balance-center__icon">⇄</span>
+              </div>
+
+              <div
+                className={`trade-balance-side trade-balance-side--ask ${
+                  totalAsk > 0 ? "has-items" : ""
+                }`}
+              >
+                <div className="trade-balance-side__header">
+                  <span className="trade-balance-side__tag">
+                    📥 {t("VOCÊ PEDE", "YOU REQUEST")}
+                  </span>
+                  {totalAsk > 0 && (
+                    <span className="trade-balance-side__count">
+                      {totalAsk} {totalAsk === 1 ? t("carta", "card") : t("cartas", "cards")}
+                    </span>
+                  )}
+                </div>
+                <div className="trade-balance-side__items">
+                  {totalAsk > 0 ? (
+                    RESOURCE_ORDER.map((res, idx) => {
+                      const qty = askCounts[idx];
+                      if (qty <= 0) return null;
+                      const meta = resourceMeta[res];
+                      return (
+                        <button
+                          key={res}
+                          type="button"
+                          className="trade-bundle-chip trade-bundle-chip--ask"
+                          title={t(
+                            `Clique para remover 1 ${meta.label}`,
+                            `Click to remove 1 ${meta.label}`
+                          )}
+                          onClick={() => adjustAsk(idx, -1)}
+                        >
+                          <ResourceIcon resource={res} size={20} />
+                          <span>
+                            {qty}× {meta.label}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <span className="trade-balance-side__empty">
+                      {t(
+                        "Escolha o que deseja receber abaixo",
+                        "Choose what you want to receive below"
+                      )}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Step 1: Offer from Hand */}
-            <div className="trade-section">
+            <div className="trade-section trade-section--give">
               <div className="trade-section__header">
                 <span>
+                  📤{" "}
                   {t(
                     "1. Você Oferece da sua Mão",
                     "1. You Offer from Your Hand"
@@ -502,7 +613,7 @@ export default function TradeModal({
                       setAskCounts([0, 0, 0, 0, 0]);
                     }}
                   >
-                    {t("Limpar proposta", "Clear offer")}
+                    🧹 {t("Limpar proposta", "Clear offer")}
                   </button>
                 )}
               </div>
@@ -516,16 +627,32 @@ export default function TradeModal({
                   return (
                     <div
                       key={res}
-                      className={`trade-res-card trade-res-card--p2p ${qty > 0 ? "selected" : ""}`}
-                      style={{
-                        borderColor: qty > 0 ? meta.accentColor : undefined,
-                      }}
+                      className={`trade-res-card trade-res-card--p2p ${
+                        qty > 0 ? "selected" : ""
+                      } ${inHand === 0 ? "is-depleted" : ""}`}
+                      style={
+                        {
+                          "--res-accent": meta.accentColor,
+                          borderColor: qty > 0 ? meta.accentColor : undefined,
+                        } as React.CSSProperties
+                      }
                     >
-                      <ResourceIcon resource={res} size={28} />
-                      <span className="trade-res-card__name">{meta.label}</span>
-                      <span className="trade-res-card__hand">
-                        {t("Na mão:", "In hand:")} <strong>{inHand}</strong>
-                      </span>
+                      <div
+                        className="trade-res-card__tap-area"
+                        onClick={() => {
+                          if (qty < inHand && !submitting) {
+                            adjustOffer(idx, 1);
+                          }
+                        }}
+                      >
+                        <span className="trade-res-card__hand-pill">
+                          {t("Na mão:", "In hand:")} <strong>{inHand}</strong>
+                        </span>
+                        <ResourceIcon resource={res} size={34} />
+                        <span className="trade-res-card__name">
+                          {meta.label}
+                        </span>
+                      </div>
                       <div className="trade-stepper">
                         <button
                           type="button"
@@ -564,57 +691,50 @@ export default function TradeModal({
               </div>
             </div>
 
-            {/* P2P Summary */}
-            <div className="trade-exchange-divider">
-              {totalOffer > 0 && totalAsk > 0 ? (
-                <div className="trade-summary-pill">
-                  <span>
-                    {t("Oferece:", "You offer:")}{" "}
-                    <strong>{formatTradeBundlePt(offerCounts, language)}</strong>
-                  </span>
-                  <span className="trade-summary-pill__arrow">➔</span>
-                  <span>
-                    {t("Pede:", "You receive:")}{" "}
-                    <strong>{formatTradeBundlePt(askCounts, language)}</strong>
-                  </span>
-                </div>
-              ) : (
-                <span>
-                  {t(
-                    "Escolha ao menos 1 recurso para oferecer e 1 para pedir",
-                    "Choose at least 1 resource to offer and 1 to receive"
-                  )}
-                </span>
-              )}
-            </div>
-
             {/* Step 2: Ask from Table */}
-            <div className="trade-section">
+            <div className="trade-section trade-section--ask">
               <div className="trade-section__header">
                 <span>
-                  {t("2. Você Pede em Troca", "2. You Request in Return")}
+                  📥 {t("2. Você Pede em Troca", "2. You Request in Return")}
                 </span>
               </div>
               <div className="trade-resource-grid">
                 {RESOURCE_ORDER.map((res, idx) => {
                   const meta = resourceMeta[res];
                   const qty = askCounts[idx];
+                  const isBeingOffered = offerCounts[idx] > 0;
 
                   return (
                     <div
                       key={res}
-                      className={`trade-res-card trade-res-card--p2p ${qty > 0 ? "selected" : ""}`}
-                      style={{
-                        borderColor: qty > 0 ? meta.accentColor : undefined,
-                      }}
+                      className={`trade-res-card trade-res-card--p2p ${
+                        qty > 0 ? "selected" : ""
+                      } ${isBeingOffered ? "is-offered-elsewhere" : ""}`}
+                      style={
+                        {
+                          "--res-accent": meta.accentColor,
+                          borderColor: qty > 0 ? meta.accentColor : undefined,
+                        } as React.CSSProperties
+                      }
                     >
-                      <ResourceIcon resource={res} size={28} />
-                      <span className="trade-res-card__name">{meta.label}</span>
-                      <span className="trade-res-card__hand">
-                        {offerCounts[idx] > 0
-                          ? t("Em oferta", "Offering")
-                          : t("Pedir", "Request")}
-                      </span>
+                      <div
+                        className="trade-res-card__tap-area"
+                        onClick={() => {
+                          if (qty < 9 && !submitting) {
+                            adjustAsk(idx, 1);
+                          }
+                        }}
+                      >
+                        <span className="trade-res-card__hand-pill">
+                          {isBeingOffered
+                            ? t("Em oferta", "Offering")
+                            : t("Pedir", "Request")}
+                        </span>
+                        <ResourceIcon resource={res} size={34} />
+                        <span className="trade-res-card__name">
+                          {meta.label}
+                        </span>
+                      </div>
                       <div className="trade-stepper">
                         <button
                           type="button"

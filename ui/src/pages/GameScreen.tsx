@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import { GridLoader } from "react-spinners";
 import { useSnackbar } from "notistack";
@@ -35,6 +35,7 @@ import CardGainOverlay from "../components/CardGainOverlay";
 import { getCardGains } from "../utils/cardGains";
 import GameChatPanel from "../components/GameChatPanel";
 import MatchIntroOverlay from "../components/MatchIntroOverlay";
+import VictoryScreenOverlay from "../components/VictoryScreenOverlay";
 import AlmanacModal from "../components/AlmanacModal";
 import DiceHistogram from "../components/DiceHistogram";
 import OceanBackdrop from "../components/OceanBackdrop";
@@ -94,6 +95,7 @@ import {
   LOCAL_MESSAGES_STORAGE_KEY,
 } from "../utils/localEngine";
 import {
+  type AwardConquestFX,
   type GameSpeed,
   type RobberNoticeFX,
   type TurnHandoffFX,
@@ -176,6 +178,7 @@ function describePromptBanner(
 
 function GameScreen({ replayMode }: { replayMode: boolean }) {
   const { gameId, stateIndex } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { state, dispatch } = useContext(store);
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
@@ -225,6 +228,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const [yieldFX, setYieldFX] = useState<FloatingYieldFX[]>([]);
   const [vpFX, setVpFX] = useState<FloatingVpFX[]>([]);
   const [robberNotice, setRobberNotice] = useState<RobberNoticeFX | null>(null);
+  const [awardNotice, setAwardNotice] = useState<AwardConquestFX | null>(null);
 
   const hasOceanChatSpace = useMediaQuery("(min-width: 1100px) and (min-height: 640px)");
   const [chatPreference, setChatOpen] = useState<boolean | null>(null);
@@ -265,6 +269,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turnPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const robberNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const awardNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
   const diceSpinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -481,6 +488,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     setCardGains([]);
     setVpFX([]);
     setRobberNotice(null);
+    setAwardNotice(null);
     setChatMessages([]);
     setUnreadChatCount(0);
     setChatPreview(null);
@@ -498,6 +506,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       if (introTimerRef.current) clearTimeout(introTimerRef.current);
       if (turnPauseTimerRef.current) clearTimeout(turnPauseTimerRef.current);
       if (robberNoticeTimerRef.current) clearTimeout(robberNoticeTimerRef.current);
+      if (awardNoticeTimerRef.current) clearTimeout(awardNoticeTimerRef.current);
       if (diceSpinTimerRef.current) clearTimeout(diceSpinTimerRef.current);
       if (diceHideTimerRef.current) clearTimeout(diceHideTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -956,6 +965,21 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         robberNoticeTimerRef.current = setTimeout(() => {
           setRobberNotice(null);
         }, 6200);
+      }
+
+      if (batchFx.awardEvents && batchFx.awardEvents.length > 0) {
+        const latestAward =
+          batchFx.awardEvents[batchFx.awardEvents.length - 1];
+        if (awardNoticeTimerRef.current) {
+          clearTimeout(awardNoticeTimerRef.current);
+        }
+        setAwardNotice(latestAward);
+        if (!gs.winning_color) {
+          playVictorySound();
+        }
+        awardNoticeTimerRef.current = setTimeout(() => {
+          setAwardNotice(null);
+        }, 5600);
       }
 
       if (batchFx.turnHandoff) {
@@ -1816,6 +1840,73 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         </div>
       )}
 
+      {awardNotice && (
+        <div
+          className={cn(
+            "award-conquest-banner",
+            `award-conquest-banner--${awardNotice.type.toLowerCase()}`
+          )}
+          data-testid="award-conquest-banner"
+          style={
+            {
+              "--award-player-color":
+                colorMeta[awardNotice.color]?.primary || "#facc15",
+            } as React.CSSProperties
+          }
+          role="status"
+          aria-live="assertive"
+        >
+          <div className="award-conquest-banner__rays" aria-hidden="true" />
+          <div className="award-conquest-banner__emblem" aria-hidden="true">
+            {awardNotice.type === "ROAD" ? "🛤️" : "⚔️"}
+          </div>
+          <div className="award-conquest-banner__body">
+            <span className="award-conquest-banner__eyebrow">
+              🏆{" "}
+              {t(
+                "TÍTULO ESPECIAL CONQUISTADO • +2 PONTOS DE VITÓRIA",
+                "SPECIAL TITLE CONQUERED • +2 VICTORY POINTS"
+              )}
+            </span>
+            <strong className="award-conquest-banner__title">
+              {awardNotice.type === "ROAD"
+                ? t("MAIOR ESTRADA COMERCIAL!", "LONGEST TRADE ROAD!")
+                : t("MAIOR EXÉRCITO DA ILHA!", "LARGEST ARMY OF THE ISLE!")}
+            </strong>
+            <span className="award-conquest-banner__desc">
+              {awardNotice.type === "ROAD"
+                ? t(
+                    `${awardNotice.playerName} assumiu a Maior Estrada com ${awardNotice.metricCount} estradas conectadas${
+                      awardNotice.previousHolderName
+                        ? ` (tomou de ${awardNotice.previousHolderName}!)`
+                        : "!"
+                    }`,
+                    `${awardNotice.playerName} claimed Longest Road with ${awardNotice.metricCount} connected roads${
+                      awardNotice.previousHolderName
+                        ? ` (taken from ${awardNotice.previousHolderName}!)`
+                        : "!"
+                    }`
+                  )
+                : t(
+                    `${awardNotice.playerName} assumiu o Maior Exército com ${awardNotice.metricCount} cavaleiros em campo${
+                      awardNotice.previousHolderName
+                        ? ` (tomou de ${awardNotice.previousHolderName}!)`
+                        : "!"
+                    }`,
+                    `${awardNotice.playerName} claimed Largest Army with ${awardNotice.metricCount} knights played${
+                      awardNotice.previousHolderName
+                        ? ` (taken from ${awardNotice.previousHolderName}!)`
+                        : "!"
+                    }`
+                  )}
+            </span>
+          </div>
+          <div className="award-conquest-banner__vp-pill" aria-hidden="true">
+            +2 PV
+          </div>
+        </div>
+      )}
+
       {gs.action_records && gs.action_records.length > 0 && (
         <aside
           className={cn("mini-action-log", {
@@ -1862,6 +1953,14 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         perspective={state.perspective}
         onDismiss={handleDismissIntro}
       />
+
+      {Boolean(gs.winning_color) && (
+        <VictoryScreenOverlay
+          gameState={gs}
+          mySeatColor={mySeatColor}
+          onReturnLobby={() => navigate("/")}
+        />
+      )}
 
       {!chatOpen && chatPreview && (
         <button

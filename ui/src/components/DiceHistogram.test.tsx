@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { makeGameState } from "../test/fixtures";
@@ -61,5 +61,43 @@ describe("DiceHistogram", () => {
     expect(
       screen.getByText(/Aguardando primeira rolagem/i)
     ).toBeInTheDocument();
+  });
+
+  test("filters dice roll counts by individual player and resets back to Todos", () => {
+    const state = makeGameState({
+      colors: ["RED", "BLUE"],
+      seat_names: { RED: "Charlie", BLUE: "Tchita" },
+      action_records: [
+        [["RED", "ROLL", null], [3, 5]],
+        [["BLUE", "ROLL", null], [1, 6]],
+        [["RED", "ROLL", null], [4, 4]],
+      ] as GameState["action_records"],
+    });
+
+    render(<DiceHistogram gameState={state} />);
+
+    // Initially "Todos" is active (3 rolls)
+    expect(screen.getByText(/3 rolagem\(ns\)/i)).toBeInTheDocument();
+
+    // Filter by BLUE (Tchita -> 1 roll, sum 7)
+    fireEvent.click(screen.getByTestId("dice-filter-BLUE"));
+    expect(screen.getByText(/1 rolagem\(ns\) · Último: 7/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("listitem", { name: "Número 7: 1 vez(es)" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("listitem", { name: "Número 8: 0 vez(es)" })
+    ).toBeInTheDocument();
+
+    // Filter by RED (Charlie -> 2 rolls, sum 8)
+    fireEvent.click(screen.getByTestId("dice-filter-RED"));
+    expect(screen.getByText(/2 rolagem\(ns\) · Último: 8/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("listitem", { name: "Número 8: 2 vez(es)" })
+    ).toBeInTheDocument();
+
+    // Back to Todos
+    fireEvent.click(screen.getByTestId("dice-filter-ALL"));
+    expect(screen.getByText(/3 rolagem\(ns\)/i)).toBeInTheDocument();
   });
 });

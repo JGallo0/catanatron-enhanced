@@ -161,19 +161,19 @@ describe("AvatarStudioModal", () => {
     // Apply V2 archetype preset "Capitão dos Mares"
     await user.click(screen.getByRole("button", { name: /Capitão dos Mares/i }));
 
-    // Adereços tab: Coroa Dourada is clickable for Try-On and shows 7 Vitórias lock badge
+    // Adereços tab: Coroa Dourada is unlocked immediately with no win requirement
     await user.click(screen.getByRole("tab", { name: /Adereços/i }));
     const crownBtn = screen.getByRole("button", { name: /Coroa Dourada/i });
     expect(crownBtn).toBeEnabled();
-    expect(crownBtn).toHaveTextContent(/7 Vitórias/i);
+    expect(crownBtn).not.toHaveTextContent(/🔒/);
 
-    // Molduras tab: Bronze (1 win) unlocked, Prata (3 wins) locked at 3 Vitórias
+    // Molduras tab: all frames are unlocked immediately
     await user.click(screen.getByRole("tab", { name: /Molduras/i }));
     const bronzeBtn = screen.getByRole("button", { name: /Bronze de Navegador/i });
     const silverBtn = screen.getByRole("button", { name: /Prata da Guilda/i });
     expect(bronzeBtn).toBeEnabled();
     expect(silverBtn).toBeEnabled();
-    expect(silverBtn).toHaveTextContent(/3 Vitórias/i);
+    expect(silverBtn).not.toHaveTextContent(/🔒/);
 
     await user.click(bronzeBtn);
 
@@ -226,10 +226,12 @@ describe("AvatarStudioModal", () => {
       />
     );
 
-    // Randomizer keeps frame within unlocked options (wood or bronze at 2 wins)
+    // Randomizer selects any unlocked frame in Edição República
     await user.click(screen.getByRole("button", { name: /Aleatório/i }));
     const previewAvatar = screen.getAllByTestId("player-avatar")[0];
-    expect(["wood", "bronze"]).toContain(previewAvatar.getAttribute("data-frame"));
+    expect(
+      ["wood", "bronze", "silver", "gold", "imperial", "vip_dragon"]
+    ).toContain(previewAvatar.getAttribute("data-frame"));
 
     // Empty nickname validation
     const nameInput = screen.getByLabelText(/Apelido na Mesa/i);
@@ -295,11 +297,11 @@ describe("AvatarStudioModal", () => {
     expect(crownBtn).toBeEnabled();
     expect(crownBtn).not.toHaveTextContent(/🔒/);
 
-    // Tab 5: Montarias & Pets + Tier filters
+    // Tab 5: Montarias & Pets + Tier filters (all unlocked without prices)
     await user.click(screen.getByRole("tab", { name: /Montarias & Pets/i }));
     expect(screen.getByRole("button", { name: /Corcel da Ilha/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Grifo Imperial/i })).toHaveTextContent(
-      /R\$ 29,90/
+    expect(screen.getByRole("button", { name: /Grifo Imperial/i })).not.toHaveTextContent(
+      /R\$/
     );
 
     await user.click(screen.getByRole("button", { name: /👑 VIP/i }));
@@ -309,7 +311,7 @@ describe("AvatarStudioModal", () => {
     await user.click(screen.getByRole("button", { name: /Desbloqueados/i }));
     expect(screen.getByRole("button", { name: /Corcel da Ilha/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Coruja Cartógrafa/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Grifo Imperial/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Grifo Imperial/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^Todos$/i }));
 
@@ -429,7 +431,7 @@ describe("AvatarStudioModal", () => {
     expect(wrapper).toHaveAttribute("data-camera-focus", "full");
   }, 20000);
 
-  test("Option A Try-On VIP flow: allows live preview of locked VIP items, opens lock dialog on save, and strips only locked slots while preserving unlocked + colors", async () => {
+  test("allows rookie accounts with 0 wins to equip and save any legendary item directly in Edição República", async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();
     const onClose = vi.fn();
@@ -456,38 +458,15 @@ describe("AvatarStudioModal", () => {
     await user.click(screen.getByRole("tab", { name: /Vestimenta/i }));
     await user.click(screen.getByRole("button", { name: /Capa de Viajante/i }));
 
-    // Equip locked VIP mount "Grifo Imperial" in Try-On mode
+    // Equip legendary mount "Grifo Imperial" directly without Try-On restrictions
     await user.click(screen.getByRole("tab", { name: /Montarias & Pets/i }));
     const griffinBtn = screen.getByRole("button", { name: /Grifo Imperial/i });
     expect(griffinBtn).toBeEnabled();
     await user.click(griffinBtn);
 
-    // Try-On pill banner appears
-    expect(
-      screen.getByText(/Modo Provador — testando 1 item\(ns\) bloqueado\(s\)/i)
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Modo Provador/i)).not.toBeInTheDocument();
 
-    // Attempting to save opens tryon-lock-dialog instead of calling updateProfile
     await user.click(screen.getByRole("button", { name: /Salvar Perfil/i }));
-    expect(updateProfile).not.toHaveBeenCalled();
-
-    const lockDialog = screen.getByTestId("tryon-lock-dialog");
-    expect(lockDialog).toBeInTheDocument();
-    expect(lockDialog).toHaveTextContent(/Grifo Imperial/i);
-    expect(lockDialog).toHaveTextContent(/VIP/i);
-
-    // "Continuar no provador" keeps modal open and keeps Grifo Imperial equipped
-    await user.click(screen.getByRole("button", { name: /Continuar no provador/i }));
-    expect(screen.queryByTestId("tryon-lock-dialog")).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/Modo Provador — testando 1 item\(ns\) bloqueado\(s\)/i)
-    ).toBeInTheDocument();
-
-    // Save again -> click "Remover bloqueados e salvar"
-    await user.click(screen.getByRole("button", { name: /Salvar Perfil/i }));
-    await user.click(
-      screen.getByRole("button", { name: /Remover bloqueados e salvar/i })
-    );
 
     await waitFor(() => {
       expect(updateProfile).toHaveBeenCalledTimes(1);
@@ -495,7 +474,7 @@ describe("AvatarStudioModal", () => {
     expect(updateProfile).toHaveBeenCalledWith({
       displayName: "João",
       avatarConfig: expect.objectContaining({
-        mount: "none",
+        mount: "imperial_griffin",
         cape: "traveler",
         colors: expect.objectContaining({
           outfitPrimary: "#059669",
@@ -506,7 +485,7 @@ describe("AvatarStudioModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   }, 20000);
 
-  test("allows saving VIP items when account owns the entitlement and handles 403 locked_items defensively", async () => {
+  test("handles 403 locked_items defensively if returned by server", async () => {
     const user = userEvent.setup();
     const vipAccount: PlayerAccount = {
       ...baseAccount,
@@ -545,7 +524,6 @@ describe("AvatarStudioModal", () => {
     await user.click(screen.getByRole("tab", { name: /Montarias & Pets/i }));
     await user.click(screen.getByRole("button", { name: /Grifo Imperial/i }));
 
-    // Should NOT show Try-On warning because entitlement is owned
     expect(screen.queryByText(/Modo Provador/i)).not.toBeInTheDocument();
 
     // First save triggers defensive 403 -> opens tryon-lock-dialog
@@ -553,7 +531,7 @@ describe("AvatarStudioModal", () => {
     expect(await screen.findByTestId("tryon-lock-dialog")).toBeInTheDocument();
   }, 15000);
 
-  test("supports guest customization, Try-On stripping, and attaches portraitSnapshot when available", async () => {
+  test("supports guest customization and attaches portraitSnapshot when available", async () => {
     const user = userEvent.setup();
     const onGuestSaved = vi.fn();
     const onClose = vi.fn();
@@ -595,7 +573,7 @@ describe("AvatarStudioModal", () => {
     expect(savedRaw).toContain("Viajante da Ilha");
   }, 15000);
 
-  test("renders bilingual English copy cleanly across tabs, camera controls, and Try-On dialog", async () => {
+  test("renders bilingual English copy cleanly across tabs and camera controls", async () => {
     const user = userEvent.setup();
     setLanguage("en");
 
@@ -619,17 +597,7 @@ describe("AvatarStudioModal", () => {
 
     await user.click(screen.getByRole("tab", { name: /Mounts & Pets/i }));
     await user.click(screen.getByRole("button", { name: /Imperial Griffin/i }));
-    expect(screen.getByText(/Try-On Mode — testing 1 locked item/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /Save Profile/i }));
-    const lockDialog = screen.getByTestId("tryon-lock-dialog");
-    expect(lockDialog).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Remove locked & save/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Keep trying on/i })
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Try-On Mode/i)).not.toBeInTheDocument();
   }, 15000);
 });
 
@@ -687,5 +655,26 @@ describe("PlayerAvatar", () => {
       expect(current).toHaveAttribute("data-frame", entry.frame);
       expect(screen.getByText(entry.label)).toBeInTheDocument();
     }
+
+    rerender(
+      <PlayerAvatar
+        username="campeao"
+        size={112}
+        fullBody={true}
+        showFrameLabel
+        config={{
+          frame: "imperial",
+          hat: "crown_gold",
+          outfit: "imperial_lord",
+          cape: "royal_mantle",
+          legsBoots: "royal_greaves",
+          handProp: "royal_scepter",
+          pedestal: "runic_gold",
+        }}
+      />
+    );
+    const fullBodyAvatar = screen.getByTestId("player-avatar");
+    expect(fullBodyAvatar).toHaveClass("player-avatar--full-body");
+    expect(fullBodyAvatar).toHaveAttribute("data-full-body", "true");
   });
 });

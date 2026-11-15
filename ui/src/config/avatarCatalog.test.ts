@@ -130,72 +130,42 @@ describe("avatarCatalog", () => {
     expect(droppedSnap.portraitSnapshot).toBeUndefined();
   });
 
-  test("enforces ranked win unlock thresholds and VIP entitlements accurately", () => {
+  test("unlocks all cosmetics with 0 win requirements and no prices in Edição República", () => {
     expect(getAvatarItemRequirement("frame", "wood")).toBe(0);
-    expect(getAvatarItemRequirement("frame", "bronze")).toBe(1);
-    expect(getAvatarItemRequirement("cape", "navy_commander")).toBe(2);
-    expect(getAvatarItemRequirement("frame", "silver")).toBe(3);
-    expect(getAvatarItemRequirement("handProp", "royal_scepter")).toBe(4);
-    expect(getAvatarItemRequirement("frame", "gold")).toBe(5);
-    expect(getAvatarItemRequirement("pedestal", "runic_gold")).toBe(5);
-    expect(getAvatarItemRequirement("pet", "owl")).toBe(6);
-    expect(getAvatarItemRequirement("hat", "crown_gold")).toBe(7);
-    expect(getAvatarItemRequirement("aura", "sun_motes")).toBe(8);
-    expect(getAvatarItemRequirement("frame", "imperial")).toBe(10);
+    expect(getAvatarItemRequirement("frame", "bronze")).toBe(0);
+    expect(getAvatarItemRequirement("cape", "navy_commander")).toBe(0);
+    expect(getAvatarItemRequirement("frame", "silver")).toBe(0);
+    expect(getAvatarItemRequirement("handProp", "royal_scepter")).toBe(0);
+    expect(getAvatarItemRequirement("frame", "gold")).toBe(0);
+    expect(getAvatarItemRequirement("pedestal", "runic_gold")).toBe(0);
+    expect(getAvatarItemRequirement("pet", "owl")).toBe(0);
+    expect(getAvatarItemRequirement("hat", "crown_gold")).toBe(0);
+    expect(getAvatarItemRequirement("aura", "sun_motes")).toBe(0);
+    expect(getAvatarItemRequirement("frame", "imperial")).toBe(0);
 
-    expect(isAvatarItemUnlocked("frame", "bronze", 0)).toBe(false);
-    expect(isAvatarItemUnlocked("frame", "bronze", 1)).toBe(true);
-    expect(isAvatarItemUnlocked("hat", "crown_gold", 6)).toBe(false);
-    expect(isAvatarItemUnlocked("hat", "crown_gold", 7)).toBe(true);
-    expect(isAvatarItemUnlocked("frame", "imperial", 9)).toBe(false);
-    expect(isAvatarItemUnlocked("frame", "imperial", 10)).toBe(true);
-
-    // VIP items require explicit entitlement regardless of wins
-    expect(isAvatarItemUnlocked("mount", "imperial_griffin", 99, [])).toBe(false);
-    expect(
-      isAvatarItemUnlocked("mount", "imperial_griffin", 0, ["mount:imperial_griffin"])
-    ).toBe(true);
-
-    // Earnable items can also be granted via entitlement
-    expect(isAvatarItemUnlocked("cape", "navy_commander", 0, ["cape:navy_commander"])).toBe(true);
+    for (const entry of AVATAR_CATALOG_ITEMS) {
+      expect(entry.tier).toBe("free");
+      expect(entry.requiredWins).toBe(0);
+      expect(entry.priceBrlCents).toBeUndefined();
+      expect(isAvatarItemUnlocked(entry.slot, entry.id, 0, [])).toBe(true);
+    }
   });
 
-  test("findLockedAvatarItems flags earnable and VIP items and clears them when unlocked", () => {
+  test("findLockedAvatarItems returns empty list since all items are unlocked in Edição República", () => {
     const draft = resolveAvatarConfig(
       {
         version: 2,
-        cape: "navy_commander", // earnable, 2 wins
-        mount: "imperial_griffin", // vip
-        frame: "vip_dragon", // vip
+        cape: "navy_commander",
+        mount: "imperial_griffin",
+        frame: "vip_dragon",
       },
       "bruno"
     );
 
-    const locked0 = findLockedAvatarItems(draft, 0, []);
-    expect(locked0).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ slot: "cape", id: "navy_commander", tier: "earnable", required_wins: 2 }),
-        expect.objectContaining({ slot: "mount", id: "imperial_griffin", tier: "vip", sku: "vip_mount_griffin" }),
-        expect.objectContaining({ slot: "frame", id: "vip_dragon", tier: "vip", sku: "vip_frame_dragon" }),
-      ])
-    );
-
-    const lockedWithWinsAndOneVip = findLockedAvatarItems(draft, 2, ["mount:imperial_griffin"]);
-    expect(lockedWithWinsAndOneVip).toHaveLength(1);
-    expect(lockedWithWinsAndOneVip[0]).toMatchObject({
-      slot: "frame",
-      id: "vip_dragon",
-      tier: "vip",
-    });
-
-    const cleared = findLockedAvatarItems(draft, 2, [
-      "mount:imperial_griffin",
-      "frame:vip_dragon",
-    ]);
-    expect(cleared).toEqual([]);
+    expect(findLockedAvatarItems(draft, 0, [])).toEqual([]);
   });
 
-  test("stripLockedAvatarItems replaces only locked slots while preserving unlocked items and custom colors", () => {
+  test("stripLockedAvatarItems preserves all items and custom colors", () => {
     const fallback = resolveAvatarConfig(
       {
         version: 2,
@@ -209,11 +179,11 @@ describe("avatarCatalog", () => {
     const draft = resolveAvatarConfig(
       {
         version: 2,
-        hat: "crown_gold", // locked at 2 wins (requires 7)
-        cape: "navy_commander", // unlocked at 2 wins
-        mount: "imperial_griffin", // VIP locked
-        outfit: "armor", // free unlocked
-        frame: "vip_dragon", // VIP locked
+        hat: "crown_gold",
+        cape: "navy_commander",
+        mount: "imperial_griffin",
+        outfit: "armor",
+        frame: "vip_dragon",
         colors: {
           skin: "#c98b5b",
           hair: "#eab308",
@@ -229,18 +199,18 @@ describe("avatarCatalog", () => {
       "clara"
     );
 
-    const stripped = stripLockedAvatarItems(draft, fallback, 2, []);
-    expect(stripped.hat).toBe("captain");
-    expect(stripped.frame).toBe("bronze");
-    expect(stripped.mount).toBe("none");
+    const stripped = stripLockedAvatarItems(draft, fallback, 0, []);
+    expect(stripped.hat).toBe("crown_gold");
+    expect(stripped.frame).toBe("vip_dragon");
+    expect(stripped.mount).toBe("imperial_griffin");
     expect(stripped.cape).toBe("navy_commander");
     expect(stripped.outfit).toBe("armor");
     expect(stripped.colors).toEqual(draft.colors);
     expect(stripped.portraitSnapshot).toBe(draft.portraitSnapshot);
-    expect(findLockedAvatarItems(stripped, 2, [])).toEqual([]);
+    expect(findLockedAvatarItems(stripped, 0, [])).toEqual([]);
   });
 
-  test("catalog exposes expanded unique color swatches including backpack, 3D modelPaths, and monetization metadata", () => {
+  test("catalog exposes expanded unique color swatches including backpack and 3D modelPaths without prices", () => {
     expect(AVATAR_COLOR_SWATCHES.skin.length).toBeGreaterThanOrEqual(10);
     expect(AVATAR_COLOR_SWATCHES.hair.length).toBeGreaterThanOrEqual(12);
     expect(AVATAR_COLOR_SWATCHES.outfitPrimary.length).toBeGreaterThanOrEqual(12);
@@ -255,12 +225,12 @@ describe("avatarCatalog", () => {
       (i) => i.slot === "mount" && i.id === "imperial_griffin"
     );
     expect(griffin).toMatchObject({
-      tier: "vip",
+      tier: "free",
       rarity: "legendary",
-      sku: "vip_mount_griffin",
-      priceBrlCents: 2990,
+      requiredWins: 0,
       modelPath: "/assets/models/avatars/mounts/imperial_griffin.glb",
     });
+    expect(griffin?.priceBrlCents).toBeUndefined();
 
     const spyglass = AVATAR_CATALOG_ITEMS.find(
       (i) => i.slot === "handProp" && i.id === "spyglass"
@@ -288,43 +258,12 @@ describe("avatarCatalog", () => {
     }
   });
 
-  test("localUpdateProfile enforces V2 unlocks with 403 locked_items and preserves V2 colors & snapshot", () => {
+  test("localUpdateProfile allows saving any cosmetic including legendary mounts and frames at 0 wins", () => {
     localRegisterUser({
       username: "diego",
       password: "secret",
       displayName: "Diego",
     });
-
-    expect(() =>
-      localUpdateProfile({
-        username: "diego",
-        avatarConfig: {
-          version: 2,
-          mount: "imperial_griffin",
-        },
-      })
-    ).toThrowError();
-
-    let caught: any = null;
-    try {
-      localUpdateProfile({
-        username: "diego",
-        avatarConfig: {
-          version: 2,
-          mount: "imperial_griffin",
-          cape: "navy_commander",
-        },
-      });
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught?.response?.status).toBe(403);
-    expect(caught?.response?.data?.locked_items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ slot: "mount", id: "imperial_griffin", tier: "vip" }),
-        expect.objectContaining({ slot: "cape", id: "navy_commander", tier: "earnable", required_wins: 2 }),
-      ])
-    );
 
     const validSnap =
       "data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA=";
@@ -334,7 +273,8 @@ describe("avatarCatalog", () => {
       avatarConfig: {
         version: 2,
         bodyType: "sturdy",
-        mount: "island_horse",
+        mount: "imperial_griffin",
+        frame: "vip_dragon",
         colors: {
           skin: "#e4b287",
           hair: "#1f242d",
@@ -348,10 +288,10 @@ describe("avatarCatalog", () => {
       },
     });
     expect(updated.display_name).toBe("Cap. Diego");
-    expect(updated.entitlements).toEqual([]);
     expect(updated.avatar_config?.version).toBe(2);
     expect(updated.avatar_config?.bodyType).toBe("sturdy");
-    expect(updated.avatar_config?.mount).toBe("island_horse");
+    expect(updated.avatar_config?.mount).toBe("imperial_griffin");
+    expect(updated.avatar_config?.frame).toBe("vip_dragon");
     expect(updated.avatar_config?.colors?.outfitPrimary).toBe("#dc2626");
     expect(updated.avatar_config?.portraitSnapshot).toBe(validSnap);
   });

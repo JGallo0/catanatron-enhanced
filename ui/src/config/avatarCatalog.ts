@@ -232,7 +232,7 @@ export const AVATAR_HAT_OPTIONS: AvatarOption<AvatarHat>[] = [
     value: "crown_gold",
     label: "Coroa Dourada do Soberano",
     labelEn: "Sovereign Golden Crown",
-    requiredWins: 7,
+    requiredWins: 0,
     subtitle: "Prestígio Real",
     subtitleEn: "Royal Prestige",
   },
@@ -279,9 +279,9 @@ export const AVATAR_FRAME_OPTIONS: AvatarOption<AvatarFrame>[] = [
     labelEn: "Navigator Bronze",
     swatch: "#d97736",
     secondarySwatch: "#7c3b15",
-    requiredWins: 1,
-    subtitle: "1 Vitória",
-    subtitleEn: "1 Win",
+    requiredWins: 0,
+    subtitle: "Edição República",
+    subtitleEn: "República Edition",
   },
   {
     value: "silver",
@@ -289,9 +289,9 @@ export const AVATAR_FRAME_OPTIONS: AvatarOption<AvatarFrame>[] = [
     labelEn: "Guild Silver",
     swatch: "#e2e8f0",
     secondarySwatch: "#64748b",
-    requiredWins: 3,
-    subtitle: "3 Vitórias",
-    subtitleEn: "3 Wins",
+    requiredWins: 0,
+    subtitle: "Edição República",
+    subtitleEn: "República Edition",
   },
   {
     value: "gold",
@@ -299,9 +299,9 @@ export const AVATAR_FRAME_OPTIONS: AvatarOption<AvatarFrame>[] = [
     labelEn: "Royal Gold",
     swatch: "#facc15",
     secondarySwatch: "#b45309",
-    requiredWins: 5,
-    subtitle: "5 Vitórias",
-    subtitleEn: "5 Wins",
+    requiredWins: 0,
+    subtitle: "Edição República",
+    subtitleEn: "República Edition",
   },
   {
     value: "imperial",
@@ -309,13 +309,13 @@ export const AVATAR_FRAME_OPTIONS: AvatarOption<AvatarFrame>[] = [
     labelEn: "Isle Imperial",
     swatch: "#10b981",
     secondarySwatch: "#facc15",
-    requiredWins: 10,
-    subtitle: "10 Vitórias",
-    subtitleEn: "10 Wins",
+    requiredWins: 0,
+    subtitle: "Edição República",
+    subtitleEn: "República Edition",
   },
 ];
 
-// ===== Unified V2 Catalog (3D Modular + Monetization + Achievements) =====
+// ===== Unified V2 Catalog (Edição República: all items free & unlocked) =====
 export const AVATAR_CATALOG_ITEMS: readonly AvatarCatalogEntry[] = [
   // bodyType
   { slot: "bodyType", id: "athletic", label: "Atlético", labelEn: "Athletic", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/bodies/athletic.glb" },
@@ -363,7 +363,7 @@ export const AVATAR_CATALOG_ITEMS: readonly AvatarCatalogEntry[] = [
   { slot: "hair", id: "curly", label: "Cacheado", labelEn: "Curly", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/hair/curly.glb" },
   { slot: "hair", id: "long", label: "Longo", labelEn: "Long", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/hair/long.glb" },
   { slot: "hair", id: "navigator", label: "Navegador", labelEn: "Navigator", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/hair/navigator.glb" },
-  { slot: "hair", id: "royal_bun", label: "Coque Real", labelEn: "Royal Bun", tier: "vip", rarity: "rare", requiredWins: 0, sku: "vip_hair_royal_bun", priceBrlCents: 690, modelPath: "/assets/models/avatars/hair/royal_bun.glb" },
+  { slot: "hair", id: "royal_bun", label: "Coque Real", labelEn: "Royal Bun", tier: "free", rarity: "rare", requiredWins: 0, modelPath: "/assets/models/avatars/hair/royal_bun.glb" },
 
   // beard
   { slot: "beard", id: "none", label: "Sem Barba", labelEn: "Clean-Shaven", tier: "free", rarity: "common", requiredWins: 0, modelPath: null },
@@ -371,26 +371,26 @@ export const AVATAR_CATALOG_ITEMS: readonly AvatarCatalogEntry[] = [
   { slot: "beard", id: "full", label: "Barba Cheia", labelEn: "Full Beard", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/beards/full.glb" },
   { slot: "beard", id: "mustache", label: "Bigode", labelEn: "Mustache", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/beards/mustache.glb" },
   { slot: "beard", id: "captain_trimmed", label: "Barba de Capitão", labelEn: "Captain's Trim", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/beards/captain_trimmed.glb" },
-  { slot: "beard", id: "full_viking", label: "Barba Viking Real", labelEn: "Royal Viking Beard", tier: "vip", rarity: "rare", requiredWins: 0, sku: "vip_beard_viking", priceBrlCents: 690, modelPath: "/assets/models/avatars/beards/full_viking.glb" },
+  { slot: "beard", id: "full_viking", label: "Barba Viking Real", labelEn: "Royal Viking Beard", tier: "free", rarity: "rare", requiredWins: 0, modelPath: "/assets/models/avatars/beards/full_viking.glb" },
 
   // outfit
   { slot: "outfit", id: "settler", label: "Túnica de Colono", labelEn: "Settler Tunic", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/outfits/settler.glb" },
   { slot: "outfit", id: "captain", label: "Casaco de Capitão", labelEn: "Captain Coat", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/outfits/captain.glb" },
   { slot: "outfit", id: "armor", label: "Armadura Medieval", labelEn: "Medieval Armor", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/outfits/armor.glb" },
   { slot: "outfit", id: "merchant", label: "Manto de Mercador", labelEn: "Merchant Cloak", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/outfits/merchant.glb" },
-  { slot: "outfit", id: "imperial_lord", label: "Traje de Lorde Imperial", labelEn: "Imperial Lord Attire", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_outfit_imperial_lord", priceBrlCents: 1490, modelPath: "/assets/models/avatars/outfits/imperial_lord.glb" },
+  { slot: "outfit", id: "imperial_lord", label: "Traje de Lorde Imperial", labelEn: "Imperial Lord Attire", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/outfits/imperial_lord.glb" },
 
   // legsBoots
   { slot: "legsBoots", id: "traveler", label: "Botas de Viajante", labelEn: "Traveler Boots", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/legs/traveler.glb" },
   { slot: "legsBoots", id: "cuffed_boots", label: "Botas Dobradas", labelEn: "Cuffed Boots", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/legs/cuffed_boots.glb" },
   { slot: "legsBoots", id: "greaves", label: "Grevas de Aço", labelEn: "Steel Greaves", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/legs/greaves.glb" },
-  { slot: "legsBoots", id: "royal_greaves", label: "Grevas Reais", labelEn: "Royal Greaves", tier: "vip", rarity: "rare", requiredWins: 0, sku: "vip_legs_royal_greaves", priceBrlCents: 790, modelPath: "/assets/models/avatars/legs/royal_greaves.glb" },
+  { slot: "legsBoots", id: "royal_greaves", label: "Grevas Reais", labelEn: "Royal Greaves", tier: "free", rarity: "rare", requiredWins: 0, modelPath: "/assets/models/avatars/legs/royal_greaves.glb" },
 
   // cape
   { slot: "cape", id: "none", label: "Sem Capa", labelEn: "No Cape", tier: "free", rarity: "common", requiredWins: 0, modelPath: null },
   { slot: "cape", id: "traveler", label: "Capa de Viajante", labelEn: "Traveler Cloak", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/capes/traveler.glb" },
-  { slot: "cape", id: "navy_commander", label: "Manto de Comandante", labelEn: "Navy Commander Cape", tier: "earnable", rarity: "rare", requiredWins: 2, modelPath: "/assets/models/avatars/capes/navy_commander.glb" },
-  { slot: "cape", id: "royal_mantle", label: "Manto Real Imperial", labelEn: "Royal Mantle", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_cape_royal_mantle", priceBrlCents: 1290, modelPath: "/assets/models/avatars/capes/royal_mantle.glb" },
+  { slot: "cape", id: "navy_commander", label: "Manto de Comandante", labelEn: "Navy Commander Cape", tier: "free", rarity: "rare", requiredWins: 0, modelPath: "/assets/models/avatars/capes/navy_commander.glb" },
+  { slot: "cape", id: "royal_mantle", label: "Manto Real Imperial", labelEn: "Royal Mantle", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/capes/royal_mantle.glb" },
 
   // hat
   { slot: "hat", id: "none", label: "Sem Chapéu", labelEn: "No Hat", tier: "free", rarity: "common", requiredWins: 0, modelPath: null },
@@ -398,45 +398,45 @@ export const AVATAR_CATALOG_ITEMS: readonly AvatarCatalogEntry[] = [
   { slot: "hat", id: "explorer", label: "Chapéu Explorador", labelEn: "Explorer Hat", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/hats/explorer.glb" },
   { slot: "hat", id: "bandana", label: "Bandana Marítima", labelEn: "Sea Bandana", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/hats/bandana.glb" },
   { slot: "hat", id: "helm", label: "Elmo de Ferro", labelEn: "Iron Helm", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/hats/helm.glb" },
-  { slot: "hat", id: "crown_gold", label: "Coroa Dourada do Soberano", labelEn: "Sovereign Golden Crown", tier: "earnable", rarity: "epic", requiredWins: 7, subtitle: "Prestígio Real", subtitleEn: "Royal Prestige", modelPath: "/assets/models/avatars/hats/crown_gold.glb" },
-  { slot: "hat", id: "admiral_bicorne", label: "Bicórnio do Almirante", labelEn: "Admiral's Bicorne", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_hat_admiral_bicorne", priceBrlCents: 990, modelPath: "/assets/models/avatars/hats/admiral_bicorne.glb" },
+  { slot: "hat", id: "crown_gold", label: "Coroa Dourada do Soberano", labelEn: "Sovereign Golden Crown", tier: "free", rarity: "epic", requiredWins: 0, subtitle: "Prestígio Real", subtitleEn: "Royal Prestige", modelPath: "/assets/models/avatars/hats/crown_gold.glb" },
+  { slot: "hat", id: "admiral_bicorne", label: "Bicórnio do Almirante", labelEn: "Admiral's Bicorne", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/hats/admiral_bicorne.glb" },
 
   // handProp
   { slot: "handProp", id: "none", label: "Mãos Livres", labelEn: "Empty Hand", tier: "free", rarity: "common", requiredWins: 0, modelPath: null },
   { slot: "handProp", id: "spyglass", label: "Luneta Dourada", labelEn: "Golden Spyglass", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/props_hand/spyglass.glb" },
   { slot: "handProp", id: "scroll", label: "Pergaminho de Rotas", labelEn: "Route Scroll", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/props_hand/scroll.glb" },
-  { slot: "handProp", id: "royal_scepter", label: "Cetro Real", labelEn: "Royal Scepter", tier: "earnable", rarity: "rare", requiredWins: 4, modelPath: "/assets/models/avatars/props_hand/royal_scepter.glb" },
-  { slot: "handProp", id: "sun_rapier", label: "Rapieira do Sol", labelEn: "Sun Rapier", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_prop_sun_rapier", priceBrlCents: 1190, modelPath: "/assets/models/avatars/props_hand/sun_rapier.glb" },
+  { slot: "handProp", id: "royal_scepter", label: "Cetro Real", labelEn: "Royal Scepter", tier: "free", rarity: "rare", requiredWins: 0, modelPath: "/assets/models/avatars/props_hand/royal_scepter.glb" },
+  { slot: "handProp", id: "sun_rapier", label: "Rapieira do Sol", labelEn: "Sun Rapier", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/props_hand/sun_rapier.glb" },
 
   // backProp
   { slot: "backProp", id: "none", label: "Sem Item nas Costas", labelEn: "None", tier: "free", rarity: "common", requiredWins: 0, modelPath: null },
   { slot: "backProp", id: "explorer_pack", label: "Mochila de Explorador", labelEn: "Explorer Pack", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/props_back/explorer_pack.glb" },
   { slot: "backProp", id: "sheathed_sword", label: "Espada Embainhada", labelEn: "Sheathed Sword", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/props_back/sheathed_sword.glb" },
-  { slot: "backProp", id: "imperial_shield", label: "Escudo Imperial", labelEn: "Imperial Shield", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_prop_shield", priceBrlCents: 1190, modelPath: "/assets/models/avatars/props_back/imperial_shield.glb" },
+  { slot: "backProp", id: "imperial_shield", label: "Escudo Imperial", labelEn: "Imperial Shield", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/props_back/imperial_shield.glb" },
 
   // pet
   { slot: "pet", id: "none", label: "Sem Mascote", labelEn: "No Pet", tier: "free", rarity: "common", requiredWins: 0, modelPath: null },
-  { slot: "pet", id: "owl", label: "Coruja Cartógrafa", labelEn: "Cartographer Owl", tier: "earnable", rarity: "rare", requiredWins: 6, modelPath: "/assets/models/avatars/pets/owl.glb" },
-  { slot: "pet", id: "parrot", label: "Papagaio Corsário", labelEn: "Corsair Parrot", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_pet_parrot", priceBrlCents: 1490, modelPath: "/assets/models/avatars/pets/parrot.glb" },
-  { slot: "pet", id: "falcon", label: "Falcão Real", labelEn: "Royal Falcon", tier: "vip", rarity: "legendary", requiredWins: 0, sku: "vip_pet_falcon", priceBrlCents: 1990, modelPath: "/assets/models/avatars/pets/falcon.glb" },
+  { slot: "pet", id: "owl", label: "Coruja Cartógrafa", labelEn: "Cartographer Owl", tier: "free", rarity: "rare", requiredWins: 0, modelPath: "/assets/models/avatars/pets/owl.glb" },
+  { slot: "pet", id: "parrot", label: "Papagaio Corsário", labelEn: "Corsair Parrot", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/pets/parrot.glb" },
+  { slot: "pet", id: "falcon", label: "Falcão Real", labelEn: "Royal Falcon", tier: "free", rarity: "legendary", requiredWins: 0, modelPath: "/assets/models/avatars/pets/falcon.glb" },
 
   // mount
   { slot: "mount", id: "none", label: "Sem Montaria", labelEn: "No Mount", tier: "free", rarity: "common", requiredWins: 0, modelPath: null },
   { slot: "mount", id: "island_horse", label: "Corcel da Ilha", labelEn: "Island Steed", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/mounts/island_horse.glb" },
-  { slot: "mount", id: "snow_wolf", label: "Lobo das Neves", labelEn: "Snow Wolf", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_mount_snow_wolf", priceBrlCents: 1990, modelPath: "/assets/models/avatars/mounts/snow_wolf.glb" },
-  { slot: "mount", id: "royal_stag", label: "Cervo Real", labelEn: "Royal Stag", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_mount_royal_stag", priceBrlCents: 1990, modelPath: "/assets/models/avatars/mounts/royal_stag.glb" },
-  { slot: "mount", id: "imperial_griffin", label: "Grifo Imperial", labelEn: "Imperial Griffin", tier: "vip", rarity: "legendary", requiredWins: 0, sku: "vip_mount_griffin", priceBrlCents: 2990, modelPath: "/assets/models/avatars/mounts/imperial_griffin.glb" },
+  { slot: "mount", id: "snow_wolf", label: "Lobo das Neves", labelEn: "Snow Wolf", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/mounts/snow_wolf.glb" },
+  { slot: "mount", id: "royal_stag", label: "Cervo Real", labelEn: "Royal Stag", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/mounts/royal_stag.glb" },
+  { slot: "mount", id: "imperial_griffin", label: "Grifo Imperial", labelEn: "Imperial Griffin", tier: "free", rarity: "legendary", requiredWins: 0, modelPath: "/assets/models/avatars/mounts/imperial_griffin.glb" },
 
   // pedestal
   { slot: "pedestal", id: "stone_wood", label: "Pedestal Pedra & Carvalho", labelEn: "Stone & Oak Pedestal", tier: "free", rarity: "common", requiredWins: 0, modelPath: "/assets/models/avatars/pedestals/stone_wood.glb" },
-  { slot: "pedestal", id: "runic_gold", label: "Pedestal Rúnico Dourado", labelEn: "Golden Runic Pedestal", tier: "earnable", rarity: "rare", requiredWins: 5, modelPath: "/assets/models/avatars/pedestals/runic_gold.glb" },
-  { slot: "pedestal", id: "obsidian_crown", label: "Trono de Obsidiana", labelEn: "Obsidian Crown Base", tier: "vip", rarity: "epic", requiredWins: 0, sku: "vip_pedestal_obsidian", priceBrlCents: 990, modelPath: "/assets/models/avatars/pedestals/obsidian_crown.glb" },
+  { slot: "pedestal", id: "runic_gold", label: "Pedestal Rúnico Dourado", labelEn: "Golden Runic Pedestal", tier: "free", rarity: "rare", requiredWins: 0, modelPath: "/assets/models/avatars/pedestals/runic_gold.glb" },
+  { slot: "pedestal", id: "obsidian_crown", label: "Trono de Obsidiana", labelEn: "Obsidian Crown Base", tier: "free", rarity: "epic", requiredWins: 0, modelPath: "/assets/models/avatars/pedestals/obsidian_crown.glb" },
 
   // aura
   { slot: "aura", id: "none", label: "Sem Aura", labelEn: "No Aura", tier: "free", rarity: "common", requiredWins: 0, modelPath: null },
-  { slot: "aura", id: "sun_motes", label: "Partículas Solares", labelEn: "Sun Motes", tier: "earnable", rarity: "epic", requiredWins: 8, modelPath: null },
-  { slot: "aura", id: "sea_mist", label: "Bruma Marinha", labelEn: "Sea Mist", tier: "vip", rarity: "rare", requiredWins: 0, sku: "vip_aura_sea_mist", priceBrlCents: 890, modelPath: null },
-  { slot: "aura", id: "imperial_flame", label: "Chama Imperial", labelEn: "Imperial Flame", tier: "vip", rarity: "legendary", requiredWins: 0, sku: "vip_aura_imperial_flame", priceBrlCents: 1790, modelPath: null },
+  { slot: "aura", id: "sun_motes", label: "Partículas Solares", labelEn: "Sun Motes", tier: "free", rarity: "epic", requiredWins: 0, modelPath: null },
+  { slot: "aura", id: "sea_mist", label: "Bruma Marinha", labelEn: "Sea Mist", tier: "free", rarity: "rare", requiredWins: 0, modelPath: null },
+  { slot: "aura", id: "imperial_flame", label: "Chama Imperial", labelEn: "Imperial Flame", tier: "free", rarity: "legendary", requiredWins: 0, modelPath: null },
 
   // background
   { slot: "background", id: "ocean", label: "Oceano", labelEn: "Ocean", tier: "free", rarity: "common", requiredWins: 0, swatch: "#0e4d7a", secondarySwatch: "#06213c", modelPath: null },
@@ -448,11 +448,11 @@ export const AVATAR_CATALOG_ITEMS: readonly AvatarCatalogEntry[] = [
 
   // frame
   { slot: "frame", id: "wood", label: "Madeira de Colono", labelEn: "Settler Wood", tier: "free", rarity: "common", requiredWins: 0, swatch: "#925d30", secondarySwatch: "#5a3618", subtitle: "Inicial", subtitleEn: "Starter", modelPath: null },
-  { slot: "frame", id: "bronze", label: "Bronze de Navegador", labelEn: "Navigator Bronze", tier: "earnable", rarity: "common", requiredWins: 1, swatch: "#d97736", secondarySwatch: "#7c3b15", subtitle: "1 Vitória", subtitleEn: "1 Win", modelPath: null },
-  { slot: "frame", id: "silver", label: "Prata da Guilda", labelEn: "Guild Silver", tier: "earnable", rarity: "rare", requiredWins: 3, swatch: "#e2e8f0", secondarySwatch: "#64748b", subtitle: "3 Vitórias", subtitleEn: "3 Wins", modelPath: null },
-  { slot: "frame", id: "gold", label: "Ouro Real", labelEn: "Royal Gold", tier: "earnable", rarity: "epic", requiredWins: 5, swatch: "#facc15", secondarySwatch: "#b45309", subtitle: "5 Vitórias", subtitleEn: "5 Wins", modelPath: null },
-  { slot: "frame", id: "imperial", label: "Imperial da Ilha", labelEn: "Isle Imperial", tier: "earnable", rarity: "legendary", requiredWins: 10, swatch: "#10b981", secondarySwatch: "#facc15", subtitle: "10 Vitórias", subtitleEn: "10 Wins", modelPath: null },
-  { slot: "frame", id: "vip_dragon", label: "Dragão Imperial", labelEn: "Imperial Dragon", tier: "vip", rarity: "legendary", requiredWins: 0, sku: "vip_frame_dragon", priceBrlCents: 1690, swatch: "#f59e0b", secondarySwatch: "#7f1d1d", subtitle: "VIP Exclusivo", subtitleEn: "VIP Exclusive", modelPath: null },
+  { slot: "frame", id: "bronze", label: "Bronze de Navegador", labelEn: "Navigator Bronze", tier: "free", rarity: "common", requiredWins: 0, swatch: "#d97736", secondarySwatch: "#7c3b15", subtitle: "Edição República", subtitleEn: "República Edition", modelPath: null },
+  { slot: "frame", id: "silver", label: "Prata da Guilda", labelEn: "Guild Silver", tier: "free", rarity: "rare", requiredWins: 0, swatch: "#e2e8f0", secondarySwatch: "#64748b", subtitle: "Edição República", subtitleEn: "República Edition", modelPath: null },
+  { slot: "frame", id: "gold", label: "Ouro Real", labelEn: "Royal Gold", tier: "free", rarity: "epic", requiredWins: 0, swatch: "#facc15", secondarySwatch: "#b45309", subtitle: "Edição República", subtitleEn: "República Edition", modelPath: null },
+  { slot: "frame", id: "imperial", label: "Imperial da Ilha", labelEn: "Isle Imperial", tier: "free", rarity: "legendary", requiredWins: 0, swatch: "#10b981", secondarySwatch: "#facc15", subtitle: "Edição República", subtitleEn: "República Edition", modelPath: null },
+  { slot: "frame", id: "vip_dragon", label: "Dragão Imperial", labelEn: "Imperial Dragon", tier: "free", rarity: "legendary", requiredWins: 0, swatch: "#f59e0b", secondarySwatch: "#7f1d1d", subtitle: "Edição República", subtitleEn: "República Edition", modelPath: null },
 ];
 
 export const AVATAR_CATALOG_SLOTS: readonly AvatarItemSlot[] = [
@@ -524,15 +524,7 @@ export const AVATAR_VALID_VALUES: Record<
 
 export const AVATAR_UNLOCK_REQUIREMENTS: Partial<
   Record<keyof AvatarConfig, Record<string, number>>
-> = {
-  frame: { bronze: 1, silver: 3, gold: 5, imperial: 10 },
-  hat: { crown_gold: 7 },
-  cape: { navy_commander: 2 },
-  handProp: { royal_scepter: 4 },
-  pedestal: { runic_gold: 5 },
-  pet: { owl: 6 },
-  aura: { sun_motes: 8 },
-};
+> = {};
 
 const SKIN_HEX_BY_V1: Record<AvatarSkin, string> = {
   porcelain: "#fbe2d1",

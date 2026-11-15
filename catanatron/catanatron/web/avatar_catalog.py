@@ -82,69 +82,69 @@ AVATAR_CATALOG_ITEMS: list[dict[str, Any]] = [
     _item("hair", "curly"),
     _item("hair", "long"),
     _item("hair", "navigator"),
-    _item("hair", "royal_bun", tier="vip", rarity="rare", sku="vip_hair_royal_bun", price_brl_cents=690),
+    _item("hair", "royal_bun", tier="free", rarity="rare"),
     # beard
     _item("beard", "none"),
     _item("beard", "goatee"),
     _item("beard", "full"),
     _item("beard", "mustache"),
     _item("beard", "captain_trimmed"),
-    _item("beard", "full_viking", tier="vip", rarity="rare", sku="vip_beard_viking", price_brl_cents=690),
+    _item("beard", "full_viking", tier="free", rarity="rare"),
     # outfit
     _item("outfit", "settler"),
     _item("outfit", "captain"),
     _item("outfit", "armor"),
     _item("outfit", "merchant"),
-    _item("outfit", "imperial_lord", tier="vip", rarity="epic", sku="vip_outfit_imperial_lord", price_brl_cents=1490),
+    _item("outfit", "imperial_lord", tier="free", rarity="epic"),
     # legsBoots
     _item("legsBoots", "traveler"),
     _item("legsBoots", "cuffed_boots"),
     _item("legsBoots", "greaves"),
-    _item("legsBoots", "royal_greaves", tier="vip", rarity="rare", sku="vip_legs_royal_greaves", price_brl_cents=790),
+    _item("legsBoots", "royal_greaves", tier="free", rarity="rare"),
     # cape
     _item("cape", "none"),
     _item("cape", "traveler"),
-    _item("cape", "navy_commander", tier="earnable", rarity="rare", required_wins=2),
-    _item("cape", "royal_mantle", tier="vip", rarity="epic", sku="vip_cape_royal_mantle", price_brl_cents=1290),
+    _item("cape", "navy_commander", tier="free", rarity="rare", required_wins=0),
+    _item("cape", "royal_mantle", tier="free", rarity="epic"),
     # hat
     _item("hat", "none"),
     _item("hat", "captain"),
     _item("hat", "explorer"),
     _item("hat", "bandana"),
     _item("hat", "helm"),
-    _item("hat", "crown_gold", tier="earnable", rarity="epic", required_wins=7),
-    _item("hat", "admiral_bicorne", tier="vip", rarity="epic", sku="vip_hat_admiral_bicorne", price_brl_cents=990),
+    _item("hat", "crown_gold", tier="free", rarity="epic", required_wins=0),
+    _item("hat", "admiral_bicorne", tier="free", rarity="epic"),
     # handProp
     _item("handProp", "none"),
     _item("handProp", "spyglass"),
     _item("handProp", "scroll"),
-    _item("handProp", "royal_scepter", tier="earnable", rarity="rare", required_wins=4),
-    _item("handProp", "sun_rapier", tier="vip", rarity="epic", sku="vip_prop_sun_rapier", price_brl_cents=1190),
+    _item("handProp", "royal_scepter", tier="free", rarity="rare", required_wins=0),
+    _item("handProp", "sun_rapier", tier="free", rarity="epic"),
     # backProp
     _item("backProp", "none"),
     _item("backProp", "explorer_pack"),
     _item("backProp", "sheathed_sword"),
-    _item("backProp", "imperial_shield", tier="vip", rarity="epic", sku="vip_prop_shield", price_brl_cents=1190),
+    _item("backProp", "imperial_shield", tier="free", rarity="epic"),
     # pet
     _item("pet", "none"),
-    _item("pet", "owl", tier="earnable", rarity="rare", required_wins=6),
-    _item("pet", "parrot", tier="vip", rarity="epic", sku="vip_pet_parrot", price_brl_cents=1490),
-    _item("pet", "falcon", tier="vip", rarity="legendary", sku="vip_pet_falcon", price_brl_cents=1990),
+    _item("pet", "owl", tier="free", rarity="rare", required_wins=0),
+    _item("pet", "parrot", tier="free", rarity="epic"),
+    _item("pet", "falcon", tier="free", rarity="legendary"),
     # mount
     _item("mount", "none"),
     _item("mount", "island_horse"),
-    _item("mount", "snow_wolf", tier="vip", rarity="epic", sku="vip_mount_snow_wolf", price_brl_cents=1990),
-    _item("mount", "royal_stag", tier="vip", rarity="epic", sku="vip_mount_royal_stag", price_brl_cents=1990),
-    _item("mount", "imperial_griffin", tier="vip", rarity="legendary", sku="vip_mount_griffin", price_brl_cents=2990),
+    _item("mount", "snow_wolf", tier="free", rarity="epic"),
+    _item("mount", "royal_stag", tier="free", rarity="epic"),
+    _item("mount", "imperial_griffin", tier="free", rarity="legendary"),
     # pedestal
     _item("pedestal", "stone_wood"),
-    _item("pedestal", "runic_gold", tier="earnable", rarity="rare", required_wins=5),
-    _item("pedestal", "obsidian_crown", tier="vip", rarity="epic", sku="vip_pedestal_obsidian", price_brl_cents=990),
+    _item("pedestal", "runic_gold", tier="free", rarity="rare", required_wins=0),
+    _item("pedestal", "obsidian_crown", tier="free", rarity="epic"),
     # aura
     _item("aura", "none"),
-    _item("aura", "sun_motes", tier="earnable", rarity="epic", required_wins=8),
-    _item("aura", "sea_mist", tier="vip", rarity="rare", sku="vip_aura_sea_mist", price_brl_cents=890),
-    _item("aura", "imperial_flame", tier="vip", rarity="legendary", sku="vip_aura_imperial_flame", price_brl_cents=1790),
+    _item("aura", "sun_motes", tier="free", rarity="epic", required_wins=0),
+    _item("aura", "sea_mist", tier="free", rarity="rare"),
+    _item("aura", "imperial_flame", tier="free", rarity="legendary"),
     # background
     _item("background", "ocean"),
     _item("background", "sunset"),
@@ -154,11 +154,11 @@ AVATAR_CATALOG_ITEMS: list[dict[str, Any]] = [
     _item("background", "crimson"),
     # frame
     _item("frame", "wood"),
-    _item("frame", "bronze", tier="earnable", rarity="common", required_wins=1),
-    _item("frame", "silver", tier="earnable", rarity="rare", required_wins=3),
-    _item("frame", "gold", tier="earnable", rarity="epic", required_wins=5),
-    _item("frame", "imperial", tier="earnable", rarity="legendary", required_wins=10),
-    _item("frame", "vip_dragon", tier="vip", rarity="legendary", sku="vip_frame_dragon", price_brl_cents=1690),
+    _item("frame", "bronze", tier="free", rarity="common", required_wins=0),
+    _item("frame", "silver", tier="free", rarity="rare", required_wins=0),
+    _item("frame", "gold", tier="free", rarity="epic", required_wins=0),
+    _item("frame", "imperial", tier="free", rarity="legendary", required_wins=0),
+    _item("frame", "vip_dragon", tier="free", rarity="legendary"),
 ]
 
 # Backward-compatible V1 exports
@@ -175,10 +175,7 @@ AVATAR_VALID_VALUES: dict[str, tuple[str, ...]] = {
     "frame": ("wood", "bronze", "silver", "gold", "imperial"),
 }
 
-AVATAR_UNLOCK_REQUIREMENTS: dict[str, dict[str, int]] = {
-    "frame": {"bronze": 1, "silver": 3, "gold": 5, "imperial": 10},
-    "hat": {"crown_gold": 7},
-}
+AVATAR_UNLOCK_REQUIREMENTS: dict[str, dict[str, int]] = {}
 
 _CATALOG_BY_SLOT: dict[str, dict[str, dict[str, Any]]] = {}
 for _entry in AVATAR_CATALOG_ITEMS:

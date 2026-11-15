@@ -431,7 +431,13 @@ export default function AvatarStudioModal({
   const renderSlotSection = (section: SlotSectionDef) => {
     const allItems = getAvatarCatalogBySlot(section.slot);
     const filteredItems = allItems.filter((entry) => {
-      if (tierFilter === "vip") return entry.tier === "vip";
+      if (tierFilter === "vip") {
+        return (
+          entry.tier === "vip" ||
+          entry.rarity === "epic" ||
+          entry.rarity === "legendary"
+        );
+      }
       if (tierFilter === "unlocked") {
         return isAvatarItemUnlocked(section.slot, entry.id, wins, entitlements);
       }

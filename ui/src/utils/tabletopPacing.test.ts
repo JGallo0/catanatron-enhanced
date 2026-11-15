@@ -165,5 +165,36 @@ describe("tabletopPacing", () => {
     const robFx = extractBatchTransitionFX(next, robberNext, "BLUE");
     expect(robFx.robberEvent?.tone).toBe("safe");
     expect(robFx.robberEvent?.message).toMatch(/Você não foi roubado!/i);
+
+    // Longest Road & Largest Army award events
+    const awardState = makeGameState({
+      state_index: 16,
+      current_color: "BLUE",
+      seat_names: { RED: "Creitu", BLUE: "João" },
+      player_state: {
+        ...robberNext.player_state,
+        P1_HAS_ROAD: true,
+        P1_LONGEST_ROAD_LENGTH: 6,
+        P0_HAS_ARMY: true,
+        P0_PLAYED_KNIGHT: 3,
+      },
+    });
+    const awardFx = extractBatchTransitionFX(robberNext, awardState, "BLUE");
+    expect(awardFx.awardEvents).toEqual([
+      {
+        type: "ARMY",
+        color: "RED",
+        playerName: "Creitu",
+        previousHolderName: null,
+        metricCount: 3,
+      },
+      {
+        type: "ROAD",
+        color: "BLUE",
+        playerName: "João",
+        previousHolderName: null,
+        metricCount: 6,
+      },
+    ]);
   });
 });

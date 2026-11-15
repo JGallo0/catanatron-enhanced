@@ -89,6 +89,7 @@ export default function PlayerAvatar({
   config,
   username,
   size = 48,
+  fullBody = false,
   className,
   showFrameLabel = false,
   testId = "player-avatar",
@@ -96,6 +97,7 @@ export default function PlayerAvatar({
   config?: Partial<AvatarConfig> | Record<string, unknown> | null;
   username?: string | null;
   size?: number;
+  fullBody?: boolean;
   className?: string;
   showFrameLabel?: boolean;
   testId?: string | null;
@@ -151,6 +153,11 @@ export default function PlayerAvatar({
   const resolvedOutfit = rawResolved.outfit ?? "settler";
   const resolvedHat = rawResolved.hat ?? "none";
   const resolvedCape = rawResolved.cape ?? "none";
+  const resolvedLegsBoots = rawResolved.legsBoots ?? "traveler";
+  const resolvedHandProp = rawResolved.handProp ?? "none";
+  const resolvedPedestal = rawResolved.pedestal ?? "stone_wood";
+  const resolvedAura = rawResolved.aura ?? "none";
+  const resolvedPet = rawResolved.pet ?? "none";
 
   const clipId = `pa-clip-${uid}`;
   const bgGradId = `pa-bg-${uid}`;
@@ -161,21 +168,26 @@ export default function PlayerAvatar({
   const isNobleEyes = eyeStyle === "noble";
   const isWiseEyes = eyeStyle === "wise";
 
+  const svgHeight = fullBody ? Math.round(size * 1.55) : size;
+  const viewBoxStr = fullBody ? "0 0 120 192" : "0 0 120 120";
+
   return (
     <div
       className={cn(
         "player-avatar",
         `player-avatar--frame-${resolvedFrame}`,
+        { "player-avatar--full-body": fullBody },
         className
       )}
       data-testid={testId || undefined}
       data-frame={resolvedFrame}
+      data-full-body={fullBody ? "true" : undefined}
     >
       <div
         className="player-avatar__frame"
-        style={{ width: size, height: size }}
+        style={{ width: size, height: svgHeight }}
       >
-        {hasValidSnapshot ? (
+        {hasValidSnapshot && !fullBody ? (
           <img
             className="player-avatar__snapshot"
             src={rawResolved.portraitSnapshot}
@@ -185,16 +197,20 @@ export default function PlayerAvatar({
           />
         ) : (
           <svg
-            viewBox="0 0 120 120"
+            viewBox={viewBoxStr}
             width={size}
-            height={size}
+            height={svgHeight}
             className="player-avatar__svg"
             role="img"
             aria-label={ariaLabel}
           >
             <defs>
               <clipPath id={clipId}>
-                <circle cx="60" cy="60" r="58" />
+                {fullBody ? (
+                  <rect x="3" y="3" width="114" height="186" rx="22" ry="22" />
+                ) : (
+                  <circle cx="60" cy="60" r="58" />
+                )}
               </clipPath>
               <linearGradient id={bgGradId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={bg.top} />
@@ -213,36 +229,343 @@ export default function PlayerAvatar({
 
             <g clipPath={`url(#${clipId})`}>
               {/* 1. Background */}
-              <rect width="120" height="120" fill={`url(#${bgGradId})`} />
+              <rect
+                width="120"
+                height={fullBody ? "192" : "120"}
+                fill={`url(#${bgGradId})`}
+              />
               {resolvedBackground === "ocean" && (
                 <path
-                  d="M0 90 Q30 82 60 90 T120 90 V120 H0 Z"
+                  d="M0 90 Q30 82 60 90 T120 90 V192 H0 Z"
                   fill="rgba(255,255,255,0.12)"
                 />
               )}
               {resolvedBackground === "sunset" && (
-                <circle cx="60" cy="68" r="28" fill="rgba(254, 240, 138, 0.28)" />
+                <circle cx="60" cy="68" r="32" fill="rgba(254, 240, 138, 0.28)" />
               )}
               {resolvedBackground === "forest" && (
                 <path
-                  d="M8 106 L22 76 L36 106 Z M84 106 L98 72 L112 106 Z"
+                  d="M8 126 L22 76 L36 126 Z M84 126 L98 72 L112 126 Z"
                   fill="rgba(0,0,0,0.22)"
                 />
               )}
               {resolvedBackground === "mountain" && (
                 <path
-                  d="M-5 110 L32 64 L64 96 L94 60 L126 110 Z"
+                  d="M-5 126 L32 64 L64 96 L94 60 L126 126 Z"
                   fill="rgba(15,23,42,0.45)"
                 />
               )}
               {resolvedBackground === "gold" && (
-                <circle cx="60" cy="54" r="40" fill="rgba(254, 249, 195, 0.22)" />
+                <circle cx="60" cy="54" r="44" fill="rgba(254, 249, 195, 0.22)" />
               )}
               {resolvedBackground === "crimson" && (
                 <path
-                  d="M12 115 V82 H24 V88 H34 V82 H86 V88 H96 V82 H108 V115 Z"
+                  d="M12 130 V82 H24 V88 H34 V82 H86 V88 H96 V82 H108 V130 Z"
                   fill="rgba(0,0,0,0.22)"
                 />
+              )}
+
+              {/* Optional Full-Body Aura */}
+              {fullBody && resolvedAura !== "none" && (
+                <g opacity="0.65">
+                  <ellipse
+                    cx="60"
+                    cy="104"
+                    rx="46"
+                    ry="68"
+                    fill="none"
+                    stroke={
+                      resolvedAura === "imperial_flame"
+                        ? "#f97316"
+                        : resolvedAura === "sea_mist"
+                        ? "#38bdf8"
+                        : "#fde047"
+                    }
+                    strokeWidth="2.2"
+                    strokeDasharray="6 6"
+                  />
+                  <circle cx="24" cy="48" r="2.6" fill="#fde047" />
+                  <circle cx="96" cy="56" r="2.2" fill="#fde047" />
+                  <circle cx="20" cy="128" r="2.4" fill="#fde047" />
+                  <circle cx="98" cy="124" r="2.8" fill="#fde047" />
+                </g>
+              )}
+
+              {/* Full-Body Lower Body, Pedestal, Cape & Legs */}
+              {fullBody && (
+                <g className="player-avatar__fullbody-lower">
+                  {/* Full-length Cape */}
+                  {resolvedCape !== "none" && (
+                    <path
+                      d="M22 86 C16 118 14 148 18 168 H102 C106 148 104 118 98 86 Z"
+                      fill={
+                        resolvedCape === "royal_mantle"
+                          ? outfitDark
+                          : outfitDeepDark
+                      }
+                      stroke={
+                        resolvedCape === "royal_mantle" ||
+                        resolvedCape === "navy_commander"
+                          ? outfitTrim
+                          : "none"
+                      }
+                      strokeWidth="2"
+                    />
+                  )}
+
+                  {/* Stage Pedestal */}
+                  {resolvedPedestal === "runic_gold" ? (
+                    <g>
+                      <ellipse
+                        cx="60"
+                        cy="176"
+                        rx="42"
+                        ry="9"
+                        fill="#78350f"
+                        stroke="#facc15"
+                        strokeWidth="2"
+                      />
+                      <ellipse
+                        cx="60"
+                        cy="173"
+                        rx="36"
+                        ry="6.5"
+                        fill="#b45309"
+                        stroke="#fef08a"
+                        strokeWidth="1.2"
+                      />
+                    </g>
+                  ) : resolvedPedestal === "obsidian_crown" ? (
+                    <g>
+                      <ellipse
+                        cx="60"
+                        cy="176"
+                        rx="43"
+                        ry="9"
+                        fill="#0f172a"
+                        stroke="#f59e0b"
+                        strokeWidth="2"
+                      />
+                      <ellipse
+                        cx="60"
+                        cy="173"
+                        rx="36"
+                        ry="6.5"
+                        fill="#1e1b4b"
+                        stroke="#ef4444"
+                        strokeWidth="1.3"
+                      />
+                    </g>
+                  ) : (
+                    <g>
+                      <ellipse
+                        cx="60"
+                        cy="176"
+                        rx="41"
+                        ry="8.5"
+                        fill="#451a03"
+                        stroke="#a16207"
+                        strokeWidth="1.6"
+                      />
+                      <ellipse
+                        cx="60"
+                        cy="173"
+                        rx="35"
+                        ry="6"
+                        fill="#64748b"
+                        stroke="#94a3b8"
+                        strokeWidth="1.2"
+                      />
+                    </g>
+                  )}
+
+                  {/* Trousers / Legs */}
+                  <rect
+                    x="41"
+                    y="126"
+                    width="15"
+                    height="32"
+                    rx="6"
+                    fill={outfitDeepDark}
+                  />
+                  <rect
+                    x="64"
+                    y="126"
+                    width="15"
+                    height="32"
+                    rx="6"
+                    fill={outfitDeepDark}
+                  />
+
+                  {/* Boots / Greaves */}
+                  <path
+                    d="M39 148 H57 V169 C57 172 36 172 36 168 V158 C36 154 39 152 39 148 Z"
+                    fill={
+                      resolvedLegsBoots === "greaves"
+                        ? "#64748b"
+                        : resolvedLegsBoots === "royal_greaves"
+                        ? "#334155"
+                        : "#422006"
+                    }
+                    stroke={
+                      resolvedLegsBoots === "royal_greaves" ||
+                      resolvedLegsBoots === "cuffed_boots"
+                        ? outfitTrim
+                        : "#1e293b"
+                    }
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M63 148 H81 C81 152 84 154 84 158 V168 C84 172 63 172 63 169 Z"
+                    fill={
+                      resolvedLegsBoots === "greaves"
+                        ? "#64748b"
+                        : resolvedLegsBoots === "royal_greaves"
+                        ? "#334155"
+                        : "#422006"
+                    }
+                    stroke={
+                      resolvedLegsBoots === "royal_greaves" ||
+                      resolvedLegsBoots === "cuffed_boots"
+                        ? outfitTrim
+                        : "#1e293b"
+                    }
+                    strokeWidth="1.5"
+                  />
+
+                  {/* Full Torso Tunic / Coat Extension */}
+                  <path
+                    d="M28 110 L34 140 H86 L92 110 Z"
+                    fill={
+                      resolvedOutfit === "armor" ? "#64748b" : outfitPrimary
+                    }
+                    stroke={outfitDark}
+                    strokeWidth="1.2"
+                  />
+                  {/* Belt & Buckle */}
+                  <rect
+                    x="31"
+                    y="124"
+                    width="58"
+                    height="7.5"
+                    rx="2.5"
+                    fill="#291507"
+                    stroke={outfitTrim}
+                    strokeWidth="1"
+                  />
+                  <rect
+                    x="54"
+                    y="122.5"
+                    width="12"
+                    height="10.5"
+                    rx="2"
+                    fill={outfitTrim}
+                    stroke="#713f12"
+                    strokeWidth="1.2"
+                  />
+
+                  {/* Arms & Hands */}
+                  <path
+                    d="M23 94 C15 108 16 124 23 134 L31 130 C27 121 27 109 32 98 Z"
+                    fill={outfitPrimary}
+                  />
+                  <path
+                    d="M97 94 C105 108 104 124 97 134 L89 130 C93 121 93 109 88 98 Z"
+                    fill={outfitPrimary}
+                  />
+                  <circle cx="25" cy="135" r="5.5" fill={skinBase} stroke={skinShade} strokeWidth="1" />
+                  <circle cx="95" cy="135" r="5.5" fill={skinBase} stroke={skinShade} strokeWidth="1" />
+
+                  {/* Hand Prop in Right Hand */}
+                  {resolvedHandProp === "royal_scepter" && (
+                    <g>
+                      <line
+                        x1="95"
+                        y1="100"
+                        x2="95"
+                        y2="164"
+                        stroke="#facc15"
+                        strokeWidth="3.2"
+                        strokeLinecap="round"
+                      />
+                      <circle
+                        cx="95"
+                        cy="98"
+                        r="6"
+                        fill="#ef4444"
+                        stroke="#fef08a"
+                        strokeWidth="2"
+                      />
+                    </g>
+                  )}
+                  {resolvedHandProp === "sun_rapier" && (
+                    <g>
+                      <line
+                        x1="96"
+                        y1="86"
+                        x2="96"
+                        y2="144"
+                        stroke="#e2e8f0"
+                        strokeWidth="2.6"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M89 131 Q96 125 103 131"
+                        fill="none"
+                        stroke="#facc15"
+                        strokeWidth="2.6"
+                      />
+                    </g>
+                  )}
+                  {resolvedHandProp === "spyglass" && (
+                    <rect
+                      x="88"
+                      y="129"
+                      width="16"
+                      height="6"
+                      rx="2"
+                      transform="rotate(-24 95 132)"
+                      fill="#ca8a04"
+                      stroke="#fef08a"
+                      strokeWidth="1.1"
+                    />
+                  )}
+                  {resolvedHandProp === "scroll" && (
+                    <rect
+                      x="88"
+                      y="128"
+                      width="14"
+                      height="8"
+                      rx="3"
+                      fill="#fef3c7"
+                      stroke="#b45309"
+                      strokeWidth="1.2"
+                    />
+                  )}
+
+                  {/* Shoulder / Companion Pet */}
+                  {resolvedPet !== "none" && (
+                    <g transform="translate(18, 72)">
+                      <ellipse
+                        cx="8"
+                        cy="9"
+                        rx="6.5"
+                        ry="8"
+                        fill={
+                          resolvedPet === "parrot"
+                            ? "#ef4444"
+                            : resolvedPet === "falcon"
+                            ? "#f59e0b"
+                            : "#a8a29e"
+                        }
+                        stroke="#0f172a"
+                        strokeWidth="1.1"
+                      />
+                      <circle cx="6.5" cy="6" r="1.5" fill="#fef08a" />
+                      <polygon points="13,6 17,8 13,10" fill="#facc15" />
+                    </g>
+                  )}
+                </g>
               )}
 
               {/* 2. Back Hair */}

@@ -1,7 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import cn from "classnames";
 
-import type { GameState } from "../utils/api.types";
+import type { Color, GameState } from "../utils/api.types";
+import { getPlayerColorMeta } from "../config/assetRegistry";
+import { resolvePlayerDisplayName } from "../config/botCatalog";
 import { useLanguage } from "../i18n";
 import "./DiceHistogram.scss";
 
@@ -26,7 +28,36 @@ interface DiceHistogramProps {
 }
 
 export default function DiceHistogram({ gameState }: DiceHistogramProps) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+  const [selectedPlayer, setSelectedPlayer] = useState<Color | "ALL">("ALL");
+  const colorMeta = useMemo(() => getPlayerColorMeta(language), [language]);
+
+  const playerOptions = useMemo(() => {
+    const rollCounts: Partial<Record<Color, number>> = {};
+    for (const rec of gameState.action_records || []) {
+      const action = rec?.[0];
+      const result = rec?.[1];
+      if (
+        action &&
+        action[1] === "ROLL" &&
+        Array.isArray(result) &&
+        result.length >= 2
+      ) {
+        rollCounts[action[0]] = (rollCounts[action[0]] ?? 0) + 1;
+      }
+    }
+    return (gameState.colors || []).map((color) => ({
+      color,
+      name: resolvePlayerDisplayName(
+        gameState,
+        color,
+        colorMeta[color]?.label || color
+      ),
+      hex: colorMeta[color]?.primary || "#60a5fa",
+      rollCount: rollCounts[color] ?? 0,
+    }));
+  }, [gameState, colorMeta]);
+
   const { counts, totalRolls, lastSum, maxScale } = useMemo(() => {
     const map: Record<number, number> = {};
     for (const s of DICE_SUMS) map[s] = 0;
@@ -39,6 +70,7 @@ export default function DiceHistogram({ gameState }: DiceHistogramProps) {
       if (
         action &&
         action[1] === "ROLL" &&
+        (selectedPlayer === "ALL" || action[0] === selectedPlayer) &&
         Array.isArray(result) &&
         result.length >= 2
       ) {
@@ -63,7 +95,7 @@ export default function DiceHistogram({ gameState }: DiceHistogramProps) {
       lastSum: recent,
       maxScale: highest,
     };
-  }, [gameState.action_records]);
+  }, [gameState.action_records, selectedPlayer]);
 
   const isBalanced = gameState.game?.dice_mode === "balanced";
   const deckRemaining = gameState.dice_deck_remaining;
@@ -114,6 +146,51 @@ export default function DiceHistogram({ gameState }: DiceHistogramProps) {
             : t("🎲 Padrão 2d6", "🎲 Standard 2d6")}
         </span>
       </div>
+
+      {playerOptions.length > 0 && (
+        <div
+          className="dice-histogram__filters"
+          role="group"
+          aria-label={t("Filtrar dados por jogador", "Filter dice by player")}
+        >
+          <button
+            type="button"
+            data-testid="dice-filter-ALL"
+            aria-pressed={selectedPlayer === "ALL"}
+            className={cn("dice-histogram__filter-btn", {
+              "is-active": selectedPlayer === "ALL",
+            })}
+            onClick={() => setSelectedPlayer("ALL")}
+          >
+            {t("Todos", "All")}
+          </button>
+          {playerOptions.map((p) => (
+            <button
+              key={p.color}
+              type="button"
+              data-testid={`dice-filter-${p.color}`}
+              aria-pressed={selectedPlayer === p.color}
+              className={cn("dice-histogram__filter-btn", {
+                "is-active": selectedPlayer === p.color,
+              })}
+              style={
+                {
+                  "--filter-player-color": p.hex,
+                } as React.CSSProperties
+              }
+              onClick={() => setSelectedPlayer(p.color)}
+            >
+              <span
+                className="dice-histogram__filter-dot"
+                style={{ backgroundColor: p.hex }}
+              />
+              <span className="dice-histogram__filter-name">
+                {`${p.name} (${p.rollCount})`}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="dice-histogram__bars" role="list">
         {DICE_SUMS.map((sum) => {
