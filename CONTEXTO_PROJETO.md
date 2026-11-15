@@ -6,6 +6,14 @@ Este documento consolida **todo o histórico, arquitetura, decisões de design e
 
 ## 1. Visão Geral e Objetivos
 
+### Perfis e amizades — 14/11/2026
+- O botão **Amigos** na Home abre `FriendsModal`: lista de amigos, pedidos recebidos/enviados, busca por nome ou `@usuário` (2–32 caracteres, até 20 resultados) e Meu perfil.
+- Perfis mostram avatar, nome, usuário, data de entrada, estatísticas e posição no ranking. A edição reutiliza o estúdio existente para nome e avatar.
+- O módulo `web/social.py`, espelhado em `api/catanatron/web/social.py`, expõe rotas autenticadas em `/api/social`: `GET /players?q=`, `GET /profiles/<username>`, `GET /friends` e `POST/PATCH/DELETE /friendships/<username>`. PATCH exige `{"action":"accept"}` e somente o destinatário pode aceitar.
+- `StoredFriendship` armazena um par canônico único de usuários, solicitante e estado `pending`/`accepted`. Cancelar pedido, recusar e remover amizade usam DELETE. `db.create_all()` cria a tabela `friendships` na inicialização; usa a mesma base persistente das contas. O servidor não expõe e-mail, sessões ou dados privados nos perfis.
+- `socialApi.ts` exige sessão online e apresenta erros reais, sem criar amizades fictícias no fallback offline. Visitantes/contas locais recebem acesso ao login. A lista atualiza a cada 15 segundos enquanto o modal está aberto e a aba visível.
+- Escopo desta versão: perfis e amizades. Convites diretos para salas, presença online e mensagens privadas ficam para uma etapa futura.
+
 ### Atualização de mecânicas — 14/11/2026
 - `CardGainOverlay` apresenta os ganhos reais da mão local (recursos e desenvolvimento) em fila, uma carta por vez, com voo para o ícone correspondente na barra inferior. Não reapresenta cartas ao carregar a partida; aguarda o fim da rolagem e respeita movimento reduzido.
 - O destaque dos números no tabuleiro e os efeitos de produção agora aguardam o estado `isRollingDice` da tela. O botão Roubar ganha destaque pulsante somente após esse intervalo.

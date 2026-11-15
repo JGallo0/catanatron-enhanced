@@ -1,0 +1,74 @@
+.friends-modal.MuiPaper-root {
+  background: linear-gradient(145deg, #142c40, #091725 65%);
+  color: #edf3f6;
+  border: 1px solid #a88b4d;
+  border-radius: 20px;
+  min-height: 440px;
+  .MuiButton-root { text-transform: none; border-radius: 9px; font-weight: 650; }
+  .MuiButton-text { color: #f1d28d; }
+  .MuiButton-contained { background: #edce88; color: #182a35; }
+  .MuiButton-root.Mui-disabled { opacity: .45; }
+  .MuiButton-colorError { color: #ffaaa0; }
+  button:focus-visible, input:focus-visible { outline: 2px solid #f1d28d; outline-offset: 3px; }
+}
+.friends-header.MuiDialogTitle-root {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 24px 10px;
+  > span { display: flex; align-items: center; gap: 12px; color: #f1d28d; }
+  .MuiIconButton-root { color: #c7d6e2; }
+}
+.friends-content.MuiDialogContent-root { padding: 0 24px 26px; }
+.friends-tabs { border-bottom: 1px solid #ffffff1a; margin-bottom: 22px;
+  .MuiTab-root { min-width: 0; padding: 12px 16px; color: #b2c4d1; text-transform: none; }
+  .MuiTab-root.Mui-selected { color: #f1d28d; }
+  .MuiTabs-indicator { background: #f1d28d; }
+}
+.friends-empty { text-align: center; padding: 28px 12px; color: #b7cbd7;
+  > svg { color: #d0b579; }
+  h3 { color: #f1e4c4; font-size: 20px; margin: 16px 0 10px; }
+  p { line-height: 1.6; max-width: 380px; margin: 0 auto 22px; }
+}
+.friends-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px;
+  > li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px; background: #ffffff05; border: 1px solid #ffffff13; border-radius: 12px; }
+}
+.friends-identity { display: flex; align-items: center; gap: 12px; border: 0; padding: 0; background: none; color: inherit; text-align: left; cursor: pointer; min-width: 0; max-width: 100%;
+  > span:last-child { min-width: 0; }
+  strong, small { display: block; overflow-wrap: anywhere; }
+  strong { font-size: 15px; }
+  small { margin-top: 3px; color: #a9bfce; }
+}
+.friends-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px;
+  &--profile { justify-content: center; margin-top: 24px; }
+}
+.friends-status { display: inline-flex; align-items: center; gap: 4px; color: #a2d7c7; }
+.friends-search { display: grid; gap: 10px;
+  label { font-size: 15px; color: #e8d9b5; }
+  > div { display: flex; gap: 10px; }
+  input { width: 100%; min-width: 0; padding: 12px; border-radius: 9px; border: 1px solid #7893a557; color: #edf3f6; background: #06121f; font: inherit; }
+  small { color: #9cb4c5; margin-bottom: 16px; }
+}
+.friends-section-title { display: flex; gap: 8px; align-items: center; font-size: 14px; color: #e8d9b5; margin: 22px 0 12px;
+  span { border-radius: 20px; background: #ffffff0e; padding: 3px 8px; font-size: 12px; }
+}
+.friends-muted { color: #a9bfce; font-size: 14px; }
+.friends-profile-hero { text-align: center; padding: 10px 0 22px;
+  h3 { font-size: 24px; margin: 12px 0 2px; overflow-wrap: anywhere; }
+  p { color: #f1d28d; margin: 0 0 10px; overflow-wrap: anywhere; }
+  small { color: #9cb4c5; }
+}
+.friends-stats { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; padding: 18px 0; border-block: 1px solid #ffffff18; gap: 8px; text-align: center;
+  dt { font-size: 11px; color: #b2c4d1; }
+  dd { font-size: 22px; font-weight: 700; margin: 7px 0 0; color: #f1d28d; }
+}
+.friends-error { border: 1px solid #d8847466; color: #ffd0c6; background: #ab4d351a; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; p { margin: 0 0 4px; } }
+.friends-notice { color: #b7e7d8; background: #53bb9514; padding: 12px; border-radius: 9px; font-size: 14px; }
+@media (max-width: 480px) {
+  .friends-modal.MuiPaper-root { margin: 12px; width: calc(100% - 24px); }
+  .friends-content.MuiDialogContent-root { padding: 0 14px 20px; }
+  .friends-header.MuiDialogTitle-root { padding: 14px 14px 6px; font-size: 19px; }
+  .friends-tabs .MuiTab-root { padding-inline: 10px; font-size: 12px; }
+  .friends-list > li { align-items: flex-start; }
+  .friends-actions { width: 100%; justify-content: flex-end; }
+  .friends-actions--profile { justify-content: center; }
+  .friends-stats { grid-template-columns: repeat(2, 1fr); gap: 18px; }
+}

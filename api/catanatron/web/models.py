@@ -26,6 +26,7 @@ from catanatron.state import VALID_DICE_MODES
 from catanatron.state_functions import get_actual_victory_points, get_state_index
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     ForeignKey,
     Integer,
@@ -289,6 +290,22 @@ class StoredUser(Base):
     google_sub = Column(String(64), unique=True, index=True, nullable=True)
     email = Column(String(255), index=True, nullable=True)
     avatar_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
+
+
+class StoredFriendship(Base):
+    """One canonical pair for both pending requests and accepted friendships."""
+
+    __tablename__ = "friendships"
+    __table_args__ = (
+        CheckConstraint("user_low <> user_high", name="ck_friendship_distinct"),
+        CheckConstraint("status IN ('pending', 'accepted')", name="ck_friendship_status"),
+        CheckConstraint("requested_by = user_low OR requested_by = user_high", name="ck_friendship_requester"),
+    )
+    user_low = Column(String(32), ForeignKey("users.username"), primary_key=True)
+    user_high = Column(String(32), ForeignKey("users.username"), primary_key=True, index=True)
+    requested_by = Column(String(32), ForeignKey("users.username"), nullable=False)
+    status = Column(String(16), nullable=False, default="pending")
     created_at = Column(Integer, nullable=False, default=lambda: int(time.time()))
 
 

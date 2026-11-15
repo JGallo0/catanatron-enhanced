@@ -36,6 +36,8 @@ import MatchSetupModal, {
   type MatchSetupMode,
 } from "../components/home/MatchSetupModal";
 import OpenLobbyModal from "../components/home/OpenLobbyModal";
+import FriendsModal from "../components/home/FriendsModal";
+import { Users } from "lucide-react";
 
 import "./HomePage.scss";
 
@@ -61,6 +63,7 @@ export default function HomePage() {
   const [setupMode, setSetupMode] = useState<MatchSetupMode>(null);
   const [openLobbyOpen, setOpenLobbyOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
   const [avatarStudioOpen, setAvatarStudioOpen] = useState(false);
   const [almanacOpen, setAlmanacOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -144,6 +147,7 @@ export default function HomePage() {
   }, [refreshRooms]);
 
   const handleLogout = async () => {
+    setFriendsOpen(false);
     setAvatarStudioOpen(false);
     await logoutAccount();
     setAccount(null);
@@ -420,6 +424,9 @@ export default function HomePage() {
           >
             🎨 {t("Personalizar Avatar", "Customize Avatar")}
           </Button>
+          <Button variant="outlined" className="home-dock-btn home-dock-btn--friends" startIcon={<Users size={19} />} onClick={() => setFriendsOpen(true)}>
+            Amigos
+          </Button>
           <Button
             variant="outlined"
             className="home-dock-btn home-dock-btn--almanac"
@@ -511,6 +518,14 @@ export default function HomePage() {
         onClose={() => setLeaderboardOpen(false)}
         currentUsername={account?.username}
       />
+
+      {friendsOpen && <FriendsModal
+        key={account?.auth_token ?? "guest"}
+        account={account}
+        onClose={() => setFriendsOpen(false)}
+        onLogin={() => { setFriendsOpen(false); handleOpenAuth("Entre na sua conta online para adicionar amigos."); }}
+        onEditProfile={() => { setFriendsOpen(false); handleOpenAvatarStudio(); }}
+      />}
 
       <AvatarStudioModal
         open={avatarStudioOpen}

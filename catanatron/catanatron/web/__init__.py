@@ -184,5 +184,7 @@ def create_app(test_config=None):
     from . import api
 
     app.register_blueprint(api.bp)
+    from . import social
+    app.register_blueprint(social.bp)
 
     return app
