@@ -88,6 +88,7 @@ describe("HomePage A2 Stage", () => {
     expect(container.querySelector(".setup-card")).toBeNull();
     expect(await screen.findByText("João Gallo")).toBeInTheDocument();
     expect(screen.getByText(/#1 no Ranking/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vitórias|partidas|62\.5%/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Ouro Real/i)).toBeInTheDocument();
     expect(screen.getByTestId("player-avatar")).toHaveAttribute("data-frame", "gold");
     expect(
@@ -265,9 +266,9 @@ describe("HomePage A2 Stage", () => {
     ).toBeInTheDocument();
   }, 15000);
 
-  test("clicking Estúdio 3D pill on central hero stage opens AvatarStudioModal", async () => {
+  test("removes Estúdio 3D pill from hero stage and opens AvatarStudioModal via dock Personalizar Avatar button", async () => {
     const user = userEvent.setup();
-    render(
+    const { container } = render(
       <MemoryRouter>
         <HomePage />
       </MemoryRouter>
@@ -275,7 +276,13 @@ describe("HomePage A2 Stage", () => {
 
     const heroStage = screen.getByTestId("home-hero-stage");
     expect(heroStage).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Estúdio 3D/i }));
+    expect(container.querySelector(".home-hero-stage__footer")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Estúdio 3D/i })
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: /Personalizar Avatar/i })
+    );
     expect(
       await screen.findByText(/Personalizar Avatar & Perfil/i)
     ).toBeInTheDocument();

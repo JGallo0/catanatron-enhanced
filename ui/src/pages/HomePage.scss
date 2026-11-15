@@ -249,46 +249,6 @@
     justify-content: center;
     opacity: 0.72;
   }
-
-  &__footer {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: -10px;
-    padding: 4px 6px 4px 12px;
-    border-radius: 999px;
-    background: rgba(9, 17, 32, 0.78);
-    border: 1px solid rgba(250, 204, 21, 0.42);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
-    pointer-events: auto;
-    z-index: 2;
-  }
-
-  &__orbit-hint {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #cbd5e1;
-    user-select: none;
-  }
-
-  &__studio-pill {
-    padding: 5px 12px;
-    border-radius: 999px;
-    border: 1px solid rgba(254, 240, 138, 0.55);
-    background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%);
-    color: #0f172a;
-    font-size: 0.76rem;
-    font-weight: 800;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 14px rgba(250, 204, 21, 0.45);
-    }
-  }
 }
 
 /* Doca Inferior Flutuante de Modos */
