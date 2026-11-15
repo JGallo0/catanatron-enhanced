@@ -2,7 +2,9 @@
   position: fixed;
   inset: 0;
   z-index: 92;
+  overflow: hidden;
   pointer-events: none;
+  animation: award-conquest-overlay-exit 700ms 4.6s ease-in forwards;
 
   &__scrim {
     position: absolute;
@@ -20,12 +22,20 @@
     position: absolute;
     inset: 0;
     display: grid;
-    place-items: center;
+    grid-template-rows: 1fr auto auto 1fr;
+    justify-items: center;
+    align-items: center;
+    row-gap: clamp(14px, 2.4vh, 24px);
+    padding: 16px;
     perspective: 1400px;
   }
 
   &__halo {
+    grid-row: 2;
+    grid-column: 1;
     position: absolute;
+    justify-self: center;
+    align-self: center;
     width: min(660px, 62vw);
     aspect-ratio: 1;
     border-radius: 50%;
@@ -40,9 +50,12 @@
   }
 
   &__crest {
+    grid-row: 2;
+    grid-column: 1;
     position: relative;
-    width: min(760px, 70vw);
-    height: min(70vh, 760px);
+    width: min(760px, 70vw, 108vh);
+    aspect-ratio: 1678 / 937;
+    height: auto;
     object-fit: contain;
     filter:
       drop-shadow(0 34px 32px rgba(0, 0, 0, 0.82))
@@ -52,22 +65,33 @@
   }
 
   &__glint {
-    position: absolute;
-    width: min(760px, 70vw);
-    height: min(70vh, 760px);
-    background: linear-gradient(
-      108deg,
-      transparent 38%,
-      rgba(255, 230, 157, 0.06) 44%,
-      rgba(255, 240, 194, 0.72) 49%,
-      rgba(255, 255, 255, 0.12) 52%,
-      transparent 58%
-    );
+    grid-row: 2;
+    grid-column: 1;
+    position: relative;
+    width: min(760px, 70vw, 108vh);
+    aspect-ratio: 1678 / 937;
+    overflow: hidden;
     mask: var(--award-crest-mask) center / contain no-repeat;
     -webkit-mask: var(--award-crest-mask) center / contain no-repeat;
     mix-blend-mode: screen;
-    transform: translateX(-75%);
-    animation: award-conquest-glint 2.1s 1.25s ease-in-out both;
+    animation: award-conquest-glint-track 5.3s cubic-bezier(0.17, 0.79, 0.18, 1) both;
+    pointer-events: none;
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        108deg,
+        transparent 38%,
+        rgba(255, 230, 157, 0.08) 44%,
+        rgba(255, 240, 194, 0.68) 49%,
+        rgba(255, 255, 255, 0.14) 52%,
+        transparent 58%
+      );
+      transform: translateX(-75%);
+      animation: award-conquest-glint 2.1s 1.25s ease-in-out both;
+    }
   }
 
   &__particles {
@@ -93,10 +117,9 @@
   }
 
   &__identity-plate {
-    position: absolute;
-    left: 50%;
-    bottom: 8.5%;
-    transform: translateX(-50%);
+    grid-row: 3;
+    grid-column: 1;
+    position: relative;
     display: flex;
     align-items: center;
     gap: 13px;
@@ -115,10 +138,11 @@
       content: "";
       position: absolute;
       left: 50%;
-      top: -9px;
+      top: -11px;
       width: 1px;
-      height: 9px;
-      background: linear-gradient(#e4b85a, rgba(228, 184, 90, 0.1));
+      height: 11px;
+      transform: translateX(-50%);
+      background: linear-gradient(rgba(228, 184, 90, 0.1), #e4b85a);
     }
   }
 
@@ -169,6 +193,11 @@
   }
 }
 
+@keyframes award-conquest-overlay-exit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes award-conquest-scrim-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -187,6 +216,13 @@
   100% { opacity: 1; transform: none; }
 }
 
+@keyframes award-conquest-glint-track {
+  0% { opacity: 0; transform: translateY(38px) translateZ(-430px) scale(0.68); }
+  22% { opacity: 1; }
+  58% { transform: translateY(-8px) translateZ(20px) scale(1.025); }
+  100% { opacity: 1; transform: none; }
+}
+
 @keyframes award-conquest-glint {
   0% { opacity: 0; transform: translateX(-75%); }
   20% { opacity: 1; }
@@ -194,8 +230,8 @@
 }
 
 @keyframes award-conquest-identity-in {
-  from { opacity: 0; transform: translate(-50%, 20px); filter: blur(5px); }
-  to { opacity: 1; transform: translateX(-50%); filter: none; }
+  from { opacity: 0; transform: translateY(20px); filter: blur(5px); }
+  to { opacity: 1; transform: none; filter: none; }
 }
 
 @keyframes award-conquest-particle-drift {
@@ -212,15 +248,33 @@
     }
 
     &__identity-plate {
-      bottom: 9%;
       max-width: 92vw;
-      transform: translateX(-50%) scale(0.88);
+      gap: 10px;
+      padding: 7px 14px 7px 8px;
+    }
+
+    &__avatar {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      font-size: 15px;
+    }
+
+    &__player-name {
+      font-size: 16px;
+    }
+
+    &__points {
+      padding-left: 12px;
+      font-size: 14px;
     }
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .award-conquest-overlay {
+    animation: none;
+
     &__scrim,
     &__halo,
     &__crest,
