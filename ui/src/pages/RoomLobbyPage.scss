@@ -625,6 +625,17 @@
   box-shadow: 0 12px 28px rgba(234, 179, 8, 0.35) !important;
 }
 
+.lobby-waiting-host-note {
+  padding: 13px 16px;
+  border-radius: 14px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fde68a;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px dashed rgba(250, 204, 21, 0.42);
+}
+
 @media (max-width: 600px) {
   .room-lobby-page {
     padding: 12px 10px 28px;

@@ -301,6 +301,12 @@ describe("RoomLobbyPage", () => {
     expect(
       screen.queryByRole("button", { name: /Encerrar Sala/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Iniciar Partida/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Aguardando quem criou a sala iniciar a partida/i)
+    ).toBeInTheDocument();
 
     const diffGroup = screen.getByRole("group", { name: /Dificuldade dos Bots/i });
     expect(

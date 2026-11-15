@@ -4478,6 +4478,16 @@ export function localStartRoomGame(
   const rooms = loadRoomsMap();
   const stored = rooms[code];
 
+  if (!stored.game_id && !resolvedRoom.is_host) {
+    throw makeRoomHttpError(
+      403,
+      tr(
+        "Apenas quem criou a sala pode iniciar a partida.",
+        "Only the room creator can start the match."
+      )
+    );
+  }
+
   if (!stored.game_id) {
     const seatNames: Partial<Record<Color, string>> = {};
     const seatMeta = {} as Record<Color, LocalSeatMeta>;

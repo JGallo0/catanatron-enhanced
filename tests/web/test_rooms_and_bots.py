@@ -280,6 +280,7 @@ def test_room_close_leave_ownership_and_finished_filtering(app, client):
         "/api/rooms",
         json={"host_name": "Visitante", "players": ["HUMAN", "HUMAN", "CATANATRON", "W"]},
     ).get_json()
+    assert waiting_res["room"]["config"]["friendly_robber"] is False
     w_code = waiting_res["room_code"]
     w_tok = waiting_res["seat_token"]
 
@@ -290,7 +291,11 @@ def test_room_close_leave_ownership_and_finished_filtering(app, client):
     assert guest_join.status_code == 200
     g_tok = guest_join.get_json()["seat_token"]
 
-    # Non-host gets 403 on DELETE and POST /close
+    # Non-host gets 403 on POST /start, DELETE and POST /close
+    forbidden_start = client.post(
+        f"/api/rooms/{w_code}/start", json={"token": g_tok}
+    )
+    assert forbidden_start.status_code == 403
     forbidden_del = client.delete(f"/api/rooms/{w_code}", headers={"X-Seat-Token": g_tok})
     assert forbidden_del.status_code == 403
     forbidden_post = client.post(

@@ -1890,7 +1890,7 @@ def create_room(
     map_template: str = "BASE",
     vps_to_win: int = 10,
     discard_limit: int = 7,
-    friendly_robber: bool = True,
+    friendly_robber: bool = False,
     host_token: str | None = None,
     host_username: str | None = None,
     host_avatar_config: dict | None = None,

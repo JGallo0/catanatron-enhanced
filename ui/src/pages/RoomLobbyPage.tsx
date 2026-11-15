@@ -419,7 +419,7 @@ export default function RoomLobbyPage() {
   };
 
   const handleStartGame = async () => {
-    if (!room) return;
+    if (!room || !room.is_host) return;
     try {
       setStarting(true);
       const res = await startRoomGame(room.room_code, getStoredToken(room.room_code));
@@ -1136,19 +1136,29 @@ export default function RoomLobbyPage() {
               </span>
             </div>
 
-            <Button
-              variant="contained"
-              className="start-room-btn"
-              disabled={starting}
-              onClick={handleStartGame}
-            >
-              {starting
-                ? t("Iniciando Partida...", "Starting Match...")
-                : t(
-                    "🚀 Iniciar Partida (Todos na Sala entram juntos)",
-                    "🚀 Start Match (Everyone in Room joins together)"
-                  )}
-            </Button>
+            {room.is_host ? (
+              <Button
+                variant="contained"
+                className="start-room-btn"
+                disabled={starting}
+                onClick={handleStartGame}
+              >
+                {starting
+                  ? t("Iniciando Partida...", "Starting Match...")
+                  : t(
+                      "🚀 Iniciar Partida (Todos na Sala entram juntos)",
+                      "🚀 Start Match (Everyone in Room joins together)"
+                    )}
+              </Button>
+            ) : (
+              <div className="lobby-waiting-host-note" role="status">
+                ⏳{" "}
+                {t(
+                  "Aguardando quem criou a sala iniciar a partida...",
+                  "Waiting for the room creator to start the match..."
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
