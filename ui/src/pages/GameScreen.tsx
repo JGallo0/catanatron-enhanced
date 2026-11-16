@@ -18,6 +18,7 @@ import {
 import { BookOpen, Castle, ChartColumn, FastForward, History, Map as MapIcon, MessageSquare, Smile } from "lucide-react";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import VolumeDownIcon from "@mui/icons-material/VolumeDown";
 
 import ZoomableBoard from "./ZoomableBoard";
 import ActionsToolbar from "./ActionsToolbar";
@@ -42,6 +43,7 @@ import AlmanacModal from "../components/AlmanacModal";
 import DiceHistogram from "../components/DiceHistogram";
 import OceanBackdrop from "../components/OceanBackdrop";
 import LanguageToggle from "../components/LanguageToggle";
+import AudioSettingsPopover from "../components/AudioSettingsPopover";
 import { store } from "../store";
 import ACTIONS from "../actions";
 import {
@@ -84,13 +86,18 @@ import {
 import type { Card, Color, GameMessage, GameState } from "../utils/api.types";
 import { getSavedGameSeat, saveGameSeat } from "../utils/seatStorage";
 import {
-  isSoundMuted,
-  setSoundMuted,
   playActionRecordSound,
   playChatSound,
   playTauntSound,
   playVictorySound,
 } from "../utils/soundEffects";
+import {
+  getEffectsVolume,
+  getMusicVolume,
+  stopGameMusic,
+  subscribeAudioPreferences,
+  unlockAndPlayMusic,
+} from "../utils/gameAudio";
 import { humanizeActionRecordPt } from "../utils/promptUtils";
 import {
   LOCAL_MESSAGES_CHANNEL_NAME,
@@ -199,7 +206,11 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     () => setCardGainBatches((queue) => queue.slice(1)),
     []
   );
-  const [muted, setMuted] = useState(() => isSoundMuted());
+  const [audioAnchorEl, setAudioAnchorEl] = useState<HTMLElement | null>(null);
+  const [audioLevels, setAudioLevels] = useState(() => ({
+    music: getMusicVolume(),
+    effects: getEffectsVolume(),
+  }));
   const [localGameSpeed, setLocalGameSpeed] = useState<GameSpeed>(() =>
     getSavedGameSpeed()
   );
@@ -1178,11 +1189,25 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     setIntroDismissedForGameId(gameId ?? "__done__");
   };
 
-  const toggleSoundMute = () => {
-    const next = !muted;
-    setMuted(next);
-    setSoundMuted(next);
-  };
+  useEffect(() =>
+    subscribeAudioPreferences(() =>
+      setAudioLevels({ music: getMusicVolume(), effects: getEffectsVolume() })
+    ), []);
+
+  useEffect(() => {
+    const unlock = () => {
+      void unlockAndPlayMusic();
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("keydown", unlock);
+    };
+    document.addEventListener("pointerdown", unlock, { once: true });
+    document.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("keydown", unlock);
+      stopGameMusic();
+    };
+  }, []);
 
   const toggleGameSpeed = () => {
     if (isSpeedLockedOnline) return;
@@ -1806,18 +1831,26 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
         <button
           type="button"
           className="game-left-dock__btn"
-          onClick={toggleSoundMute}
-          title={
-            muted
-              ? t("Ativar efeitos sonoros", "Enable sound effects")
-              : t("Silenciar efeitos sonoros", "Mute sound effects")
-          }
-          aria-label={
-            muted ? t("Ativar som", "Unmute sound") : t("Silenciar som", "Mute sound")
-          }
+          onClick={(event) => setAudioAnchorEl(event.currentTarget)}
+          title={t("Ajustar música e efeitos", "Adjust music and effects")}
+          aria-label={t("Configurar áudio", "Configure audio")}
+          aria-expanded={Boolean(audioAnchorEl)}
+          aria-haspopup="dialog"
         >
-          {muted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
+          {audioLevels.music === 0 && audioLevels.effects === 0 ? (
+            <VolumeOffIcon fontSize="small" />
+          ) : Math.max(audioLevels.music, audioLevels.effects) <= 45 ? (
+            <VolumeDownIcon fontSize="small" />
+          ) : (
+            <VolumeUpIcon fontSize="small" />
+          )}
         </button>
+        <AudioSettingsPopover
+          open={Boolean(audioAnchorEl)}
+          anchorEl={audioAnchorEl}
+          onClose={() => setAudioAnchorEl(null)}
+          language={language}
+        />
       </nav>
 
       {spotlightToast && (
