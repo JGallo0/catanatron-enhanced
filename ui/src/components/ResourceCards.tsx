@@ -91,6 +91,7 @@ export default function ResourceCards({
     id: DevCardType;
     anchorEl: HTMLElement | null;
   } | null>(null);
+  const [hoveredDev, setHoveredDev] = useState<DevCardType | null>(null);
 
   const amount = (card: Card): number | undefined =>
     playerState[`${playerKey}_${card}_IN_HAND`];
@@ -253,6 +254,7 @@ export default function ResourceCards({
               interactiveDevCards
                 ? (e) => {
                     const targetEl = e.currentTarget;
+                    setHoveredDev(null);
                     setInspectedDev((prev) =>
                       prev?.id === id ? null : { id, anchorEl: targetEl }
                     );
@@ -265,6 +267,7 @@ export default function ResourceCards({
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       const targetEl = e.currentTarget;
+                      setHoveredDev(null);
                       setInspectedDev((prev) =>
                         prev?.id === id ? null : { id, anchorEl: targetEl }
                       );
@@ -369,7 +372,11 @@ export default function ResourceCards({
             key={id}
             placement="top"
             arrow
-            disableHoverListener={isInspected}
+            open={!isInspected && hoveredDev === id}
+            onOpen={() => setHoveredDev(id)}
+            onClose={() =>
+              setHoveredDev((current) => (current === id ? null : current))
+            }
             title={
               <div
                 style={{
