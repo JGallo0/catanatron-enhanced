@@ -82,6 +82,36 @@ test("does not throw when the browser rejects music playback", async () => {
   audioInstances[0].play.mockRejectedValueOnce(new Error("autoplay blocked"));
 
   audio.setMusicVolume(50);
-  await expect(audio.unlockAndPlayMusic()).resolves.toBeUndefined();
+  await expect(audio.unlockAndPlayMusic()).resolves.toBe(true);
+});
+
+test("keeps applied volumes in memory when localStorage writes fail", async () => {
+  const audio = await import("./gameAudio");
+  const setItem = vi
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(() => { throw new DOMException("quota", "QuotaExceededError"); });
+
+  audio.setMusicVolume(0);
+  audio.setEffectsVolume(22);
+
+  expect(audio.getMusicVolume()).toBe(0);
+  expect(audio.getEffectsVolume()).toBe(22);
+  setItem.mockRestore();
+});
+
+test("falls back safely when access to the localStorage property throws", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get: () => { throw new DOMException("blocked", "SecurityError"); },
+  });
+
+  try {
+    const audio = await import("./gameAudio");
+    expect(audio.getMusicVolume()).toBe(35);
+    expect(audio.getEffectsVolume()).toBe(70);
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, "localStorage", descriptor);
+  }
 });
 

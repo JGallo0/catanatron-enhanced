@@ -28,7 +28,7 @@ const snackbar = vi.hoisted(() => ({
 const gameAudio = vi.hoisted(() => ({
   music: 35,
   effects: 70,
-  unlockAndPlayMusic: vi.fn().mockResolvedValue(undefined),
+  unlockAndPlayMusic: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../utils/gameAudio", () => ({
@@ -998,6 +998,23 @@ test("renders left vertical quick dock shortcuts for AlmanacModal and RightDrawe
   expect(screen.getByText(/2 rolagem\(ns\) · Último: 7/i)).toBeInTheDocument();
   expect(screen.getByText(/Equilibrados · 34\/36/i)).toBeInTheDocument();
 }, 15000);
+
+test("retries music unlock after a blocked interaction and stops after success", async () => {
+  vi.mocked(getState).mockResolvedValue(baseState);
+  gameAudio.unlockAndPlayMusic
+    .mockResolvedValueOnce(false)
+    .mockResolvedValueOnce(true);
+  renderGameScreen();
+  expect(await screen.findByTestId("board")).toBeInTheDocument();
+
+  fireEvent.pointerDown(document.body);
+  await waitFor(() => expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledTimes(1));
+  fireEvent.keyDown(document.body, { key: "Enter" });
+  await waitFor(() => expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledTimes(2));
+  fireEvent.pointerDown(document.body);
+
+  expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledTimes(2);
+});
 
 test("locks dock speed to room bot_speed in online matches while keeping offline solo speed editable", async () => {
   localStorage.setItem("catan_game_speed_v1", "normal");

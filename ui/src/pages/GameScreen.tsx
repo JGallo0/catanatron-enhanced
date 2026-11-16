@@ -1195,16 +1195,19 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     ), []);
 
   useEffect(() => {
-    const unlock = () => {
-      void unlockAndPlayMusic();
+    const removeUnlockListeners = () => {
       document.removeEventListener("pointerdown", unlock);
       document.removeEventListener("keydown", unlock);
     };
-    document.addEventListener("pointerdown", unlock, { once: true });
-    document.addEventListener("keydown", unlock, { once: true });
+    const unlock = () => {
+      void unlockAndPlayMusic().then((unlocked) => {
+        if (unlocked) removeUnlockListeners();
+      });
+    };
+    document.addEventListener("pointerdown", unlock);
+    document.addEventListener("keydown", unlock);
     return () => {
-      document.removeEventListener("pointerdown", unlock);
-      document.removeEventListener("keydown", unlock);
+      removeUnlockListeners();
       stopGameMusic();
     };
   }, []);
