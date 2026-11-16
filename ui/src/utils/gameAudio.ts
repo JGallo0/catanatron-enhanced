@@ -10,6 +10,8 @@ type AudioPreferenceListener = () => void;
 const listeners = new Set<AudioPreferenceListener>();
 let music: HTMLAudioElement | null = null;
 let musicUnlocked = false;
+let musicVolumeMemory: number | null = null;
+let effectsVolumeMemory: number | null = null;
 
 function clampVolume(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
@@ -17,8 +19,8 @@ function clampVolume(value: number, fallback: number): number {
 }
 
 function readVolume(key: string, fallback: number): number {
-  if (typeof localStorage === "undefined") return fallback;
   try {
+    if (typeof localStorage === "undefined") return fallback;
     const raw = localStorage.getItem(key);
     if (raw === null) return fallback;
     return clampVolume(Number(raw), fallback);
@@ -62,10 +64,12 @@ function syncMusic(): void {
 }
 
 export function getMusicVolume(): number {
+  if (musicVolumeMemory !== null) return musicVolumeMemory;
   return readVolume(MUSIC_VOLUME_KEY, DEFAULT_MUSIC_VOLUME);
 }
 
 export function getEffectsVolume(): number {
+  if (effectsVolumeMemory !== null) return effectsVolumeMemory;
   try {
     if (
       localStorage.getItem(EFFECTS_VOLUME_KEY) === null &&
@@ -80,13 +84,15 @@ export function getEffectsVolume(): number {
 }
 
 export function setMusicVolume(value: number): void {
-  writeVolume(MUSIC_VOLUME_KEY, clampVolume(value, DEFAULT_MUSIC_VOLUME));
+  musicVolumeMemory = clampVolume(value, DEFAULT_MUSIC_VOLUME);
+  writeVolume(MUSIC_VOLUME_KEY, musicVolumeMemory);
   syncMusic();
   notifyListeners();
 }
 
 export function setEffectsVolume(value: number): void {
   const next = clampVolume(value, DEFAULT_EFFECTS_VOLUME);
+  effectsVolumeMemory = next;
   writeVolume(EFFECTS_VOLUME_KEY, next);
   try {
     localStorage.removeItem(LEGACY_MUTE_KEY);
@@ -101,17 +107,23 @@ export function subscribeAudioPreferences(listener: AudioPreferenceListener): ()
   return () => listeners.delete(listener);
 }
 
-export async function unlockAndPlayMusic(): Promise<void> {
-  if (musicUnlocked) return;
+export async function unlockAndPlayMusic(): Promise<boolean> {
+  if (musicUnlocked) return true;
   musicUnlocked = true;
   const player = getMusic();
-  if (!player || getMusicVolume() === 0) return;
+  if (!player) {
+    musicUnlocked = false;
+    return false;
+  }
+  if (getMusicVolume() === 0) return true;
   player.volume = getMusicVolume() / 100;
   try {
     await player.play();
+    return true;
   } catch {
     // Browsers may still reject playback until a later trusted interaction.
     musicUnlocked = false;
+    return false;
   }
 }
 
