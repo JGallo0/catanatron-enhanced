@@ -94,9 +94,7 @@ import {
 import {
   getEffectsVolume,
   getMusicVolume,
-  stopGameMusic,
   subscribeAudioPreferences,
-  unlockAndPlayMusic,
 } from "../utils/gameAudio";
 import { humanizeActionRecordPt } from "../utils/promptUtils";
 import {
@@ -125,6 +123,7 @@ import {
 } from "../utils/tabletopPacing";
 import { usePieceSkin } from "../utils/pieceSkin";
 import { useBoardSkin } from "../utils/boardSkin";
+import { useGameMusic } from "../hooks/useGameMusic";
 
 const VALID_COLORS = new Set<Color>(["RED", "BLUE", "ORANGE", "WHITE"]);
 
@@ -188,6 +187,7 @@ function describePromptBanner(
 }
 
 function GameScreen({ replayMode }: { replayMode: boolean }) {
+  useGameMusic();
   const { gameId, stateIndex } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -1193,24 +1193,6 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
     subscribeAudioPreferences(() =>
       setAudioLevels({ music: getMusicVolume(), effects: getEffectsVolume() })
     ), []);
-
-  useEffect(() => {
-    const removeUnlockListeners = () => {
-      document.removeEventListener("pointerdown", unlock);
-      document.removeEventListener("keydown", unlock);
-    };
-    const unlock = () => {
-      void unlockAndPlayMusic().then((unlocked) => {
-        if (unlocked) removeUnlockListeners();
-      });
-    };
-    document.addEventListener("pointerdown", unlock);
-    document.addEventListener("keydown", unlock);
-    return () => {
-      removeUnlockListeners();
-      stopGameMusic();
-    };
-  }, []);
 
   const toggleGameSpeed = () => {
     if (isSpeedLockedOnline) return;
