@@ -1,4 +1,5 @@
 import type { GameActionRecord } from "./api.types";
+import { getEffectsVolume, setEffectsVolume } from "./gameAudio";
 
 const MUTE_KEY = "catanatron_sound_muted";
 
@@ -22,19 +23,12 @@ function getAudioContext(): AudioContext | null {
 }
 
 export function isSoundMuted(): boolean {
-  try {
-    return localStorage.getItem(MUTE_KEY) === "1";
-  } catch {
-    return false;
-  }
+  return getEffectsVolume() === 0;
 }
 
 export function setSoundMuted(muted: boolean): void {
-  try {
-    localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
-  } catch {
-    // ignore storage quota errors
-  }
+  setEffectsVolume(muted ? 0 : 70);
+  try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch { /* legacy mirror */ }
 }
 
 function playTone(
@@ -44,6 +38,8 @@ function playTone(
   gainPeak = 0.08,
   delaySec = 0
 ) {
+  const effectsScale = getEffectsVolume() / 100;
+  if (effectsScale <= 0) return;
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -54,7 +50,7 @@ function playTone(
   osc.frequency.setValueAtTime(freq, now);
 
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(gainPeak, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(gainPeak * effectsScale, now + 0.015);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec);
 
   osc.connect(gain);
