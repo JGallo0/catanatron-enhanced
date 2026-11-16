@@ -25,6 +25,21 @@ const snackbar = vi.hoisted(() => ({
   enqueueSnackbar: vi.fn(),
   closeSnackbar: vi.fn(),
 }));
+const gameAudio = vi.hoisted(() => ({
+  music: 35,
+  effects: 70,
+  unlockAndPlayMusic: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../utils/gameAudio", () => ({
+  getMusicVolume: () => gameAudio.music,
+  getEffectsVolume: () => gameAudio.effects,
+  setMusicVolume: (value: number) => { gameAudio.music = value; },
+  setEffectsVolume: (value: number) => { gameAudio.effects = value; },
+  subscribeAudioPreferences: () => () => {},
+  unlockAndPlayMusic: gameAudio.unlockAndPlayMusic,
+  stopGameMusic: vi.fn(),
+}));
 
 vi.mock("../utils/apiClient", () => ({
   getState: vi.fn(),
@@ -941,6 +956,8 @@ test("renders left vertical quick dock shortcuts for AlmanacModal and RightDrawe
   renderGameScreen();
 
   expect(await screen.findByTestId("board")).toBeInTheDocument();
+  fireEvent.pointerDown(document.body);
+  expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledOnce();
   const dock = screen.getByRole("navigation", { name: /Atalhos da partida/i });
   expect(dock).toBeInTheDocument();
 
@@ -959,10 +976,17 @@ test("renders left vertical quick dock shortcuts for AlmanacModal and RightDrawe
   expect(await screen.findByText(/Histórico de Jogadas/i)).toBeInTheDocument();
   fireEvent.keyDown(document.activeElement || document.body, { key: "Escape" });
 
-  const soundBtn = screen.getByRole("button", { name: /^Silenciar som$/i });
+  const soundBtn = screen.getByRole("button", { name: /^Configurar áudio$/i });
   fireEvent.click(soundBtn);
-  expect(screen.getByRole("button", { name: /^Ativar som$/i })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /^Ativar som$/i }));
+  expect(screen.getByRole("heading", { name: "Áudio do Jogo" })).toBeInTheDocument();
+  expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("35");
+  expect(screen.getByRole("slider", { name: "Efeitos" })).toHaveValue("70");
+  fireEvent.click(
+    document.querySelector(".MuiPopover-root .MuiBackdrop-root") as HTMLElement
+  );
+  await waitFor(() => {
+    expect(screen.queryByRole("heading", { name: "Áudio do Jogo" })).not.toBeInTheDocument();
+  });
 
   const analysisBtn = screen.getByRole("button", { name: /^Chances \(IA\)$/i });
   fireEvent.click(analysisBtn);
