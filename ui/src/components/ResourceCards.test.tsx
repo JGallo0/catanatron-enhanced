@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { setLanguage } from "../i18n";
@@ -118,4 +118,30 @@ test("shows the five resource counters and keeps development cards playable in t
   fireEvent.click(screen.getByRole("button", { name: /Cavaleiro.*Clique para jogar/i }));
   fireEvent.click(screen.getByRole("button", { name: /Jogar Carta/i }));
   expect(playKnight).toHaveBeenCalledOnce();
+});
+
+test("closes the hover preview when a playable development card is clicked", async () => {
+  render(
+    <ResourceCards
+      playerState={OWN_HAND}
+      playerKey="P0"
+      showEmptySlots
+      iconOnly
+      interactiveDevCards
+      playableDevCallbacks={{ KNIGHT: vi.fn() }}
+    />
+  );
+
+  const knight = screen.getByRole("button", {
+    name: /Cavaleiro.*Clique para jogar/i,
+  });
+  fireEvent.mouseOver(knight);
+  expect(await screen.findByRole("tooltip")).toBeInTheDocument();
+
+  fireEvent.click(knight);
+
+  expect(screen.getByRole("dialog", { name: /Carta Cavaleiro/i })).toBeInTheDocument();
+  await waitFor(() =>
+    expect(document.querySelector(".MuiTooltip-popper")).not.toBeInTheDocument()
+  );
 });
