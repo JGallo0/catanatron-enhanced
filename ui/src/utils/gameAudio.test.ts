@@ -7,6 +7,7 @@ class FakeAudio {
   loop = false;
   preload = "";
   volume = 1;
+  muted = false;
   paused = true;
   play = vi.fn(async () => {
     this.paused = false;
@@ -28,20 +29,34 @@ beforeEach(async () => {
   vi.stubGlobal("Audio", FakeAudio);
 });
 
-test("uses safe defaults and clamps persisted audio volumes", async () => {
+test("uses balanced defaults and clamps persisted audio volumes", async () => {
   localStorage.setItem("catanatron_music_volume_v1", "not-a-number");
   localStorage.setItem("catanatron_effects_volume_v1", "250");
   const audio = await import("./gameAudio");
 
-  expect(audio.getMusicVolume()).toBe(35);
+  expect(audio.DEFAULT_MUSIC_VOLUME).toBe(25);
+  expect(audio.DEFAULT_EFFECTS_VOLUME).toBe(80);
+  expect(audio.getMusicVolume()).toBe(25);
   expect(audio.getEffectsVolume()).toBe(100);
+  expect(audio.isMusicMuted()).toBe(false);
 
   audio.setMusicVolume(-5);
   audio.setEffectsVolume(42.8);
   expect(audio.getMusicVolume()).toBe(0);
+  expect(audio.isMusicMuted()).toBe(true);
   expect(audio.getEffectsVolume()).toBe(43);
   expect(localStorage.getItem("catanatron_music_volume_v1")).toBe("0");
   expect(localStorage.getItem("catanatron_effects_volume_v1")).toBe("43");
+});
+
+test("applies perceptual headroom curve to music so SFX stay clearly audible", async () => {
+  const audio = await import("./gameAudio");
+
+  expect(audio.toPlayerMusicVolume(0)).toBe(0);
+  expect(audio.toPlayerMusicVolume(25)).toBeCloseTo(0.0239, 3);
+  expect(audio.toPlayerMusicVolume(50)).toBeCloseTo(0.0726, 3);
+  expect(audio.toPlayerMusicVolume(100)).toBeCloseTo(0.22, 3);
+  expect(audio.toPlayerMusicVolume(50, true)).toBe(0);
 });
 
 test("notifies subscribers when either preference changes", async () => {
@@ -51,13 +66,14 @@ test("notifies subscribers when either preference changes", async () => {
 
   audio.setMusicVolume(55);
   audio.setEffectsVolume(65);
+  audio.setMusicMuted(true);
   unsubscribe();
   audio.setMusicVolume(75);
 
-  expect(listener).toHaveBeenCalledTimes(2);
+  expect(listener).toHaveBeenCalledTimes(3);
 });
 
-test("creates one looping music instance and pauses or resumes from its volume", async () => {
+test("creates one looping music instance and mutes/pauses cleanly while preserving saved volume", async () => {
   const audio = await import("./gameAudio");
 
   await audio.unlockAndPlayMusic();
@@ -65,15 +81,43 @@ test("creates one looping music instance and pauses or resumes from its volume",
   expect(audioInstances).toHaveLength(1);
   expect(audioInstances[0].src).toContain("/assets/audio/island-game-night-loop.ogg");
   expect(audioInstances[0].loop).toBe(true);
-  expect(audioInstances[0].volume).toBeCloseTo(0.35);
+  expect(audioInstances[0].muted).toBe(false);
+  expect(audioInstances[0].volume).toBeCloseTo(0.0239, 3);
   expect(audioInstances[0].play).toHaveBeenCalledTimes(1);
 
-  audio.setMusicVolume(0);
+  audio.setMusicMuted(true);
+  expect(audio.isMusicMuted()).toBe(true);
+  expect(audio.getMusicVolume()).toBe(25);
+  expect(audioInstances[0].muted).toBe(true);
+  expect(audioInstances[0].volume).toBe(0);
   expect(audioInstances[0].pause).toHaveBeenCalledOnce();
+  expect(localStorage.getItem("catanatron_music_muted_v1")).toBe("1");
+
+  audio.setMusicMuted(false);
+  expect(audio.isMusicMuted()).toBe(false);
+  expect(audio.getMusicVolume()).toBe(25);
+  expect(audioInstances[0].muted).toBe(false);
+  expect(audioInstances[0].volume).toBeCloseTo(0.0239, 3);
+  expect(audioInstances[0].play).toHaveBeenCalledTimes(2);
 
   audio.setMusicVolume(40);
-  expect(audioInstances[0].volume).toBeCloseTo(0.4);
-  expect(audioInstances[0].play).toHaveBeenCalledTimes(2);
+  expect(audioInstances[0].volume).toBeCloseTo(audio.toPlayerMusicVolume(40), 4);
+});
+
+test("keeps music silent during unlock when previously muted", async () => {
+  localStorage.setItem("catanatron_music_muted_v1", "1");
+  const audio = await import("./gameAudio");
+
+  expect(audio.isMusicMuted()).toBe(true);
+  await expect(audio.unlockAndPlayMusic()).resolves.toBe(true);
+  expect(audioInstances[0].muted).toBe(true);
+  expect(audioInstances[0].volume).toBe(0);
+  expect(audioInstances[0].play).not.toHaveBeenCalled();
+
+  audio.setMusicVolume(30);
+  expect(audio.isMusicMuted()).toBe(false);
+  expect(audioInstances[0].muted).toBe(false);
+  expect(audioInstances[0].play).toHaveBeenCalledTimes(1);
 });
 
 test("does not throw when the browser rejects music playback", async () => {
@@ -95,6 +139,7 @@ test("keeps applied volumes in memory when localStorage writes fail", async () =
   audio.setEffectsVolume(22);
 
   expect(audio.getMusicVolume()).toBe(0);
+  expect(audio.isMusicMuted()).toBe(true);
   expect(audio.getEffectsVolume()).toBe(22);
   setItem.mockRestore();
 });
@@ -108,10 +153,10 @@ test("falls back safely when access to the localStorage property throws", async 
 
   try {
     const audio = await import("./gameAudio");
-    expect(audio.getMusicVolume()).toBe(35);
-    expect(audio.getEffectsVolume()).toBe(70);
+    expect(audio.getMusicVolume()).toBe(25);
+    expect(audio.getEffectsVolume()).toBe(80);
+    expect(audio.isMusicMuted()).toBe(false);
   } finally {
     if (descriptor) Object.defineProperty(globalThis, "localStorage", descriptor);
   }
 });
-

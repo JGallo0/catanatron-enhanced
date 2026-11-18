@@ -95,6 +95,7 @@ import {
 import {
   getEffectsVolume,
   getMusicVolume,
+  isMusicMuted,
   subscribeAudioPreferences,
 } from "../utils/gameAudio";
 import { humanizeActionRecordPt } from "../utils/promptUtils";
@@ -209,7 +210,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
   );
   const [audioAnchorEl, setAudioAnchorEl] = useState<HTMLElement | null>(null);
   const [audioLevels, setAudioLevels] = useState(() => ({
-    music: getMusicVolume(),
+    music: isMusicMuted() ? 0 : getMusicVolume(),
     effects: getEffectsVolume(),
   }));
   const [localGameSpeed, setLocalGameSpeed] = useState<GameSpeed>(() =>
@@ -1192,7 +1193,10 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
   useEffect(() =>
     subscribeAudioPreferences(() =>
-      setAudioLevels({ music: getMusicVolume(), effects: getEffectsVolume() })
+      setAudioLevels({
+        music: isMusicMuted() ? 0 : getMusicVolume(),
+        effects: getEffectsVolume(),
+      })
     ), []);
 
   const toggleGameSpeed = () => {

@@ -1,9 +1,35 @@
 import type { GameActionRecord } from "./api.types";
-import { getEffectsVolume, setEffectsVolume } from "./gameAudio";
+import {
+  DEFAULT_EFFECTS_VOLUME,
+  getEffectsVolume,
+  setEffectsVolume,
+} from "./gameAudio";
 
 const MUTE_KEY = "catanatron_sound_muted";
+const EFFECTS_GAIN_BOOST = 4.0;
+const MAX_TONE_GAIN = 0.95;
 
 let audioCtx: AudioContext | null = null;
+let compressorNode: AudioNode | null = null;
+let compressorOwnerCtx: AudioContext | null = null;
+
+function getEffectsDestination(ctx: AudioContext): AudioNode {
+  if (typeof ctx.createDynamicsCompressor !== "function") {
+    return ctx.destination;
+  }
+  if (!compressorNode || compressorOwnerCtx !== ctx) {
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-14, ctx.currentTime);
+    compressor.knee.setValueAtTime(12, ctx.currentTime);
+    compressor.ratio.setValueAtTime(6, ctx.currentTime);
+    compressor.attack.setValueAtTime(0.003, ctx.currentTime);
+    compressor.release.setValueAtTime(0.12, ctx.currentTime);
+    compressor.connect(ctx.destination);
+    compressorNode = compressor;
+    compressorOwnerCtx = ctx;
+  }
+  return compressorNode;
+}
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -27,7 +53,7 @@ export function isSoundMuted(): boolean {
 }
 
 export function setSoundMuted(muted: boolean): void {
-  setEffectsVolume(muted ? 0 : 70);
+  setEffectsVolume(muted ? 0 : DEFAULT_EFFECTS_VOLUME);
   try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch { /* legacy mirror */ }
 }
 
@@ -49,12 +75,16 @@ function playTone(
   osc.type = type;
   osc.frequency.setValueAtTime(freq, now);
 
+  const scaledPeak = Math.min(
+    MAX_TONE_GAIN,
+    Math.max(0.0001, gainPeak * effectsScale * EFFECTS_GAIN_BOOST)
+  );
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(gainPeak * effectsScale, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(scaledPeak, now + 0.015);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSec);
 
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(getEffectsDestination(ctx));
   osc.start(now);
   osc.stop(now + durationSec + 0.02);
 }

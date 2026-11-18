@@ -17,12 +17,19 @@ import {
   type PlayerAccount,
 } from "../utils/apiClient";
 
-const gameAudio = vi.hoisted(() => ({ music: 35, effects: 70 }));
+const gameAudio = vi.hoisted(() => ({ music: 25, musicMuted: false, effects: 80 }));
 
 vi.mock("../utils/gameAudio", () => ({
+  DEFAULT_MUSIC_VOLUME: 25,
+  DEFAULT_EFFECTS_VOLUME: 80,
   getMusicVolume: () => gameAudio.music,
+  isMusicMuted: () => gameAudio.musicMuted || gameAudio.music === 0,
   getEffectsVolume: () => gameAudio.effects,
-  setMusicVolume: (value: number) => { gameAudio.music = value; },
+  setMusicVolume: (value: number) => {
+    gameAudio.music = value;
+    gameAudio.musicMuted = value === 0;
+  },
+  setMusicMuted: (muted: boolean) => { gameAudio.musicMuted = muted; },
   setEffectsVolume: (value: number) => { gameAudio.effects = value; },
   subscribeAudioPreferences: () => () => {},
   unlockAndPlayMusic: vi.fn().mockResolvedValue(true),
@@ -68,8 +75,9 @@ describe("HomePage A2 Stage", () => {
     });
     vi.mocked(getPlayers).mockResolvedValue(DEFAULT_PLAYERS);
     vi.mocked(listActiveRooms).mockResolvedValue([]);
-    gameAudio.music = 35;
-    gameAudio.effects = 70;
+    gameAudio.music = 25;
+    gameAudio.musicMuted = false;
+    gameAudio.effects = 80;
   });
 
   test("displays logged-in avatar, frame label, and live #rank in A2 symmetric header without setup-card", async () => {
@@ -184,8 +192,9 @@ describe("HomePage A2 Stage", () => {
 
     await user.click(screen.getByRole("button", { name: "Configurar áudio" }));
     expect(screen.getByRole("heading", { name: "Áudio do Jogo" })).toBeInTheDocument();
-    expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("35");
-    expect(screen.getByRole("slider", { name: "Efeitos" })).toHaveValue("70");
+    expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("25");
+    expect(screen.getByRole("slider", { name: "Efeitos" })).toHaveValue("80");
+    expect(screen.getByRole("button", { name: "Mutar música" })).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("slider", { name: "Música" }), {
       target: { value: "48" },
