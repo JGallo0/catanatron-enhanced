@@ -1,6 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@mui/material";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeDownIcon from "@mui/icons-material/VolumeDown";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import {
   DEFAULT_PLAYERS,
   closeRoom,
@@ -27,6 +30,13 @@ import {
 } from "../config/avatarCatalog";
 import { useLanguage } from "../i18n";
 import LanguageToggle from "../components/LanguageToggle";
+import AudioSettingsPopover from "../components/AudioSettingsPopover";
+import { useGameMusic } from "../hooks/useGameMusic";
+import {
+  getEffectsVolume,
+  getMusicVolume,
+  subscribeAudioPreferences,
+} from "../utils/gameAudio";
 import LeaderboardModal from "../components/LeaderboardModal";
 import PlayerAvatar from "../components/PlayerAvatar";
 import AvatarStudioModal from "../components/AvatarStudioModal";
@@ -43,6 +53,7 @@ const LazyAvatar3DCanvas = lazy(
 );
 
 export default function HomePage() {
+  useGameMusic();
   const { language, t } = useLanguage();
   const [available, setAvailable] = useState<PlayerEntry[]>(DEFAULT_PLAYERS);
   const [account, setAccount] = useState<PlayerAccount | null>(() =>
@@ -65,6 +76,11 @@ export default function HomePage() {
   const [authPromptBanner, setAuthPromptBanner] = useState<string | undefined>(
     undefined
   );
+  const [audioAnchorEl, setAudioAnchorEl] = useState<HTMLElement | null>(null);
+  const [audioLevels, setAudioLevels] = useState(() => ({
+    music: getMusicVolume(),
+    effects: getEffectsVolume(),
+  }));
 
   const [hostName, setHostName] = useState(
     () =>
@@ -140,6 +156,11 @@ export default function HomePage() {
     const timer = setInterval(refreshRooms, 5000);
     return () => clearInterval(timer);
   }, [refreshRooms]);
+
+  useEffect(() =>
+    subscribeAudioPreferences(() =>
+      setAudioLevels({ music: getMusicVolume(), effects: getEffectsVolume() })
+    ), []);
 
   const handleLogout = async () => {
     setAvatarStudioOpen(false);
@@ -301,7 +322,32 @@ export default function HomePage() {
               </Button>
             </div>
           )}
-          <LanguageToggle compact />
+          <div className="home-topbar__tools">
+            <button
+              type="button"
+              className="home-audio-btn"
+              onClick={(event) => setAudioAnchorEl(event.currentTarget)}
+              title={t("Ajustar música e efeitos", "Adjust music and effects")}
+              aria-label={t("Configurar áudio", "Configure audio")}
+              aria-expanded={Boolean(audioAnchorEl)}
+              aria-haspopup="dialog"
+            >
+              {audioLevels.music === 0 && audioLevels.effects === 0 ? (
+                <VolumeOffIcon fontSize="small" />
+              ) : Math.max(audioLevels.music, audioLevels.effects) <= 45 ? (
+                <VolumeDownIcon fontSize="small" />
+              ) : (
+                <VolumeUpIcon fontSize="small" />
+              )}
+            </button>
+            <LanguageToggle compact />
+          </div>
+          <AudioSettingsPopover
+            open={Boolean(audioAnchorEl)}
+            anchorEl={audioAnchorEl}
+            onClose={() => setAudioAnchorEl(null)}
+            language={language}
+          />
         </div>
       </header>
 
