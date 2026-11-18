@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitForElementToBeRemoved } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitForElementToBeRemoved } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -16,6 +16,17 @@ import {
   logoutAccount,
   type PlayerAccount,
 } from "../utils/apiClient";
+
+const gameAudio = vi.hoisted(() => ({ music: 35, effects: 70 }));
+
+vi.mock("../utils/gameAudio", () => ({
+  getMusicVolume: () => gameAudio.music,
+  getEffectsVolume: () => gameAudio.effects,
+  setMusicVolume: (value: number) => { gameAudio.music = value; },
+  setEffectsVolume: (value: number) => { gameAudio.effects = value; },
+  subscribeAudioPreferences: () => () => {},
+  unlockAndPlayMusic: vi.fn().mockResolvedValue(true),
+}));
 
 vi.mock("../utils/apiClient", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../utils/apiClient")>();
@@ -57,6 +68,8 @@ describe("HomePage A2 Stage", () => {
     });
     vi.mocked(getPlayers).mockResolvedValue(DEFAULT_PLAYERS);
     vi.mocked(listActiveRooms).mockResolvedValue([]);
+    gameAudio.music = 35;
+    gameAudio.effects = 70;
   });
 
   test("displays logged-in avatar, frame label, and live #rank in A2 symmetric header without setup-card", async () => {
@@ -161,6 +174,25 @@ describe("HomePage A2 Stage", () => {
     expect(screen.queryByRole("button", { name: /Almanaque/i })).not.toBeInTheDocument();
   });
 
+  test("opens shared music and effects controls from the lobby header", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Configurar áudio" }));
+    expect(screen.getByRole("heading", { name: "Áudio do Jogo" })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("35");
+    expect(screen.getByRole("slider", { name: "Efeitos" })).toHaveValue("70");
+
+    fireEvent.change(screen.getByRole("slider", { name: "Música" }), {
+      target: { value: "48" },
+    });
+    expect(gameAudio.music).toBe(48);
+  });
+
   test("LanguageToggle switches HomePage and MatchSetupModal between PT and EN cleanly", async () => {
     const user = userEvent.setup();
     render(
@@ -186,6 +218,9 @@ describe("HomePage A2 Stage", () => {
     const enBtn = screen.getByRole("button", { name: /^EN$/i });
     await user.click(enBtn);
     expect(enBtn).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Configure audio" })
+    ).toBeInTheDocument();
 
     expect(
       screen.getByText(

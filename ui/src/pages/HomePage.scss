@@ -51,6 +51,39 @@
     gap: 8px;
     min-width: 0;
   }
+
+  &__tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.home-audio-btn {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(250, 204, 21, 0.34);
+  background: rgba(9, 17, 32, 0.82);
+  color: #fde68a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+
+  &:hover {
+    background: rgba(30, 41, 59, 0.94);
+    border-color: rgba(250, 204, 21, 0.68);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #fde047;
+    outline-offset: 3px;
+  }
 }
 
 .home-topbar .logo {
