@@ -9,6 +9,25 @@ const MUTE_KEY = "catanatron_sound_muted";
 const EFFECTS_GAIN_BOOST = 4.0;
 const MAX_TONE_GAIN = 0.95;
 
+export const SFX_PATHS = {
+  dice: "/assets/audio/sfx/dice-roll.ogg",
+  buildRoad: "/assets/audio/sfx/build-road.ogg",
+  buildSettlement: "/assets/audio/sfx/build-settlement.ogg",
+  buildCity: "/assets/audio/sfx/build-city.ogg",
+  buyDevCard: "/assets/audio/sfx/buy-dev-card.ogg",
+  playDevCard: "/assets/audio/sfx/play-dev-card.ogg",
+  playKnight: "/assets/audio/sfx/play-knight.ogg",
+  playPlentyMonopoly: "/assets/audio/sfx/play-plenty-monopoly.ogg",
+  robberMove: "/assets/audio/sfx/robber-move.ogg",
+  stealCard: "/assets/audio/sfx/steal-card.ogg",
+  discardCard: "/assets/audio/sfx/discard-card.ogg",
+  chat: "/assets/audio/sfx/chat.ogg",
+  invalidAction: "/assets/audio/sfx/invalid-action.ogg",
+  awardRoad: "/assets/audio/sfx/award-road.ogg",
+  awardArmy: "/assets/audio/sfx/award-army.ogg",
+  victory: "/assets/audio/sfx/victory.ogg",
+} as const;
+
 let audioCtx: AudioContext | null = null;
 let compressorNode: AudioNode | null = null;
 let compressorOwnerCtx: AudioContext | null = null;
@@ -54,7 +73,37 @@ export function isSoundMuted(): boolean {
 
 export function setSoundMuted(muted: boolean): void {
   setEffectsVolume(muted ? 0 : DEFAULT_EFFECTS_VOLUME);
-  try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch { /* legacy mirror */ }
+  try {
+    localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+  } catch {
+    /* legacy mirror */
+  }
+}
+
+function playSfxClip(src: string, relativeGain = 1.0): void {
+  if (typeof window === "undefined" || typeof Audio === "undefined") return;
+  const effectsScale = getEffectsVolume() / 100;
+  if (effectsScale <= 0) return;
+
+  try {
+    const clip = new Audio(src);
+    clip.preload = "auto";
+    clip.volume = Math.min(1, Math.max(0, effectsScale * relativeGain));
+    if (
+      typeof HTMLAudioElement !== "undefined" &&
+      clip instanceof HTMLAudioElement &&
+      typeof navigator !== "undefined" &&
+      /jsdom/i.test(navigator.userAgent)
+    ) {
+      return;
+    }
+    const maybePromise = clip.play();
+    if (maybePromise && typeof maybePromise.catch === "function") {
+      void maybePromise.catch(() => {});
+    }
+  } catch {
+    // Ignore autoplay/environment playback rejections.
+  }
 }
 
 function playTone(
@@ -89,54 +138,66 @@ function playTone(
   osc.stop(now + durationSec + 0.02);
 }
 
-export function playDiceSound() {
-  playTone(210, 0.05, "square", 0.04, 0.0);
-  playTone(280, 0.05, "square", 0.05, 0.055);
-  playTone(175, 0.07, "triangle", 0.07, 0.11);
-  playTone(320, 0.08, "triangle", 0.06, 0.16);
+export function playDiceSound(): void {
+  playSfxClip(SFX_PATHS.dice);
 }
 
-export function playBuildPieceSound(kind: "ROAD" | "SETTLEMENT" | "CITY") {
+export function playBuildPieceSound(kind: "ROAD" | "SETTLEMENT" | "CITY"): void {
   if (kind === "ROAD") {
-    playTone(165, 0.09, "triangle", 0.09, 0);
-    playTone(220, 0.07, "sine", 0.05, 0.04);
+    playSfxClip(SFX_PATHS.buildRoad);
   } else if (kind === "SETTLEMENT") {
-    playTone(261.6, 0.11, "triangle", 0.09, 0);
-    playTone(329.6, 0.14, "sine", 0.08, 0.07);
-    playTone(392.0, 0.18, "sine", 0.07, 0.13);
+    playSfxClip(SFX_PATHS.buildSettlement);
   } else {
-    playTone(293.66, 0.12, "triangle", 0.1, 0);
-    playTone(369.99, 0.15, "sine", 0.09, 0.06);
-    playTone(440.0, 0.18, "sine", 0.08, 0.12);
-    playTone(587.33, 0.25, "sine", 0.08, 0.19);
+    playSfxClip(SFX_PATHS.buildCity);
   }
 }
 
-export function playCardSound() {
-  playTone(523.25, 0.1, "sine", 0.06, 0);
-  playTone(659.25, 0.14, "sine", 0.06, 0.06);
+export function playBuyDevCardSound(): void {
+  playSfxClip(SFX_PATHS.buyDevCard);
 }
 
-export function playRobberSound() {
-  playTone(110, 0.18, "sawtooth", 0.06, 0);
-  playTone(88, 0.24, "triangle", 0.08, 0.08);
+export function playCardSound(): void {
+  playSfxClip(SFX_PATHS.playDevCard);
 }
 
-export function playTurnSound() {
-  playTone(440, 0.08, "sine", 0.04, 0);
-  playTone(554.37, 0.11, "sine", 0.04, 0.06);
+export function playKnightCardSound(): void {
+  playSfxClip(SFX_PATHS.playKnight);
 }
 
-export function playVictorySound() {
-  playTone(392.0, 0.16, "triangle", 0.09, 0);
-  playTone(493.88, 0.16, "triangle", 0.09, 0.12);
-  playTone(587.33, 0.2, "triangle", 0.09, 0.24);
-  playTone(783.99, 0.45, "sine", 0.11, 0.36);
+export function playPlentyMonopolySound(): void {
+  playSfxClip(SFX_PATHS.playPlentyMonopoly);
 }
 
-export function playChatSound() {
-  playTone(587.33, 0.06, "sine", 0.045, 0);
-  playTone(783.99, 0.08, "sine", 0.045, 0.05);
+export function playRobberSound(): void {
+  playSfxClip(SFX_PATHS.robberMove);
+}
+
+export function playStealCardSound(): void {
+  playSfxClip(SFX_PATHS.stealCard);
+}
+
+export function playDiscardCardSound(): void {
+  playSfxClip(SFX_PATHS.discardCard);
+}
+
+export function playTurnSound(): void {
+  // Turn start / handoff intentionally kept silent per audio direction.
+}
+
+export function playAwardConquestSound(type: "ROAD" | "ARMY"): void {
+  playSfxClip(type === "ROAD" ? SFX_PATHS.awardRoad : SFX_PATHS.awardArmy);
+}
+
+export function playVictorySound(): void {
+  playSfxClip(SFX_PATHS.victory);
+}
+
+export function playChatSound(): void {
+  playSfxClip(SFX_PATHS.chat);
+}
+
+export function playInvalidActionSound(): void {
+  playSfxClip(SFX_PATHS.invalidAction);
 }
 
 export function playTauntSound(tone?: string) {
@@ -153,7 +214,7 @@ export function playTauntSound(tone?: string) {
   }
 }
 
-export function playActionRecordSound(record?: GameActionRecord) {
+export function playActionRecordSound(record?: GameActionRecord): void {
   if (!record || !record[0]) return;
   const actionType = record[0][1];
   switch (actionType) {
@@ -170,20 +231,36 @@ export function playActionRecordSound(record?: GameActionRecord) {
       playBuildPieceSound("CITY");
       break;
     case "BUY_DEVELOPMENT_CARD":
+      playBuyDevCardSound();
+      break;
+    case "PLAY_ROAD_BUILDING":
+      playCardSound();
+      break;
+    case "PLAY_YEAR_OF_PLENTY":
+    case "PLAY_MONOPOLY":
+      playPlentyMonopolySound();
+      break;
+    case "PLAY_KNIGHT_CARD":
+      playKnightCardSound();
+      break;
+    case "MOVE_ROBBER": {
+      playRobberSound();
+      const victimFromArgs = Array.isArray(record[0][2]) ? record[0][2][1] : undefined;
+      if (record[1] || victimFromArgs) {
+        playStealCardSound();
+      }
+      break;
+    }
+    case "DISCARD_RESOURCE":
+      playDiscardCardSound();
+      break;
     case "MARITIME_TRADE":
     case "OFFER_TRADE":
     case "ACCEPT_TRADE":
+    case "REJECT_TRADE":
     case "CONFIRM_TRADE":
-    case "PLAY_YEAR_OF_PLENTY":
-    case "PLAY_MONOPOLY":
-      playCardSound();
-      break;
-    case "MOVE_ROBBER":
-    case "PLAY_KNIGHT_CARD":
-      playRobberSound();
-      break;
+    case "CANCEL_TRADE":
     case "END_TURN":
-      playTurnSound();
       break;
   }
 }

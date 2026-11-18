@@ -62,6 +62,7 @@ import type {
 } from "../utils/api.types";
 import { getHumanColor, playerKey } from "../utils/stateUtils";
 import { postAction } from "../utils/apiClient";
+import { playInvalidActionSound } from "../utils/soundEffects";
 import { useDiscardBatchSubmission } from "../hooks/useDiscardBatchSubmission";
 
 import "./ActionsToolbar.scss";
@@ -160,9 +161,14 @@ export default function ActionsToolbar({
   const executeGameAction = useCallback(
     async (action?: GameAction) => {
       if (!resolvedGameId) return;
-      const nextState = await postAction(resolvedGameId, action);
-      dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
-      dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+      try {
+        const nextState = await postAction(resolvedGameId, action);
+        dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+        dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+      } catch (err) {
+        playInvalidActionSound();
+        throw err;
+      }
     },
     [resolvedGameId, dispatch, enqueueSnackbar, closeSnackbar]
   );
