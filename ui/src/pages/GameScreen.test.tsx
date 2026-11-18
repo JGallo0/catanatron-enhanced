@@ -26,15 +26,23 @@ const snackbar = vi.hoisted(() => ({
   closeSnackbar: vi.fn(),
 }));
 const gameAudio = vi.hoisted(() => ({
-  music: 35,
-  effects: 70,
+  music: 25,
+  musicMuted: false,
+  effects: 80,
   unlockAndPlayMusic: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../utils/gameAudio", () => ({
+  DEFAULT_MUSIC_VOLUME: 25,
+  DEFAULT_EFFECTS_VOLUME: 80,
   getMusicVolume: () => gameAudio.music,
+  isMusicMuted: () => gameAudio.musicMuted || gameAudio.music === 0,
   getEffectsVolume: () => gameAudio.effects,
-  setMusicVolume: (value: number) => { gameAudio.music = value; },
+  setMusicVolume: (value: number) => {
+    gameAudio.music = value;
+    gameAudio.musicMuted = value === 0;
+  },
+  setMusicMuted: (muted: boolean) => { gameAudio.musicMuted = muted; },
   setEffectsVolume: (value: number) => { gameAudio.effects = value; },
   subscribeAudioPreferences: () => () => {},
   unlockAndPlayMusic: gameAudio.unlockAndPlayMusic,
@@ -979,8 +987,9 @@ test("renders left vertical quick dock shortcuts for AlmanacModal and RightDrawe
   const soundBtn = screen.getByRole("button", { name: /^Configurar áudio$/i });
   fireEvent.click(soundBtn);
   expect(screen.getByRole("heading", { name: "Áudio do Jogo" })).toBeInTheDocument();
-  expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("35");
-  expect(screen.getByRole("slider", { name: "Efeitos" })).toHaveValue("70");
+  expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("25");
+  expect(screen.getByRole("slider", { name: "Efeitos" })).toHaveValue("80");
+  expect(screen.getByRole("button", { name: "Mutar música" })).toBeInTheDocument();
   fireEvent.click(
     document.querySelector(".MuiPopover-root .MuiBackdrop-root") as HTMLElement
   );

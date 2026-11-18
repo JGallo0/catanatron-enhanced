@@ -9,7 +9,7 @@
 }
 
 .audio-settings {
-  width: min(260px, calc(100vw - 32px));
+  width: min(296px, calc(100vw - 32px));
   padding: 14px 16px 16px;
 
   &__header {
@@ -36,6 +36,16 @@
       margin-top: 14px;
     }
 
+    &.is-muted {
+      input[type="range"] {
+        opacity: 0.55;
+      }
+
+      .audio-settings__label output {
+        color: #fca5a5;
+      }
+    }
+
     input[type="range"] {
       width: 100%;
       accent-color: #facc15;
@@ -49,21 +59,66 @@
     }
   }
 
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
   &__label {
     display: grid;
-    grid-template-columns: 22px 1fr auto;
+    grid-template-columns: 20px 1fr auto;
     align-items: center;
-    gap: 7px;
+    flex: 1;
+    min-width: 0;
+    gap: 6px;
     color: #e2e8f0;
     font-size: 0.8rem;
     font-weight: 700;
 
     output {
-      min-width: 36px;
+      min-width: 44px;
       color: #fde68a;
       text-align: right;
       font-variant-numeric: tabular-nums;
+      font-size: 0.76rem;
+    }
+  }
+
+  &__mute-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #cbd5e1;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+
+    svg {
+      font-size: 0.85rem;
+    }
+
+    &:hover {
+      border-color: rgba(250, 204, 21, 0.6);
+      color: #fef08a;
+    }
+
+    &.is-muted {
+      border-color: rgba(248, 113, 113, 0.65);
+      background: rgba(127, 29, 29, 0.42);
+      color: #fecaca;
+    }
+
+    &:focus-visible {
+      outline: 2px solid #fde047;
+      outline-offset: 2px;
     }
   }
 }
-
