@@ -87,7 +87,9 @@ import type { Card, Color, GameMessage, GameState } from "../utils/api.types";
 import { getSavedGameSeat, saveGameSeat } from "../utils/seatStorage";
 import {
   playActionRecordSound,
+  playAwardConquestSound,
   playChatSound,
+  playDiscardCardSound,
   playTauntSound,
   playVictorySound,
 } from "../utils/soundEffects";
@@ -563,6 +565,7 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
 
   useEffect(() => {
     if (!activeAward) return;
+    playAwardConquestSound(activeAward.type);
     const timer = setTimeout(() => {
       setAwardQueue((queue) => queue.slice(1));
     }, AWARD_CONQUEST_DURATION_MS);
@@ -968,6 +971,9 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       }
 
       if (batchFx.discards.length > 0) {
+        if (latestRecord?.[0]?.[1] !== "DISCARD_RESOURCE") {
+          playDiscardCardSound();
+        }
         const createdDrops = batchFx.discards.map((d) => ({
           id: fxCounterRef.current++,
           color: d.color,
@@ -1039,9 +1045,6 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
           id: fxCounterRef.current++,
         }));
         setAwardQueue((queue) => [...queue, ...queued]);
-        if (!gs.winning_color) {
-          playVictorySound();
-        }
       }
 
       if (batchFx.turnHandoff) {
