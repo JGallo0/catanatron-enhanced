@@ -37,6 +37,16 @@ Adicionar a trilha instrumental `Island Game Night` às edições Ilha e Repúbl
 - Equalizador, seleção de dispositivo de áudio ou controles por tipo individual de efeito.
 - Hospedagem externa da trilha nesta etapa.
 
+## Extensão aprovada: áudio na página inicial
+
+- A trilha também toca na `HomePage` das edições Ilha e República.
+- O desbloqueio respeita o navegador e acontece na primeira interação válida no lobby.
+- Um botão compacto de áudio fica no cabeçalho da Home, próximo ao seletor de idioma, sem aumentar o dock inferior.
+- O botão abre o mesmo `AudioSettingsPopover`, com os controles independentes de **Música** e **Efeitos**.
+- As preferências são compartilhadas entre lobby e partida.
+- A música deve continuar da posição atual durante a navegação entre lobby e partida, sem reiniciar nem criar instâncias sobrepostas.
+- O ciclo de vida da música deixa de pertencer ao `GameScreen`: trocar de rota não pausa a trilha; apenas volume zero ou encerramento da página a interrompe.
+
 ## Validação
 
 - Testes unitários para persistência, escala de ganho, pausa/retomada e desbloqueio após interação.
