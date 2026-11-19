@@ -747,19 +747,22 @@ export default function ActionsToolbar({
 
         {/* CENTER ZONE: Illustrated Hand Deck (Always visible in player perspective) */}
         {humanColor && (
-          <div className="cu-console__hand">
-            <ResourceCards
-              playerState={gameState.player_state}
-              playerKey={playerKey(gameState, humanColor)}
-              showEmptySlots={true}
-              iconOnly
-              interactiveDevCards={true}
-              playableDevCallbacks={playableDevCallbacks}
-            />
+          <div className="cu-console__hand-zone">
+            <div className="cu-console__hand">
+              <ResourceCards
+                playerState={gameState.player_state}
+                playerKey={playerKey(gameState, humanColor)}
+                showEmptySlots={true}
+                iconOnly
+                interactiveDevCards={true}
+                playableDevCallbacks={playableDevCallbacks}
+              />
+            </div>
             <div
               className={cn("cu-hand-limit-pill", {
                 "is-over-limit": myResourceTotal > discardLimit,
               })}
+              data-testid="cu-hand-limit-pill"
               title={t(
                 `Total de cartas de recurso na mão: ${myResourceTotal}. Se tirar 7 nos dados acima de ${discardLimit}, descarta metade!`,
                 `Total resource cards in hand: ${myResourceTotal}. If a 7 is rolled above ${discardLimit}, discard half!`

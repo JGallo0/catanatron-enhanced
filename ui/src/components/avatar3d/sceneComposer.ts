@@ -120,6 +120,8 @@ export const MOUNT_PROFILES: Record<string, MountProfile> = {
   },
 };
 
+export type AvatarStagePose = "standing" | "throne" | "applaud";
+
 export type AvatarRigFitWrappers = {
   handPropFit: THREE.Group;
   backPropFit: THREE.Group;
@@ -138,6 +140,7 @@ export type AvatarRigInstance = {
   mountId: string;
   baseRiderPos: [number, number, number];
   baseRiderRotY: number;
+  stagePose: AvatarStagePose;
 };
 
 type AuraParticleMeta = {
@@ -292,6 +295,7 @@ export function createAvatarRig(): AvatarRigInstance {
     mountId: "none",
     baseRiderPos: [0, 0, 0],
     baseRiderRotY: 0,
+    stagePose: "standing",
   };
 }
 
@@ -906,29 +910,252 @@ function findObjectInContainer(
   return found;
 }
 
+export function createRoyalThroneGroup(): THREE.Group {
+  const throne = new THREE.Group();
+  throne.name = "royal_victory_throne";
+
+  // Stepped imperial marble & gold dais base
+  const daisLower = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.68, 0.74, 0.06, 32),
+    new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.35,
+      metalness: 0.25,
+    })
+  );
+  daisLower.position.set(0, 0.03, -0.02);
+  daisLower.receiveShadow = true;
+  throne.add(daisLower);
+
+  const daisRim = new THREE.Mesh(
+    new THREE.TorusGeometry(0.69, 0.016, 12, 48),
+    new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      roughness: 0.22,
+      metalness: 0.88,
+    })
+  );
+  daisRim.name = "mat_gold_throne_dais_rim";
+  daisRim.rotation.x = Math.PI / 2;
+  daisRim.position.set(0, 0.058, -0.02);
+  throne.add(daisRim);
+
+  // Crimson / player-primary royal carpet runner over the dais
+  const carpet = new THREE.Mesh(
+    new THREE.BoxGeometry(0.54, 0.018, 0.96),
+    new THREE.MeshStandardMaterial({
+      color: 0x991b1b,
+      roughness: 0.75,
+      metalness: 0.06,
+    })
+  );
+  carpet.name = "mat_outfit_primary_throne_carpet";
+  carpet.position.set(0, 0.064, 0.06);
+  carpet.receiveShadow = true;
+  throne.add(carpet);
+
+  // Throne dark mahogany base & seat box
+  const seatBox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.64, 0.36, 0.54),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a1810,
+      roughness: 0.48,
+      metalness: 0.18,
+    })
+  );
+  seatBox.name = "mat_leather_throne_seat_box";
+  seatBox.position.set(0, 0.24, -0.06);
+  seatBox.castShadow = true;
+  seatBox.receiveShadow = true;
+  throne.add(seatBox);
+
+  // Velvet seat cushion
+  const seatCushion = new THREE.Mesh(
+    new THREE.BoxGeometry(0.58, 0.09, 0.50),
+    new THREE.MeshStandardMaterial({
+      color: 0xb91c1c,
+      roughness: 0.65,
+      metalness: 0.08,
+    })
+  );
+  seatCushion.name = "mat_outfit_primary_throne_cushion";
+  seatCushion.position.set(0, 0.45, -0.05);
+  seatCushion.castShadow = true;
+  throne.add(seatCushion);
+
+  // Gold front trim across the seat base
+  const frontGoldTrim = new THREE.Mesh(
+    new THREE.BoxGeometry(0.66, 0.05, 0.04),
+    new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      roughness: 0.22,
+      metalness: 0.88,
+    })
+  );
+  frontGoldTrim.name = "mat_gold_throne_front_trim";
+  frontGoldTrim.position.set(0, 0.39, 0.21);
+  throne.add(frontGoldTrim);
+
+  // Left & Right carved armrests + gold lion/sun pommels
+  for (const side of [-1, 1] as const) {
+    const armSupport = new THREE.Mesh(
+      new THREE.BoxGeometry(0.11, 0.36, 0.54),
+      new THREE.MeshStandardMaterial({
+        color: 0x3b2216,
+        roughness: 0.44,
+        metalness: 0.22,
+      })
+    );
+    armSupport.name = `mat_leather_throne_arm_${side}`;
+    armSupport.position.set(side * 0.35, 0.54, -0.05);
+    armSupport.castShadow = true;
+    throne.add(armSupport);
+
+    const armVelvetTop = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.055, 0.52),
+      new THREE.MeshStandardMaterial({
+        color: 0x991b1b,
+        roughness: 0.65,
+        metalness: 0.08,
+      })
+    );
+    armVelvetTop.name = `mat_outfit_primary_throne_armtop_${side}`;
+    armVelvetTop.position.set(side * 0.35, 0.74, -0.05);
+    throne.add(armVelvetTop);
+
+    const armPommel = new THREE.Mesh(
+      new THREE.SphereGeometry(0.068, 16, 16),
+      new THREE.MeshStandardMaterial({
+        color: 0xfacc15,
+        roughness: 0.2,
+        metalness: 0.9,
+      })
+    );
+    armPommel.name = `mat_gold_throne_pommel_${side}`;
+    armPommel.position.set(side * 0.35, 0.75, 0.22);
+    throne.add(armPommel);
+
+    // Tall golden pillar flanking the high backrest
+    const pillar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.048, 0.058, 1.48, 16),
+      new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        roughness: 0.24,
+        metalness: 0.88,
+      })
+    );
+    pillar.name = `mat_gold_throne_pillar_${side}`;
+    pillar.position.set(side * 0.36, 1.12, -0.29);
+    pillar.castShadow = true;
+    throne.add(pillar);
+
+    // Pillar spire finial
+    const finial = new THREE.Mesh(
+      new THREE.ConeGeometry(0.072, 0.22, 12),
+      new THREE.MeshStandardMaterial({
+        color: 0xfef08a,
+        roughness: 0.18,
+        metalness: 0.92,
+      })
+    );
+    finial.name = `mat_gold_throne_finial_${side}`;
+    finial.position.set(side * 0.36, 1.94, -0.29);
+    throne.add(finial);
+  }
+
+  // High sovereign backrest frame
+  const backFrame = new THREE.Mesh(
+    new THREE.BoxGeometry(0.68, 1.42, 0.09),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a1810,
+      roughness: 0.42,
+      metalness: 0.25,
+    })
+  );
+  backFrame.name = "mat_leather_throne_back_frame";
+  backFrame.position.set(0, 1.14, -0.29);
+  backFrame.castShadow = true;
+  throne.add(backFrame);
+
+  // Quilted royal velvet backrest panel
+  const backVelvet = new THREE.Mesh(
+    new THREE.BoxGeometry(0.56, 1.24, 0.06),
+    new THREE.MeshStandardMaterial({
+      color: 0xb91c1c,
+      roughness: 0.62,
+      metalness: 0.1,
+    })
+  );
+  backVelvet.name = "mat_outfit_primary_throne_back_velvet";
+  backVelvet.position.set(0, 1.14, -0.25);
+  throne.add(backVelvet);
+
+  // Sovereign arched golden crest crown at the top of the backrest
+  const crestArch = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.36, 0.36, 0.09, 24, 1, false, 0, Math.PI),
+    new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      roughness: 0.22,
+      metalness: 0.9,
+    })
+  );
+  crestArch.name = "mat_gold_throne_crest_arch";
+  crestArch.rotation.x = Math.PI / 2;
+  crestArch.rotation.y = Math.PI / 2;
+  crestArch.position.set(0, 1.84, -0.28);
+  throne.add(crestArch);
+
+  // Sunburst jewel emblem on the throne crest
+  const crestSun = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.11, 0),
+    new THREE.MeshStandardMaterial({
+      color: 0xfef08a,
+      roughness: 0.15,
+      metalness: 0.94,
+      emissive: new THREE.Color(0xf59e0b),
+      emissiveIntensity: 0.35,
+    })
+  );
+  crestSun.name = "mat_gold_throne_sun_jewel";
+  crestSun.position.set(0, 2.02, -0.27);
+  throne.add(crestSun);
+
+  return throne;
+}
+
 /**
- * Applies articulated standing OR riding bone poses + universal cross-slot compatibility
+ * Applies articulated standing, throne-seated, applauding, OR riding bone poses + universal cross-slot compatibility
  * (hat-over-hair tuck, cape-behind-backProp push, pauldron pet perch, handProp grip sync).
  */
 export function applyAvatarCombinationAndPose(
   rig: AvatarRigInstance,
   config: ResolvedAvatarConfig
 ): void {
+  const isThronePose = rig.stagePose === "throne";
+  const isApplaudPose = rig.stagePose === "applaud";
   const mountProfile =
-    config.mount && config.mount !== "none"
+    !isThronePose && config.mount && config.mount !== "none"
       ? MOUNT_PROFILES[config.mount] ?? MOUNT_PROFILES.island_horse
       : null;
 
   rig.isMounted = Boolean(mountProfile);
-  rig.mountId = config.mount || "none";
+  rig.mountId = isThronePose ? "throne" : config.mount || "none";
 
   const hasHandProp = Boolean(config.handProp && config.handProp !== "none");
   const hasCape = Boolean(config.cape && config.cape !== "none");
   const hasPauldrons = PAULDRON_OUTFITS.has(config.outfit);
   const [sx, sy, sz] = rig.bodyScale;
 
-  // 1. Mount / Rider Root Transform & Pedestal Footprint
-  if (mountProfile) {
+  // 1. Mount / Throne / Rider Root Transform & Pedestal Footprint
+  if (isThronePose) {
+    // Seated regally on the golden throne cushion
+    rig.baseRiderPos = [0, -0.21, 0.05];
+    rig.baseRiderRotY = 0;
+    rig.riderPivot.position.set(0, -0.21, 0.05);
+    rig.riderPivot.rotation.set(0, 0, 0);
+    rig.sockets.socket_mount.rotation.set(0, 0, 0);
+    rig.sockets.socket_pedestal.scale.set(1.22, 1.0, 1.22);
+  } else if (mountProfile) {
     rig.baseRiderPos = [0, mountProfile.riderY, mountProfile.riderZ];
     rig.baseRiderRotY = mountProfile.turnY;
     rig.riderPivot.position.set(0, mountProfile.riderY, mountProfile.riderZ);
@@ -945,7 +1172,53 @@ export function applyAvatarCombinationAndPose(
   }
 
   // 2. Articulated Bone Pose (Shared identically across body + outfit + legs + cape!)
-  const bonePose: Record<string, readonly [number, number, number]> = mountProfile
+  const bonePose: Record<string, readonly [number, number, number]> = isThronePose
+    ? {
+        rig_hips: [-0.04, 0, 0],
+        rig_torso: [-0.03, 0, 0],
+        rig_skirt_front: [-1.18, 0, 0],
+        rig_skirt_back: [0.22, 0, 0],
+        rig_cape_drape: [0.28, 0, 0],
+        rig_thigh_l: [-1.32, 0, 0.14],
+        rig_thigh_r: [-1.32, 0, -0.14],
+        rig_calf_l: [1.34, 0, -0.04],
+        rig_calf_r: [1.34, 0, 0.04],
+        rig_foot_l: [-0.04, 0, -0.04],
+        rig_foot_r: [-0.04, 0, 0.04],
+        // Left arm rests regally on the left throne armrest
+        rig_shoulder_l: [0, 0, 0.12],
+        rig_upper_arm_l: [-0.34, -0.10, 0.24],
+        rig_forearm_l: [-0.88, -0.12, -0.16],
+        rig_hand_l: [0.08, 0.12, 0],
+        // Right arm raised in triumph (or resting on right armrest if no handProp)
+        rig_shoulder_r: [0, 0, -0.14],
+        rig_upper_arm_r: hasHandProp ? [-0.62, 0.14, -0.32] : [-0.36, 0.10, -0.24],
+        rig_forearm_r: hasHandProp ? [-0.74, -0.08, -0.08] : [-0.86, 0.12, 0.16],
+        rig_hand_r: hasHandProp ? [-0.18, -0.12, -0.08] : [-0.08, -0.12, 0],
+      }
+    : isApplaudPose
+      ? {
+          rig_hips: [0, 0, 0],
+          rig_torso: [-0.02, 0, 0],
+          rig_skirt_front: [0, 0, 0],
+          rig_skirt_back: [0, 0, 0],
+          rig_cape_drape: [0.06, 0, 0],
+          rig_thigh_l: [0, 0, 0.03],
+          rig_thigh_r: [0, 0, -0.03],
+          rig_calf_l: [0, 0, 0],
+          rig_calf_r: [0, 0, 0],
+          rig_foot_l: [0, 0, 0],
+          rig_foot_r: [0, 0, 0],
+          rig_shoulder_l: [0, 0, 0.05],
+          rig_upper_arm_l: [-0.36, -0.24, -0.14],
+          rig_forearm_l: [-0.84, -0.32, -0.22],
+          rig_hand_l: [0.15, 0.35, 0.18],
+          rig_shoulder_r: [0, 0, -0.05],
+          rig_upper_arm_r: hasHandProp ? [-0.28, 0.08, -0.16] : [-0.36, 0.24, 0.14],
+          rig_forearm_r: hasHandProp ? [-0.52, -0.06, -0.04] : [-0.84, 0.32, 0.22],
+          rig_hand_r: [0, 0, 0],
+        }
+      : mountProfile
     ? {
         rig_hips: [0.06, 0, 0],
         rig_torso: [mountProfile.torsoLean, 0, 0],
@@ -1210,10 +1483,15 @@ export function clearGroupChildren(group: THREE.Group): void {
 export async function populateAvatarRig(
   rig: AvatarRigInstance,
   config: ResolvedAvatarConfig,
-  options?: { signal?: AbortSignal }
+  options?: { signal?: AbortSignal; stagePose?: AvatarStagePose }
 ): Promise<void> {
   const signal = options?.signal;
-  const assignments = getResolvedModelAssignments(config);
+  if (options?.stagePose) {
+    rig.stagePose = options.stagePose;
+  }
+  const assignments = getResolvedModelAssignments(config).filter(
+    (entry) => !(rig.stagePose === "throne" && entry.slot === "mount")
+  );
 
   const loadedParts = await Promise.all(
     assignments.map(async (entry) => {
@@ -1281,12 +1559,20 @@ export async function populateAvatarRig(
     }
   }
 
+  if (rig.stagePose === "throne") {
+    rig.sockets.socket_mount.add(createRoyalThroneGroup());
+  }
+
   updateAvatarBodyProportions(rig, config.bodyType);
   updateAvatarFacialFeatures(rig, config);
   applyAvatarCombinationAndPose(rig, config);
 
   clearGroupChildren(rig.auraSlot);
-  const auraEffect = createAuraEffect(config.aura);
+  const effectiveAura =
+    rig.stagePose === "throne" && (!config.aura || config.aura === "none")
+      ? "sun_motes"
+      : config.aura;
+  const auraEffect = createAuraEffect(effectiveAura);
   if (auraEffect) {
     rig.auraSlot.add(auraEffect);
   }
@@ -1296,7 +1582,7 @@ export async function populateAvatarRig(
 
 export async function composeAvatarScene(
   config: ResolvedAvatarConfig,
-  options?: { signal?: AbortSignal }
+  options?: { signal?: AbortSignal; stagePose?: AvatarStagePose }
 ): Promise<AvatarRigInstance> {
   const rig = createAvatarRig();
   await populateAvatarRig(rig, config, options);
@@ -1356,18 +1642,38 @@ export function updateAvatarAnimation(
     headBase[2]
   );
   rig.sockets.socket_head.rotation.set(
-    Math.sin(elapsedSeconds * 1.25) * 0.015,
-    gentleSway * 0.032,
+    Math.sin(elapsedSeconds * 1.25) * 0.015 +
+      (rig.stagePose === "throne" ? -0.025 : 0),
+    gentleSway * (rig.stagePose === "throne" ? 0.045 : 0.032),
     0
   );
 
+  if (rig.stagePose === "throne") {
+    const sunJewel = rig.sockets.socket_mount.getObjectByName(
+      "mat_gold_throne_sun_jewel"
+    );
+    if (sunJewel) {
+      sunJewel.rotation.y = elapsedSeconds * 1.1;
+      sunJewel.position.y = 2.02 + Math.sin(elapsedSeconds * 2.2) * 0.018;
+    }
+  }
+
   const handBase = AVATAR_SOCKET_OFFSETS.socket_hand_r;
+  const handWave =
+    rig.stagePose === "throne"
+      ? Math.sin(elapsedSeconds * 2.4) * 0.028
+      : rig.stagePose === "applaud"
+        ? Math.sin(elapsedSeconds * 5.2) * 0.018
+        : Math.sin(elapsedSeconds * 1.8 - 0.35) * 0.005;
   rig.sockets.socket_hand_r.position.set(
     handBase[0] * bsx,
-    handBase[1] + Math.sin(elapsedSeconds * 1.8 - 0.35) * 0.005,
+    handBase[1] + handWave,
     handBase[2]
   );
-  rig.sockets.socket_hand_r.rotation.z = Math.sin(elapsedSeconds * 1.2) * 0.02;
+  rig.sockets.socket_hand_r.rotation.z =
+    rig.stagePose === "throne"
+      ? Math.sin(elapsedSeconds * 2.2) * 0.055
+      : Math.sin(elapsedSeconds * 1.2) * 0.02;
 
   const backBase = AVATAR_SOCKET_OFFSETS.socket_back;
   rig.sockets.socket_back.position.set(

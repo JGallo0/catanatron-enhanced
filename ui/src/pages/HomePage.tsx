@@ -1,9 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@mui/material";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeDownIcon from "@mui/icons-material/VolumeDown";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import VictoryScreenOverlay from "../components/VictoryScreenOverlay";
+import type { GameState } from "../utils/api.types";
 import {
   DEFAULT_PLAYERS,
   closeRoom,
@@ -94,6 +96,175 @@ export default function HomePage() {
   );
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isVictoryPreview = searchParams.get("victoryPreview") === "1";
+
+  const victoryPreviewState = useMemo<GameState | null>(() => {
+    if (!isVictoryPreview) return null;
+    const heroAvatar = resolveAvatarConfig(
+      account?.avatar_config ?? guestProfile.avatar_config,
+      hostName
+    );
+    const rolls: Array<[[Color, string, null], [number, number]]> = [
+      [["RED", "ROLL", null], [1, 1]],
+      [["BLUE", "ROLL", null], [1, 2]],
+      [["ORANGE", "ROLL", null], [2, 1]],
+      [["WHITE", "ROLL", null], [2, 2]],
+      [["RED", "ROLL", null], [3, 1]],
+      [["BLUE", "ROLL", null], [2, 2]],
+      [["ORANGE", "ROLL", null], [2, 3]],
+      [["WHITE", "ROLL", null], [3, 2]],
+      [["RED", "ROLL", null], [4, 1]],
+      [["BLUE", "ROLL", null], [1, 4]],
+      [["ORANGE", "ROLL", null], [3, 3]],
+      [["WHITE", "ROLL", null], [4, 2]],
+      [["RED", "ROLL", null], [2, 4]],
+      [["BLUE", "ROLL", null], [5, 1]],
+      [["ORANGE", "ROLL", null], [3, 3]],
+      [["WHITE", "ROLL", null], [4, 2]],
+      [["RED", "ROLL", null], [5, 1]],
+      [["BLUE", "ROLL", null], [3, 4]],
+      [["ORANGE", "ROLL", null], [4, 3]],
+      [["WHITE", "ROLL", null], [5, 2]],
+      [["RED", "ROLL", null], [6, 1]],
+      [["BLUE", "ROLL", null], [3, 4]],
+      [["ORANGE", "ROLL", null], [4, 3]],
+      [["WHITE", "ROLL", null], [2, 5]],
+      [["RED", "ROLL", null], [5, 2]],
+      [["BLUE", "ROLL", null], [4, 4]],
+      [["ORANGE", "ROLL", null], [5, 3]],
+      [["WHITE", "ROLL", null], [6, 2]],
+      [["RED", "ROLL", null], [5, 3]],
+      [["BLUE", "ROLL", null], [4, 4]],
+      [["ORANGE", "ROLL", null], [6, 2]],
+      [["WHITE", "ROLL", null], [5, 4]],
+      [["RED", "ROLL", null], [6, 3]],
+      [["BLUE", "ROLL", null], [4, 5]],
+      [["ORANGE", "ROLL", null], [3, 6]],
+      [["WHITE", "ROLL", null], [5, 5]],
+      [["RED", "ROLL", null], [6, 4]],
+      [["BLUE", "ROLL", null], [4, 6]],
+      [["ORANGE", "ROLL", null], [6, 5]],
+      [["WHITE", "ROLL", null], [5, 6]],
+      [["RED", "ROLL", null], [6, 6]],
+    ];
+    return {
+      tiles: [],
+      adjacent_tiles: {},
+      nodes: {},
+      edges: [],
+      bot_colors: ["BLUE", "WHITE", "ORANGE"],
+      colors: ["RED", "BLUE", "WHITE", "ORANGE"],
+      current_color: "RED",
+      winning_color: "RED",
+      current_prompt: "PLAY_TURN",
+      is_initial_build_phase: false,
+      robber_coordinate: [0, 0, 0],
+      state_index: 999,
+      seat_names: {
+        RED: hostName || "Comandante Imperial",
+        BLUE: "Duquesa Valéria",
+        WHITE: "Almirante Kael",
+        ORANGE: "Barão Thorne",
+      },
+      seat_avatars: {
+        RED: {
+          username: hostName || "Comandante Imperial",
+          avatar_config: {
+            ...heroAvatar,
+            hat: "crown_gold",
+            cape: "royal_mantle",
+            outfit: "imperial_lord",
+            handProp: "royal_scepter",
+            aura: "sun_motes",
+          },
+        },
+        BLUE: {
+          username: "Duquesa Valéria",
+          avatar_config: resolveAvatarConfig(
+            {
+              outfit: "captain",
+              hat: "admiral_bicorne",
+              cape: "navy_commander",
+              handProp: "spyglass",
+              hair: "royal_bun",
+            },
+            "Duquesa Valéria"
+          ),
+        },
+        WHITE: {
+          username: "Almirante Kael",
+          avatar_config: resolveAvatarConfig(
+            {
+              outfit: "armor",
+              hat: "helm",
+              cape: "traveler_cloak",
+              handProp: "cutlass",
+              beard: "full",
+            },
+            "Almirante Kael"
+          ),
+        },
+        ORANGE: {
+          username: "Barão Thorne",
+          avatar_config: resolveAvatarConfig(
+            {
+              outfit: "merchant",
+              hat: "explorer",
+              handProp: "trade_ledger",
+              hair: "curly",
+              pet: "parrot",
+            },
+            "Barão Thorne"
+          ),
+        },
+      },
+      player_state: {
+        P0_ACTUAL_VICTORY_POINTS: 10,
+        P0_VICTORY_POINTS: 10,
+        P0_SETTLEMENTS_AVAILABLE: 2,
+        P0_CITIES_AVAILABLE: 2,
+        P0_ROADS_AVAILABLE: 6,
+        P0_LONGEST_ROAD_LENGTH: 9,
+        P0_PLAYED_KNIGHT: 2,
+        P0_HAS_ROAD: true,
+        P0_HAS_ARMY: false,
+        P1_ACTUAL_VICTORY_POINTS: 8,
+        P1_VICTORY_POINTS: 8,
+        P1_SETTLEMENTS_AVAILABLE: 3,
+        P1_CITIES_AVAILABLE: 2,
+        P1_ROADS_AVAILABLE: 8,
+        P1_LONGEST_ROAD_LENGTH: 6,
+        P1_PLAYED_KNIGHT: 4,
+        P1_HAS_ROAD: false,
+        P1_HAS_ARMY: true,
+        P2_ACTUAL_VICTORY_POINTS: 7,
+        P2_VICTORY_POINTS: 7,
+        P2_SETTLEMENTS_AVAILABLE: 2,
+        P2_CITIES_AVAILABLE: 3,
+        P2_ROADS_AVAILABLE: 9,
+        P2_LONGEST_ROAD_LENGTH: 5,
+        P2_PLAYED_KNIGHT: 2,
+        P2_HAS_ROAD: false,
+        P2_HAS_ARMY: false,
+        P3_ACTUAL_VICTORY_POINTS: 6,
+        P3_VICTORY_POINTS: 6,
+        P3_SETTLEMENTS_AVAILABLE: 1,
+        P3_CITIES_AVAILABLE: 3,
+        P3_ROADS_AVAILABLE: 10,
+        P3_LONGEST_ROAD_LENGTH: 4,
+        P3_PLAYED_KNIGHT: 1,
+        P3_HAS_ROAD: false,
+        P3_HAS_ARMY: false,
+      },
+      action_records: rolls as any,
+    } as unknown as GameState;
+  }, [
+    isVictoryPreview,
+    account?.avatar_config,
+    guestProfile.avatar_config,
+    hostName,
+  ]);
 
   const refreshRooms = useCallback(() => {
     listActiveRooms(account?.auth_token)
@@ -563,6 +734,14 @@ export default function HomePage() {
           setHostName(saved.display_name);
         }}
       />
+
+      {victoryPreviewState && (
+        <VictoryScreenOverlay
+          gameState={victoryPreviewState}
+          mySeatColor="RED"
+          onReturnLobby={() => setSearchParams({})}
+        />
+      )}
 
     </div>
   );
