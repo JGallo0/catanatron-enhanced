@@ -559,7 +559,7 @@ export default function ActionsToolbar({
               >
                 <Tooltip
                   title={t(
-                    "Construir Estrada (1 Madeira + 1 Barro) — Maior Estrada (+2 PV)",
+                    "Construir Estrada (1 Madeira + 1 Argila) — Maior Estrada (+2 PV)",
                     "Build Road (1 Lumber + 1 Brick) — Longest Road (+2 VP)"
                   )}
                   arrow
@@ -599,7 +599,7 @@ export default function ActionsToolbar({
 
                 <Tooltip
                   title={t(
-                    "Fundar Aldeia (1 Madeira + 1 Barro + 1 Ovelha + 1 Trigo) — +1 PV",
+                    "Fundar Aldeia (1 Madeira + 1 Argila + 1 Ovelha + 1 Trigo) — +1 PV",
                     "Build Settlement (1 Lumber + 1 Brick + 1 Sheep + 1 Grain) — +1 VP"
                   )}
                   arrow
@@ -630,7 +630,7 @@ export default function ActionsToolbar({
 
                 <Tooltip
                   title={t(
-                    "Evoluir para Cidade (2 Trigos + 3 Pedras) — +2 PV & coleta em dobro",
+                    "Evoluir para Cidade (2 Trigos + 3 Minérios) — +2 PV & coleta em dobro",
                     "Upgrade to City (2 Grain + 3 Ore) — +2 VP & double yield"
                   )}
                   arrow
@@ -661,7 +661,7 @@ export default function ActionsToolbar({
 
                 <Tooltip
                   title={t(
-                    "Comprar Carta de Desenvolvimento (1 Ovelha + 1 Trigo + 1 Pedra)",
+                    "Comprar Carta de Desenvolvimento (1 Ovelha + 1 Trigo + 1 Minério)",
                     "Buy Development Card (1 Sheep + 1 Grain + 1 Ore)"
                   )}
                   arrow
@@ -747,19 +747,22 @@ export default function ActionsToolbar({
 
         {/* CENTER ZONE: Illustrated Hand Deck (Always visible in player perspective) */}
         {humanColor && (
-          <div className="cu-console__hand">
-            <ResourceCards
-              playerState={gameState.player_state}
-              playerKey={playerKey(gameState, humanColor)}
-              showEmptySlots={true}
-              iconOnly
-              interactiveDevCards={true}
-              playableDevCallbacks={playableDevCallbacks}
-            />
+          <div className="cu-console__hand-zone">
+            <div className="cu-console__hand">
+              <ResourceCards
+                playerState={gameState.player_state}
+                playerKey={playerKey(gameState, humanColor)}
+                showEmptySlots={true}
+                iconOnly
+                interactiveDevCards={true}
+                playableDevCallbacks={playableDevCallbacks}
+              />
+            </div>
             <div
               className={cn("cu-hand-limit-pill", {
                 "is-over-limit": myResourceTotal > discardLimit,
               })}
+              data-testid="cu-hand-limit-pill"
               title={t(
                 `Total de cartas de recurso na mão: ${myResourceTotal}. Se tirar 7 nos dados acima de ${discardLimit}, descarta metade!`,
                 `Total resource cards in hand: ${myResourceTotal}. If a 7 is rolled above ${discardLimit}, discard half!`

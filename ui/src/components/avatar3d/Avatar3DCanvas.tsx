@@ -33,6 +33,7 @@ import {
   updateAvatarBodyProportions,
   updateAvatarFacialFeatures,
   type AvatarRigInstance,
+  type AvatarStagePose,
 } from "./sceneComposer";
 import "./Avatar3DCanvas.scss";
 
@@ -44,6 +45,7 @@ export type Avatar3DCanvasProps = {
   config: AvatarConfigV2 | Partial<AvatarConfig> | Record<string, unknown>;
   mode?: "studio" | "hero" | "card";
   cameraFocus?: "full" | "portrait";
+  stagePose?: AvatarStagePose;
   interactive?: boolean;
   className?: string;
   backgroundMode?: "themed" | "transparent";
@@ -58,6 +60,11 @@ const CAMERA_PRESETS = {
     fov: 36,
     position: [0.34, 1.18, 3.65] as const,
     target: [0, 0.88, 0] as const,
+  },
+  throneFull: {
+    fov: 37,
+    position: [0.16, 1.24, 3.85] as const,
+    target: [0, 0.96, -0.02] as const,
   },
   mountedFull: {
     fov: 38,
@@ -122,15 +129,20 @@ function applyCameraPreset(
   camera: THREE.PerspectiveCamera,
   controls: OrbitControls | null,
   focus: "full" | "portrait",
-  mountId: string = "none"
+  mountId: string = "none",
+  stagePose: AvatarStagePose = "standing"
 ): void {
-  const isMounted = Boolean(mountId && mountId !== "none" && MOUNT_PROFILES[mountId]);
+  const isThrone = stagePose === "throne";
+  const isMounted =
+    !isThrone && Boolean(mountId && mountId !== "none" && MOUNT_PROFILES[mountId]);
   const preset =
     focus === "portrait"
-      ? resolvePortraitCameraCoords(mountId)
-      : isMounted
-        ? CAMERA_PRESETS.mountedFull
-        : CAMERA_PRESETS.full;
+      ? resolvePortraitCameraCoords(isThrone ? "none" : mountId)
+      : isThrone
+        ? CAMERA_PRESETS.throneFull
+        : isMounted
+          ? CAMERA_PRESETS.mountedFull
+          : CAMERA_PRESETS.full;
   camera.fov = preset.fov;
   camera.position.set(
     preset.position[0],
@@ -154,6 +166,7 @@ export const Avatar3DCanvas = forwardRef<
     config,
     mode = "studio",
     cameraFocus = "full",
+    stagePose = "standing",
     interactive = false,
     className,
     backgroundMode,
@@ -194,13 +207,14 @@ export const Avatar3DCanvas = forwardRef<
 
   const modelSignature = useMemo(
     () =>
+      `${stagePose}::` +
       getResolvedModelAssignments(resolved)
         .map((a) => `${a.slot}:${a.modelPath}`)
         .join("|"),
-    [resolved]
+    [resolved, stagePose]
   );
 
-  const faceSignature = `${resolved.eyeStyle}|${resolved.browStyle}|${resolved.noseStyle}|${resolved.mouthStyle}|${resolved.bodyType}`;
+  const faceSignature = `${stagePose}|${resolved.eyeStyle}|${resolved.browStyle}|${resolved.noseStyle}|${resolved.mouthStyle}|${resolved.bodyType}`;
 
   useImperativeHandle(
     ref,
@@ -342,7 +356,7 @@ export const Avatar3DCanvas = forwardRef<
     controls.maxPolarAngle = Math.PI * 0.52;
     controls.enableZoom = interactive && mode === "studio";
     controls.enabled = interactive;
-    applyCameraPreset(camera, controls, cameraFocus, resolved.mount);
+    applyCameraPreset(camera, controls, cameraFocus, resolved.mount, stagePose);
 
     rendererRef.current = renderer;
     sceneRef.current = scene;
@@ -408,8 +422,8 @@ export const Avatar3DCanvas = forwardRef<
     if (!camera || !controls) return;
     controls.enabled = interactive;
     controls.enableZoom = interactive && mode === "studio";
-    applyCameraPreset(camera, controls, cameraFocus, resolved.mount);
-  }, [cameraFocus, interactive, mode, resolved.mount]);
+    applyCameraPreset(camera, controls, cameraFocus, resolved.mount, stagePose);
+  }, [cameraFocus, interactive, mode, resolved.mount, stagePose]);
 
   // Compose/update modular parts, aura, and material colors
   useEffect(() => {
@@ -425,6 +439,7 @@ export const Avatar3DCanvas = forwardRef<
     const auraChanged = lastAuraRef.current !== resolved.aura;
 
     if (!modelsChanged) {
+      rig.stagePose = stagePose;
       if (faceChanged) {
         updateAvatarBodyProportions(rig, resolved.bodyType);
         updateAvatarFacialFeatures(rig, resolved);
@@ -433,7 +448,11 @@ export const Avatar3DCanvas = forwardRef<
       }
       if (auraChanged) {
         clearGroupChildren(rig.auraSlot);
-        const auraEffect = createAuraEffect(resolved.aura);
+        const effectiveAura =
+          stagePose === "throne" && (!resolved.aura || resolved.aura === "none")
+            ? "sun_motes"
+            : resolved.aura;
+        const auraEffect = createAuraEffect(effectiveAura);
         if (auraEffect) {
           rig.auraSlot.add(auraEffect);
         }
@@ -454,7 +473,10 @@ export const Avatar3DCanvas = forwardRef<
     lastFaceKeyRef.current = faceSignature;
     lastAuraRef.current = resolved.aura;
 
-    populateAvatarRig(rig, resolved, { signal: controller.signal }).then(() => {
+    populateAvatarRig(rig, resolved, {
+      signal: controller.signal,
+      stagePose,
+    }).then(() => {
       if (controller.signal.aborted) return;
       if (renderer && scene && camera) {
         renderer.render(scene, camera);
@@ -468,7 +490,7 @@ export const Avatar3DCanvas = forwardRef<
     return () => {
       controller.abort();
     };
-  }, [webglFailed, resolved, modelSignature, faceSignature]);
+  }, [webglFailed, resolved, modelSignature, faceSignature, stagePose]);
 
   const computedFallbackSize =
     fallbackSize ?? (mode === "card" ? 84 : mode === "hero" ? 136 : 160);
@@ -498,6 +520,8 @@ export const Avatar3DCanvas = forwardRef<
           config={resolved}
           username={username}
           size={computedFallbackSize}
+          fullBody={cameraFocus === "full"}
+          onThrone={stagePose === "throne"}
           testId={fallbackTestId}
         />
       </div>

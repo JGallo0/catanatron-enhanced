@@ -90,6 +90,7 @@ export default function PlayerAvatar({
   username,
   size = 48,
   fullBody = false,
+  onThrone = false,
   className,
   showFrameLabel = false,
   testId = "player-avatar",
@@ -98,6 +99,7 @@ export default function PlayerAvatar({
   username?: string | null;
   size?: number;
   fullBody?: boolean;
+  onThrone?: boolean;
   className?: string;
   showFrameLabel?: boolean;
   testId?: string | null;
@@ -176,12 +178,16 @@ export default function PlayerAvatar({
       className={cn(
         "player-avatar",
         `player-avatar--frame-${resolvedFrame}`,
-        { "player-avatar--full-body": fullBody },
+        {
+          "player-avatar--full-body": fullBody,
+          "player-avatar--on-throne": onThrone,
+        },
         className
       )}
       data-testid={testId || undefined}
       data-frame={resolvedFrame}
       data-full-body={fullBody ? "true" : undefined}
+      data-on-throne={onThrone ? "true" : undefined}
     >
       <div
         className="player-avatar__frame"
@@ -294,6 +300,26 @@ export default function PlayerAvatar({
               {/* Full-Body Lower Body, Pedestal, Cape & Legs */}
               {fullBody && (
                 <g className="player-avatar__fullbody-lower">
+                  {onThrone && (
+                    <g className="player-avatar__royal-throne" data-testid="player-avatar-throne">
+                      {/* Stepped Golden Dais */}
+                      <ellipse cx="60" cy="181" rx="52" ry="7" fill="#78350f" stroke="#facc15" strokeWidth="1.8" />
+                      <ellipse cx="60" cy="178" rx="44" ry="5.5" fill="#991b1b" stroke="#fde047" strokeWidth="1.2" />
+                      {/* High Royal Backrest & Golden Pillars */}
+                      <rect x="20" y="16" width="80" height="126" rx="12" fill="#2a1810" stroke="#f59e0b" strokeWidth="2.6" />
+                      <rect x="26" y="22" width="68" height="114" rx="8" fill="#991b1b" stroke="#fbbf24" strokeWidth="1.4" />
+                      <rect x="15" y="14" width="8" height="136" rx="3" fill="#eab308" stroke="#fef08a" strokeWidth="1.2" />
+                      <rect x="97" y="14" width="8" height="136" rx="3" fill="#eab308" stroke="#fef08a" strokeWidth="1.2" />
+                      <polygon points="19,4 24,15 14,15" fill="#fef08a" />
+                      <polygon points="101,4 106,15 96,15" fill="#fef08a" />
+                      <polygon points="60,3 67,16 53,16" fill="#fef08a" stroke="#ca8a04" strokeWidth="1" />
+                      {/* Carved Armrests */}
+                      <rect x="12" y="106" width="16" height="42" rx="4" fill="#451a03" stroke="#facc15" strokeWidth="1.8" />
+                      <rect x="92" y="106" width="16" height="42" rx="4" fill="#451a03" stroke="#facc15" strokeWidth="1.8" />
+                      <circle cx="20" cy="108" r="5" fill="#facc15" />
+                      <circle cx="100" cy="108" r="5" fill="#facc15" />
+                    </g>
+                  )}
                   {/* Full-length Cape */}
                   {resolvedCape !== "none" && (
                     <path
