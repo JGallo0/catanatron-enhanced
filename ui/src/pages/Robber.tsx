@@ -9,9 +9,15 @@ type RobberProps = {
   center: [number, number];
   size: number;
   coordinate: CubeCoordinate;
+  isPending?: boolean;
 };
 
-export default function Robber({ center, size, coordinate }: RobberProps) {
+export default function Robber({
+  center,
+  size,
+  coordinate,
+  isPending = false,
+}: RobberProps) {
   const { t } = useLanguage();
   const [centerX, centerY] = center;
   const w = SQRT3 * size;
@@ -24,7 +30,7 @@ export default function Robber({ center, size, coordinate }: RobberProps) {
 
   return (
     <div
-      className="robber robber-pawn"
+      className={`robber robber-pawn${isPending ? " robber--pending" : ""}`}
       title={t(
         "O Ladrão (Bloqueia a produção deste hexágono)",
         "The Robber (Blocks production on this hex)"

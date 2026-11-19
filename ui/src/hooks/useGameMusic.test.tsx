@@ -13,27 +13,46 @@ beforeEach(() => {
   audio.stopGameMusic.mockClear();
 });
 
-test("retries a blocked unlock and removes listeners after success", async () => {
+test("attempts immediate unlock when enabled, retries when blocked, and removes listeners after success", async () => {
   audio.unlockAndPlayMusic
     .mockResolvedValueOnce(false)
+    .mockResolvedValueOnce(false)
     .mockResolvedValueOnce(true);
-  renderHook(() => useGameMusic());
+  renderHook(() => useGameMusic(true));
+
+  expect(audio.unlockAndPlayMusic).toHaveBeenCalledTimes(1);
 
   await act(async () => document.dispatchEvent(new Event("pointerdown")));
   await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })));
   await act(async () => document.dispatchEvent(new Event("pointerdown")));
 
-  expect(audio.unlockAndPlayMusic).toHaveBeenCalledTimes(2);
+  expect(audio.unlockAndPlayMusic).toHaveBeenCalledTimes(3);
+});
+
+test("stays stopped while disabled (e.g. during Boa Guerra) and starts immediately once enabled", async () => {
+  const { rerender } = renderHook(({ enabled }) => useGameMusic(enabled), {
+    initialProps: { enabled: false },
+  });
+
+  expect(audio.stopGameMusic).toHaveBeenCalledTimes(1);
+  expect(audio.unlockAndPlayMusic).not.toHaveBeenCalled();
+
+  await act(async () => document.dispatchEvent(new Event("pointerdown")));
+  expect(audio.unlockAndPlayMusic).not.toHaveBeenCalled();
+
+  await act(async () => rerender({ enabled: true }));
+  expect(audio.unlockAndPlayMusic).toHaveBeenCalledTimes(1);
 });
 
 test("cleans interaction listeners without stopping music on unmount", async () => {
   audio.unlockAndPlayMusic.mockResolvedValue(false);
-  const { unmount } = renderHook(() => useGameMusic());
+  const { unmount } = renderHook(() => useGameMusic(true));
+  expect(audio.unlockAndPlayMusic).toHaveBeenCalledTimes(1);
   unmount();
 
   await act(async () => document.dispatchEvent(new Event("pointerdown")));
 
-  expect(audio.unlockAndPlayMusic).not.toHaveBeenCalled();
+  expect(audio.unlockAndPlayMusic).toHaveBeenCalledTimes(1);
   expect(audio.stopGameMusic).not.toHaveBeenCalled();
 });
 

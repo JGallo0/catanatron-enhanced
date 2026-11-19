@@ -73,6 +73,7 @@ type BoardProps = {
   pendingEdgeId?: string | null;
   pendingColor?: Color | null;
   pendingBuilding?: BuildingType | null;
+  pendingRobberCoordinate?: TileCoordinate | null;
 };
 
 export default function Board({
@@ -99,6 +100,7 @@ export default function Board({
   pendingEdgeId = null,
   pendingColor = null,
   pendingBuilding = null,
+  pendingRobberCoordinate = null,
 }: BoardProps) {
   // Exact available viewport: prefer ResizeObserver container bounds when mounted in ZoomableBoard
   const leftSidebarWidth = 0;
@@ -312,7 +314,8 @@ export default function Board({
       <Robber
         center={center}
         size={size}
-        coordinate={gameState.robber_coordinate}
+        coordinate={pendingRobberCoordinate ?? gameState.robber_coordinate}
+        isPending={Boolean(pendingRobberCoordinate)}
       />
     </div>
   );

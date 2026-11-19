@@ -3,6 +3,7 @@ import Popover from "@mui/material/Popover";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import MusicOffIcon from "@mui/icons-material/MusicOff";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 
@@ -12,8 +13,10 @@ import {
   DEFAULT_MUSIC_VOLUME,
   getEffectsVolume,
   getMusicVolume,
+  isLobbyMusicPlaying,
   isMusicMuted,
   setEffectsVolume,
+  setLobbyMusicPlaying,
   setMusicMuted,
   setMusicVolume,
   subscribeAudioPreferences,
@@ -25,6 +28,7 @@ interface AudioSettingsPopoverProps {
   anchorEl: HTMLElement | null;
   onClose: () => void;
   language: AppLanguage;
+  context?: "lobby" | "game";
 }
 
 export default function AudioSettingsPopover({
@@ -32,23 +36,30 @@ export default function AudioSettingsPopover({
   anchorEl,
   onClose,
   language,
+  context = "game",
 }: AudioSettingsPopoverProps) {
   const [music, setMusic] = useState(getMusicVolume);
   const [musicMuted, setMusicMutedState] = useState(isMusicMuted);
+  const [lobbyPlaying, setLobbyPlayingState] = useState(
+    () => isLobbyMusicPlaying?.() ?? false
+  );
   const [effects, setEffects] = useState(getEffectsVolume);
   const lastAudibleEffectsRef = useRef(
     getEffectsVolume() > 0 ? getEffectsVolume() : DEFAULT_EFFECTS_VOLUME
   );
   const en = language === "en";
+  const isLobby = context === "lobby";
 
   useEffect(
     () =>
       subscribeAudioPreferences(() => {
         const nextMusic = getMusicVolume();
         const nextMuted = isMusicMuted();
+        const nextLobbyPlaying = isLobbyMusicPlaying?.() ?? false;
         const nextEffects = getEffectsVolume();
         setMusic(nextMusic);
         setMusicMutedState(nextMuted);
+        setLobbyPlayingState(nextLobbyPlaying);
         setEffects(nextEffects);
         if (nextEffects > 0) {
           lastAudibleEffectsRef.current = nextEffects;
@@ -57,10 +68,21 @@ export default function AudioSettingsPopover({
     []
   );
 
+  const effectiveMusicMuted = isLobby ? !lobbyPlaying || musicMuted : musicMuted;
   const effectsMuted = effects === 0;
-  const displayedMusic = musicMuted ? 0 : music;
+  const displayedMusic = effectiveMusicMuted ? 0 : music;
 
   const handleToggleMusicMute = () => {
+    if (isLobby) {
+      const nextPlaying = effectiveMusicMuted;
+      setLobbyPlayingState(nextPlaying);
+      if (nextPlaying && music === 0) {
+        setMusic(DEFAULT_MUSIC_VOLUME);
+      }
+      setMusicMutedState(!nextPlaying && music === 0);
+      void setLobbyMusicPlaying?.(nextPlaying);
+      return;
+    }
     const nextMuted = !musicMuted;
     setMusicMuted(nextMuted);
     setMusicMutedState(nextMuted);
@@ -81,6 +103,32 @@ export default function AudioSettingsPopover({
     }
   };
 
+  const musicStatusText = effectiveMusicMuted
+    ? isLobby
+      ? en
+        ? "Off"
+        : "Desativada"
+      : en
+        ? "Muted"
+        : "Mutada"
+    : `${music}%`;
+
+  const musicToggleLabel = isLobby
+    ? effectiveMusicMuted
+      ? en
+        ? "Play music"
+        : "Reproduzir música"
+      : en
+        ? "Mute music"
+        : "Mutar música"
+    : effectiveMusicMuted
+      ? en
+        ? "Unmute music"
+        : "Desmutar música"
+      : en
+        ? "Mute music"
+        : "Mutar música";
+
   return (
     <Popover
       open={open}
@@ -96,39 +144,36 @@ export default function AudioSettingsPopover({
           <h2>{en ? "Game Audio" : "Áudio do Jogo"}</h2>
         </header>
 
-        <div className={`audio-settings__control${musicMuted ? " is-muted" : ""}`}>
+        <div className={`audio-settings__control${effectiveMusicMuted ? " is-muted" : ""}`}>
           <div className="audio-settings__row">
             <label className="audio-settings__label" htmlFor="audio-music-slider">
-              {musicMuted ? (
+              {effectiveMusicMuted ? (
                 <MusicOffIcon fontSize="small" aria-hidden="true" />
               ) : (
                 <MusicNoteIcon fontSize="small" aria-hidden="true" />
               )}
               <span>{en ? "Music" : "Música"}</span>
-              <output htmlFor="audio-music-slider">
-                {musicMuted ? (en ? "Muted" : "Mutada") : `${music}%`}
-              </output>
+              <output htmlFor="audio-music-slider">{musicStatusText}</output>
             </label>
             <button
               type="button"
-              className={`audio-settings__mute-btn${musicMuted ? " is-muted" : ""}`}
-              aria-pressed={musicMuted}
-              aria-label={
-                en
-                  ? musicMuted
-                    ? "Unmute music"
-                    : "Mute music"
-                  : musicMuted
-                    ? "Desmutar música"
-                    : "Mutar música"
-              }
+              className={`audio-settings__mute-btn${effectiveMusicMuted ? " is-muted" : ""}`}
+              aria-pressed={isLobby ? lobbyPlaying && !musicMuted : musicMuted}
+              aria-label={musicToggleLabel}
               onClick={handleToggleMusicMute}
             >
-              {musicMuted ? (
-                <>
-                  <MusicNoteIcon fontSize="inherit" aria-hidden="true" />
-                  <span>{en ? "Unmute" : "Ativar"}</span>
-                </>
+              {effectiveMusicMuted ? (
+                isLobby ? (
+                  <>
+                    <PlayArrowIcon fontSize="inherit" aria-hidden="true" />
+                    <span>{en ? "Play" : "Reproduzir"}</span>
+                  </>
+                ) : (
+                  <>
+                    <MusicNoteIcon fontSize="inherit" aria-hidden="true" />
+                    <span>{en ? "Unmute" : "Ativar"}</span>
+                  </>
+                )
               ) : (
                 <>
                   <MusicOffIcon fontSize="inherit" aria-hidden="true" />
@@ -150,6 +195,10 @@ export default function AudioSettingsPopover({
               setMusic(value);
               setMusicMutedState(value === 0);
               setMusicVolume(value);
+              if (isLobby) {
+                setLobbyPlayingState(value > 0);
+                void setLobbyMusicPlaying?.(value > 0);
+              }
             }}
           />
         </div>

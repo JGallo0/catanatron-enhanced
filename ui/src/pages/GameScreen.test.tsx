@@ -30,6 +30,7 @@ const gameAudio = vi.hoisted(() => ({
   musicMuted: false,
   effects: 80,
   unlockAndPlayMusic: vi.fn().mockResolvedValue(true),
+  stopGameMusic: vi.fn(),
 }));
 
 vi.mock("../utils/gameAudio", () => ({
@@ -37,6 +38,9 @@ vi.mock("../utils/gameAudio", () => ({
   DEFAULT_EFFECTS_VOLUME: 80,
   getMusicVolume: () => gameAudio.music,
   isMusicMuted: () => gameAudio.musicMuted || gameAudio.music === 0,
+  isLobbyMusicPlaying: () => false,
+  enterLobbyAudioMode: vi.fn(),
+  setLobbyMusicPlaying: vi.fn().mockResolvedValue(true),
   getEffectsVolume: () => gameAudio.effects,
   setMusicVolume: (value: number) => {
     gameAudio.music = value;
@@ -46,7 +50,7 @@ vi.mock("../utils/gameAudio", () => ({
   setEffectsVolume: (value: number) => { gameAudio.effects = value; },
   subscribeAudioPreferences: () => () => {},
   unlockAndPlayMusic: gameAudio.unlockAndPlayMusic,
-  stopGameMusic: vi.fn(),
+  stopGameMusic: gameAudio.stopGameMusic,
 }));
 
 vi.mock("../utils/apiClient", () => ({
@@ -780,18 +784,21 @@ test("shows 10s 'Boa Guerra' splash at state_index === 0 while gating bots until
 
   expect(screen.getByText("Boa Guerra")).toBeInTheDocument();
   expect(postAction).not.toHaveBeenCalled();
+  expect(gameAudio.unlockAndPlayMusic).not.toHaveBeenCalled();
 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(9800);
   });
   expect(screen.getByText("Boa Guerra")).toBeInTheDocument();
   expect(postAction).not.toHaveBeenCalled();
+  expect(gameAudio.unlockAndPlayMusic).not.toHaveBeenCalled();
 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(250);
   });
 
   expect(screen.queryByText("Boa Guerra")).not.toBeInTheDocument();
+  expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalled();
   expect(postAction).toHaveBeenCalledWith("game-123", undefined, {
     botOnly: true,
   });
@@ -806,11 +813,13 @@ test("shows 10s 'Boa Guerra' splash at state_index === 0 while gating bots until
     await vi.advanceTimersByTimeAsync(50);
   });
   expect(screen.getByText("Boa Guerra")).toBeInTheDocument();
+  expect(gameAudio.unlockAndPlayMusic).not.toHaveBeenCalled();
   const zarparBtn = screen.getByRole("button", { name: /Zarpar para a Ilha/i });
   await act(async () => {
     fireEvent.click(zarparBtn);
   });
   expect(screen.queryByText("Boa Guerra")).not.toBeInTheDocument();
+  expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalled();
   expect(postAction).toHaveBeenCalledWith("game-123", undefined, {
     botOnly: true,
   });
@@ -1016,11 +1025,10 @@ test("retries music unlock after a blocked interaction and stops after success",
   renderGameScreen();
   expect(await screen.findByTestId("board")).toBeInTheDocument();
 
-  fireEvent.pointerDown(document.body);
   await waitFor(() => expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledTimes(1));
-  fireEvent.keyDown(document.body, { key: "Enter" });
-  await waitFor(() => expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledTimes(2));
   fireEvent.pointerDown(document.body);
+  await waitFor(() => expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledTimes(2));
+  fireEvent.keyDown(document.body, { key: "Enter" });
 
   expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledTimes(2);
 });
