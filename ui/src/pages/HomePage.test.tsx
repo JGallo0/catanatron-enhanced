@@ -17,22 +17,45 @@ import {
   type PlayerAccount,
 } from "../utils/apiClient";
 
-const gameAudio = vi.hoisted(() => ({ music: 25, musicMuted: false, effects: 80 }));
+const gameAudio = vi.hoisted(() => ({
+  music: 25,
+  musicMuted: false,
+  lobbyPlaying: false,
+  effects: 80,
+  enterLobbyAudioMode: vi.fn(),
+  unlockAndPlayMusic: vi.fn().mockResolvedValue(true),
+}));
 
 vi.mock("../utils/gameAudio", () => ({
   DEFAULT_MUSIC_VOLUME: 25,
   DEFAULT_EFFECTS_VOLUME: 80,
   getMusicVolume: () => gameAudio.music,
   isMusicMuted: () => gameAudio.musicMuted || gameAudio.music === 0,
+  isLobbyMusicPlaying: () =>
+    gameAudio.lobbyPlaying && !gameAudio.musicMuted && gameAudio.music > 0,
+  enterLobbyAudioMode: () => {
+    gameAudio.lobbyPlaying = false;
+    gameAudio.enterLobbyAudioMode();
+  },
+  setLobbyMusicPlaying: (playing: boolean) => {
+    gameAudio.lobbyPlaying = playing;
+    if (playing) gameAudio.unlockAndPlayMusic();
+    return Promise.resolve(true);
+  },
   getEffectsVolume: () => gameAudio.effects,
   setMusicVolume: (value: number) => {
     gameAudio.music = value;
     gameAudio.musicMuted = value === 0;
   },
-  setMusicMuted: (muted: boolean) => { gameAudio.musicMuted = muted; },
-  setEffectsVolume: (value: number) => { gameAudio.effects = value; },
+  setMusicMuted: (muted: boolean) => {
+    gameAudio.musicMuted = muted;
+    if (muted) gameAudio.lobbyPlaying = false;
+  },
+  setEffectsVolume: (value: number) => {
+    gameAudio.effects = value;
+  },
   subscribeAudioPreferences: () => () => {},
-  unlockAndPlayMusic: vi.fn().mockResolvedValue(true),
+  unlockAndPlayMusic: gameAudio.unlockAndPlayMusic,
 }));
 
 vi.mock("../utils/apiClient", async (importOriginal) => {
@@ -77,6 +100,7 @@ describe("HomePage A2 Stage", () => {
     vi.mocked(listActiveRooms).mockResolvedValue([]);
     gameAudio.music = 25;
     gameAudio.musicMuted = false;
+    gameAudio.lobbyPlaying = false;
     gameAudio.effects = 80;
   });
 
@@ -194,10 +218,17 @@ describe("HomePage A2 Stage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Configurar áudio" }));
+    expect(gameAudio.enterLobbyAudioMode).toHaveBeenCalled();
+    expect(gameAudio.unlockAndPlayMusic).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Áudio do Jogo" })).toBeInTheDocument();
-    expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("25");
+    expect(screen.getByText("Desativada")).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("0");
     expect(screen.getByRole("slider", { name: "Efeitos" })).toHaveValue("80");
-    expect(screen.getByRole("button", { name: "Mutar música" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reproduzir música" }));
+    expect(gameAudio.lobbyPlaying).toBe(true);
+    expect(gameAudio.unlockAndPlayMusic).toHaveBeenCalledOnce();
+    expect(screen.getByRole("slider", { name: "Música" })).toHaveValue("25");
 
     fireEvent.change(screen.getByRole("slider", { name: "Música" }), {
       target: { value: "48" },

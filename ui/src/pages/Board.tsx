@@ -76,6 +76,7 @@ type BoardProps = {
   pendingColor?: Color | null;
   pendingBuilding?: BuildingType | null;
   diceStage?: Omit<DiceRollOverlayProps, "center" | "size"> | null;
+  pendingRobberCoordinate?: TileCoordinate | null;
 };
 
 export default function Board({
@@ -103,6 +104,7 @@ export default function Board({
   pendingColor = null,
   pendingBuilding = null,
   diceStage = null,
+  pendingRobberCoordinate = null,
 }: BoardProps) {
   // Exact available viewport: prefer ResizeObserver container bounds when mounted in ZoomableBoard
   const leftSidebarWidth = 0;
@@ -258,7 +260,8 @@ export default function Board({
       <Robber
         center={center}
         size={size}
-        coordinate={gameState.robber_coordinate}
+        coordinate={pendingRobberCoordinate ?? gameState.robber_coordinate}
+        isPending={Boolean(pendingRobberCoordinate)}
       />
       {diceStage && (
         <DiceRollOverlay

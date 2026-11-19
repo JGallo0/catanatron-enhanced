@@ -16,6 +16,7 @@ let musicUnlocked = false;
 let musicVolumeMemory: number | null = null;
 let musicMutedMemory: boolean | null = null;
 let effectsVolumeMemory: number | null = null;
+let lobbyMusicPlaying = false;
 
 function clampVolume(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
@@ -122,6 +123,9 @@ export function setMusicVolume(value: number): void {
   const next = clampVolume(value, DEFAULT_MUSIC_VOLUME);
   musicVolumeMemory = next;
   musicMutedMemory = next === 0;
+  if (next === 0) {
+    lobbyMusicPlaying = false;
+  }
   writeStorage(MUSIC_VOLUME_KEY, String(next));
   writeStorage(MUSIC_MUTED_KEY, next === 0 ? "1" : "0");
   syncMusic();
@@ -131,6 +135,9 @@ export function setMusicVolume(value: number): void {
 export function setMusicMuted(muted: boolean): void {
   const nextMuted = Boolean(muted);
   musicMutedMemory = nextMuted;
+  if (nextMuted) {
+    lobbyMusicPlaying = false;
+  }
   writeStorage(MUSIC_MUTED_KEY, nextMuted ? "1" : "0");
   if (!nextMuted && getMusicVolume() === 0) {
     musicVolumeMemory = DEFAULT_MUSIC_VOLUME;
@@ -138,6 +145,32 @@ export function setMusicMuted(muted: boolean): void {
   }
   syncMusic();
   notifyListeners();
+}
+
+export function isLobbyMusicPlaying(): boolean {
+  return lobbyMusicPlaying && !isMusicMuted();
+}
+
+export function enterLobbyAudioMode(): void {
+  lobbyMusicPlaying = false;
+  stopGameMusic();
+  notifyListeners();
+}
+
+export async function setLobbyMusicPlaying(playing: boolean): Promise<boolean> {
+  if (!playing) {
+    lobbyMusicPlaying = false;
+    stopGameMusic();
+    notifyListeners();
+    return true;
+  }
+  lobbyMusicPlaying = true;
+  if (isMusicMuted()) {
+    setMusicMuted(false);
+  } else {
+    notifyListeners();
+  }
+  return unlockAndPlayMusic();
 }
 
 export function toggleMusicMuted(): boolean {

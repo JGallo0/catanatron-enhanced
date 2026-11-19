@@ -31,11 +31,11 @@ import {
 import { useLanguage } from "../i18n";
 import LanguageToggle from "../components/LanguageToggle";
 import AudioSettingsPopover from "../components/AudioSettingsPopover";
-import { useGameMusic } from "../hooks/useGameMusic";
 import {
+  enterLobbyAudioMode,
   getEffectsVolume,
   getMusicVolume,
-  isMusicMuted,
+  isLobbyMusicPlaying,
   subscribeAudioPreferences,
 } from "../utils/gameAudio";
 import LeaderboardModal from "../components/LeaderboardModal";
@@ -54,7 +54,6 @@ const LazyAvatar3DCanvas = lazy(
 );
 
 export default function HomePage() {
-  useGameMusic();
   const { language, t } = useLanguage();
   const [available, setAvailable] = useState<PlayerEntry[]>(DEFAULT_PLAYERS);
   const [account, setAccount] = useState<PlayerAccount | null>(() =>
@@ -79,7 +78,7 @@ export default function HomePage() {
   );
   const [audioAnchorEl, setAudioAnchorEl] = useState<HTMLElement | null>(null);
   const [audioLevels, setAudioLevels] = useState(() => ({
-    music: isMusicMuted() ? 0 : getMusicVolume(),
+    music: isLobbyMusicPlaying() ? getMusicVolume() : 0,
     effects: getEffectsVolume(),
   }));
 
@@ -158,10 +157,14 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [refreshRooms]);
 
+  useEffect(() => {
+    enterLobbyAudioMode();
+  }, []);
+
   useEffect(() =>
     subscribeAudioPreferences(() =>
       setAudioLevels({
-        music: isMusicMuted() ? 0 : getMusicVolume(),
+        music: isLobbyMusicPlaying() ? getMusicVolume() : 0,
         effects: getEffectsVolume(),
       })
     ), []);
@@ -351,6 +354,7 @@ export default function HomePage() {
             anchorEl={audioAnchorEl}
             onClose={() => setAudioAnchorEl(null)}
             language={language}
+            context="lobby"
           />
         </div>
       </header>

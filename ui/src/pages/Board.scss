@@ -101,6 +101,14 @@
   transition: left 0.42s cubic-bezier(0.22, 1, 0.36, 1),
     top 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 
+  &--pending {
+    z-index: 21;
+    filter:
+      drop-shadow(0 0 12px rgba(52, 211, 153, 0.95))
+      drop-shadow(0 0 24px rgba(250, 204, 21, 0.65));
+    transform: translate(-50%, -50%) scale(1.16);
+  }
+
   &__arrival-shockwave {
     position: absolute;
     bottom: -4px;

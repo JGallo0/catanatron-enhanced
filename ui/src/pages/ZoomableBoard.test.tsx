@@ -129,6 +129,15 @@ describe("ZoomableBoard robber victim selector", () => {
 
     const tileEl = container.querySelector(".tile");
     expect(tileEl).toBeTruthy();
+    // 1st click previews robber on the hex when 2-click confirmation is active
+    fireEvent.click(tileEl!);
+    expect(
+      screen.getByText(/Confirmar posicionamento do Ladrão\?/i)
+    ).toBeInTheDocument();
+    expect(container.querySelector(".robber--pending")).toBeTruthy();
+    expect(postAction).not.toHaveBeenCalled();
+
+    // 2nd click on the same hex opens the steal victim selector
     fireEvent.click(tileEl!);
 
     expect(
@@ -356,5 +365,106 @@ describe("ZoomableBoard robber victim selector", () => {
     rerender(renderRolling(producingRollState, false));
     expect(container.querySelector(".tile--producing")).not.toBeNull();
     expect(container.querySelector(".number-token--producing")).not.toBeNull();
+  });
+
+  test("applies 2-click confirmation toggle to MOVE_ROBBER (7 roll and Knight card) with pending robber preview and instant 1-click when off", async () => {
+    const robberState = makeGameState({
+      colors: ["RED", "BLUE"],
+      bot_colors: ["BLUE"],
+      current_color: "RED",
+      current_player_index: 0,
+      current_turn_index: 0,
+      current_prompt: "MOVE_ROBBER",
+      robber_coordinate: [1, -1, 0],
+      tiles: [
+        {
+          coordinate: [0, 0, 0],
+          tile: { id: 0, type: "RESOURCE_TILE", resource: "WHEAT", number: 8 },
+        },
+        {
+          coordinate: [1, -1, 0],
+          tile: { id: 1, type: "DESERT" },
+        },
+      ],
+      current_playable_actions: [["RED", "MOVE_ROBBER", [[0, 0, 0]]]],
+    });
+    vi.mocked(postAction).mockResolvedValue(robberState);
+
+    const { container, unmount } = render(
+      <ThemeProvider theme={theme}>
+        <StateProvider>
+          <MemoryRouter initialEntries={["/games/game-rob-confirm"]}>
+            <Routes>
+              <Route
+                path="/games/:gameId"
+                element={<SeedState gameState={robberState} />}
+              />
+            </Routes>
+          </MemoryRouter>
+        </StateProvider>
+      </ThemeProvider>
+    );
+
+    const toggleBtn = await screen.findByRole("button", {
+      name: /Confirmar jogada em 2 cliques/i,
+    });
+    expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
+
+    const tileEl = container.querySelector(".tile") as HTMLElement;
+    expect(tileEl).toBeTruthy();
+
+    // 1st click opens robber preview & confirmation dock without posting
+    fireEvent.click(tileEl);
+    expect(postAction).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/Confirmar posicionamento do Ladrão\?/i)
+    ).toBeInTheDocument();
+    expect(container.querySelector(".robber--pending")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Confirmar Ladrão/i })
+    ).toBeInTheDocument();
+
+    // Cancel clears pending robber preview
+    fireEvent.click(screen.getByRole("button", { name: /✕ Cancelar/i }));
+    expect(
+      screen.queryByText(/Confirmar posicionamento do Ladrão\?/i)
+    ).not.toBeInTheDocument();
+    expect(container.querySelector(".robber--pending")).toBeNull();
+    expect(postAction).not.toHaveBeenCalled();
+
+    // 1st click + confirm dock button executes MOVE_ROBBER
+    fireEvent.click(tileEl);
+    expect(
+      screen.getByText(/Confirmar posicionamento do Ladrão\?/i)
+    ).toBeInTheDocument();
+    const confirmRobberBtn = screen.getByRole("button", {
+      name: /Confirmar Ladrão/i,
+    });
+    await act(async () => {
+      fireEvent.click(confirmRobberBtn);
+    });
+    expect(postAction).toHaveBeenCalledTimes(1);
+    expect(postAction).toHaveBeenCalledWith("game-rob-confirm", [
+      "RED",
+      "MOVE_ROBBER",
+      [[0, 0, 0]],
+    ]);
+
+    vi.clearAllMocks();
+
+    // Turning off confirmation makes a single click execute immediately
+    fireEvent.click(toggleBtn);
+    expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
+    await act(async () => {
+      fireEvent.click(tileEl);
+    });
+    expect(postAction).toHaveBeenCalledTimes(1);
+    expect(postAction).toHaveBeenCalledWith("game-rob-confirm", [
+      "RED",
+      "MOVE_ROBBER",
+      [[0, 0, 0]],
+    ]);
+
+    unmount();
   });
 });

@@ -190,7 +190,6 @@ function describePromptBanner(
 }
 
 function GameScreen({ replayMode }: { replayMode: boolean }) {
-  useGameMusic();
   const { gameId, stateIndex } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -349,6 +348,8 @@ function GameScreen({ replayMode }: { replayMode: boolean }) {
       gameId &&
       introDismissedForGameId !== gameId
   );
+
+  useGameMusic(Boolean(gs && !replayMode && !introActive));
 
   const mySeatColor: Color | null = useMemo(() => {
     if (!gs) return null;

@@ -1,9 +1,14 @@
 import { useEffect } from "react";
 
-import { unlockAndPlayMusic } from "../utils/gameAudio";
+import { stopGameMusic, unlockAndPlayMusic } from "../utils/gameAudio";
 
-export function useGameMusic(): void {
+export function useGameMusic(enabled = true): void {
   useEffect(() => {
+    if (!enabled) {
+      stopGameMusic();
+      return;
+    }
+
     let active = true;
 
     const removeUnlockListeners = () => {
@@ -16,11 +21,12 @@ export function useGameMusic(): void {
       });
     };
 
+    unlock();
     document.addEventListener("pointerdown", unlock);
     document.addEventListener("keydown", unlock);
     return () => {
       active = false;
       removeUnlockListeners();
     };
-  }, []);
+  }, [enabled]);
 }

@@ -144,6 +144,28 @@ test("keeps applied volumes in memory when localStorage writes fail", async () =
   setItem.mockRestore();
 });
 
+test("keeps music off by default in lobby mode until user chooses play", async () => {
+  const audio = await import("./gameAudio");
+
+  await audio.unlockAndPlayMusic();
+  expect(audioInstances[0].paused).toBe(false);
+
+  audio.enterLobbyAudioMode();
+  expect(audio.isLobbyMusicPlaying()).toBe(false);
+  expect(audio.isMusicMuted()).toBe(false);
+  expect(audioInstances[0].paused).toBe(true);
+
+  await audio.setLobbyMusicPlaying(true);
+  expect(audio.isLobbyMusicPlaying()).toBe(true);
+  expect(audioInstances[0].muted).toBe(false);
+  expect(audioInstances[0].paused).toBe(false);
+
+  await audio.setLobbyMusicPlaying(false);
+  expect(audio.isLobbyMusicPlaying()).toBe(false);
+  expect(audio.isMusicMuted()).toBe(false);
+  expect(audioInstances[0].paused).toBe(true);
+});
+
 test("falls back safely when access to the localStorage property throws", async () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   Object.defineProperty(globalThis, "localStorage", {

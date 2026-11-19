@@ -118,6 +118,13 @@ type PendingPlacement =
       edgeId: string;
       action: GameAction;
       buildType: "ROAD";
+    }
+  | {
+      kind: "robber";
+      coordinate: TileCoordinate;
+      coordKey: string;
+      matchingActions: MoveRobberAction[];
+      buildType: "ROBBER";
     };
 
 function loadSavedConfirmPlacement(): boolean {
@@ -206,6 +213,29 @@ export default function ZoomableBoard({
     [gameId, dispatch, enqueueSnackbar, closeSnackbar]
   );
 
+  const commitRobberPlacement = useCallback(
+    async (actions: MoveRobberAction[]) => {
+      setPendingPlacement(null);
+      if (actions.length === 1) {
+        const nextState = await postAction(gameId, actions[0]);
+        dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
+        dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
+      } else if (actions.length > 1) {
+        setPendingRobberActions(actions);
+      }
+    },
+    [gameId, dispatch, enqueueSnackbar, closeSnackbar]
+  );
+
+  const confirmPendingPlacement = useCallback(() => {
+    if (!pendingPlacement) return;
+    if (pendingPlacement.kind === "robber") {
+      void commitRobberPlacement(pendingPlacement.matchingActions);
+      return;
+    }
+    void executePlacementAction(pendingPlacement.action);
+  }, [pendingPlacement, commitRobberPlacement, executePlacementAction]);
+
   const handleToggleConfirmPlacement = () => {
     setConfirmPlacement((prev) => {
       const next = !prev;
@@ -284,24 +314,38 @@ export default function ZoomableBoard({
           )
       );
 
-      if (matchingActions.length === 1) {
-        postAction(gameId, matchingActions[0]).then((nextState) => {
-          dispatch({ type: ACTIONS.SET_GAME_STATE, data: nextState });
-          dispatchSnackbar(enqueueSnackbar, closeSnackbar, nextState);
-        });
-      } else if (matchingActions.length > 1) {
-        setPendingRobberActions(matchingActions);
+      if (matchingActions.length === 0) return;
+
+      if (!confirmPlacement) {
+        void commitRobberPlacement(matchingActions);
+        return;
       }
+
+      const coordKey = `${coordinate}`;
+      if (
+        pendingPlacement?.kind === "robber" &&
+        pendingPlacement.coordKey === coordKey
+      ) {
+        void commitRobberPlacement(matchingActions);
+        return;
+      }
+
+      setPendingPlacement({
+        kind: "robber",
+        coordinate,
+        coordKey,
+        matchingActions,
+        buildType: "ROBBER",
+      });
     },
     [
       isRollingDice,
       state.isMovingRobber,
       gameState.current_prompt,
       gameState.current_playable_actions,
-      gameId,
-      dispatch,
-      enqueueSnackbar,
-      closeSnackbar,
+      confirmPlacement,
+      pendingPlacement,
+      commitRobberPlacement,
     ]
   );
 
@@ -466,6 +510,11 @@ export default function ZoomableBoard({
                     : null
                 }
                 diceStage={diceStage}
+                pendingRobberCoordinate={
+                  pendingPlacement?.kind === "robber"
+                    ? pendingPlacement.coordinate
+                    : null
+                }
               />
             </TransformComponent>
 
@@ -480,26 +529,31 @@ export default function ZoomableBoard({
                   )}
                 >
                   <span className="placement-confirm-bar__label">
-                    {pendingPlacement.buildType === "CITY"
+                    {pendingPlacement.buildType === "ROBBER"
                       ? t(
-                          "Confirmar melhoria para Cidade?",
-                          "Confirm City upgrade?"
+                          "Confirmar posicionamento do Ladrão?",
+                          "Confirm Robber placement?"
                         )
-                      : pendingPlacement.buildType === "SETTLEMENT"
+                      : pendingPlacement.buildType === "CITY"
                         ? t(
-                            "Confirmar construção de Aldeia?",
-                            "Confirm Settlement build?"
+                            "Confirmar melhoria para Cidade?",
+                            "Confirm City upgrade?"
                           )
-                        : t(
-                            "Confirmar construção de Estrada?",
-                            "Confirm Road build?"
-                          )}
+                        : pendingPlacement.buildType === "SETTLEMENT"
+                          ? t(
+                              "Confirmar construção de Aldeia?",
+                              "Confirm Settlement build?"
+                            )
+                          : t(
+                              "Confirmar construção de Estrada?",
+                              "Confirm Road build?"
+                            )}
                   </span>
                   <div className="placement-confirm-bar__actions">
                     <button
                       type="button"
                       className="placement-confirm-btn placement-confirm-btn--confirm"
-                      onClick={() => executePlacementAction(pendingPlacement.action)}
+                      onClick={confirmPendingPlacement}
                     >
                       ✓ {t("Confirmar", "Confirm")}
                     </button>
@@ -522,9 +576,17 @@ export default function ZoomableBoard({
                   <button
                     type="button"
                     className="cu-confirm-btn"
-                    onClick={() => executePlacementAction(pendingPlacement.action)}
-                    title={t("Confirmar Construção [✔]", "Confirm Build [✔]")}
-                    aria-label={t("Confirmar Construção", "Confirm Build")}
+                    onClick={confirmPendingPlacement}
+                    title={
+                      pendingPlacement.kind === "robber"
+                        ? t("Confirmar Ladrão [✔]", "Confirm Robber [✔]")
+                        : t("Confirmar Construção [✔]", "Confirm Build [✔]")
+                    }
+                    aria-label={
+                      pendingPlacement.kind === "robber"
+                        ? t("Confirmar Ladrão", "Confirm Robber")
+                        : t("Confirmar Construção", "Confirm Build")
+                    }
                   >
                     <CheckIcon fontSize="large" className="cu-confirm-btn__icon" />
                   </button>
